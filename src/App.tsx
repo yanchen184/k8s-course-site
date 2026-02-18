@@ -204,7 +204,7 @@ function App() {
 
   // 切換課程（同步 URL hash）
   const switchLesson = useCallback((idx: number) => {
-    switchLesson(idx)
+    setCurrentLesson(idx)
     window.location.hash = LESSONS[idx].id
   }, [])
 

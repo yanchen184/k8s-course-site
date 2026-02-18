@@ -1140,7 +1140,7 @@ debug 場景的完整排查流程值得最後整理一遍：
         </div>
       </div>
     ),
-    notes: \`kubectl debug 是 K8s 1.18 之後加入的原生排查指令，解決了一個在實際工作中非常常見的痛點：很多 Production 用的容器映像為了最小化體積，只包含應用程式本身，沒有 bash、沒有 curl、沒有 ps 這些基本工具，導致你想用 kubectl exec 進去排查的時候，連一個 shell 都沒有。比如用 distroless image 打包的 Go 程式，image 裡只有一個靜態編譯的二進位檔，什麼工具都沒有，exec 進去根本什麼都做不了。
+    notes: `kubectl debug 是 K8s 1.18 之後加入的原生排查指令，解決了一個在實際工作中非常常見的痛點：很多 Production 用的容器映像為了最小化體積，只包含應用程式本身，沒有 bash、沒有 curl、沒有 ps 這些基本工具，導致你想用 kubectl exec 進去排查的時候，連一個 shell 都沒有。比如用 distroless image 打包的 Go 程式，image 裡只有一個靜態編譯的二進位檔，什麼工具都沒有，exec 進去根本什麼都做不了。
 
 kubectl debug 用兩種方式解決這個問題。第一種是注入 ephemeral container（臨時容器）：kubectl debug nginx-pod -it --image=busybox --share-processes，它在正在跑的 Pod 裡注入一個全新的 busybox 容器，這個容器可以和原容器共享 PID namespace，讓你可以用 ps 看到原容器的程序、用 nsenter 進入原容器的 network namespace 做網路排查，而且完全不影響原本的服務。Ephemeral container 是 Pod 已在跑之後臨時添加的，無法修改，重啟後就消失，真的是一次性的排查工具。
 
@@ -1202,7 +1202,7 @@ kubectl debug node/節點名 -it --image=busybox 可以在一個 Node 上起一�
         </div>
       </div>
     ),
-    notes: \`ResourceQuota 和 LimitRange 是 K8s 多租戶叢集管理的兩個重要工具，讓平台團隊能夠確保各個 team 的資源使用在合理範圍內，防止某一個 team 或服務把整個叢集的資源吃光，影響到其他 team。
+    notes: `ResourceQuota 和 LimitRange 是 K8s 多租戶叢集管理的兩個重要工具，讓平台團隊能夠確保各個 team 的資源使用在合理範圍內，防止某一個 team 或服務把整個叢集的資源吃光，影響到其他 team。
 
 ResourceQuota 作用在 Namespace 層級，設定這個 namespace 裡所有資源的總用量上限。比如你的平台有 16 個 CPU core 和 32 GB 記憶體，你想把它平均分給 4 個 team，每個 team 的 namespace 就設一個 ResourceQuota：requests.cpu: "4"、requests.memory: 8Gi。這樣即使某個 team 的開發者想部署一個超大規格的 Pod 或大量增加 replica 數，只要超過配額就會被 K8s 拒絕，kubectl apply 會回報 exceeded quota 的錯誤。
 

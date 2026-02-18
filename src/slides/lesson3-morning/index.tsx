@@ -123,7 +123,19 @@ Container 操作方面，docker run -d 以背景（daemon）模式啟動容器�
 
 docker exec -it 是讓你進入容器內部執行指令，-i 代表互動式，-t 代表分配一個偽終端。docker logs -f 可以即時追蹤容器的輸出，就像 Linux 的 tail -f 一樣。大家對這些有沒有問題？
 
-大家還有什麼問題嗎？沒有的話，我們繼續往下走！`,
+讓我再補充幾個昨天可能沒有提到但是非常實用的小技巧。
+
+第一個是 docker ps 的格式化輸出。預設的 docker ps 輸出有很多欄位，有時候看起來很亂。你可以用 --format 選項來自訂輸出格式，比如 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 就只顯示容器名稱、狀態和埠號，這樣看起來清爽很多。在管理很多容器的時候特別有用。
+
+第二個是快速清理環境的技巧。在開發過程中，我們往往會建立很多臨時容器，時間長了環境就會很雜亂。有幾個指令可以快速清理：docker container prune 刪除所有已停止的容器，docker image prune 刪除所有懸掛的 Image（就是那些沒有名稱、只有 ID 的 Image，通常是 docker build 留下的中間層），docker system prune 一次清除所有未使用的容器、網路、Image 和 build cache，非常乾淨俐落。不過 docker system prune 威力很大，執行之前確認你不需要那些被清除的東西。
+
+第三個是 docker logs 的進階用法。除了 -f 即時追蹤之外，還有幾個很有用的選項：--tail 50 只顯示最後 50 行日誌（在日誌量很大的時候很有用，不用等半天才載入所有日誌）；--since 1h 顯示過去一個小時內的日誌；--until 2024-01-01T12:00:00 顯示某個時間點之前的日誌；--timestamps 在每行日誌前面加上時間戳記，方便追蹤事件發生的時間。這些選項在生產環境排查問題的時候非常實用，可以快速縮小問題的時間範圍。
+
+第四個是 docker inspect 的過濾輸出。docker inspect 輸出的 JSON 資訊非常詳細，有時候你只想看某個特定的欄位。可以用 --format 選項搭配 Go template 語法來過濾，比如 docker inspect --format "{{.NetworkSettings.IPAddress}}" my-container 只顯示容器的 IP 位址，docker inspect --format "{{.State.Status}}" my-container 只顯示容器的狀態。這在腳本自動化的時候非常有用。
+
+大家還有什麼問題嗎？沒有的話，我們繼續往下走！
+
+最後補充一個小提示：在終端機使用 Docker 指令的時候，善用 Tab 鍵自動補全功能可以大幅提升效率。大多數 shell（bash、zsh）在安裝 Docker 之後都會有 docker 指令的自動補全，不確定容器名稱的時候按 Tab 讓 shell 幫你補全，省時省力又不容易打錯。`,
     duration: "5"
   },
   {
@@ -173,6 +185,16 @@ Container 則是你依照食譜實際做出來的那道菜。菜做好了就可�
 還有一點：從同一個 Image 可以同時運行多個容器，就像同一份食譜可以同時在多個廚房裡烹飪一樣。每個容器都是獨立的，它們互不干擾，各自有自己的讀寫層。
 
 把這個食譜和料理的比喻記在心裡，等一下學習 Volume 的時候你就會明白為什麼容器的資料不持久化，以及為什麼我們需要額外的儲存機制。好，接下來我們正式進入今天第一個大主題：容器的生命週期管理。
+
+在進入下一個主題之前，讓我再多說一點關於 Image 分層架構的知識，因為這個底層原理會影響你對很多 Docker 行為的理解。Docker Image 不是一個單一的大檔案，而是由多個「Layer（層）」疊加而成的。每一個 Layer 對應 Dockerfile 裡面的一條指令，比如 FROM、RUN、COPY、ADD 等等，每執行一條指令就產生一個新的 Layer。這些 Layer 是唯讀的，而且會被快取和共享。
+
+舉一個具體的例子：假設你有兩個 Image，一個是 nginx，一個是 apache，它們都基於 ubuntu:22.04。ubuntu:22.04 這個 Layer 在你的磁碟上只需要存一份，nginx 和 apache 的 Image 都可以重複使用這個 Layer，不需要各自存一份。這就是為什麼 Docker Image 的磁碟使用效率很高，你本機有很多 Image，但是佔用的磁碟空間往往比想像的小得多。
+
+當你 docker run 啟動一個容器的時候，Docker 會在所有唯讀的 Image Layer 上面再加一個薄薄的讀寫 Layer，叫做容器層（Container Layer）。這個容器層是你在容器裡面所有寫入操作的去處。這種設計叫做 Copy-on-Write（寫時複製）：當你要修改 Image 裡面某個檔案，Docker 不會直接修改 Image Layer（因為那是唯讀的），而是先把那個檔案複製到容器層，再在容器層裡面修改。
+
+這個架構解釋了幾個重要的行為：首先，為什麼 docker rm 之後容器裡的資料消失——因為容器層被刪掉了；其次，為什麼你可以用同一個 Image 同時執行很多容器——因為 Image Layer 是共享的唯讀層，每個容器只需要一個小小的讀寫層；第三，為什麼 docker commit 可以把容器的修改保存成新的 Image——因為它把容器層提升為一個新的唯讀 Layer。
+
+理解這個底層機制，你就能明白為什麼 Docker 的快速部署不只是「方便」，而是有真正的技術優勢——Layer 共享讓資源使用更有效率，Copy-on-Write 讓容器啟動更快速，分層架構讓 Image 更新時只需要重新下載改變的 Layer。這些都是 Docker 技術設計上的精妙之處。
 
 沒問題的話，我們就往下走，進入今天第一個正式主題。大家跟我一起打開終端機，準備動手！`,
     duration: "5"
@@ -523,7 +545,19 @@ docker network disconnect 這個指令也很有用。它可以把一個容器從
 
 這個功能在實際工作中非常重要。想像你有一個後端服務需要連接資料庫，你可以在程式碼或設定檔裡寫資料庫的主機名稱為 db 或 mysql，然後把資料庫容器命名為 db 或 mysql，它們放在同一個自訂網路裡面，後端就可以直接用名稱連接了。這樣比寫死 IP 位址靈活得多，也更容易維護。
 
-做完這個練習之後，大家可以試著用 docker network inspect lab-net 查看網路的詳細資訊，確認兩個容器都列在裡面，並記下它們各自的 IP 位址。然後試試看用 IP 位址來 ping，確認通訊正常。接下來再試試看把兩個容器中的一個斷開網路，再次 ping，確認確實無法通訊。這樣的實際操作可以幫助你更深刻地理解 Docker 網路的運作方式。`,
+做完這個練習之後，大家可以試著用 docker network inspect lab-net 查看網路的詳細資訊，確認兩個容器都列在裡面，並記下它們各自的 IP 位址。然後試試看用 IP 位址來 ping，確認通訊正常。接下來再試試看把兩個容器中的一個斷開網路，再次 ping，確認確實無法通訊。這樣的實際操作可以幫助你更深刻地理解 Docker 網路的運作方式。
+
+讓我補充說明 Docker 內建 DNS 的工作機制，因為理解這個底層原理對你以後學習 Docker Compose 和 Kubernetes 非常有幫助。
+
+當你建立一個自訂 bridge 網路並把容器加入這個網路，Docker 會為這個網路自動配置一個內建的 DNS 伺服器。這個 DNS 伺服器的 IP 位址是 127.0.0.11，這是一個特殊的 loopback 位址，只在容器內部可見，外部訪問不到。你可以用 docker exec server1 cat /etc/resolv.conf 這個指令查看容器的 DNS 設定，你會看到 nameserver 127.0.0.11 這一行，確認容器確實在使用 Docker 的內建 DNS。
+
+當容器 server1 要解析 server2 這個名稱的時候，查詢會先發給 127.0.0.11 這個 Docker DNS 伺服器。Docker DNS 伺服器知道同一個網路裡面所有容器的名稱和 IP 的對應關係，所以它能直接回答說「server2 的 IP 是 xxx.xxx.xxx.xxx」，然後 server1 就知道要把封包發往哪個 IP 了。
+
+Docker 的內建 DNS 還支援「容器別名」功能。你可以在啟動容器的時候用 --network-alias 給容器設定一個別名，比如 docker run -d --name mysql-primary --network mynet --network-alias db mysql:8。這樣其他容器不只可以用 mysql-primary 這個名稱找到它，也可以用 db 這個別名找到它。這個功能在替換容器的時候很有用：假設你要把 mysql-primary 這個容器換成新版本，你可以先啟動一個新容器掛上同樣的 db 別名，然後再停掉舊容器，其他容器仍然可以繼續用 db 這個別名訪問，完全不需要修改任何設定，實現「無縫更換」。
+
+另一個有趣的進階功能是：如果你讓多個容器都有同一個別名，Docker DNS 在解析這個別名的時候會輪流回傳這幾個容器的 IP，實現一種簡單的 round-robin 負載均衡。這在開發環境測試多副本場景的時候很實用，雖然在生產環境我們會有更專業的負載均衡方案，但這個機制展示了 Docker 網路設計的靈活性。
+
+這個 DNS 功能也是 Docker Compose 的基礎。在 Docker Compose 裡，每個 service 的名稱就自動成為 DNS 名稱，讓同一個 Compose 應用裡的不同 service 可以用名稱互相訪問，完全不需要手動配置 IP 或者 hosts 檔案。而在 Kubernetes 裡，CoreDNS 提供了類似但更強大的 DNS 功能，讓 Pod 可以透過 Service 名稱找到其他服務。今天理解了 Docker 的 DNS 機制，等一下學習 Compose 和未來學習 Kubernetes 的時候，你就能很快地觸類旁通。`,
     duration: "5"
   },
   {
@@ -845,7 +879,17 @@ tmpfs 的使用場景補充：在 Kubernetes 環境裡，也有類似的功能�
 
 做完基本的練習之後，大家可以試試看更進階的操作：在 ~/mywebsite 目錄裡建立多個 HTML 檔案，看看 nginx 是否都能正確提供服務。也可以試著建立子目錄和 CSS 檔案，測試靜態網站的完整功能。如果你看到容器的 logs 裡面有請求記錄，表示 nginx 正確地接收並處理了你的請求，這個實作就成功了。大家動手試試！
 
-好，趁著這 15 分鐘休息，大家也可以試著用 docker volume ls 和 docker volume inspect 查看一下你剛才建立的 Volume 資訊，看看 Docker 把資料存放在主機的哪個位置。這個小探索可以幫助你更深刻理解 Volume 的運作方式。`,
+在這個實作中，有幾個常見的問題和排查方式我想提前告訴大家，這樣你遇到問題的時候知道從哪裡下手。
+
+第一個常見問題是「權限被拒絕（Permission denied）」。當 Bind Mount 主機目錄到容器裡面，容器裡面的程序如果沒有讀取或寫入那個目錄的權限，就會出現這個錯誤。對於 nginx 服務靜態檔案的場景，nginx 在容器裡面是用 www-data 這個使用者來跑的，它需要有讀取 /usr/share/nginx/html 目錄的權限。在 Linux 上，如果你的 ~/mywebsite 目錄的權限設定太嚴格，nginx 可能沒辦法讀取。解決方式是用 chmod 755 ~/mywebsite 和 chmod 644 ~/mywebsite/*.html 確保目錄和檔案的讀取權限是開放的。在 Mac 和 Windows 上使用 Docker Desktop，這個問題比較少見，因為 Docker Desktop 有特殊的虛擬機器檔案系統映射機制。
+
+第二個常見問題是「掛載的是目錄還是檔案搞錯了」。如果你想掛載一個設定檔（比如 -v ~/my.conf:/etc/nginx/nginx.conf），但是 ~/my.conf 這個檔案在主機上不存在，Docker 會自動建立一個叫做 my.conf 的目錄，而不是你期望的檔案。容器啟動後 nginx 試圖讀取 /etc/nginx/nginx.conf 的時候發現那是一個目錄，就會失敗。解決方式很簡單：在執行 docker run 之前，先在主機上確認你要掛載的檔案確實存在。如果是要掛載目錄，也確認目錄已經建立好。
+
+第三個問題是「修改了檔案但瀏覽器看不到更新」。這通常不是 Bind Mount 的問題，而是瀏覽器快取（cache）的問題。試著按 Ctrl+Shift+R（強制重新整理）或者在無痕視窗裡面開啟頁面，看看是否能看到更新後的內容。如果 curl localhost:8080 看到的是新內容但瀏覽器還是舊的，那就確定是瀏覽器快取問題了。
+
+第四個問題是「容器啟動後立刻退出」。這時候用 docker logs 容器名稱 查看錯誤訊息，通常能找到原因。常見的原因有：主機路徑不存在、容器裡面的目標路徑錯誤、掛載的設定檔格式有問題等等。把 docker logs 的輸出仔細看一遍，裡面通常有足夠的資訊幫助你定位問題。
+
+好，趁著接下來的休息時間，大家也可以試著用 docker volume ls 和 docker volume inspect 查看一下你剛才建立的 Volume 資訊，看看 Docker 把資料存放在主機的哪個位置。這個小探索可以幫助你更深刻理解 Volume 的運作方式。在 Linux 上，Named Volume 通常存放在 /var/lib/docker/volumes/ 這個目錄下，每個 Volume 都有一個子目錄，裡面的 _data 目錄就是實際的資料。了解資料存放的位置，對於之後要做備份或遷移的時候很有幫助。`,
     duration: "5"
   },
   {
@@ -915,7 +959,13 @@ tmpfs 的使用場景補充：在 Kubernetes 環境裡，也有類似的功能�
 
 去吧！15 分鐘後我們繼續，下半場精彩不容錯過。有任何問題現在都可以來找我。
 
-（下午再見，繼續加油！準時回來，不要遲到！下午的 Docker Compose 會把今天所有知識融合在一起。）`,
+（下午再見，繼續加油！準時回來，不要遲到！下午的 Docker Compose 會把今天所有知識融合在一起。）
+
+另外，這個休息時間也可以用來整理自己的學習筆記，把今天上午的核心概念用自己的話寫下來。建議大家可以嘗試建立一個「指令速查卡」，把今天學到的指令按功能分類：網路類（docker network create/inspect/rm）、Volume 類（docker volume create/ls/inspect/rm）、容器管理類（docker stop/kill/pause/unpause/rm）。把這些指令整理成一張表，放在工作桌面旁邊，在接下來幾天練習的時候隨時可以參考。
+
+有一件事我想跟大家強調：今天學習的 Docker 技能，不只是為了 Docker 本身，更是為了理解雲原生架構的基礎設施設計哲學。當你未來要面試 DevOps 或後端工程師職位，面試官問你「怎麼部署一個高可用的 Web 應用程式」，你能說出自訂網路、Volume 持久化、資源限制、重啟策略這些關鍵詞，並且能說明為什麼要這樣設計，就已經比很多候選人強得多了。把今天的每一個知識點都學紮實，這是你職涯投資，值得！
+
+好了，去休息吧，15 分鐘後見！`,
     duration: "15"
   },
   {
@@ -977,7 +1027,9 @@ tmpfs 的使用場景補充：在 Kubernetes 環境裡，也有類似的功能�
 
 最後補充一個進階技巧：你可以在 docker run 的時候不給值，只給變數名稱，比如 -e MY_VAR，這樣 Docker 會從主機的環境變數中繼承這個變數的值。這個技巧在 CI/CD 環境中很常用。
 
-最後補充一個觀念：環境變數雖然方便，但不是所有設定都適合用環境變數傳入。對於結構複雜的設定（比如 nginx 的詳細設定），用設定檔（搭配 Volume 掛載）更合適。環境變數最適合用在：資料庫連線字串、API 金鑰、功能開關（feature flags）、服務端點 URL 等簡單的鍵值設定。`,
+最後補充一個觀念：環境變數雖然方便，但不是所有設定都適合用環境變數傳入。對於結構複雜的設定（比如 nginx 的詳細設定），用設定檔（搭配 Volume 掛載）更合適。環境變數最適合用在：資料庫連線字串、API 金鑰、功能開關（feature flags）、服務端點 URL 等簡單的鍵值設定。
+
+我想補充一個在實際工作中非常常見的場景：同一個 Docker Image 在不同環境（dev/staging/prod）需要連接不同的資料庫。傳統做法是為每個環境建立不同的設定檔，維護成本很高，也容易出錯。使用環境變數的做法是：Image 裡面的程式碼讀取 DATABASE_URL 這個環境變數，在 dev 環境傳入 DATABASE_URL=mysql://localhost:3306/devdb，在 prod 環境傳入 DATABASE_URL=mysql://prod-db.example.com:3306/proddb。同一個 Image，只需要改傳入的環境變數，就能在不同環境正確連線。這就是「Twelve-Factor App」的威力——設定與程式碼分離，讓部署更靈活、更安全、更容易自動化。`,
     duration: "10"
   },
   {
@@ -1056,7 +1108,9 @@ tmpfs 的使用場景補充：在 Kubernetes 環境裡，也有類似的功能�
 
 最後，定期審查應用程式使用的環境變數，刪掉不再使用的，並且定期輪換密碼和 API key，這是良好的安全習慣。
 
-記住一個原則：設定檔可以提交到 Git 作為版本追蹤（但不要包含敏感資訊），機密資訊用 .env 放在 .gitignore 裡面。建立一個清晰的「什麼應該在 Git、什麼不應該」的規範，是團隊協作中非常重要的基礎設施安全實踐。`,
+記住一個原則：設定檔可以提交到 Git 作為版本追蹤（但不要包含敏感資訊），機密資訊用 .env 放在 .gitignore 裡面。建立一個清晰的「什麼應該在 Git、什麼不應該」的規範，是團隊協作中非常重要的基礎設施安全實踐。
+
+最後補充一個進階技巧：在 CI/CD 流程中，環境變數通常由 CI 平台（GitHub Actions、GitLab CI、Jenkins 等）在執行時注入，不需要在倉庫裡存任何 .env 檔案。以 GitHub Actions 為例，你可以在 repository 的 Settings → Secrets 裡面設定機密變數，然後在 workflow YAML 裡面用 \${{ secrets.MY_SECRET }} 的方式引用。這樣機密資訊只在 CI/CD 環境裡面存在，本地開發用 .env 檔案（放在 .gitignore），生產部署由 CI 注入——三個環境各自管理自己的機密，安全性最高，也是業界標準做法。`,
     duration: "10"
   },
   {
@@ -1127,7 +1181,9 @@ Docker 的資源限制功能是建立在 Linux 核心的 cgroups 機制上的。
 
 關於記憶體限制的補充：在設定 --memory 的時候，需要合理評估應用程式的記憶體需求。設定太低會導致 OOM，設定太高又浪費資源。一般建議先在無限制的情況下用 docker stats 監控應用程式的實際記憶體使用，取一段時間的平均值加上一定的緩衝（比如 20-30%）作為限制值。對於 Java 應用程式要特別注意，JVM 預設會嘗試使用大量記憶體（通常是主機記憶體的四分之一），在容器環境下可能需要用 -Xmx 選項顯式設定 JVM 的最大 heap 大小，或者使用 JVM 的容器感知模式（JDK 8u191+ 和 JDK 11+ 支援）。
 
-關於 CPU 限制：--cpu-period 和 --cpu-quota 是更細緻的 CPU 控制選項。--cpus 1.5 實際上等同於設定 --cpu-period 100000 --cpu-quota 150000（也就是每 100 毫秒的週期裡，這個容器最多可以使用 150 毫秒的 CPU 時間）。理解這個原理對於精確調整 CPU 限制很有幫助。`,
+關於 CPU 限制：--cpu-period 和 --cpu-quota 是更細緻的 CPU 控制選項。--cpus 1.5 實際上等同於設定 --cpu-period 100000 --cpu-quota 150000（也就是每 100 毫秒的週期裡，這個容器最多可以使用 150 毫秒的 CPU 時間）。理解這個原理對於精確調整 CPU 限制很有幫助。
+
+在實際工作中設定資源限制的建議流程：第一步，先不設定限制，讓容器在正常負載下執行，用 docker stats 觀察 5-10 分鐘，記錄平均和峰值的 CPU 與記憶體使用量；第二步，以峰值的 120-150% 作為資源上限的初始值，留出緩衝空間；第三步，部署後持續監控，如果頻繁出現 OOM 事件（可以在 docker events 裡看到 oom 事件），就需要上調記憶體限制；第四步，定期複審資源設定，隨著應用程式版本更新和流量變化進行調整。這個動態調整的過程是運維工作的日常，沒有一次性設定就永久有效的魔法數字，只有持續觀察和調整。`,
     duration: "10"
   },
   {
@@ -1217,7 +1273,11 @@ docker stats --format 選項可以自訂輸出格式。比如 docker stats --for
 
 另外，docker events 指令可以即時查看 Docker 守護程序產生的事件，比如容器啟動、停止、OOM 等事件。這個指令在排查問題的時候很有用，可以看到容器的完整生命週期事件記錄。
 
-對於容器日誌的管理，docker logs 只是最基本的方式。生產環境通常會設定集中式日誌系統，比如 ELK Stack（Elasticsearch + Logstash + Kibana）或 Loki + Grafana，把所有容器的日誌統一收集和查詢。`,
+對於容器日誌的管理，docker logs 只是最基本的方式。生產環境通常會設定集中式日誌系統，比如 ELK Stack（Elasticsearch + Logstash + Kibana）或 Loki + Grafana，把所有容器的日誌統一收集和查詢。
+
+補充說明 docker stats 在腳本中的應用：你可以把 docker stats 的輸出用於簡易的健康檢查。比如用 docker stats --no-stream --format "{{.Name}} {{.MemPerc}}" 取得所有容器的記憶體使用百分比，再過濾出超過 80% 的容器發出告警。這種輕量級的監控腳本在小型環境或初期運維中很實用，可以作為過渡方案。
+
+另外，docker stats 顯示的 CPU % 有一個細節要注意：它是相對於所有可用 CPU 的百分比，而不是相對於你設定的 --cpus 限制。所以如果你設定了 --cpus 0.5，容器的 CPU % 最多顯示約 50%（假設主機是單核）。理解這個差異有助於你正確解讀監控數據，避免誤判容器的實際負載情況。在多核心主機上，這個比例的計算更複雜，需要結合主機的 CPU 核心數和容器的 --cpus 設定一起看。`,
     duration: "10"
   },
   {
@@ -1287,7 +1347,11 @@ docker stats --format 選項可以自訂輸出格式。比如 docker stats --for
 
 讓我再補充說明 -p 在 Docker Desktop（Mac/Windows）和 Linux 上的行為差異。在 Linux 上，Docker 直接運行在主機上，-p 8080:80 會讓主機的 8080 埠實際上對所有網路介面開放，包括外部網路。在 Mac/Windows 上，Docker Desktop 使用 VM，埠映射只對 localhost 有效，外部網路無法直接訪問（除非額外設定）。這是開發環境和生產環境的重要差異，部署到 Linux 伺服器時要記得檢查防火牆規則。
 
-最後一個小提醒：在查看埠號映射的時候，可以同時用 docker ps 和 docker port 互相驗證，確認映射設定符合預期。這個交叉驗證的習慣在生產環境部署時特別重要。`,
+最後一個小提醒：在查看埠號映射的時候，可以同時用 docker ps 和 docker port 互相驗證，確認映射設定符合預期。這個交叉驗證的習慣在生產環境部署時特別重要。
+
+做完這個綜合實作之後，我希望大家有一個體悟：容器化部署不只是把應用程式放進容器那麼簡單，而是要把網路、儲存、資源管理、服務可用性都想清楚。每一個 docker run 的選項都有它存在的理由，而這些選項組合在一起，就是一個完整的、生產就緒的服務部署方案。
+
+讓我也說一下這個實作和真實生產環境的差距在哪裡：真實環境通常會使用 Docker Compose 或 Kubernetes 來管理這些設定，而不是手動打一長串的 docker run 指令。Docker Compose 讓你把所有容器的設定寫在一個 YAML 檔案裡，用 docker compose up 一個指令就能啟動整個服務，用 docker compose down 一個指令就能全部停止並清理。等一下下午的課程我們就會學到這個！今天的 docker run 練習是基礎，讓你理解每個選項的含義；Docker Compose 是組合這些選項的更優雅方式，是實際工作中的標準做法。`,
     duration: "10"
   },
   {

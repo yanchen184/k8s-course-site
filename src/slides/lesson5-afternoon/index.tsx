@@ -54,7 +54,13 @@ export const slides: Slide[] = [
 
 今天下午，我們會從四個主題循序漸進地解決這個問題：第一，Service 的四種類型深入分析，每種都有明確的使用場景，選對工具才事半功倍；第二，CoreDNS 服務發現，搞懂 Kubernetes 內部那個很長的域名格式是什麼意思，讓服務之間可以用名字互相找到；第三，Ingress，現在業界最主流的 HTTP 服務對外方式，一個入口管理所有 HTTP 服務；第四，NetworkPolicy，網路防火牆，用白名單方式限制 Pod 之間的流量，加強安全性。
 
-今天下午有大量的實作。特別是最後那個「完整對外服務」組合實作，會讓大家把 Deployment、Service、Ingress 全部串起來，這是真實環境中幾乎每天都用到的部署模式。學完今天，你就能獨立完成一個 Kubernetes 服務從部署到對外的完整流程。準備好了嗎？我們開始！`,
+今天下午有大量的實作。特別是最後那個「完整對外服務」組合實作，會讓大家把 Deployment、Service、Ingress 全部串起來，這是真實環境中幾乎每天都用到的部署模式。學完今天，你就能獨立完成一個 Kubernetes 服務從部署到對外的完整流程。
+
+在我們開始之前，讓我快速說明今天下午的時間規劃。13:00 到 14:00 是 Service 深入，涵蓋四種 Service 類型和 Endpoints 機制；14:00 到 14:30 是 DNS 服務發現；14:30 到 14:45 是中場休息；14:45 到 15:30 是 Ingress，包含安裝 Controller 和設定 TLS；15:30 到 16:15 是 NetworkPolicy；16:15 到 17:00 是兩個實作練習加上 Q&A。時間有點緊，所以請大家問問題的時候盡量集中在課後，理解上有不清楚的先舉手讓我知道。
+
+有一個小建議：今天學的內容互相依賴，Service 是 Ingress 的基礎，理解 DNS 才能正確設定跨 Namespace 通訊，NetworkPolicy 需要理解 selector 機制才能寫出正確的規則。所以每個概念都要跟上，後面才不會跟丟。
+
+另外補充一個學習心態：Kubernetes 網路這塊是很多工程師覺得難的地方，不是因為概念太難，而是元件太多、名詞很像、而且純看文字很難想象流量是怎麼流的。所以今天如果某個地方聽到一半卡住了，不要慌，先把整體框架記住，細節可以課後複習。Kubernetes 是一個需要反覆接觸才會越來越清楚的技術，第一遍不懂很正常。每個大師都曾經是初學者，重要的是持續練習、遇到問題不放棄。今天大家有疑問的地方，隨時都可以舉手問，不用等到最後課程結束。準備好了嗎？我們開始！`,
   },
 
   // ========== Service 概念回顧 ==========
@@ -98,7 +104,13 @@ Service 就是解決這兩個問題的抽象層。它的核心機制是這樣的
 
 把 Service 想像成公司的總機：總機電話號碼固定（ClusterIP），打進來的電話會自動轉給空閒的員工（Pod），員工請假了系統自動跳過（Pod 不健康時從 Endpoints 移除）。這樣解決了所有問題，前端只需要記 Service 的 ClusterIP 或 DNS 名稱，不需要知道任何 Pod 的 IP。
 
-了解了 Service 的核心設計理念，接下來我們深入看四種具體的 Service 類型。`,
+Service 在 Kubernetes 架構裡扮演的角色，其實和微服務設計模式裡的「服務登錄與發現（Service Registry and Discovery）」非常類似。在傳統的微服務架構裡，你可能會用 Consul、Eureka 或 etcd 這類工具來做服務登錄，每個服務啟動時把自己的 IP 和 port 告訴登錄中心，其他服務要連它的時候去查登錄中心。Kubernetes 的 Service 加上 CoreDNS 做的事情本質上一樣，只是這些機制已經被 Kubernetes 內建好了，不需要你自己搭和維護，大幅降低了架構的複雜度。
+
+還有一個常見的誤解要澄清：Service 不是一個真實的 Pod 或程式，它沒有自己的 IP 堆疊，ClusterIP 是一個「虛擬 IP」，實際上是靠每個節點上的 kube-proxy 元件用 iptables 或 IPVS 規則來實現流量轉發的。當 Pod 要連一個 Service 的 ClusterIP，封包到達節點的網路層時，kube-proxy 設定的規則會捕捉這個封包，看是要到哪個 ClusterIP 的哪個 port，然後根據 Endpoints 清單用 DNAT（目的地址轉換）把封包的目的地改寫成實際 Pod 的 IP 和 port，轉發出去。這就是 Service 負載均衡的底層實現原理。了解這個，遇到 Service 問題排查時思路會更清晰。
+
+了解了 Service 的核心設計理念，接下來我們深入看四種具體的 Service 類型。
+
+還有一個常見的誤解要澄清：Service 不是一個真實執行中的 Pod 或程式，它沒有自己的網路堆疊，ClusterIP 是一個「虛擬 IP」，實際上是靠每個節點上的 kube-proxy 元件用 iptables 或 IPVS 規則來實現流量轉發的。當 Pod 要連一個 Service 的 ClusterIP，封包到達節點的網路層時，kube-proxy 預先設定好的規則會捕捉這個封包，再根據 Endpoints 清單用 DNAT 把封包的目的地改寫成實際 Pod 的 IP 和 port 轉發出去。了解這個底層原理，遇到 Service 問題排查時思路會更清晰，而不是把 Service 當成一個神秘的黑盒子。`,
   },
 
   // ========== ClusterIP 與 NodePort ==========
@@ -159,6 +171,10 @@ ClusterIP YAML 的重點是 selector 和 ports。selector 用 Label 選取後端
 舉個例子：叢集有三個節點，IP 分別是 192.168.1.10、192.168.1.11、192.168.1.12，你設定 nodePort: 30080。那麼從外部機器，連任何一個節點 IP 加 30080 都能到達這個 Service，比如 curl http://192.168.1.10:30080。你不需要記哪個 Pod 在哪個節點，任何節點都可以進入。
 
 NodePort 的使用場景是開發測試和學習環境。它的好處是不需要額外的基礎設施（不需要 LB），設定簡單，馬上可以從外部存取。缺點是埠號範圍只有 30000-32767，不能用標準的 80 或 443，而且你要記得節點 IP，不適合大規模的生產環境服務對外。生產環境對外通常用 Ingress，我們等一下會學到。
+
+這裡補充一個重要的實作細節：NodePort 的 nodePort 欄位可以省略不寫，Kubernetes 會自動從 30000-32767 範圍裡選一個沒有被使用的 port 分配給你。優點是不用自己管 port 衝突；缺點是每次刪除重建 Service，可能分配到不同的 port，如果有防火牆規則依賴 port 號就要跟著改。所以生產環境如果真的需要固定 port，最好明確指定 nodePort 的值，而且要建立一份文件記錄哪個服務用哪個 NodePort，避免衝突。
+
+另外要說明 NodePort 的 port 欄位含義。NodePort Service 實際上有三個 port 相關的設定：port 是 Service 的 ClusterIP 監聽的 port（叢集內部其他 Pod 用 ClusterIP:port 來連）；targetPort 是後端 Pod 容器監聽的 port；nodePort 是節點上開放的 port（外部用 NodeIP:nodePort 來連）。初學者容易搞混這三個，建議手畫一張流量路徑圖：外部 → NodeIP:nodePort → Service ClusterIP:port → Pod:targetPort，這樣就清楚多了。
 
 現在大家把這兩個 YAML 記下來，理解 port 和 targetPort 的差別，這個概念在後面會反覆用到。`,
   },
@@ -221,6 +237,10 @@ NodePort 的使用場景是開發測試和學習環境。它的好處是不需�
 
 這樣做的好處很明顯：應用程式程式碼裡只寫 mysql，完全不知道後面是什麼。如果哪天要從 RDS 搬到自己維護的 MySQL，或者換到另一個 RDS endpoint，只需要改 ExternalName 這個 Service 的 YAML，應用程式完全不用改，也不用重新部署。這是一種很好的解耦設計。
 
+ExternalName 有一個值得注意的限制：它只能做域名的 CNAME 對應，不能直接填 IP 位址。如果你的外部服務只有 IP 沒有域名，ExternalName 無法使用，應改用手動管理 Endpoints 的方式（建立沒有 selector 的 Service 加上手動 Endpoints 物件，直接填 IP）。我們在下一個 Endpoints 投影片會提到這個用法。
+
+還有一個進階技巧：在做環境遷移時，ExternalName 非常好用。假設你正在把傳統架構的 PostgreSQL 資料庫遷移進 Kubernetes，遷移期間新舊系統要共存。你可以先建一個 ExternalName Service 指向舊的 PostgreSQL，程式碼連這個 Service 名稱；等到新的 PostgreSQL Pod 在叢集裡部署好了，把 ExternalName Service 換成一般的 ClusterIP Service，selector 選到新的 Pod。這樣切換過程應用程式的設定完全不用改，只需要改一次 Service 的 YAML。這種 strangler fig pattern（絞殺者模式）在企業大型系統漸進遷移中非常常見。
+
 四種 Service 類型使用場景速查：ClusterIP 給叢集內部服務互相通訊用（最常用）；NodePort 給開發測試時臨時對外存取用；LoadBalancer 給雲端生產環境對外服務用；ExternalName 給把外部服務接入叢集 DNS 體系用。記住這四個場景，遇到問題就知道該用哪種。`,
   },
 
@@ -277,9 +297,11 @@ Endpoints 是動態更新的。當 Deployment 擴展副本數，新 Pod 啟動�
 
 你可以用 kubectl get endpoints api-service 查看，或者 kubectl describe endpoints api-service 看更詳細的資訊。如果 Endpoints 顯示空的，代表 selector 沒有匹配到任何 Pod，要去檢查 Label 是否正確。這是排查 Service 問題的第一步：確認 Endpoints 有沒有 Pod IP。
 
-還有一個進階用法值得了解：手動管理 Endpoints。如果建立 Service 時不設定 selector，Kubernetes 就不會自動管理 Endpoints。你可以手動建立一個同名的 Endpoints 物件，直接指定外部服務的 IP 和 port。這樣可以把叢集外部的服務——比如機房裡跑在裸機上的 PostgreSQL、或者 VPN 後面的舊系統——接入 Kubernetes 的 Service 體系，讓叢集內的 Pod 用 Service 名稱來存取。這比 ExternalName 更靈活，因為你可以直接指定 IP，不需要依賴 DNS；而且可以指定多個 IP，自帶負載均衡。
+Kubernetes 1.21 之後引入了 EndpointSlice，這是 Endpoints 的改良版。傳統的 Endpoints 物件把所有 Pod IP 放在同一個物件裡，如果你的 Service 後面有幾百個 Pod（比如大型服務），這個 Endpoints 物件會非常大，每次有 Pod 異動，這個大物件就要整個傳遞給所有節點的 kube-proxy 更新，效能很差。EndpointSlice 把 Pod IP 切成多個 Slice，每個 Slice 預設最多 100 個，大大減少了每次更新的資料量。新版 Kubernetes 預設使用 EndpointSlice，但 API 和使用方式對使用者來說大多透明，一般操作還是用 kubectl get endpoints，kubectl 會自動幫你從 EndpointSlice 整合顯示。
 
-記住這個除錯技巧：遇到 Service 連不上，永遠先看 Endpoints。Endpoints 空了就是 selector 問題；Endpoints 有 IP 但連不上就是 Pod 本身或防火牆問題。`,
+還有一個進階用法值得了解：手動管理 Endpoints。如果建立 Service 時不設定 selector，Kubernetes 就不會自動管理 Endpoints。你可以手動建立一個同名的 Endpoints 物件，直接指定外部服務的 IP 和 port。這樣可以把叢集外部的服務——比如機房裡跑在裸機上的 PostgreSQL、或者 VPN 後面的舊系統——接入 Kubernetes 的 Service 體系，讓叢集內的 Pod 用 Service 名稱來存取。這比 ExternalName 更靈活，因為你可以直接指定 IP，不需要依賴 DNS；而且可以指定多個 IP，自帶負載均衡。這個模式在漸進式遷移舊系統時特別有用。
+
+記住這個除錯技巧：遇到 Service 連不上，永遠先看 Endpoints。Endpoints 空了就是 selector 問題；Endpoints 有 IP 但連不上就是 Pod 本身或防火牆問題。有了這個排查邏輯，解決 Service 問題會非常有條理。`,
   },
 
   // ========== DNS 與服務發現 ==========
@@ -347,6 +369,10 @@ Kubernetes 在安裝時就會自動部署一個 DNS 伺服器叫做 CoreDNS，�
 
 實際結果是：同 Namespace 的 Service 只需要寫 Service 名稱就夠了，DNS 自動補全。比如同在 production Namespace 的前端 Pod 連後端，寫 http://backend-api:8080 就可以。跨 Namespace 的話，最少要帶上目標 Namespace：http://backend-api.production，DNS 會幫你補全 .svc.cluster.local。
 
+順帶一提，除了 Service 的 DNS 記錄，CoreDNS 也會為每個 Pod 建立 DNS 記錄，格式是 Pod-IP（用破折號取代點）.Namespace.pod.cluster.local。例如 IP 是 10.244.1.5 的 Pod，它的 DNS 名稱是 10-244-1-5.default.pod.cluster.local。不過 Pod 的 DNS 幾乎不會在實際開發中用到，因為 Pod IP 本身就不穩定，用 Pod DNS 意義不大，一般還是透過 Service DNS 來做服務間通訊。
+
+如果你想驗證 CoreDNS 的解析是否正常，可以在叢集裡跑一個測試 Pod：kubectl run dns-test --image=busybox --restart=Never -it --rm -- nslookup backend-api.production.svc.cluster.local。如果回傳了正確的 ClusterIP，代表 DNS 正常。這個工具 Pod 用完 --rm 會自動刪除，很方便做臨時測試。
+
 這個機制讓你的程式碼完全不依賴 IP，服務名稱就是連線地址，不管 Pod 怎麼重建、IP 怎麼變，程式碼不需要做任何修改。`,
   },
 
@@ -404,6 +430,8 @@ Kubernetes 在安裝時就會自動部署一個 DNS 伺服器叫做 CoreDNS，�
 
 讓我也提一個常見的坑：在 YAML 或程式碼裡寫跨 Namespace 的連線地址時，初學者常常忘記加 Namespace，結果 DNS 解析到同 Namespace 根本不存在的 Service，或者解析失敗。養成習慣：只要是跨 Namespace 的連線，一定帶上完整的 Service 名稱和 Namespace，或者直接用完整的 FQDN（Fully Qualified Domain Name）。
 
+有時候，你在 Namespace A 的 Pod 裡呼叫 Namespace B 的 Service，連線看似成功，但其實有細微問題。舉個例子：Namespace A 有一個 Service 也叫 mysql，Namespace B 也有一個 Service 叫 mysql。你從 Namespace A 的 Pod 寫 jdbc:mysql://mysql:3306/，DNS 搜尋域會先補 mysql.namespace-a.svc.cluster.local，找到的是 Namespace A 的 mysql 而不是 B。這種命名衝突在多 Namespace 環境裡是真實存在的坑，最好的習慣是跨 Namespace 連線永遠使用完整的 FQDN，消除任何歧義。
+
 另外要特別強調的是：Kubernetes 預設的網路策略是「全部允許（allow-all）」，任何 Pod 都可以連到任何其他 Pod 或 Service，不管是不是同個 Namespace。這在開發環境很方便，但在生產環境是一個安全風險——你的前端 Pod 理論上可以直接連到資料庫的 Service，繞過後端 API。如果有攻擊者拿到了前端 Pod 的控制權，他就可以直接查資料庫。
 
 解決這個問題的工具就是 NetworkPolicy，我們等一下會學到。NetworkPolicy 讓你定義白名單規則，明確指定哪些 Pod 可以連哪些 Service，其餘全部拒絕。
@@ -441,9 +469,23 @@ Kubernetes 在安裝時就會自動部署一個 DNS 伺服器叫做 CoreDNS，�
 
 上半場我們把 Service 從頭到尾學了一遍：四種類型的使用場景和適合的環境、Endpoints 的運作機制與除錯方法、CoreDNS 服務發現的 DNS 格式和搜尋域機制，以及跨 Namespace 的連線方式與預設全通的安全隱患。這些是 Kubernetes 網路架構的地基，搞懂了後面學 Ingress 和 NetworkPolicy 就更有感覺，知其然也知其所以然。
 
+休息期間如果還有腦力，可以在腦海裡把今天上午到現在的脈絡想一遍：我們從 Pod 開始，知道 Pod 是最基本的運行單元，但 IP 不穩定，所以有了 Service 提供穩定入口；Service 有四種類型，根據使用場景選擇合適的；叢集內部的服務通訊靠 ClusterIP + CoreDNS，用域名就能互相找到；跨 Namespace 要記得加上 Namespace 名稱。這條線捋清楚了，下半場的 Ingress 是在這個基礎上解決「外部到底怎麼進來」的問題。
+
 下半場的重頭戲是 Ingress——現在業界最主流的 HTTP 服務對外方式。之後是 NetworkPolicy 的網路隔離，最後是完整的組合實作，把 Deployment、Service、Ingress 全部串起來，完成一個從部署到對外的完整流程。
 
-15 分鐘後準時回來，我們繼續！`,
+15 分鐘後準時回來，我們繼續。如果有什麼還沒搞懂的，等等下課可以來問我，或者在課程討論群組發問，助教和我都會回覆。
+
+趁著休息，我想給大家補充幾個非常實用的 Kubernetes 除錯心法，這些都是從真實專案踩坑中累積出來的習慣，帶著這些方法學完下半場之後，你遇到問題的排查速度會快很多。
+
+【除錯心法一：Endpoints 永遠是第一步】不管是 Service 連不上、Ingress 路由失敗還是 NetworkPolicy 設定懷疑有問題，第一個指令永遠是 kubectl get endpoints 你的Service名稱。Endpoints 顯示 none 或者空的，代表 selector 沒有選到任何 Pod，問題在 Label 設定，往 Deployment 和 Pod Label 去查；Endpoints 有 Pod IP 但連不上，代表問題在 Pod 本身（可能是應用程式報錯、readinessProbe 失敗）或者防火牆、NetworkPolicy 的問題，不是 Service 設定錯了。這個思路把問題清晰地分成兩個方向，避免你在沒問題的地方浪費時間瞎猜。
+
+【除錯心法二：善用一次性 debug Pod】kubectl run debug-pod --image=busybox --restart=Never -it --rm -- sh 是工作中幾乎每天都會用到的指令。進到容器裡之後可以做很多事：nslookup 服務名稱可以測試 CoreDNS 解析是否正常；wget -O- http://服務名稱:port 可以測試 HTTP 連線是否通；nc -zv 服務名稱 port 可以測試 TCP 端口是否可達。--rm 參數讓這個 Pod 在你 exit 之後自動刪除，不留垃圾資源。更重要的是，你可以在不同的 Namespace 跑這個 debug Pod，模擬不同來源的流量，這樣就能精確驗證 NetworkPolicy 的規則是否如預期生效，非常靈活。
+
+【除錯心法三：kubectl describe 的 Events 欄位是寶藏】每次 apply 完資源，養成習慣立刻 kubectl describe 一下，拉到最底部看 Events 欄位。Kubernetes 控制面會把所有發生過的重要事件都記在這裡：Pod 調度失敗（資源不足？nodeSelector 不匹配？）、Image 拉取失敗（網路問題？私有 Registry 沒設定？）、Health Check 失敗（應用還沒啟動好？）。通常第一條 Warning 類型的 Event 就是根本原因，直接告訴你哪裡出問題，比從 kubectl logs 一行一行找快多了。
+
+【除錯心法四：畫出流量路徑圖】遇到網路問題，如果你能在紙上（或白板上）快速畫出「外部請求 → Ingress Controller → Service ClusterIP → Endpoints → Pod:containerPort」這條路徑圖，然後一個環節一個環節確認，問題範圍馬上就清晰了。這個方法不只對自己有用，跟團隊討論問題的時候，一張圖往往比說一百句話更有效率，讓所有人快速對焦在同一個問題上，解決問題的效率大幅提升。
+
+帶著這四個心法好好休息，喝杯水、動一動，15 分鐘後精神抖擻地回來，我們繼續下半場！`,
   },
 
   // ========== Ingress 概念 ==========
@@ -506,6 +548,8 @@ Ingress 資源只是一個「規則宣告」，你寫的 YAML 告訴 Kubernetes 
 
 最常用的 Ingress Controller 是 nginx-ingress，也就是把大家熟悉的 nginx 包裝成 Kubernetes Controller，用 nginx 的 upstream 和 server 設定來實現 Ingress 的路由規則。除了 nginx-ingress 之外，還有 Traefik、HAProxy Ingress、Contour（基於 Envoy）等，各有優劣，但 nginx-ingress 是最普及的，文件最完整，遇到問題也最容易找到解答。
 
+再補充一個 Ingress 和 API Gateway 的比較，很多同學在工作中會遇到這個問題：Ingress 和 API Gateway（比如 Kong、APISIX、AWS API Gateway）有什麼差別？Ingress 是 Kubernetes 層面的 HTTP 路由，主要做 Host/Path 路由、TLS 終止、基本的 URL rewrite。API Gateway 功能更完整：認證授權（JWT 驗證、API Key）、速率限制、請求轉換、監控分析、多版本管理等。小型系統 nginx-ingress 夠用；大型系統或需要精細流量管理的，通常 Ingress Controller 裝 Kong 或 APISIX（這些工具本身就可以作為 Ingress Controller 使用），同時兼顧路由和 API 管理功能。
+
 所以用 Ingress 需要兩步：第一步，安裝 Ingress Controller；第二步，建立 Ingress 規則。我們接下來先安裝 Controller。`,
   },
 
@@ -556,6 +600,8 @@ Ingress 資源只是一個「規則宣告」，你寫的 YAML 告訴 Kubernetes 
 在雲端環境（EKS、GKE、AKS），這個 LoadBalancer Service 會自動取得一個公網 IP（EXTERNAL-IP 欄位），你把你的域名 DNS A 記錄指向這個 IP，所有流向這個 IP 的 HTTP/HTTPS 請求都會進入 nginx-ingress Controller，再根據你定義的 Ingress 規則路由到對應的 Service。
 
 在本地環境，EXTERNAL-IP 會顯示 pending，因為沒有雲端的 LB 服務。解決方案有兩個：一是安裝 MetalLB，它可以從你指定的 IP 段分配一個本地 IP 給 LoadBalancer Service；二是把 Service 改成 NodePort 模式，然後用節點 IP + NodePort 來存取。我們的練習環境用後者，等一下實作我會示範。
+
+安裝 Ingress Controller 之後，有幾個常見的驗證指令值得記下來。kubectl get ingressclass 可以列出叢集裡已安裝的 Ingress Class，確認 nginx 這個 class 已經存在；kubectl describe ingressclass nginx 可以看這個 class 的詳細設定。這個 IngressClass 資源是 Kubernetes 1.18 之後引入的，它讓一個叢集可以同時安裝多個 Ingress Controller，不同的 Ingress 資源透過 ingressClassName 指定要用哪個 Controller 處理，非常靈活。如果只有一個 Controller，也可以把它設為預設 class（在 IngressClass 加 annotation kubernetes.io/ingress-class: "true"），這樣 Ingress 資源就不需要指定 ingressClassName，自動使用預設的 Controller。
 
 Controller 安裝好之後，我們來看怎麼寫 Ingress 規則。`,
   },
@@ -621,7 +667,13 @@ rules 是路由規則的清單，可以有很多條規則。每條規則可以�
 
 每個 host 下面有 http.paths，就是這個域名下的路徑路由規則。path 是 URL 路徑的匹配模式，pathType 指定匹配方式：Prefix 是前綴匹配，比如 path: /api 會匹配所有 /api/xxx 的請求；Exact 是精確匹配，路徑必須完全一樣才匹配；ImplementationSpecific 是由 Controller 自己決定匹配語義，各 Controller 行為可能不同，通常不推薦用。
 
-backend 指定匹配成功後要把流量轉發到哪個 Service 的哪個 port。一個 Ingress 資源可以定義很多條規則，不同 host 和 path 分別路由到不同 Service，全部由同一個 nginx Controller 處理，這就是 Ingress 節省 LB 費用的方式。`,
+backend 指定匹配成功後要把流量轉發到哪個 Service 的哪個 port。一個 Ingress 資源可以定義很多條規則，不同 host 和 path 分別路由到不同 Service，全部由同一個 nginx Controller 處理，這就是 Ingress 節省 LB 費用的方式。
+
+有個進階用法可以補充：Ingress 支援「默認後端（default backend）」。當請求的 Host 或 Path 沒有任何規則匹配時，nginx 預設回傳 404。如果你想自訂這個 404 頁面，可以在 Ingress spec 裡設定 defaultBackend，指向一個自訂的 Service，這樣所有未匹配的請求都會轉給這個 Service 處理，你的前端可以顯示一個友好的錯誤頁面。
+
+還要提一個實際工作中非常常遇到的場景：後端 API 有路由前綴和沒有前綴的問題。假設 nginx-ingress 的 Ingress 規則是 path: /api，後端 Service 裡的 API 路由是 GET /users（沒有 /api 前綴）。請求進來是 GET /api/users，nginx 轉給後端，後端收到 /api/users，但後端 router 只認識 /users，就 404 了。這時候就需要 URL rewrite：annotation 加上 nginx.ingress.kubernetes.io/rewrite-target: /$2，path 改成 /api(/|$)(.*)，nginx 就會把 /api/users 的後半段 users 提取出來，重寫成 /users 再轉給後端。這個 rewrite 的寫法需要用正則群組，很多人第一次設定時會搞錯，遇到了記得查 nginx-ingress 官方文件的 rewrite 範例。
+
+另外，生產環境的 Ingress 通常還會設定幾個重要的 annotation：nginx.ingress.kubernetes.io/proxy-connect-timeout 設定 nginx 連接後端的逾時；nginx.ingress.kubernetes.io/proxy-send-timeout 和 proxy-read-timeout 設定傳送和接收的逾時，預設 60 秒，如果你的 API 有長時間運算，要調大；nginx.ingress.kubernetes.io/proxy-body-size 設定允許的最大請求 body，預設 1m，有檔案上傳功能要改。這些參數不設好，生產環境很容易出現 504 Gateway Timeout 或 413 Request Entity Too Large 的錯誤。`,
   },
 
   // ========== TLS/HTTPS ==========
@@ -687,7 +739,9 @@ TLS 的完整名稱是 Transport Layer Security，它是 HTTPS 的基礎協議�
 
 安裝 cert-manager 之後，建立 ClusterIssuer 資源來設定 Let's Encrypt 的 API 端點，然後只需要在 Ingress 的 annotation 加一行 cert-manager.io/cluster-issuer: letsencrypt，cert-manager 就會全自動幫你申請憑證、建立 TLS Secret、設定 Ingress。
 
-最後，幾乎所有生產環境都會加上自動 HTTP 轉 HTTPS 的設定：annotation 裡加 nginx.ingress.kubernetes.io/ssl-redirect: "true"，nginx 就會把所有 80 port 的 HTTP 請求自動 302 重導向到 443 port 的 HTTPS，確保使用者一定走加密連線，不會有人不小心用 HTTP 傳送密碼。`,
+Let's Encrypt 有兩個驗證域名所有權的方式：HTTP-01 challenge 和 DNS-01 challenge。HTTP-01 challenge 是 Let's Encrypt 向你的域名發一個 HTTP 請求來驗證所有權，需要域名能從外部解析到你的 Ingress，所以在能對外的環境才能用；DNS-01 challenge 是要你在 DNS 加一個 TXT 記錄來驗證，不需要 HTTP 可達，適合內部服務或者 wildcard 憑證（*.example.com）的申請。cert-manager 支援兩種，各有適用場景，初學者通常先用 HTTP-01 比較簡單。
+
+最後，幾乎所有生產環境都會加上自動 HTTP 轉 HTTPS 的設定：annotation 裡加 nginx.ingress.kubernetes.io/ssl-redirect: "true"，nginx 就會把所有 80 port 的 HTTP 請求自動 302 重導向到 443 port 的 HTTPS，確保使用者一定走加密連線，不會有人不小心用 HTTP 傳送密碼。這是 HTTPS 設定的最後一哩，不要忘記加。`,
   },
 
   // ========== NetworkPolicy 概念 ==========
@@ -741,6 +795,10 @@ NetworkPolicy 就是 Kubernetes 的網路防火牆。它讓你可以定義精確
 最核心的設計哲學是：NetworkPolicy 採用白名單機制。一旦你對某個 Pod 套用了任何 NetworkPolicy，這個 Pod 預設就進入「拒絕所有」的狀態，只有在 NetworkPolicy 規則裡明確允許的流量才能通過。這和傳統防火牆的預設行為一樣，安全性很高。
 
 NetworkPolicy 有幾個核心概念必須搞清楚：podSelector 決定這個 Policy 管的是哪些 Pod，用 Label 選取，空的 podSelector 代表選取 Namespace 裡所有 Pod。policyTypes 指定這個 Policy 管入站（Ingress）、出站（Egress）還是兩者都管，不指定就預設只管 Ingress。ingress 欄位定義允許哪些「進入」流量，from 可以指定來源是哪些 Pod（用 podSelector）、哪些 Namespace（用 namespaceSelector），或者哪些 IP 範圍（用 ipBlock）。egress 欄位定義允許哪些「流出」流量，to 同樣可以指定目的地 Pod、Namespace、或 IP 範圍。
+
+有一個常見的誤解值得澄清：NetworkPolicy 是 namespace-scoped（限定在某個 Namespace 內）的資源，不是 cluster-scoped。也就是說，你在 Namespace A 建的 NetworkPolicy 只影響 Namespace A 裡的 Pod，對 Namespace B 的 Pod 沒有任何影響。這意味著如果你有多個 Namespace，每個都需要的安全策略，要分別在每個 Namespace 建立 NetworkPolicy，或者用自動化工具（比如結合 GitOps 的方式）來確保每個 Namespace 都有對應的安全策略。
+
+Kubernetes 沒有內建的「集群級別 NetworkPolicy」，但有些進階 CNI（比如 Cilium 的 CiliumClusterwideNetworkPolicy）提供了跨 Namespace 的集群級別策略，可以一次設定整個叢集的安全規則。如果你的叢集有很多 Namespace，值得研究這些工具。
 
 最後一個很重要的注意事項：NetworkPolicy 需要 CNI（Container Network Interface）支援才能生效。Calico 和 Cilium 都支援 NetworkPolicy；Flannel 預設不支援（需要搭配 Calico 的 Canal 模式）。如果你的叢集 CNI 不支援，NetworkPolicy 雖然可以建立，但完全不起作用，這非常危險，讓你以為有保護但實際上沒有。所以在開始設定 NetworkPolicy 之前，先確認你的 CNI 支援。`,
   },
@@ -809,11 +867,13 @@ NetworkPolicy 有幾個核心概念必須搞清楚：podSelector 決定這個 Po
 
 還有一個重要的語法陷阱：from 陣列裡如果是兩個獨立的 list item，就是 OR 關係；在同一個 list item 裡同時有 namespaceSelector 和 podSelector，就是 AND 關係。這個差異在 YAML 縮排上只差一個 "-"，但語義完全不同，寫 NetworkPolicy 時要特別小心這個。
 
+讓我用例子說明這個 OR 和 AND 的差別，因為這個錯誤太容易犯了。如果你想說「允許來自 frontend Namespace 的任何 Pod，或者叢集裡任何有 role: monitoring 的 Pod」，from 裡要寫兩個獨立的 list item，分別用 namespaceSelector 和 podSelector，中間用一個 - 分隔。如果你想說「必須同時符合兩個條件：在 frontend Namespace 而且有 role: web 的 Pod」，就把 namespaceSelector 和 podSelector 寫在同一個 list item 裡，不加 - 分隔。很多人因為 YAML 縮排搞混這個，導致 NetworkPolicy 規則和預期不符，建議每次寫完都仔細測試。
+
 第二個範例是「拒絕所有進入流量」的安全加固模板。podSelector 是空的（{}），代表選取這個 Namespace 裡的所有 Pod；policyTypes 只有 Ingress；但是沒有 ingress 規則。空的 ingress 規則 = 不允許任何進入流量。這是安全加固的起手式，先全部鎖死，再用其他更細粒度的 NetworkPolicy 逐一開放需要的通訊路徑，採用最小權限原則。
 
 第三個範例是 egress 到 DNS 的放行規則，這個很多人忘記，然後被自己鎖死。如果你鎖了某個 Namespace 的 egress（出站流量），Pod 連 DNS 查詢都做不了，因為 CoreDNS 在 kube-system Namespace，port 53 的流量也被你鎖了。DNS 一掛，這些 Pod 什麼 Service 都連不到，因為域名解析不了。解決方法是：在你的 default-deny egress 策略之外，加一條允許到 port 53（UDP 和 TCP 都要允許）的 egress 規則，讓 DNS 查詢可以出去。
 
-把這三個模板記起來：精確允許特定來源、預設拒絕、以及 DNS 放行。這套組合是 Kubernetes 安全加固的標準做法。`,
+把這三個模板記起來：精確允許特定來源、預設拒絕、以及 DNS 放行。這套組合是 Kubernetes 安全加固的標準做法。實際工作中，可以把這三個模板做成 Helm Chart 或者 Kustomize 的 base，讓所有 Namespace 都共用同一套安全基線，再根據各 Namespace 的需求疊加特定規則。`,
   },
 
   // ========== 實作：完整對外服務 ==========
@@ -875,6 +935,8 @@ NetworkPolicy 有幾個核心概念必須搞清楚：podSelector 決定這個 Po
 
 操作過程中如果遇到問題，排查步驟：kubectl describe ingress my-ingress 看 Ingress 的 Events 欄位，有問題通常在這裡有提示；kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller 看 Controller 的日誌，每個請求和路由結果都有記錄；kubectl get endpoints demo-web-svc 看後端 Pod 有沒有正確加入 Endpoints。
 
+進階挑戰：完成基本實作後，可以試試修改 Deployment 的 replicas，把副本從 3 改成 5，然後看看 kubectl get endpoints demo-web-svc 的變化，確認 Service 自動追蹤新的 Pod IP。也可以試試把 nginx 的自訂頁面用 ConfigMap 掛載進去，讓每個副本顯示它的 Pod 名稱，然後多次呼叫 curl 看看負載均衡是否真的在多個 Pod 之間輪替。觀察到輪替效果的同學記得截圖，這就是 Service 負載均衡的實際運作！
+
 （讓大家開始實作，巡視並幫助同學解決問題，預留約 15 分鐘的操作時間）`,
   },
 
@@ -932,6 +994,8 @@ YAML 重點解析：podSelector 選 app: demo-web 的 Pod，也就是我們要�
 第三步，確認正常流量還是通的——透過 Ingress Controller 的存取（curl 帶 Host header）應該還是正常的，因為 Ingress Controller 的 Pod 在 ingress-nginx Namespace，在 NetworkPolicy 的允許清單裡。如果這條路也不通，代表 NetworkPolicy 有問題，要排查。
 
 常見問題排查：如果 test Pod 的 wget 成功了（NetworkPolicy 沒效），先 kubectl get pods -n kube-system 確認 CNI 是什麼，Flannel 預設不支援；如果 Ingress 的路由失敗了，kubectl describe networkpolicy allow-ingress-controller 看 Policy 的細節，確認 namespaceSelector 的 Label 名稱是否正確。
+
+這個實作完成後，你就有了一個相當安全的 HTTP 服務架構：Ingress 是唯一入口、TLS 加密、只有 Ingress Controller 的流量能到達應用 Pod。在真實的生產環境，這個基礎架構還可以繼續加強：在 Ingress 前面加 WAF（Web Application Firewall）；用 Cilium 的進階 NetworkPolicy 做 L7（HTTP 層）流量控制，比如只允許 GET 請求、特定 URL path；配合 OPA（Open Policy Agent）做更靈活的存取控制策略。這些都是 Kubernetes 安全架構的進階方向。
 
 進階挑戰（給完成的同學）：試著再加一條 NetworkPolicy，限制 demo-web Pod 的 egress，只允許它連到 DNS（port 53）和 mysql-svc（port 3306），其他 egress 全部拒絕。這模擬了生產環境裡對應用程式出站流量的嚴格控制。
 
@@ -1009,7 +1073,19 @@ YAML 重點解析：podSelector 選 app: demo-web 的 Pod，也就是我們要�
 
 這就是一個完整的、安全的 Kubernetes 服務架構：Deployment 管理運行 → ClusterIP Service 提供穩定入口 → CoreDNS 讓服務用名字通訊 → Ingress 做 HTTP 七層路由對外 → NetworkPolicy 加固安全隔離。每個工具各司其職，組合在一起就是業界標準的生產環境架構。
 
-今天學到的每一個概念在真實工作中都會用到。明天我們繼續往前，學習 PersistentVolume 讓 Kubernetes 管理有狀態的資料儲存，以及 Helm 套件管理讓我們可以更方便地部署複雜的應用。大家今天表現非常好，回去好好複習今天的筆記和實作，有問題歡迎在群組提問！`,
+今天學到的每一個概念在真實工作中都會用到。明天我們繼續往前，學習 PersistentVolume 讓 Kubernetes 管理有狀態的資料儲存，以及 Helm 套件管理讓我們可以更方便地部署複雜的應用。大家今天表現非常好，回去好好複習今天的筆記和實作，有問題歡迎在群組提問！
+
+最後，給大家幾個課後繼續練習的建議，幫助今天的內容真正內化成你的能力，而不只是聽過就忘的知識點。
+
+實踐建議一：在本機建立自己的 Kubernetes 測試環境。最推薦的工具是 minikube 或 kind（Kubernetes in Docker），兩個都免費、不需要雲端帳號、五分鐘之內可以跑起來。有了本機叢集，你可以隨時練習今天學到的任何內容，不用擔心費用，不用擔心弄壞線上環境。建議從最小的案例開始，一個 Deployment + 一個 ClusterIP Service + 一個 Ingress，親手敲 YAML，看到服務跑起來、HTTP 連線通了，那種成就感會大大強化學習動機。
+
+實踐建議二：動手排查問題，而不只是建立成功的案例。刻意製造一些「壞的」設定：把 Service 的 selector 標籤故意寫錯、把 Ingress 的 host 名稱設定錯、把 NetworkPolicy 的 namespace selector 弄錯。然後用今天教的除錯工具找出問題：kubectl get endpoints、kubectl describe、kubectl logs。錯誤中學習的效率比成功中學習高很多，因為你必須真正理解每個欄位的意義才能找到問題。
+
+實踐建議三：閱讀官方文件的 Concepts 和 Reference 頁面。Kubernetes 官方文件（kubernetes.io/docs）寫得非常清楚，Service、Ingress、NetworkPolicy 都有對應的概念說明頁面和 API Reference。特別推薦把 NetworkPolicy 的官方頁面仔細讀一遍，裡面有很多詳細的範例說明 OR 和 AND 邏輯的差別，是今天課程裡點到但沒有深入講的部分。
+
+實踐建議四：嘗試理解 kube-proxy 的 iptables 規則。在你的叢集節點上執行 iptables -t nat -L -n | grep KUBE，你可以看到 kube-proxy 為每個 Service 設定的實際 iptables 規則，理解 ClusterIP 的 DNAT（目的地址轉換）是怎麼運作的。這個屬於進階內容，但理解了底層機制，遇到奇怪的網路問題，你的排查思路會比別人深得多。
+
+有任何問題，課程討論群組隨時歡迎發問，助教和我會定期回覆。明天我們繼續，期待下一堂見到大家精神飽滿的樣子！`,
   },
 
   // ========== Q&A ==========
@@ -1051,6 +1127,20 @@ YAML 重點解析：podSelector 選 app: demo-web 的 Pod，也就是我們要�
 
 大家還有什麼問題嗎？今天的內容非常豐富，Service、DNS、Ingress、NetworkPolicy，每個主題都有很多細節，如果課後複習時有問題，可以在群組發問。
 
-下一堂我們會學 Persistent Volume 和 StatefulSet，讓 Kubernetes 能夠管理有狀態的應用，比如資料庫；還有 Helm 套件管理。今天大家辛苦了，明天見！`,
+下一堂我們會學 Persistent Volume 和 StatefulSet，讓 Kubernetes 能夠管理有狀態的應用，比如資料庫；還有 Helm 套件管理。今天大家辛苦了，明天見！
+
+趁著 Q&A 還在進行，讓我再多分享幾個今天常見的問題，這些是之前開課時同學們最常問到的：
+
+【問】Service 有設定，Pod 也是 Running，但 curl Service 就是回傳 Connection refused，怎麼排查？
+
+【答】這是最常見的連線問題之一。排查步驟：第一步，kubectl get endpoints 你的Service，確認 Endpoints 不是空的。第二步，如果 Endpoints 有 Pod IP，直接 curl Pod的IP:containerPort（不是 Service port，是容器的 port），看能不能連上。如果連 Pod IP 直連都不通，代表容器裡的應用程式有問題，可能是 port 設定錯了、應用啟動失敗、或者 readinessProbe 失敗導致沒有加入 Endpoints。第三步，確認 YAML 裡的 targetPort 和容器實際監聽的 port 是一致的。
+
+【問】Ingress 設好了，kubectl get ingress 也有 ADDRESS，但瀏覽器打開 http://我的域名 還是顯示 404 not found，怎麼辦？
+
+【答】這個 404 通常是 nginx-ingress Controller 回的，不是你的應用回的。可能原因有幾個：一是 Ingress 的 host 欄位設定的域名和你瀏覽器打的網址不一致（包括大小寫）；二是 ingressClassName 設錯了，指向了不存在的 Controller；三是後端 Service 名稱或 port 寫錯了。解法：kubectl describe ingress 你的Ingress名稱，看 Rules 欄位確認設定是否正確，再看 Events 是否有錯誤訊息。也可以看 nginx-ingress Controller 的日誌：kubectl logs -n ingress-nginx 取得 controller Pod 名稱之後 kubectl logs -n ingress-nginx Pod名稱，日誌裡每個請求的路由結果都有記錄。
+
+【問】我設定了 NetworkPolicy 但感覺沒有效果，從任何 Pod 都能連到被保護的 Pod，這是什麼原因？
+
+【答】最常見的原因是 CNI 不支援 NetworkPolicy。Kubernetes 的 NetworkPolicy 資源只是一個規則聲明，真正執行網路隔離的是 CNI（Container Network Interface）。Flannel（很多入門教程用的 CNI）預設不支援 NetworkPolicy；你需要 Calico、Cilium、或 Canal 等支援 NetworkPolicy 的 CNI。確認方式：kubectl get pods -n kube-system，看有沒有 calico-node 或 cilium 的 Pod；或者用 kubectl get pods -n kube-system -o wide 看節點上跑的網路元件。如果確認 CNI 支援，再檢查 podSelector 的 Label 是否正確匹配到 Pod。`,
   },
 ]

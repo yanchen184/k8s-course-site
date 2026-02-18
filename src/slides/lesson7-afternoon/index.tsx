@@ -53,7 +53,7 @@ export const slides: Slide[] = [
 今天下午的主線是：先做一個完整的三層式應用部署，然後故意把它弄壞，練習排查故障，接著設定高可用配置，最後看看 CI/CD 怎麼跟 K8s 整合。這整個流程，就是你們將來在真實工作中會一直重複的循環：部署、壞掉、排查、修好、優化。準備好了嗎？我們開始！
 
 如果有人今天是第一次這麼系統化地接觸 Kubernetes，也別擔心，今天下午的節奏我會盡量照顧到每個人。有卡住的地方就舉手，不要悶在那邊等——遇到問題是很正常的，我們一起解決，這才是真正的學習。`,
-    duration: "3"
+    duration: "4"
   },
 
   // ========== 下午課程大綱 ==========
@@ -92,7 +92,7 @@ export const slides: Slide[] = [
 休息後，14:45 到 15:15 是第三場實戰，HPA 加上 PDB 的高可用配置，這是讓應用在生產環境穩定運行的關鍵設定。15:15 到 15:40 介紹 CI/CD 和 GitOps 流程，這是現代工程團隊的日常，值得好好了解。15:40 到 16:00 整理生產環境最佳實踐，把七天學的技術串成一個可以帶回去用的清單。
 
 最後一個小時，先做七天學習路徑的總回顧，然後進行畢業典禮和 Q&A。大家有任何問題，在 Q&A 時間盡情提出，我們把整個課程好好收個尾。今天下午的安排很緊湊，跟緊我，我們一起衝！`,
-    duration: "2"
+    duration: "3"
   },
 
   // ========== 開場回顧 ==========
@@ -144,7 +144,7 @@ Day 6，可觀測性。系統上線之後，你怎麼知道它有沒有問題？
 Day 7 就是今天。我們要用一個真實的場景，把前六天所有的知識點全部用一遍。你會發現，每一個你曾經「好像懂了」的概念，放到整合場景裡都會重新變清晰，因為你看到了它在整個系統裡扮演的角色。這種體驗是任何文件都無法給你的。開始吧！
 
 我想在進入實戰之前，再補充一個學習心態上的重點。很多人學完理論之後會覺得「我好像都懂了，但如果讓我獨立從零開始建一個環境，我不確定能不能做到」。這種感覺是完全正常的，它叫做「知識幻覺」——你讀了步驟，腦子裡有畫面，但手上還沒有肌肉記憶。今天下午的演練，就是要把知識幻覺轉換成真實的能力。每次你的手指打出一個 kubectl 指令，看到它真正運行，看到 Pod 狀態從 Pending 變成 Running，那個瞬間就是知識轉換成能力的時刻。這個轉換是任何回顧或複習都替代不了的，所以等一下請認真地跟著每一個步驟操作，不要只是看我示範。七天的課程設計有它的遞進邏輯，今天是整個旅程的最後一站，也是最精華的一站，一起把它走完！另外我想提醒大家：學習不是一次性的事件，今天學完不代表你已經「學會了 Kubernetes」。真正的掌握是在反覆使用中建立起來的。所以我鼓勵大家在課後找時間把今天的演練再獨立做一遍，不看筆記，看看自己哪些步驟記得住、哪些會卡關，那些卡關點就是你還需要加強的地方。`,
-    duration: "10"
+    duration: "11"
   },
 
   // ========== 實戰一：架構說明 ==========
@@ -196,7 +196,7 @@ Day 7 就是今天。我們要用一個真實的場景，把前六天所有的�
 我們這個演練會用到幾乎所有我們學過的資源類型：三個 Deployment、三個 Service、一個 Ingress、兩個 ConfigMap（一個存後端設定、一個存前端環境變數）、一個 Secret（存資料庫密碼）、一個 PVC（讓資料庫資料持久化保存，不會因為 Pod 重啟而消失）。
 
 這不是 Hello World，這是接近真實工作環境的部署場景。從現在開始，請打開你的終端機，我們要一步一步從最底層的資料庫開始往上建。依賴順序決定部署順序：資料庫先起來，後端才能連上去；後端先起來，前端才能打到 API。跟我來！`,
-    duration: "5"
+    duration: "6"
   },
 
   // ========== 實戰一：部署 DB + Backend ==========
@@ -362,7 +362,7 @@ apply 完 ingress.yaml 之後，用 kubectl get ingress -n demo-app 確認 Ingre
 第三個：ImagePullBackOff。Kubernetes 在建立 Pod 時，第一步是從 Registry 拉取容器映像，如果拉不到，Pod 就永遠停在這個狀態。背後可能的原因：映像名稱打錯了（包括大小寫）、Tag 不存在（常見：把 latest 當作萬能，但 latest 不一定存在）、Registry 是私有的但沒有設定認證 Secret、或者叢集的網路無法連到 Registry。
 
 我們現在開始逐一示範這三種故障的診斷和修復過程。`,
-    duration: "5"
+    duration: "6"
   },
 
   // ========== 實戰二：排查示範 ==========
@@ -422,7 +422,7 @@ apply 完 ingress.yaml 之後，用 kubectl get ingress -n demo-app 確認 Ingre
 場景三，ImagePullBackOff 排查：我把 Frontend Deployment 的 image 名稱打錯一個字（比如從 my-frontend:v1.0 改成 my-frontned:v1.0），apply 後 Pod 一直停在 ImagePullBackOff 或 ErrImagePull 狀態。kubectl describe pod frontend-xxx -n demo-app，在 Events 裡看到 Failed to pull image "my-frontned:v1.0": rpc error: code = Unknown desc = failed to pull and unpack image ...。確認是 image 名稱拼錯了，修正 YAML 重新 apply，等 Pod 成功 pull 映像並進入 Running 狀態。
 
 還有一個非常有用的排查場景：你的 Pod 是 Running，但服務沒有回應。這時候要懷疑的是 Service Selector 有沒有對到正確的 Pod。執行 kubectl get endpoints backend-svc -n demo-app，如果 ENDPOINTS 欄位是空的（<none>），代表這個 Service 沒有找到任何匹配的 Pod。然後比對 Service 的 selector（spec.selector）和 Pod 的 labels（metadata.labels），確認它們完全吻合。這個「Service Selector 和 Pod Labels 不符」的問題，是初學者最容易犯的錯誤之一，但用 kubectl get endpoints 很容易診斷出來。大家把這些工具和場景都試一遍，有問題隨時叫我！最後分享一個排查效率的心法：當你面對一個你完全不理解的 Kubernetes 錯誤，試試把錯誤訊息直接複製到搜尋引擎，通常 Stack Overflow、GitHub Issues 或 Kubernetes 官方文件都有相關討論。Kubernetes 的錯誤訊息設計得相對清晰，大部分的常見問題都有前人踩過坑留下記錄。善用社群的知識積累，是快速排查問題的重要能力之一。當然，今天我們在現場，有任何問題直接問我。`,
-    duration: "25"
+    duration: "26"
   },
 
   // ========== 休息 ==========
@@ -447,8 +447,59 @@ apply 完 ingress.yaml 之後，用 kubectl get ingress -n demo-app 確認 Ingre
       </div>
     ),
     notes: `好，休息時間到！大家辛苦了。剛才兩場實戰演練很有份量，請起來走一走，喝點水，讓眼睛和頸椎休息一下。如果剛才有任何操作卡住、沒跟上，趁這 15 分鐘來找我或助教，我們幫你補上。14:45 準時繼續，下半場同樣精彩！請記得補充水分，和旁邊的同學聊聊剛才遇到的問題，有時候同學之間的相互解說是最有效的學習方式。`,
-    duration: "1"
+    duration: "2"
   },
+
+  // ========== 實戰演練三：HPA 壓力測試 ==========
+  {
+    title: "🔨 動手做：HPA 壓力測試驗證",
+    subtitle: "親眼看到 Pod 自動擴縮容",
+    section: "實戰演練三",
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800 p-4 rounded-lg text-sm font-mono">
+          <p className="text-slate-400 mb-2"># 終端機 1：監控 HPA 狀態</p>
+          <p className="text-green-400">watch -n 2 kubectl get hpa -n demo-app</p>
+        </div>
+        <div className="bg-slate-800 p-4 rounded-lg text-sm font-mono">
+          <p className="text-slate-400 mb-2"># 終端機 2：監控 Pod 數量</p>
+          <p className="text-green-400">watch -n 2 kubectl get pods -n demo-app</p>
+        </div>
+        <div className="bg-slate-800 p-4 rounded-lg text-sm font-mono">
+          <p className="text-slate-400 mb-2"># 終端機 3：製造 CPU 壓力</p>
+          <p className="text-green-400">{"kubectl exec -it $(kubectl get pod -n demo-app \\"}</p>
+          <p className="text-green-400">{"  -l app=backend -o name | head -1) -n demo-app -- sh"}</p>
+          <p className="text-yellow-400 mt-1">{"# 容器裡執行："}</p>
+          <p className="text-green-400">{"while true; do true; done"}</p>
+        </div>
+        <div className="bg-blue-500/20 border border-blue-500/50 p-3 rounded-lg text-sm">
+          <p className="text-blue-400 font-semibold">👀 觀察點</p>
+          <p className="text-slate-300">TARGETS: 15%/70% → 95%/70%　→　REPLICAS: 2 → 4（約 2 分鐘）</p>
+        </div>
+        <div className="bg-green-900/30 border border-green-700 p-3 rounded-lg text-sm">
+          <p className="text-green-400 font-semibold">✅ Ctrl+C 停壓力後</p>
+          <p className="text-slate-300">等 5 分鐘，觀察 Pod 自動縮容回 minReplicas=2</p>
+        </div>
+      </div>
+    ),
+    notes: `好，概念說完了，現在我們要實際看到 HPA 在壓力下自動擴容，這是今天最有視覺衝擊感的環節之一。準備好三個終端機視窗，我們同時開著，讓數字變化一目瞭然。
+
+第一個終端機：跑 watch -n 2 kubectl get hpa -n demo-app。watch 指令會每 2 秒自動重新執行一次，你會看到一個持續更新的畫面。重點看 TARGETS 欄位，格式是「目前使用率 / 目標使用率」，比如 15%/70% 代表現在 CPU 平均使用率是 15%，目標是 70%，所以不需要擴容。還要看 REPLICAS 欄位，顯示目前 Pod 數量和最小最大值。
+
+第二個終端機：跑 watch -n 2 kubectl get pods -n demo-app。這個讓你直接看到 Pod 清單和數量的變化。當 HPA 決定擴容，你會看到新的 Pod 出現、從 ContainerCreating 變成 Running，整個過程非常直觀。
+
+第三個終端機：這是關鍵操作。先取得 Backend Pod 的名稱，然後 kubectl exec 進去，在容器裡跑一個無窮迴圈消耗 CPU。這個指令組合有點長，我會貼在群組裡，直接複製貼上就好。進到容器後跑 while true; do true; done，這個 Shell 迴圈不做任何有用的事，但會把一個 CPU 核心跑到 100%。
+
+壓力製造後，耐心等待約 1-3 分鐘。首先你會看到 TARGETS 欄位的 CPU 使用率開始上升，從 15% 逐漸爬到 50%、70%、80%、甚至更高。當超過 70% 的目標閾值，HPA 的 controller 會計算「要多少個 Pod 才能把平均 CPU 壓回 70% 以下」，然後更新 Deployment 的 replicas 數量。這個計算公式是：目標副本數 = 現有副本數 × (目前使用率 / 目標使用率)。比如目前是 2 個 Pod，CPU 是 140%，目標是 70%，那目標副本數 = 2 × (140 / 70) = 4 個 Pod。
+
+接著在第二個終端機，你會看到新的 backend-xxx Pod 出現，狀態是 ContainerCreating，然後變成 Running。同時在第一個終端機，REPLICAS 的數字會從 2 變成 3 或 4，TARGETS 的使用率會開始下降，因為負載被分散到更多 Pod 上了。
+
+等你看到這個變化，在第三個終端機按 Ctrl+C 停掉無窮迴圈，然後 exit 離開容器。CPU 壓力消失後，TARGETS 的使用率會快速下降到接近 0%。但 Pod 不會馬上縮容！HPA 的 scale down 有一個預設的穩定化視窗，是 5 分鐘，這是為了避免流量短暫下降就縮容、然後流量再上來又要擴容的「抖動」問題。你可以等個 5-6 分鐘，觀察 REPLICAS 數字慢慢縮回 2。
+
+這整個過程就是 HPA 的完整生命週期：偵測負載升高 → 計算目標副本數 → 觸發擴容 → 新 Pod 就緒接流量 → 負載降低 → 等待穩定 → 縮容回最小值。記住這個循環，它就是 HPA 的工作原理，面試被問到的時候，用這個流程回答準沒問題。`,
+    duration: "9",
+  },
+
 
   // ========== 實戰三：HPA + PDB ==========
   {
@@ -527,6 +578,64 @@ HPA + PDB 是一對黃金搭檔：HPA 讓你的應用能彈性應對流量波動
 補充一個關於 HPA 和 cluster autoscaler 的協作方式：HPA 負責在現有節點上增加 Pod，但如果現有節點的資源已經不夠，新增的 Pod 會停在 Pending 狀態——這時候 cluster autoscaler 就會偵測到有 Pending 的 Pod，自動往雲端請求新增節點，讓新節點加入叢集後，那些 Pending 的 Pod 就能被排程上去。HPA 和 cluster autoscaler 的組合，讓你的應用可以在不事先預留資源的情況下，按需彈性擴展到幾乎無上限的規模。這就是雲原生架構最吸引人的特性之一：基礎設施跟著業務需求自動伸縮，不需要人工干預。`,
     duration: "30"
   },
+
+  // ========== CI/CD：GitHub Actions 實例 ==========
+  {
+    title: "GitHub Actions CI/CD Workflow 實例",
+    subtitle: "從 git push 到 K8s 自動更新的完整 YAML",
+    section: "CI/CD 與 GitOps",
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800 p-3 rounded-lg text-xs font-mono leading-relaxed">
+          <p className="text-slate-400 mb-1"># .github/workflows/deploy.yml</p>
+          <p className="text-yellow-400">on:</p>
+          <p className="text-white">{"  push: { branches: [main] }"}</p>
+          <p className="text-yellow-400 mt-1">jobs:</p>
+          <p className="text-green-400">{"  test:"}</p>
+          <p className="text-slate-300">{"    runs-on: ubuntu-latest"}</p>
+          <p className="text-slate-300">{"    steps: [checkout, setup-node, npm ci, npm test]"}</p>
+          <p className="text-green-400 mt-1">{"  build:"}</p>
+          <p className="text-slate-300">{"    needs: test   # test 通過才執行"}</p>
+          <p className="text-slate-300">{"    steps:"}</p>
+          <p className="text-blue-300">{"      - docker/login-action  # 用 secrets 登入"}</p>
+          <p className="text-blue-300">{"      - docker/build-push-action"}</p>
+          <p className="text-slate-300">{"          tags: registry/app:${{ github.sha }}"}</p>
+          <p className="text-green-400 mt-1">{"  update-config:"}</p>
+          <p className="text-slate-300">{"    needs: build"}</p>
+          <p className="text-slate-300">{"    steps:"}</p>
+          <p className="text-blue-300">{"      - git clone config-repo"}</p>
+          <p className="text-blue-300">{"      - sed -i 's/OLD_SHA/${{ github.sha }}/' deploy.yaml"}</p>
+          <p className="text-blue-300">{"      - git commit -m 'deploy: ${{ github.sha }}'"}</p>
+          <p className="text-blue-300">{"      - git push  # 觸發 ArgoCD 同步"}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          {[
+            { label: "① test", color: "text-green-400", desc: "測試通過才能繼續" },
+            { label: "② build", color: "text-blue-400", desc: "映像 tag = git SHA" },
+            { label: "③ update-config", color: "text-purple-400", desc: "推 config → ArgoCD 同步" },
+          ].map((s, i) => (
+            <div key={i} className="bg-slate-800/50 p-2 rounded">
+              <p className={`font-semibold ${s.color}`}>{s.label}</p>
+              <p className="text-slate-400">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    notes: `讓我們看一個實際的 GitHub Actions workflow 文件，這是我在真實專案中簡化過的版本，每個部分我都會解釋清楚，讓你回去可以直接套用到自己的專案。
+
+整個 workflow 文件分成三個 job：test、build、update-config，它們之間有依賴關係，用 needs 關鍵字來表達。需要特別強調的是：依賴鏈是硬性的——test 失敗，build 根本不會啟動；build 失敗，update-config 也不會跑。這個設計確保了壞掉的程式碼永遠不會進入部署流程，CI 的價值就在這裡。
+
+第一個 job，test：步驟很直白——checkout 程式碼、設定執行環境（actions/setup-node 設定 Node.js 版本）、安裝依賴、跑測試。有一個細節值得注意：安裝依賴用 npm ci 而不是 npm install。ci 模式更嚴格，它嚴格按照 package-lock.json 安裝依賴，不允許版本漂移，確保每次 CI 環境都和你本機一模一樣。這個小細節可以避免「本機可以跑，CI 卻壞了」的玄學問題。
+
+第二個 job，build：最核心的是 docker/build-push-action，這個 GitHub Action 幫你做三件事：build 映像、打 tag、push 到 Container Registry。映像 tag 用 github.sha，也就是觸發這次 workflow 的 git commit 的 SHA 值，長得像 a3f8c21。用 SHA 作為 tag 的好處是唯一性和可追蹤性——你在 Kubernetes 裡看到 app:a3f8c21，馬上可以在 GitHub 上找到對應的 commit，知道是誰在什麼時候改了什麼。如果出了問題，審計路徑非常清晰。登入 Registry 的帳號密碼一定要放在 GitHub repository 的 Secrets 裡，用 secrets.DOCKER_TOKEN 引用，絕對不能 hard-code 在 workflow 文件裡。
+
+第三個 job，update-config：這是 GitOps 閉環的關鍵步驟。它做的事情是：clone 放 Kubernetes YAML 的 config repository、用 sed 指令把 Deployment YAML 裡的舊映像 tag（OLD_SHA）替換成新的 git SHA、git commit 這個變更、然後 push 回 config repo。這個 push 就是觸發器——ArgoCD 偵測到 config repo 有新 commit，比較 Git 定義的狀態和叢集目前的狀態，發現映像 tag 不一樣，就自動 kubectl apply 把 Deployment 更新到新映像。整個 CI/CD 閉環完成，開發者只需要 git push，幾分鐘後新版本就在生產環境運行了。
+
+幾個常見的坑要避免：第一，update-config job 需要對 config repo 有 push 權限，要設定一個有足夠權限的 Personal Access Token 或 Deploy Key；第二，如果你的 Docker 映像需要支援多個 CPU 架構（amd64 和 arm64），要在 build-push-action 裡加 platforms: linux/amd64,linux/arm64，不然你在 x86 機器上 build 的映像在 ARM 節點上跑不起來；第三，CI 失敗要設好通知（GitHub Actions 支援傳送 Slack 通知），讓整個團隊第一時間知道 main branch 壞了，而不是等到有人要部署的時候才發現。這份 workflow 範例是個很好的起點，大家可以直接 clone 下來改。`,
+    duration: "11",
+  },
+
 
   // ========== CI/CD 與 GitOps ==========
   {
@@ -688,7 +797,7 @@ ArgoCD 有一個很棒的 Web UI，可以視覺化地看到每個應用的部署
 關於健康檢查的具體設定，有幾個參數要理解：initialDelaySeconds 是容器啟動後多久才開始執行第一次 probe，給應用程式一點啟動時間；periodSeconds 是 probe 的執行頻率；failureThreshold 是連續幾次失敗後才觸發動作（kill 或 remove from endpoints）；successThreshold 是連續幾次成功後才算恢復（只對 readiness 有意義）。調對這幾個參數，可以避免「應用程式剛啟動就被 liveness 殺掉」或「應用程式已經掛了但 readiness 還沒偵測到，流量繼續打進來」這兩種極端。
 
 最後一個重要的實踐：Kubernetes YAML 的版本控管。所有的 YAML 檔案都應該在 Git 裡，任何對叢集的變更都應該透過 PR 進行，而不是直接 kubectl edit。這樣的好處是：每次變更都有記錄（git log）、可以 code review（PR 流程）、可以快速回滾（git revert）。當你的 YAML 加上 Git 版本控管，再加上我們之前說的 GitOps 流程，就形成了一個閉環：所有變更都在 Git 裡，ArgoCD 負責把 Git 狀態同步到叢集，誰也不需要直接操作叢集。這就是成熟的 Kubernetes 工程團隊的工作方式。所以今天學的六個最佳實踐不是孤立的，它們是一個整體：資源管理確保穩定性、健康檢查確保可用性、安全配置確保安全性、標籤策略確保可管理性、部署策略確保無停機、可觀測性確保可診斷性。缺少任何一個，系統都有明顯的弱點。把這六個都做好，你的 Kubernetes 部署才真正稱得上「生產就緒」。`,
-    duration: "20"
+    duration: "21"
   },
 
   // ========== 課程總結：七天回顧 ==========
@@ -807,7 +916,7 @@ Kubernetes 核心資源：Pod、Deployment、Service 這三個是一切的骨架
 社群方面，kubernetes.io 的官方文件品質非常高，英文很好讀，幾乎所有問題都能在上面找到答案。CNCF 的 Slack 有各種主題的頻道，遇到卡關可以在上面問。每年兩次的 KubeCon 大會（北美和歐洲）的演講都會公開在 YouTube，是了解業界最新趨勢的好方式。課程的 Line 群組我會繼續維持，大家有問題歡迎在上面討論。
 
 最後給大家一個具體的目標建議：一個月內，把今天的三層式部署演練在自己的本機重做一遍，不看筆記；三個月內，報名並通過 CKAD 考試；六個月內，找機會在工作上把 Kubernetes 用起來。有了方向，學習就有動力。加油！`,
-    duration: "5"
+    duration: "9"
   },
 
   // ========== 畢業典禮 ==========

@@ -225,7 +225,9 @@ K8s 具體解決了哪些問題呢？讓我逐一說明：
 
 值得一提的是，K8s 的開源社群非常活躍。從 2014 年開源到現在，已經有超過三千名貢獻者為 K8s 貢獻了代碼，每隔幾個月就會有新版本發布，不斷加入新功能、修復問題。這個生態系的活力，也是 K8s 成為業界標準的重要原因之一。
 
-根據 CNCF 的調查，全球有超過 90% 的財富 500 強企業在使用 K8s 或者計劃使用 K8s。台灣的很多大型企業，比如科技公司、金融機構、電商平台，也都陸續導入 K8s。所以現在學 K8s，是真的在學業界需要的技能，非常有前景。`,
+根據 CNCF 的調查，全球有超過 90% 的財富 500 強企業在使用 K8s 或者計劃使用 K8s。台灣的很多大型企業，比如科技公司、金融機構、電商平台，也都陸續導入 K8s。所以現在學 K8s，是真的在學業界需要的技能，非常有前景。
+
+還有一點值得提：K8s 不只是一個工具，它更代表了一種思維方式的轉變——從「管理機器」轉變為「管理應用程式」。在傳統的運維方式中，工程師關心的是「這台伺服器的 CPU 是多少、記憶體是多少、有哪些服務在跑」。在 K8s 的世界裡，你不再關心個別的機器，而是關心你的應用程式需要多少資源、需要幾個副本、如何對外提供服務，至於它跑在哪台機器上，那是 K8s 的事。這個思維轉變，讓工程師可以把精力放在更有價值的地方，而不是被基礎設施的細節所困擾。這也是 Cloud Native 運動的核心理念，而 K8s 是實現這個理念最重要的工具。`,
     duration: "10"
   },
   // ── Slide 4 K8s 整體架構 ─────────────────────────
@@ -668,7 +670,15 @@ Service 透過 Label Selector 來選擇它要把流量送到哪些 Pod。這和 
 
 另外一個重要概念是 Pod 的生命週期短暫性。Pod 被建立、跑著、可能因為各種原因停止（比如節點故障、容器崩潰），然後被重建。每次重建都是一個全新的 Pod，有新的名稱、新的 IP 地址。理解這個「短暫性」非常重要，它影響了你怎麼設計應用程式：應用程式不應該在容器的本地文件系統儲存重要的狀態，因為容器重建後那些資料就消失了。如果需要持久化資料，要使用 PersistentVolume 或者外部資料庫。
 
-最後補充一個常見問題：Pod 什麼時候應該放多個容器？答案是：只有當這些容器需要緊密協作、必須共享資源的時候。不要把不相關的服務塞在同一個 Pod 裡，那樣會失去 K8s 調度的靈活性。一般的原則是：一個微服務 = 一個 Deployment = 一個 Pod 模板（通常一個容器）。`,
+最後補充一個常見問題：Pod 什麼時候應該放多個容器？答案是：只有當這些容器需要緊密協作、必須共享資源的時候。不要把不相關的服務塞在同一個 Pod 裡，那樣會失去 K8s 調度的靈活性。一般的原則是：一個微服務 = 一個 Deployment = 一個 Pod 模板（通常一個容器）。
+
+在 Service 和 Pod 之間，還有一個你不常直接操作、但理解它很有幫助的物件：Endpoints。每個 Service 建立後，K8s 會自動為它建立一個同名的 Endpoints 物件，Endpoints 裡面記錄著當前所有符合 Selector 條件、且狀態健康的 Pod 的 IP 地址和 Port。當 Pod 的狀態改變，例如新 Pod 建立、舊 Pod 刪除、或者 Pod 的 readiness probe 失敗，Endpoints 的內容也會即時更新。kube-proxy 就是根據 Endpoints 的資訊來設定節點上的 iptables 或 IPVS 規則，這就是 Service 能夠自動感知後端 Pod 變化的底層機制。
+
+你可以用 kubectl get endpoints [service-name] 來查看一個 Service 目前指向哪些 Pod 的地址。這在 Debug 的時候非常有用！如果你發現流量沒有到達 Pod，Endpoints 是第一個該檢查的地方：如果 Endpoints 是空的（顯示 none），就說明 Service 的 selector 選不到任何 Pod，通常是 Label 設定不一致造成的，比如 Service 說「我要找有 app=nginx 標籤的 Pod」，但 Pod 的 Label 寫的是 app=Nginx（注意大小寫），這樣就選不到。修正 Label 之後，Endpoints 就會自動更新，流量就通了。
+
+另外關於 NodePort 的使用，我想多說一點。NodePort 會在叢集每台 Worker Node 上都開放一個相同的 Port（固定範圍在 30000 到 32767），外部使用者可以透過任意一台節點的 IP 加上這個 Port 號來存取服務。有個很重要的特性：就算你的 Pod 實際上跑在 Node A，但你連到 Node B 的那個 NodePort，流量也會被 kube-proxy 正確路由到 Pod。這是因為每台節點的 kube-proxy 都設定了完整的路由規則，讓整個叢集看起來就像一個服務網絡。NodePort 適合測試環境或者 On-Premise 沒有 Load Balancer 的環境，但在有雲端 Load Balancer 的生產環境，通常會用 LoadBalancer 類型的 Service 或者 Ingress，而不是直接暴露 NodePort，因為 NodePort 的 Port 號通常不是標準的 80 或 443，用戶存取時要記特殊的 Port 號，體驗不好。
+
+關於 Service 還有一個高級主題值得提一下：Headless Service。有些場景下，你不需要 Service 做負載均衡，而是希望客戶端能直接拿到後端所有 Pod 的 IP 清單，自己決定連哪個。比如 StatefulSet 的有狀態應用（資料庫叢集、Kafka 等），每個 Pod 都有特定的角色，需要直接定址。這時候可以把 Service 的 clusterIP 設為 None，這樣就成了 Headless Service，K8s 的 DNS 會把查詢這個 Service 名稱的請求，直接解析成所有後端 Pod 的 IP 清單，讓應用自己實現連線邏輯。這是 K8s 支援有狀態應用的重要機制之一。`,
     duration: "5"
   },
   // ── Slide 10 休息 ───────────────────────────────
@@ -867,7 +877,15 @@ kubeconfig 是 kubectl 的設定檔，預設存在 ~/.kube/config 這個路徑�
 
 另外，kubeconfig 檔案支援合併多個叢集的設定。如果你有多個 kubeconfig 檔案，可以用 KUBECONFIG 環境變數把它們合併在一起：KUBECONFIG=~/.kube/config:~/.kube/config2 kubectl config get-contexts。這樣兩個設定檔裡的叢集都會出現在 Context 列表裡，非常方便。
 
-在 Shell 提示符號上顯示當前 Context 也是個好習慣，可以時刻提醒自己在操作哪個叢集。這在 zsh 的 oh-my-zsh 裡有現成的 plugin 可以用，bash 用戶也有對應的解決方案。強烈建議設定這個，可以避免在錯誤的叢集上執行指令的烏龍事件，特別是當你同時管理開發環境和生產環境的時候，一個不小心就可能把生產環境的資源誤刪。`,
+在 Shell 提示符號上顯示當前 Context 也是個好習慣，可以時刻提醒自己在操作哪個叢集。這在 zsh 的 oh-my-zsh 裡有現成的 plugin 可以用，bash 用戶也有對應的解決方案。強烈建議設定這個，可以避免在錯誤的叢集上執行指令的烏龍事件，特別是當你同時管理開發環境和生產環境的時候，一個不小心就可能把生產環境的資源誤刪。
+
+另外，我想談一個實際工作中非常重要的安全議題：最小權限原則在 kubeconfig 上的應用。理想的情況是，每個使用者的 kubeconfig 只包含他需要存取的叢集和 Namespace 的最小權限，不應該把 cluster-admin 等級的憑證發給所有人。在企業環境中，通常有專門的 K8s 管理員負責建立和分發 kubeconfig 憑證，每個開發者的憑證只能操作他負責的 Namespace，無法看到或修改其他團隊的資源。這樣即使憑證洩漏，影響範圍也是最小的。
+
+kubeconfig 裡面的認證方式主要有幾種：第一種是 client certificate，就是用 X.509 憑證來認證，這是最傳統的方式，安全性好但管理複雜；第二種是 Bearer Token，包括 Service Account Token 和 OIDC Token，現在很多企業會用 SSO（單一登入）整合 K8s，讓工程師用公司的帳號登入就能存取 K8s；第三種是 exec plugin，讓 kubectl 動態執行某個程式來獲取 Token，AWS EKS 和 GKE 都是用這種方式，讓 kubectl 自動用雲端身份認證。
+
+說到多叢集管理，有個業界常用的工具叫 Lens，它是一個 K8s 的圖形化 IDE，可以把你所有的叢集都匯入進來，用視覺化的方式管理和監控。對於初學者，Lens 是一個很好的輔助工具，可以讓你用圖形介面探索 K8s 的各種資源，同時也支援直接開 terminal 執行 kubectl 指令。隨著你越來越熟悉 K8s，你可能會慢慢轉向純 CLI 的工作方式，但 Lens 在你熟悉 K8s 的初期非常有幫助，值得試試看。如果你的公司有很多叢集需要管理，Lens 的多叢集支援也能讓工作變得更有條理。
+
+還有一個值得一提的工具是 k9s，它是一個基於終端機的 K8s 叢集管理 TUI（Terminal User Interface）。和 Lens 不同，k9s 完全在終端機裡運作，不需要 GUI，但提供了一個互動式的介面讓你瀏覽和管理叢集資源。很多習慣 CLI 工作流程的工程師非常喜歡 k9s，因為它比純 kubectl 指令更直觀，但又不需要切換到瀏覽器視窗。在 SSH 進入遠端機器做 K8s 管理的場景中，k9s 特別好用。`,
     duration: "10"
   },
   // ── Slide 13 kubectl 基本語法 ────────────────────
@@ -976,7 +994,13 @@ kubectl describe pod [name]（查看某個 Pod 的詳細資訊，很常用在 De
 
 第二，kubectl api-resources 可以列出叢集支援的所有資源類型，包括它們的縮寫（比如 po 是 pods 的縮寫、svc 是 services 的縮寫）和 API 版本。如果你忘了某個資源的縮寫，用這個指令查一下比上網搜尋快多了。
 
-第三，很多 kubectl 指令都支援 --dry-run=client -o yaml 選項，可以在不真正執行的情況下，輸出操作結果的 YAML 格式。這個技巧常用來快速生成 YAML 模板，比如 kubectl create deployment my-app --image=nginx --dry-run=client -o yaml 會輸出一個完整的 Deployment YAML，你可以把它存成檔案然後再修改。`,
+第三，很多 kubectl 指令都支援 --dry-run=client -o yaml 選項，可以在不真正執行的情況下，輸出操作結果的 YAML 格式。這個技巧常用來快速生成 YAML 模板，比如 kubectl create deployment my-app --image=nginx --dry-run=client -o yaml 會輸出一個完整的 Deployment YAML，你可以把它存成檔案然後再修改。
+
+還有一個非常有用的指令：kubectl diff。當你修改了一個 YAML 檔案，還不確定 apply 之後會改變什麼，可以先執行 kubectl diff -f my-deployment.yaml。它會顯示目前叢集裡的資源和你 YAML 檔案之間的差異，讓你確認修改是否符合預期，再決定要不要真的 apply。這在操作生產環境的時候尤其重要，先 diff 再 apply 是個很好的習慣，可以避免不小心做了錯誤的修改。
+
+另外一個很有用的指令是 kubectl rollout。它專門用來管理 Deployment 的滾動更新：kubectl rollout status deployment/my-app 可以查看更新進度，如果更新卡住了會在這裡看到；kubectl rollout history deployment/my-app 可以查看更新歷史；kubectl rollout undo deployment/my-app 可以一鍵回滾到上一個版本，這是生產事故緊急處理時最常用的指令之一。當你發現新版本有 Bug，用 rollout undo 可以在幾秒鐘內把服務回滾到正常狀態，然後再慢慢 debug。
+
+最後，給大家一個 kubectl 使用建議：遇到不確定的指令，可以先加 --help 查看說明，比如 kubectl get --help 或者 kubectl apply --help。kubectl 的幫助文件非常詳細，有完整的選項說明和範例。培養查 help 的習慣，比死記每個指令的所有選項更有效率，你很快就能對 kubectl 得心應手。`,
     duration: "10"
   },
   // ── Slide 14 kubectl get 系列 ────────────────────
@@ -1201,7 +1225,15 @@ kubectl run 主要用在快速測試或 Debug，在實際工作中，我們通�
 
 這整個流程通常在幾秒到幾十秒內完成，具體取決於 Image 是否需要下載。理解這個流程，你就真正理解了 K8s 的運作機制，而不只是會打指令。
 
-下午我們建立第一個 Deployment 的時候，流程是一樣的，只是多了 Deployment Controller 和 ReplicaSet 這幾個層級，幫你確保 Pod 的數量永遠維持在期望的狀態。`,
+下午我們建立第一個 Deployment 的時候，流程是一樣的，只是多了 Deployment Controller 和 ReplicaSet 這幾個層級，幫你確保 Pod 的數量永遠維持在期望的狀態。
+
+你可能注意到了，用 kubectl run 建立的 Pod 和用 Deployment 建立的 Pod 有個關鍵差別：管理機制。直接用 kubectl run 建立的 Pod，沒有任何「監護人」——如果 Pod 掛了，沒有任何東西會去重建它，它就永遠消失了。但是透過 Deployment 建立的 Pod，Deployment Controller 會持續監控，確保 Pod 數量維持在設定的副本數，少了就自動補上，多了就刪掉多的。這就是「宣告式管理」和「自癒」的具體體現。
+
+我想讓大家思考一個問題：如果我用 Deployment 部署了 3 個 nginx 副本，然後我手動 kubectl delete pod 刪掉其中一個，會怎樣？答案是：K8s 會在幾秒鐘內自動建立一個新的 Pod 來替代它，副本數重新回到 3 個。這個新的 Pod 有新的名稱、新的 IP，但跑的是完全一樣的 Image 和設定，對外的服務完全不受影響（只要 Service 設定正確）。大家可以在下午的實作中親自驗證這個行為——手動刪一個 Pod，然後 watch 看 K8s 多快把它補回來，這是個很有成就感的實驗！
+
+關於 kubectl run 什麼時候還有用：雖然在生產環境我們都用 YAML 檔案和 kubectl apply，但 kubectl run 在以下情境還是很方便：一是快速測試某個 Image 能不能跑、有沒有問題；二是需要建立一個臨時的工具 Pod 用來 debug，比如 kubectl run debug-pod --image=busybox --restart=Never -it -- /bin/sh，這樣可以在叢集裡面啟動一個臨時的 shell，用來測試叢集內部的網路連線、DNS 解析等。用完之後再刪掉就好。
+
+另外，kubectl run 還有個選項 --restart=Never，加了這個之後建立的是一個不會自動重啟的 Pod（適合一次性任務），而不是預設的由 Deployment 管理的 Pod。這讓你可以用 kubectl run 來快速執行一次性的工作負載，比如資料庫初始化、備份任務等，執行完成後 Pod 狀態就變成 Completed，你可以查看日誌確認結果，最後刪掉這個 Pod。這是個很實用的技巧，在日常運維中會常常用到。`,
     duration: "10"
   },
   // ── Slide 17 Pod 狀態與管理 ──────────────────────
@@ -1260,7 +1292,19 @@ kubectl delete pod my-nginx 可以刪除 Pod。刪除後，Pod 就消失了。�
 
 現在，再建立一個同名的 Pod：kubectl run test-pod --image=nginx。等它 Running 之後，再查一次 IP 地址。你會發現這次的 IP 可能和之前不一樣！這就是 Pod 的「短暫性」的直接體現——每次重建都是一個全新的 Pod，有新的 IP。
 
-這個實驗清楚地說明了為什麼需要 Service：如果你的前端直接連到後端 Pod 的 IP，一旦後端 Pod 被重建（即使是因為正常的更新），IP 就變了，前端就連不上了。Service 提供一個穩定的 DNS 名稱和 VIP（虛擬 IP），不管後端 Pod 怎麼重建，Service 的地址永遠不變，它會自動把流量轉到新的健康 Pod。這就是微服務架構在 K8s 裡面穩定運作的基礎。`,
+這個實驗清楚地說明了為什麼需要 Service：如果你的前端直接連到後端 Pod 的 IP，一旦後端 Pod 被重建（即使是因為正常的更新），IP 就變了，前端就連不上了。Service 提供一個穩定的 DNS 名稱和 VIP（虛擬 IP），不管後端 Pod 怎麼重建，Service 的地址永遠不變，它會自動把流量轉到新的健康 Pod。這就是微服務架構在 K8s 裡面穩定運作的基礎。
+
+讓我補充一個在實際工作中非常常見的 Debug 場景：CrashLoopBackOff。這個狀態是 K8s 新手最常碰到的問題之一，意思是容器啟動了但立刻崩潰，K8s 嘗試重啟它，重啟後又立刻崩潰，如此反覆循環，每次重啟之間的等待時間會越來越長（指數退避）。遇到這個狀況，Debug 步驟如下：
+
+第一步，kubectl describe pod [name]，看 Events 有沒有錯誤訊息，比如 OOMKilled（記憶體不足被殺）、Image pull failed（Image 拉不到）等。第二步，kubectl logs [name] 看應用程式的日誌，找出為什麼崩潰。如果容器已經崩潰了，當前這個實例可能剛啟動就崩潰，日誌很少；這時候用 kubectl logs [name] --previous 來查看上一個容器實例的日誌，通常那裡有更完整的錯誤訊息。
+
+常見的 CrashLoopBackOff 原因包括：應用程式設定錯誤（比如必要的環境變數沒有設定、資料庫連線字串錯誤）、依賴的服務還沒有準備好（比如應用程式啟動時立刻去連資料庫，但資料庫 Pod 還沒 Ready）、應用程式本身有 Bug 導致啟動就崩潰、或者 Image 名稱或版本標籤寫錯了導致容器入口點不存在。
+
+另外，我想介紹一個工具 kubectl exec，它讓你可以在正在跑的容器裡面執行指令，就像 SSH 進入一台機器一樣：kubectl exec -it [pod-name] -- /bin/sh（或 /bin/bash）。進入容器之後，你可以：用 env 查看環境變數是否正確設定；用 curl 測試從容器內部能不能連到其他服務（比如 curl http://my-service:8080）；用 cat 查看設定檔是否被正確掛載；用 ls 確認文件系統裡有哪些文件。
+
+注意：有些精簡版的容器 Image（比如 scratch based 或者 distroless Image）可能沒有 Shell，這時候 exec 就進不去。遇到這種情況，可以考慮臨時換一個包含工具的 debug Image 來測試，或者使用 kubectl debug 指令，K8s 1.23+ 支援直接在 Pod 旁邊啟動一個 debug 容器，共享同一個 Network Namespace，讓你可以用 debug 容器來排查問題。
+
+進入容器執行的任何操作都是臨時的，容器重建後就消失了。如果需要修改設定，應該更新 ConfigMap 或 Secret，然後讓 Pod 重建，讓新的設定生效。這是正確的 K8s 工作流程——不要在容器裡面直接改東西，而是通過 K8s 的資源機制來管理設定。`,
     duration: "10"
   },
   // ── Slide 18 課程總結 ────────────────────────────
@@ -1326,7 +1370,9 @@ kubectl delete pod my-nginx 可以刪除 Pod。刪除後，Pod 就消失了。�
 
 下午見，午休愉快！记住把今天上午的五大核心點帶著走：K8s 架構（Control Plane + Worker Node）、四個核心物件（Pod / ReplicaSet / Deployment / Service）、宣告式管理、Minikube 叢集操作、以及 kubectl 基礎指令。這是 K8s 旅程的起點，接下來每天都會越來越有趣！
 
-期待大家下午的實作，有問題隨時提問！繼續加油，Kubernetes 的大門已經為你們打開了！ 加油！下午見大家！☸️`,
+期待大家下午的實作，有問題隨時提問！繼續加油，Kubernetes 的大門已經為你們打開了！ 加油！下午見大家！☸️
+
+補充一個學習資源給大家：K8s 官方有一個互動式的線上教學平台叫做 Katacoda，直接在瀏覽器裡面就有一個完整的 K8s 環境可以練習，不需要安裝任何東西。如果你在家練習的時候 Minikube 出問題了，可以先用 Katacoda 繼續學習。另外，CNCF 也有一個免費的線上課程叫做 Kubernetes and Cloud Native Essentials，對於系統性地學習 K8s 生態系非常有幫助。這些資源加上今天的課程，你的 K8s 之路已經有了很好的起點！期待下午繼續一起探索！最後再提醒一次：上午的核心重點是理解 K8s 的架構全景，下午的重點是動手實作。理論和實作缺一不可，今天是個非常完整的學習旅程，大家加油！午餐吃飽，養足精神，下午我們繼續全力衝刺，動手實作出屬於自己的第一個 K8s 部署！`,
     duration: "10"
   },
 ]

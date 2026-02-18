@@ -1341,7 +1341,23 @@ Kubernetes 在 Docker 的基礎上加了「叢集管理」——多台機器、�
 
 **課後練習建議**
 
-回去之後，試著用 Docker 跑一個你實際會用到的服務——比如 docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=secret mysql，或是 docker run -d -p 6379:6379 redis。然後用 docker exec 進去操作，用 docker logs 看日誌，加上 Volume 讓資料持久化。把今天課上的技能應用在真實的服務上，是最快的鞏固方式。`,
+回去之後，試著用 Docker 跑一個你實際會用到的服務——比如 docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=secret mysql，或是 docker run -d -p 6379:6379 redis。然後用 docker exec 進去操作，用 docker logs 看日誌，加上 Volume 讓資料持久化。把今天課上的技能應用在真實的服務上，是最快的鞏固方式。
+
+**給你的課後挑戰**
+
+如果你想在回家後繼續加強，這裡有幾個難度遞增的挑戰：
+
+挑戰一（入門）：用 Docker 跑一個 PostgreSQL 資料庫，加上 Named Volume 讓資料持久化，加上 -e 注入資料庫名稱和密碼，然後用 docker exec 進去用 psql 建立一個資料表，重啟容器確認資料還在。
+
+挑戰二（進階）：同時跑兩個 nginx 容器，一個用 Bind Mount 掛本地的 HTML 目錄，一個用 Named Volume，分別映射到不同的 Port（8080 和 8081），確認兩個都能正常訪問。理解兩者在開發和正式環境使用場景的差別。
+
+挑戰三（探索）：拉一個你工作中用到的服務的 Docker Image（比如 Redis、MongoDB、Elasticsearch），閱讀 Docker Hub 上它的說明文件，找出它需要哪些環境變數、預設暴露哪個 Port、推薦的 Volume 掛載路徑是什麼，然後把它跑起來。
+
+挑戰四（綜合）：模擬一個簡單的兩層架構：一個後端 API（可以用 Python Flask 或 Node.js Express，任何你熟悉的）和一個 MySQL 資料庫，都跑在容器裡。讓 API 容器連到 DB 容器（提示：要讓兩個容器能互通，需要把它們放在同一個 Docker 網路裡，搭配 --network 選項和 docker network create）。這個練習會讓你遇到很多實際問題，解決這些問題的過程就是最好的學習。
+
+**下一堂課預告**
+
+下一堂課我們要學：Dockerfile（怎麼建自己的 Image）、docker-compose（用 YAML 定義多容器應用）、以及正式踏入 Kubernetes 的大門。這三個主題都建立在今天的基礎上——你今天越熟練，下一堂課就越順。加油！`,
     duration: "10"
   },
 

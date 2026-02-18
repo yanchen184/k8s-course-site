@@ -270,7 +270,13 @@ YAML 用縮排來表示層次結構，這是 YAML 最重要的規則，也是最
 
 還有一個你不能直接設定、但會出現在 kubectl get 輸出裡的欄位是 status，那是 K8s 根據實際情況自動填入的，記錄這個資源「目前實際的狀態」，比如 Pod 的 IP、Container 的啟動狀況、Deployment 的當前副本數等。K8s 的核心設計哲學就是不斷對比 spec（你想要什麼）和 status（現在是什麼），然後透過控制器的 reconcile loop 調整，讓 status 趨近 spec。這個 desired state 的設計讓 K8s 非常強大——你宣告你要什麼，K8s 負責實現，就算中間有節點故障、容器崩潰，K8s 也會自動修復回你要的狀態。
 
-實際工作中，你可能會遇到有人說「這個資源的 spec 是什麼？」或者「status 顯示什麼？」，現在你就知道這兩個詞代表的意義了。花幾分鐘把這個四欄位的結構記熟，之後看任何 YAML 檔，你都能快速理解它的意圖。接下來我們就把這個框架套用到最基礎的 Pod YAML 上，讓它從抽象概念變成真實可以 apply 的設定檔。`,
+實際工作中，你可能會遇到有人說「這個資源的 spec 是什麼？」或者「status 顯示什麼？」，現在你就知道這兩個詞代表的意義了。花幾分鐘把這個四欄位的結構記熟，之後看任何 YAML 檔，你都能快速理解它的意圖。接下來我們就把這個框架套用到最基礎的 Pod YAML 上，讓它從抽象概念變成真實可以 apply 的設定檔。
+
+補充一個你在實際工作中很快就會遇到的問題：怎麼知道某個 kind 對應的 apiVersion 是什麼？最直接的方法是跑 kubectl api-resources 指令，它會列出目前叢集支援的所有資源類型，以及每個資源對應的 API 群組（APIGROUP 欄位）和版本（VERSION 欄位）。比如你想知道 Deployment 的 apiVersion，就在輸出裡找 KIND=Deployment，看到 APIGROUP=apps，所以 apiVersion 就是 apps/v1。另一個非常有用的指令是 kubectl explain，可以讓你查詢任何資源的欄位說明，比如 kubectl explain pod.spec.containers 會顯示 containers 欄位的說明和它可以包含哪些子欄位，幾乎就是把官方文件帶在本機隨查隨用，在沒有網路的環境裡特別有救。
+
+關於 apiVersion 的版本演進有一件事值得了解：K8s 的 API 有穩定（GA/stable）和測試（alpha、beta）之分。帶有 alpha 的 API 版本可能在任何時候被刪除、行為可能改變，不建議在生產環境使用；帶有 beta 的 API 基本上已經定型但細節還可能有小幅調整；只有去掉版本前綴（直接是 v1 或 apps/v1 這種）才是穩定的 GA API。從 K8s 1.16 版開始有幾個重要的 API 版本棄用（deprecation），比如 Deployment 從 extensions/v1beta1 改成 apps/v1、Ingress 從 extensions/v1beta1 改成 networking.k8s.io/v1。如果你在網路上找到比較舊的 YAML 範本，要注意 apiVersion 可能過時，套用的時候 K8s 可能直接拒絕並回報 no kind registered 的錯誤，這時候就要把 apiVersion 更新成目前版本支援的正確路徑。
+
+還有一個讓 K8s YAML 撰寫體驗大幅提升的技巧：VS Code 搭配 Kubernetes 擴充套件，輸入任何欄位名稱都有自動補全和型別說明，而且能直接對照你目前連接的叢集做驗證。另外 kubectl apply --dry-run=client -f pod.yaml 這個乾跑（dry-run）模式非常實用：它只在本地驗證 YAML 格式正確性，不會真的把資源建立到叢集，輸出 configured 就表示格式沒問題；--dry-run=server 更進一步，把 YAML 送到 API Server 做完整驗證（包括 admission webhook）但不建立資源。在 CI/CD 的 YAML linting 步驟，dry-run 是標準流程之一，幫你在真正部署前先把格式問題抓出來。把這四個頂層欄位背熟，你就具備了讀懂和撰寫任何 K8s YAML 的基礎框架。`,
   },
 
   // ========== Pod YAML 最簡 Pod ==========
@@ -423,7 +429,13 @@ Events 區塊記錄了 K8s 對這個 Pod 做的每一個操作，包括「Schedu
 
 還有一個重要的 get 用法是加上 -o yaml 輸出原始的 YAML 格式，kubectl get pod nginx-pod -o yaml 可以看到 K8s 實際存在 etcd 裡的完整資源設定，包括 K8s 自動加入的 annotation 和 status 欄位，對理解 K8s 的內部運作非常有幫助。
 
-現在大家跟我一起操作：先確認你的 nginx-pod 在 Running 狀態，然後用 kubectl describe pod nginx-pod 看看輸出的內容，特別注意最下方的 Events 區塊，觀察 K8s 對這個 Pod 做了哪些操作。這個觀察習慣要從現在開始養成。`,
+現在大家跟我一起操作：先確認你的 nginx-pod 在 Running 狀態，然後用 kubectl describe pod nginx-pod 看看輸出的內容，特別注意最下方的 Events 區塊，觀察 K8s 對這個 Pod 做了哪些操作。這個觀察習慣要從現在開始養成。
+
+補充幾個常用的 get 選項組合。加 --watch 或 -w 持續監看狀態（前面學 Pod 生命週期有用過）；加 -A 或 --all-namespaces 看所有 namespace 的資源，等於做全叢集的資源盤點；加 --field-selector 用欄位值過濾，比如 kubectl get pods --field-selector=status.phase=Running 只列出 Running 的 Pod；加 -o name 只輸出資源名稱，在 Shell 腳本裡批次操作時很方便，比如 kubectl get pods -o name | xargs kubectl delete 批次刪掉所有 Pod。
+
+kubectl create 和 apply 的差別前面說了，但還有一個常被忽略的情境：kubectl create deployment nginx --image=nginx:1.25 可以用命令列直接建立 Deployment，不需要寫 YAML 檔，對於快速測試或教學示範非常方便。類似的還有 kubectl create configmap app-config --from-literal=APP_ENV=production，從命令列直接建立 ConfigMap。kubectl run nginx --image=nginx --rm -it -- bash 則是建立一個一次性的 Pod，進入互動模式，退出後（--rm）自動刪掉，非常適合用來做臨時的網路測試或環境驗證——比如在叢集裡起一個 busybox Pod，curl 某個 Service 的 IP，確認網路連通性，測完就消失，不留任何痕跡。
+
+一個非常重要的生產力習慣：善用 kubectl 的說明文件。kubectl --help 顯示所有子指令；kubectl get --help 顯示 get 的所有選項；kubectl explain pod 顯示 Pod 資源的欄位說明，kubectl explain pod.spec 一層層往下查。這些說明就在你的終端機裡，不需要查網路文件，是快速找到正確欄位名稱和用法的好方法。`,
   },
 
   // ========== kubectl logs/exec/delete ==========
@@ -473,7 +485,13 @@ delete 刪除資源。kubectl delete pod nginx-pod 刪除指定名稱的 Pod；k
 
 K8s 刪除資源的時候有一個「優雅停止期」（graceful termination period），預設 30 秒。K8s 先對容器發 SIGTERM 信號，給它機會優雅地完成當前處理、關閉連線、儲存狀態，30 秒後如果還沒停止，才強制發 SIGKILL。如果你想跳過等待立刻強制刪除，加 --grace-period=0 --force，但要注意強制刪除可能導致服務的客戶端連線直接被切斷，生產環境要謹慎。
 
-特別要注意一件事：直接用 kubectl apply -f pod.yaml 建立的 Pod，被 delete 了就不見了，K8s 不會自動幫你重建，因為沒有控制器在管它。只有 Deployment 這類工作負載控制器管理的 Pod，被刪了才會自動被重建補回來。這是很多初學者容易搞混的地方，等一下學 Deployment 的時候你就會完全理解這個差異了。`,
+特別要注意一件事：直接用 kubectl apply -f pod.yaml 建立的 Pod，被 delete 了就不見了，K8s 不會自動幫你重建，因為沒有控制器在管它。只有 Deployment 這類工作負載控制器管理的 Pod，被刪了才會自動被重建補回來。這是很多初學者容易搞混的地方，等一下學 Deployment 的時候你就會完全理解這個差異了。
+
+logs 還有一個非常實用的搭配：如果你要同時看多個 Pod 的 log（比如 Deployment 的所有三個副本），可以用 -l 選項加 label selector，kubectl logs -l app=nginx --prefix=true -f，這樣會同時追蹤所有帶有 app=nginx 標籤的 Pod 的 log，前綴加上 Pod 名稱方便辨認是哪個 Pod 的輸出。有一個更強大的社群工具叫 stern，可以用 pattern 匹配 Pod 名稱、同時追蹤多個 Pod 的 log，並且用不同顏色區分，在微服務架構裡同時追蹤多個服務的 log 比原生的 kubectl logs 好用很多，如果你的工作環境允許安裝額外工具，強烈推薦裝起來試試。
+
+exec 的安全注意事項：進入容器做任何修改都是臨時性的，容器重啟後就回到 image 的初始狀態。所以 exec 進去後可以查看、排查、測試，但不要把它當成持久化設定的方式。如果你需要修改容器的設定，正確做法是修改 ConfigMap 或 YAML，然後 apply 讓新的容器帶著正確的設定啟動。另外在某些強化安全的叢集環境裡，exec 的使用可能受到限制或需要特定的 RBAC 權限，這是正確的安全實踐——直接進入生產環境的容器屬於高風險操作，應該被限制和記錄。
+
+delete 的補充：kubectl delete deployment nginx-deployment 刪掉 Deployment 的時候，預設也會把它管理的所有 Pod（以及 ReplicaSet）一起刪掉，這個級聯刪除（cascade delete）行為讓你不用手動清理衍生資源。如果你只是想刪 Deployment 本身但保留 Pod（比如要換一個 Deployment 來接管這些 Pod），加 --cascade=orphan 選項。另一個常用場景：kubectl delete pods --all -n default 清空某個 namespace 裡的所有 Pod，搭配 Deployment 的時候，Pod 會立刻被重建補回來；如果沒有 Deployment，Pod 就真的全部刪光了，要確認你清楚自己在做什麼再執行。`,
   },
 
   // ========== Pod 生命週期觀察 ==========
@@ -527,7 +545,15 @@ ImagePullBackOff（或 ErrImagePull）也很常見，代表 K8s 拉不到指定�
 
 Terminating：Pod 正在關閉中，等待 grace period 結束（預設 30 秒）或容器自己優雅退出。如果 Pod 一直卡在 Terminating 停不下來，可以用 --grace-period=0 --force 強制刪除。
 
-現在請大家做個練習：先在一個終端機跑 kubectl get pods -w，然後在另一個終端機跑 kubectl delete pod nginx-pod，在第一個視窗觀察 Pod 從 Terminating 消失的過程；接著再跑 kubectl apply -f minimal-pod.yaml，觀察 Pod 從 Pending 到 ContainerCreating 到 Running 的完整生命週期。這種即時觀察非常有助於建立對 K8s 工作原理的直覺感。`,
+現在請大家做個練習：先在一個終端機跑 kubectl get pods -w，然後在另一個終端機跑 kubectl delete pod nginx-pod，在第一個視窗觀察 Pod 從 Terminating 消失的過程；接著再跑 kubectl apply -f minimal-pod.yaml，觀察 Pod 從 Pending 到 ContainerCreating 到 Running 的完整生命週期。這種即時觀察非常有助於建立對 K8s 工作原理的直覺感。
+
+幾個在 Pod 生命週期中值得深入理解的補充概念：
+
+Init containers（初始化容器）是 Pod spec 裡的另一個列表，在一般的 containers 之前執行，必須全部成功完成（exit code 0），一般容器才會開始啟動。常見用途包括：等待依賴服務就緒（比如用 busybox 做一個 until curl db-service; do sleep 1; done 的等待迴圈）、執行資料庫 migration 腳本、從 Secret 產生設定檔等。在 kubectl get pods 的輸出裡，如果看到 STATUS 是 Init:0/1，代表第一個 init container 還沒完成；Init:1/2 代表第一個完成了、第二個還在跑。Init container 掛掉同樣會觸發 CrashLoopBackOff，排查方式一樣是 kubectl logs 加 -c init容器名稱。
+
+RESTARTS 欄位的數字要特別留意。健康的長跑服務 RESTARTS 應該長期維持在 0，或在節點重啟後有很小的數字。如果你發現某個 Pod 的 RESTARTS 一直在增加——比如你早上看到 5，下午看到 12——代表這個服務在持續不穩定地崩潰重啟，必須認真排查根源，而不是置之不理讓它一直這樣跑下去。長期的 CrashLoopBackOff 既浪費資源（頻繁重啟消耗 CPU 和記憶體），也代表服務在間歇性地不可用，對用戶體驗和系統穩定性都是威脅。
+
+Pod 的 terminationGracePeriodSeconds（優雅停止期）預設是 30 秒，代表 K8s 發出 SIGTERM 之後，最多等 30 秒讓程式自己優雅關閉，才強制 SIGKILL。如果你的應用程式需要更長的時間做收尾（比如正在處理一個很長的任務、或需要把快取同步到資料庫），可以在 Pod spec 裡設定 terminationGracePeriodSeconds: 60（甚至更長）。同時你的應用程式也要正確處理 SIGTERM 信號，在收到 SIGTERM 後停止接受新請求、把當前請求處理完、然後退出——這才是真正的優雅關閉（graceful shutdown）。`,
   },
 
   // ========== Namespace 概念 ==========
@@ -580,7 +606,15 @@ K8s 預設建立幾個系統 namespace：default 是你不指定 namespace 時�
 
 還有一個很常見的 debug 場景：你跑 kubectl get pods 顯示 No resources found，但你確定剛才部署了東西。這種時候八成是 namespace 搞錯了，加上 -A 或 --all-namespaces 看看所有 namespace 的 Pod，很可能你的 Pod 就在某個你沒預期到的 namespace 裡。
 
-最後補充一個重要的知識點：不是所有的 K8s 資源都屬於某個 namespace。像 Node、PersistentVolume、StorageClass、ClusterRole 這類叢集層級的資源是 namespace 無關的（cluster-scoped），不屬於任何 namespace，用 kubectl get 不加 -n 就能查到全叢集的資源。你可以用 kubectl api-resources --namespaced=true 列出所有 namespace-scoped 的資源類型，--namespaced=false 列出叢集層級的資源類型。`,
+最後補充一個重要的知識點：不是所有的 K8s 資源都屬於某個 namespace。像 Node、PersistentVolume、StorageClass、ClusterRole 這類叢集層級的資源是 namespace 無關的（cluster-scoped），不屬於任何 namespace，用 kubectl get 不加 -n 就能查到全叢集的資源。你可以用 kubectl api-resources --namespaced=true 列出所有 namespace-scoped 的資源類型，--namespaced=false 列出叢集層級的資源類型。
+
+在實際的企業環境中，Namespace 的規劃非常值得用心思考，因為一旦叢集建起來各 team 開始進駐，再改 namespace 架構代價很高。幾個常見的設計模式值得了解：
+
+一是按環境（environment）分：dev、staging、production，這是最常見的入門做法，優點是直觀，缺點是所有服務混在同一個環境的 namespace 裡，不容易做服務層級的存取控制。二是按服務（service/application）分：payments、user-service、analytics，每個服務有自己的命名空間，搭配 RBAC 讓各服務的 owner team 只有自己 namespace 的操作權限，更適合微服務架構。三是混合模式：payments-dev、payments-production，服務名稱和環境的組合，每個服務在每個環境都有獨立的 namespace，隔離最清楚，但 namespace 數量會相當多，通常需要有自動化工具來建立和管理。
+
+ResourceQuota 和 LimitRange 是搭配 Namespace 使用的兩個重要資源。ResourceQuota 可以限制一個 namespace 裡所有資源的總用量上限，比如限制某個 namespace 最多跑 20 個 Pod、使用不超過 8 個 CPU 核心和 16 GB 記憶體，防止單一 team 把叢集資源吃光影響其他 team。你可以在同一個叢集裡給不同 namespace 設定不同的配額，實現多租戶（multi-tenancy）的資源隔離。LimitRange 設定 namespace 裡每個 Pod 或 Container 的預設 requests/limits 值和上下限約束，比如要求任何 container 的 memory limits 不超過 4Gi、如果沒有指定 CPU requests 就預設給 100m。這兩個資源搭配 RBAC，構成了多租戶 K8s 平台的基礎安全護欄。
+
+Namespace 還為 DNS 解析提供範圍。K8s 叢集內部，每個 Service 都有一個 DNS 名稱，格式是 service名稱.namespace名稱.svc.cluster.local。同一個 namespace 內的 Pod 可以用短名稱（只用 service名稱）存取同 namespace 的 Service；跨 namespace 必須用完整名稱。這個 DNS 設計讓你在同一套應用架構裡，dev 和 production 的 Pod 都可以用相同的 Service 名稱找到各自 namespace 裡的服務，設定檔完全一樣，只是部署到不同的 namespace。這個特性在多環境管理中非常有用，你可以用完全相同的 YAML（只改 namespace）部署到任何環境。`,
   },
 
   // ========== 休息 ==========
@@ -680,7 +714,19 @@ template 是建立 Pod 的模板，裡面的 metadata.labels 和 spec 的結構�
 
 一個很多人一開始搞不清楚的點：Deployment 不直接管理 Pod，而是管理一個中間層叫做 ReplicaSet，再由 ReplicaSet 去管理 Pod。你跑 kubectl get all 會看到三層：deployment → replicaset → pod。每次你更新 Deployment 的 template（比如換一個新的 image），K8s 會建立一個新的 ReplicaSet，然後慢慢把 Pod 從舊 ReplicaSet 切換到新 ReplicaSet——這就是滾動更新的機制。舊的 ReplicaSet 不會馬上刪掉，保留起來是為了支持回滾功能。一般來說你不需要直接操作 ReplicaSet，操作 Deployment 就夠了。
 
-現在跟著我一起操作：把這份 YAML 存成 nginx-deployment.yaml，kubectl apply 套用，然後用 kubectl get pods 看三個 Pod 被建立出來；再用 kubectl get deployment 看 Deployment 的狀態，READY 欄位顯示 3/3 就代表三個副本都已就緒；用 kubectl get replicaset 看中間那層 ReplicaSet。接著做一個驗證：用 kubectl delete pod 刪掉其中一個 Pod，然後立刻觀察，你會看到 K8s 馬上自動建立一個新的 Pod 補回來，這就是 Deployment 的自我修復能力。`,
+現在跟著我一起操作：把這份 YAML 存成 nginx-deployment.yaml，kubectl apply 套用，然後用 kubectl get pods 看三個 Pod 被建立出來；再用 kubectl get deployment 看 Deployment 的狀態，READY 欄位顯示 3/3 就代表三個副本都已就緒；用 kubectl get replicaset 看中間那層 ReplicaSet。接著做一個驗證：用 kubectl delete pod 刪掉其中一個 Pod，然後立刻觀察，你會看到 K8s 馬上自動建立一個新的 Pod 補回來，這就是 Deployment 的自我修復能力。
+
+除了 replicas、selector 和 template 這三個核心欄位，Deployment 的 spec 還有幾個重要設定值得了解：
+
+spec.strategy 控制 Deployment 更新 Pod 的策略，有兩種：RollingUpdate（預設值）和 Recreate。Recreate 策略會先刪除所有舊的 Pod，再建立新的，整個過程中有一段服務中斷時間，適合不能新舊版本同時跑的應用（比如程式版本和資料庫 schema 有嚴格對應關係的情況）。RollingUpdate 就是我們說的逐步替換，服務不中斷。在 spec.strategy.rollingUpdate 裡有兩個子欄位：maxUnavailable（最多幾個 Pod 可以不可用，預設 25%）和 maxSurge（最多可以超過 replicas 幾個 Pod，預設 25%）。對於追求高可用的服務，建議設 maxUnavailable: 0、maxSurge: 1，確保任何時刻都有足夠的副本在服務。
+
+spec.progressDeadlineSeconds 設定 Deployment 更新最多等幾秒，超過就視為更新失敗並在 status 裡記錄 Progressing: False。預設 600 秒（10 分鐘）。如果你的應用程式啟動比較慢（比如 JVM 的 Spring Boot 應用要 2-3 分鐘才能起來），要把這個值調大，不然 K8s 可能在應用還在正常啟動中就判定更新失敗，觸發不必要的告警。
+
+spec.minReadySeconds 設定一個 Pod 就緒後，要再等幾秒才算真正 available，預設是 0。設一個值（比如 30 秒）可以讓 K8s 在 Pod 就緒後多觀察一段時間，確認它是真的穩定在跑而不是剛啟動就要崩潰，然後才繼續更新下一個 Pod，提高滾動更新的安全性。
+
+有一個特別容易讓初學者踩坑的地方：selector.matchLabels 一旦設定就不能修改，即使只是加一個 label 都不行。K8s 在設計上不允許修改 Deployment 的 selector，原因是 selector 變化會導致管理的 Pod 集合改變，可能造成 orphan Pod 或錯誤地接管別的 Pod。如果你真的需要改 selector，唯一的辦法是刪掉整個 Deployment 再重建。刪 Deployment 預設也會刪掉它建立的所有 Pod——可以加 --cascade=orphan 讓 Deployment 被刪但 Pod 繼續跑著，然後建立新 Deployment 讓它接管這些 Pod。
+
+幾個快速操作 Deployment 的 kubectl 技巧：kubectl scale deployment nginx-deployment --replicas=5 直接調整副本數；kubectl rollout restart deployment/nginx-deployment 強制滾動重啟所有 Pod（image 不變，但 Pod 重建），在你更新了 ConfigMap 但 Pod 用環境變數注入（需重啟才能讀到新值）的時候特別有用；kubectl get deployment -o wide 看 Deployment 目前使用的 image、ready 數量等詳細資訊。`,
   },
 
   // ========== 滾動更新 ==========
@@ -739,7 +785,25 @@ kubectl rollout status 是查看滾動更新進度的指令，執行後會一直
 
 kubectl rollout history 可以查看 Deployment 的歷史更新記錄，每次更新會建立一個新的 revision 號碼（1、2、3……）。預設 K8s 保留最多 10 個歷史 revision（可以用 spec.revisionHistoryLimit 調整）。搭配 kubectl rollout history deployment/nginx-deployment --revision=2 可以看指定 revision 的詳細資訊，包括那個版本使用的是什麼 image。
 
-要讓 CHANGE-CAUSE 欄位顯示有意義的資訊（而不是 none），可以在 kubectl apply 的時候加上 annotation：kubectl annotate deployment nginx-deployment kubernetes.io/change-cause="更新 nginx 到 1.26，修復 CVE-2024-xxx 安全漏洞"，或者直接在 YAML 的 metadata.annotations 裡寫好，這樣每次 apply 的時候 change-cause 就自動記錄下來，是非常好的文件化習慣。`,
+要讓 CHANGE-CAUSE 欄位顯示有意義的資訊（而不是 none），可以在 kubectl apply 的時候加上 annotation：kubectl annotate deployment nginx-deployment kubernetes.io/change-cause="更新 nginx 到 1.26，修復 CVE-2024-xxx 安全漏洞"，或者直接在 YAML 的 metadata.annotations 裡寫好，這樣每次 apply 的時候 change-cause 就自動記錄下來，是非常好的文件化習慣。
+
+來說一個在真實場景中非常重要的概念：readinessProbe 和滾動更新的關係。K8s 的滾動更新是這樣判斷新 Pod 是否就緒的：如果你沒有設定 readinessProbe，K8s 只看容器是否成功啟動，一旦啟動就視為就緒，馬上開始替換下一個舊 Pod。但問題是容器啟動和「應用程式真的準備好接受流量」之間可能有幾秒到幾十秒的差距——JVM 應用需要 JIT warmup、資料庫連線池需要建立連線、快取需要預熱。如果 K8s 太快判定 Pod 已就緒，真實流量就可能在應用程式還沒準備好的時候就打進來，導致短暫的 500 錯誤。
+
+readinessProbe 設定範例（HTTP 健康檢查）：
+
+\`\`\`yaml
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 3
+\`\`\`
+
+initialDelaySeconds 告訴 K8s 容器啟動後等幾秒才開始探，給應用程式一點啟動時間；periodSeconds 是探測間隔；failureThreshold 是連續失敗幾次才算失敗。滾動更新時，只有新 Pod 通過 readinessProbe 才算真正就緒，K8s 才會繼續替換下一個舊 Pod，大幅減少部署期間的錯誤率。
+
+如果你在 kubectl rollout status 監控過程中發現更新卡住不動，很可能是新 Pod 一直沒辦法通過 readinessProbe，導致 K8s 不敢繼續替換舊 Pod。用 kubectl describe 查看新 Pod 的 Events，找到 Readiness probe failed 的訊息，看看是什麼 HTTP 狀態碼或錯誤訊息，就能找到問題所在。`,
   },
 
   // ========== 版本回滾 ==========
@@ -782,7 +846,15 @@ pause 和 resume 是一對非常強大的指令組合，可以用來實現一種
 
 一個進階的使用情境：在 CI/CD pipeline 裡，你可以先 pause，部署一個 Pod，跑快速冒煙測試，測試通過再 resume。這樣比起直接全量更新更保守，適合改動比較大的版本。
 
-最後要提一個限制：kubectl rollout undo 只能回到有歷史記錄的 revision，如果 revisionHistoryLimit 設得太小（比如設成 0 就完全不保留歷史），你就沒辦法回滾了。所以在追求節省 etcd 空間的同時，要在 revisionHistoryLimit 和回滾能力之間做適當的取捨，通常保留 3-5 個版本就夠用了。`,
+最後要提一個限制：kubectl rollout undo 只能回到有歷史記錄的 revision，如果 revisionHistoryLimit 設得太小（比如設成 0 就完全不保留歷史），你就沒辦法回滾了。所以在追求節省 etcd 空間的同時，要在 revisionHistoryLimit 和回滾能力之間做適當的取捨，通常保留 3-5 個版本就夠用了。
+
+來說說在實際生產環境中，回滾決策的流程通常是怎麼跑的。大型組織通常有 SRE（Site Reliability Engineering）團隊負責服務的可靠性，當一次部署上線後，他們會觀察一組關鍵指標（SLI，Service Level Indicator）：錯誤率（Error Rate）、延遲（Latency P99）、成功請求數（Throughput）。如果這些指標在部署後出現明顯的惡化（超過預先設定的 SLO 閾值），就觸發自動或手動的回滾。
+
+現代的 SRE 實踐裡，回滾決策越快越好。有的組織有全自動回滾機制：部署後 5 分鐘內如果錯誤率超過閾值，系統自動跑 kubectl rollout undo，然後發告警通知工程師查問題。這種「部署後自動驗證加自動回滾」的模式大幅降低線上事故的影響範圍，讓工程師可以更放心地頻繁部署。
+
+GitOps 場景下，回滾做法略有不同。GitOps 的核心原則是 Git 是唯一真相來源，所有部署變更都透過 Git commit 觸發。在 GitOps 裡「回滾」不是跑 kubectl rollout undo，而是在 Git 裡做一個 revert commit，把 YAML 還原到舊的狀態，GitOps 工具（比如 ArgoCD 或 Flux）自動把叢集同步到 revert 後的狀態。這樣所有操作都有 Git 歷史記錄，誰在什麼時候為什麼回滾，在 commit message 裡清清楚楚，符合 compliance 和 audit 的要求。
+
+培養「每次部署後要觀察一段時間」的習慣：不要部署完就走人，留個 10-15 分鐘觀察監控指標和 log，發現問題能立即回應，把影響降到最低。配合 rollout undo 的秒級回滾能力，讓你在「快速推進」和「系統穩定」之間取得最佳平衡。`,
   },
 
   // ========== ConfigMap ==========
@@ -842,7 +914,34 @@ ConfigMap 的 data 欄位支援兩種格式：一是簡單的鍵值對，像 APP
 
 實際操作：先 kubectl apply 建立 ConfigMap，然後用 kubectl get configmap app-config -o yaml 確認它的內容；接著建立引用這個 ConfigMap 的 Pod，進入容器後用 env 指令查看環境變數，確認 APP_ENV 和 LOG_LEVEL 都正確注入了。
 
-最後的重要提醒：ConfigMap 是用來存一般的非敏感設定值。千萬不要把密碼、資料庫連線字串（含密碼）、API 金鑰、TLS 私鑰這類敏感資訊放進 ConfigMap，因為 ConfigMap 的內容在 K8s 裡是明文儲存的，有 kubectl get configmap 權限的人都能直接看到內容。敏感資訊要用 Secret，Secret 雖然預設只是 Base64 編碼（不是真正的加密），但它有專門的存取控制機制，在 etcd 可以設定 encryption at rest，在 RBAC 上可以更精細地限制誰能讀取哪些 Secret。有些組織會搭配外部的 Secret 管理工具，比如 HashiCorp Vault 或 AWS Secrets Manager，讓 Secret 的管理更加安全和完整。`,
+最後的重要提醒：ConfigMap 是用來存一般的非敏感設定值。千萬不要把密碼、資料庫連線字串（含密碼）、API 金鑰、TLS 私鑰這類敏感資訊放進 ConfigMap，因為 ConfigMap 的內容在 K8s 裡是明文儲存的，有 kubectl get configmap 權限的人都能直接看到內容。敏感資訊要用 Secret，Secret 雖然預設只是 Base64 編碼（不是真正的加密），但它有專門的存取控制機制，在 etcd 可以設定 encryption at rest，在 RBAC 上可以更精細地限制誰能讀取哪些 Secret。有些組織會搭配外部的 Secret 管理工具，比如 HashiCorp Vault 或 AWS Secrets Manager，讓 Secret 的管理更加安全和完整。
+
+讓我補充 ConfigMap 掛載成 Volume 的具體寫法，這是另一個很常見的使用模式，特別適合需要整個設定檔的應用程式，比如 nginx 設定、Prometheus scrape config、應用程式的 YAML/JSON 設定檔等。
+
+Volume 掛載的 YAML 寫法，在 Pod spec 的 volumes 列表宣告 volume 來源是 ConfigMap：
+
+\`\`\`yaml
+spec:
+  volumes:
+  - name: config-volume
+    configMap:
+      name: app-config
+  containers:
+  - name: my-app
+    image: my-app:1.0
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/app/config
+      readOnly: true
+\`\`\`
+
+這樣 ConfigMap 裡的每個 key 都會變成 /etc/app/config/ 目錄下的一個檔案，key 名是檔名，value 是檔案內容。如果你的 ConfigMap 有 config.yaml 這個 key，掛載後就會有 /etc/app/config/config.yaml 這個檔案。如果只想掛特定幾個 key 而不是全部，可以在 volume 的 configMap 裡用 items 欄位指定對應關係。
+
+Volume 掛載有一個非常重要的優點：ConfigMap 更新後，掛載的檔案內容大約在 1-2 分鐘內會自動同步更新，不需要重啟 Pod。但環境變數注入（envFrom 或 env.valueFrom）不會自動更新，必須重啟 Pod 才能讀到新值。所以如果你的應用程式支援熱重載（hot-reload），用 Volume 掛載搭配熱重載，可以做到完全不重啟 Pod 就更新設定，對服務可用性更友好。比如 nginx 的 nginx -s reload 指令、很多 Java 應用的 /actuator/refresh endpoint，都可以和 ConfigMap Volume 掛載配合做到動態設定更新。
+
+ConfigMap 的大小限制是 1 MiB（1,048,576 bytes）。如果你的設定檔超過這個大小，就需要考慮別的方案，比如把設定存在外部的設定服務（Consul、etcd）或物件儲存（S3、GCS），然後在應用程式啟動時從外部讀取。
+
+實際工作中的一個重要提醒：確保 ConfigMap 在引用它的 Pod 之前就建立好。如果 Pod spec 引用的 ConfigMap 不存在，Pod 會卡在 Pending 或 ContainerCreating 狀態，kubectl describe 的 Events 裡顯示 configmap "app-config" not found 之類的錯誤。如果你用 kubectl apply -f 套用一個包含 ConfigMap 和 Deployment 的多文件 YAML（用 --- 分隔），把 ConfigMap 放在 Deployment 前面就能保證建立順序正確。在使用 Helm 或 GitOps 工具時，資源的依賴順序需要透過 hook 或 sync wave 機制來控制，這也是為什麼這些進階工具存在的原因之一。`,
   },
 
   // ========== Label 與 Selector ==========
@@ -908,7 +1007,36 @@ NetworkPolicy（網路策略，控制 Pod 間的網路流量）也是用 selecto
 
 Label 和 annotation 的區別也值得一提：annotation 也是鍵值對，但它無法被 selector 用來過濾，通常放的是非識別性的後設資訊，比如 CI/CD pipeline ID、部署工具版本、change cause 說明、負責人聯絡資訊等。大原則是：需要被 selector 篩選的資訊放 label，純粹記錄用的資訊放 annotation。
 
-動手練習：在你的 nginx Deployment 的 YAML 裡加上 env: staging 和 tier: frontend 兩個 label（放在 template.metadata.labels 裡），apply 之後用 kubectl get pods -l tier=frontend 篩選看看，確認 label 有正確設定；再用 kubectl get pods --show-labels 看所有 Pod 完整的 label 清單。最後試試 kubectl label pod nginx-pod-xxx env=production 動態加 label，然後 kubectl label pod nginx-pod-xxx env- 刪除這個 label，感受 label 的靈活性。`,
+動手練習：在你的 nginx Deployment 的 YAML 裡加上 env: staging 和 tier: frontend 兩個 label（放在 template.metadata.labels 裡），apply 之後用 kubectl get pods -l tier=frontend 篩選看看，確認 label 有正確設定；再用 kubectl get pods --show-labels 看所有 Pod 完整的 label 清單。最後試試 kubectl label pod nginx-pod-xxx env=production 動態加 label，然後 kubectl label pod nginx-pod-xxx env- 刪除這個 label，感受 label 的靈活性。
+
+Label Selector 除了 matchLabels（精確匹配），還支援一種更靈活的寫法叫做 matchExpressions，允許使用 In、NotIn、Exists、DoesNotExist 這幾種運算子，可以表達更複雜的選取邏輯。比如：
+
+\`\`\`yaml
+selector:
+  matchExpressions:
+  - key: env
+    operator: In
+    values: [staging, production]
+  - key: tier
+    operator: NotIn
+    values: [debug]
+\`\`\`
+
+這個 selector 選取 env 是 staging 或 production、且 tier 不是 debug 的 Pod。多個 matchExpressions 之間是 AND 邏輯，matchLabels 和 matchExpressions 可以一起用，兩者都要滿足。Exists 運算子不需要指定 values，只要有這個 key 就匹配，比如確認 Pod 有沒有打 debug 標籤。這種複合 selector 在大型多環境叢集裡非常有用。
+
+Label 和 Annotation 的區別值得再強調：Annotation 也是鍵值對，但無法被 selector 篩選，通常放非識別性的後設資訊。在 K8s 生態工具裡，Annotation 有很多約定俗成的用法：kubernetes.io/change-cause 記錄部署原因（rollout history 顯示的 CHANGE-CAUSE）、prometheus.io/scrape: "true" 讓 Prometheus 自動發現並抓取 metrics、sidecar.istio.io/inject: "true"/"false" 控制 Istio 是否注入 sidecar、kubectl.kubernetes.io/last-applied-configuration 讓 kubectl apply 的合併邏輯有所依據。這些都是各工具定義的「約定優於設定」（Convention over Configuration）慣例，看到這些 annotation 就知道哪個工具在使用它。
+
+K8s 官方推薦用 app.kubernetes.io/... 前綴的標準化 label：
+- app.kubernetes.io/name：應用程式名稱（如 mysql、redis）
+- app.kubernetes.io/instance：實例名稱（如 mysql-prod、redis-cache）
+- app.kubernetes.io/version：版本號（如 v5.7、1.13.1）
+- app.kubernetes.io/component：元件類型（如 database、cache、frontend、backend）
+- app.kubernetes.io/part-of：上層系統名稱（如 wordpress）
+- app.kubernetes.io/managed-by：管理工具（如 helm、argo-cd）
+
+使用這些標準化 label 的好處是，Helm、Prometheus、Grafana 等工具可以自動辨識你的應用架構，做分組和顯示，是多工具協作環境的重要基礎設施。
+
+K8s 在 Node 上也會自動打 topology label，比如 kubernetes.io/hostname（主機名）、topology.kubernetes.io/zone（可用區）、topology.kubernetes.io/region（地區）。你可以在 Pod 的 topologySpreadConstraints 欄位裡使用這些 label，控制 Pod 如何分散在不同的 zone 或 region 上，做到高可用的容災部署——比如設定你的三個副本分別放在三個不同的可用區，一個可用區整個掛掉，另外兩個還在服務。這是超大規模高可用架構的基礎設計，理解 label 在這個方向的延伸，讓你對 K8s 設計哲學有更深的理解。`,
   },
 
   // ========== 進階 kubectl 技巧 ==========
@@ -955,7 +1083,138 @@ Label 和 annotation 的區別也值得一提：annotation 也是鍵值對，但
 
 第三個是更進階的 exec 用法。如果你只是要執行一個指令而不想互動，可以直接在 -- 後面加指令，不加 -it。比如 kubectl exec nginx-pod -- cat /etc/nginx/nginx.conf 直接印出設定檔，結果就輸出在終端機，馬上回到命令提示符。如果 Pod 有多個容器，用 -c 指定要進入哪個容器。
 
-這三個技巧加上之前學的 logs 和 describe，構成了你 debug K8s 應用的完整工具箱。記住：出問題先看 describe，再看 logs，有需要就 exec 進去手動排查，用 port-forward 從外面測試服務。這套流程能解決九成以上的 K8s 問題。`,
+這三個技巧加上之前學的 logs 和 describe，構成了你 debug K8s 應用的完整工具箱。記住：出問題先看 describe，再看 logs，有需要就 exec 進去手動排查，用 port-forward 從外面測試服務。這套流程能解決九成以上的 K8s 問題。
+
+kubectl top 可以顯示 Node 和 Pod 的即時資源使用量（需要叢集安裝了 Metrics Server）。kubectl top nodes 顯示每個 Node 目前的 CPU 和記憶體使用量及佔比，快速判斷哪個 Node 已經接近資源上限；kubectl top pods 顯示每個 Pod 的即時 CPU 和記憶體使用量。這個指令在排查某個服務消耗過多資源時非常直接，也是設定合理 requests/limits 值的重要依據——跑一段時間後看實際用量，把 requests 設到平均值、limits 設到峰值的 1.5-2 倍，是常用的啟發式方法。
+
+kubectl diff 是常被忽略但非常有用的指令。kubectl diff -f deployment.yaml 會顯示如果你 apply 這份 YAML，叢集上的資源會有什麼變化——類似 git diff，顯示新增、刪除、修改的欄位。這讓你在真正 apply 之前先 review 變更，避免無意間改到不該改的東西，是 GitOps 或 code review 流程的好幫手。
+
+kubectl get 的輸出格式有很多選項：-o yaml 輸出完整 YAML（適合看 K8s 自動填入的欄位和 status）；-o jsonpath='{.status.podIP}' 用 JSONPath 表達式提取特定欄位，在 Shell 腳本裡自動化很實用；-o custom-columns='NAME:.metadata.name,STATUS:.status.phase' 自訂輸出欄位，只顯示你關心的資訊，格式更清晰。
+
+kubectl patch 可以用 JSON Patch 或 Merge Patch 格式局部修改資源，不需要 apply 整份 YAML。比如 kubectl patch deployment nginx-deployment -p '{"spec":{"replicas":5}}' 直接把 replicas 改成 5，在緊急情況下快速調整很方便。
+
+kubectl get events --sort-by=.lastTimestamp 可以看目前 namespace 所有的 Events 並按時間排序，快速看到最近發生了什麼事，在出問題時快速定位哪個 Pod 或資源出了狀況。Events 預設只保留一個小時，超過時間就看不到了，所以要趁熱查。
+
+最後說 kubectl 的生產力工具：alias k=kubectl 是最基本的省時 alias；kubectl 的自動補全（kubectl completion bash/zsh）讓資源名稱可以 Tab 補全，大幅減少打字錯誤；kube-ps1 在命令提示符顯示目前的 context 和 namespace，避免在錯誤的叢集執行指令；kubectx 和 kubens 這兩個工具讓你快速切換 context 和 namespace，在管理多叢集多 namespace 的環境裡幾乎是必裝工具。裝起來試試，你的 K8s 操作效率會提升很多。
+
+debug 場景的完整排查流程值得最後整理一遍：
+1. kubectl get pods 確認 Pod 狀態和 RESTARTS 次數
+2. kubectl describe pod Pod名 看 Events，找到具體的錯誤訊息  
+3. kubectl logs Pod名 --previous 看崩潰時的 log，找問題根源
+4. 根據錯誤類型決定下一步：設定問題查 ConfigMap/Secret、網路問題查 Service/NetworkPolicy、記憶體不足調 limits、程式 bug 查 code
+5. 必要時 kubectl exec 進容器手動排查環境
+6. 用 port-forward 從本機直接測試服務連通性
+
+掌握這套流程，你就有能力獨立排查九成以上的 K8s 問題。`,
+  },
+
+
+  // ========== kubectl debug 排查技術 ==========
+  {
+    title: 'kubectl debug 與容器排查技術',
+    subtitle: 'ephemeral containers、debug image、網路排查',
+    section: '進階技巧',
+    duration: '8',
+    content: (
+      <div className="space-y-4 font-mono text-sm">
+        <div className="bg-slate-800 p-3 rounded-lg">
+          <p className="text-slate-500 mb-1"># kubectl debug - K8s 1.18+ 支援</p>
+          <p><span className="text-slate-400">$ </span><span className="text-green-400">kubectl debug nginx-pod -it --image=busybox --share-processes</span></p>
+          <p><span className="text-slate-400">$ </span><span className="text-green-400">kubectl debug nginx-pod -it --image=nicolaka/netshoot</span></p>
+          <p className="text-slate-500 mt-2 mb-1"># 以 debug 模式複製 Pod（不影響原 Pod）</p>
+          <p><span className="text-slate-400">$ </span><span className="text-green-400">kubectl debug nginx-pod --copy-to=debug-pod --image=ubuntu:22.04 -it</span></p>
+        </div>
+        <div className="bg-slate-800 p-3 rounded-lg">
+          <p className="text-slate-500 mb-1"># 在 Node 上直接排查</p>
+          <p><span className="text-slate-400">$ </span><span className="text-green-400">kubectl debug node/worker-01 -it --image=busybox</span></p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs font-sans">
+          <div className="bg-blue-900/30 p-3 rounded-lg border border-blue-700/50">
+            <p className="text-blue-400 font-semibold">適用場景</p>
+            <p className="text-slate-300">• 原容器沒有 bash/sh<br/>• 需要網路診斷工具（curl, dig, tcpdump）<br/>• 不想影響正在服務的 Pod</p>
+          </div>
+          <div className="bg-green-900/30 p-3 rounded-lg border border-green-700/50">
+            <p className="text-green-400 font-semibold">常用 debug image</p>
+            <p className="text-slate-300">• busybox：基礎工具<br/>• nicolaka/netshoot：網路診斷全套<br/>• ubuntu：完整 Linux 環境</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: \`kubectl debug 是 K8s 1.18 之後加入的原生排查指令，解決了一個在實際工作中非常常見的痛點：很多 Production 用的容器映像為了最小化體積，只包含應用程式本身，沒有 bash、沒有 curl、沒有 ps 這些基本工具，導致你想用 kubectl exec 進去排查的時候，連一個 shell 都沒有。比如用 distroless image 打包的 Go 程式，image 裡只有一個靜態編譯的二進位檔，什麼工具都沒有，exec 進去根本什麼都做不了。
+
+kubectl debug 用兩種方式解決這個問題。第一種是注入 ephemeral container（臨時容器）：kubectl debug nginx-pod -it --image=busybox --share-processes，它在正在跑的 Pod 裡注入一個全新的 busybox 容器，這個容器可以和原容器共享 PID namespace，讓你可以用 ps 看到原容器的程序、用 nsenter 進入原容器的 network namespace 做網路排查，而且完全不影響原本的服務。Ephemeral container 是 Pod 已在跑之後臨時添加的，無法修改，重啟後就消失，真的是一次性的排查工具。
+
+第二種是複製 Pod 做 debug：kubectl debug nginx-pod --copy-to=debug-pod --image=ubuntu:22.04 -it，它把原 Pod 的設定完整複製一份，但把映像換成有工具的 ubuntu，啟動一個新的 debug Pod，讓你在不影響原本服務的情況下，在完全相同的設定環境裡做排查。你可以加 --set-image 換掉某個容器的映像，或加 --share-processes 共享程序命名空間。排查完之後手動刪掉這個 debug Pod 就好。
+
+nicolaka/netshoot 是一個在 K8s 社群非常受歡迎的 debug image，裡面包含了幾十個網路診斷工具：curl、wget、dig、nslookup（DNS 查詢）、ping、traceroute、nmap（連接埠掃描）、tcpdump（封包抓取）、iperf（頻寬測試）、ss、netstat 等等，幾乎你在排查 K8s 網路問題時用得到的所有工具都在裡面。當你的服務連不到另一個服務，第一步可以用 kubectl run netshoot --image=nicolaka/netshoot -it --rm -- bash 起一個臨時的 debug Pod，然後用 curl 或 dig 測試網路連通性和 DNS 解析，快速定位是應用層問題還是網路層問題。
+
+kubectl debug node/節點名 -it --image=busybox 可以在一個 Node 上起一個 debug Pod，並且掛載 Node 的根檔案系統到 /host 目錄，讓你可以直接看 Node 上的系統日誌（/host/var/log/）、查看 kubelet 的設定、檢查磁碟空間等 Node 層級的排查。這在懷疑是 Node 本身有問題（磁碟滿了、記憶體洩漏、內核錯誤）的時候特別有用。
+
+一個進階的網路排查場景：你有一個服務 A 怎麼樣都連不到服務 B，但看起來兩個 Service 的設定都正確。這時候系統性的排查步驟是：先確認 Pod IP（kubectl get pods -o wide），然後在服務 A 的 Pod 裡用 netshoot 直接 curl 服務 B 的 Pod IP，確認是 Pod 層面就不通（可能是 NetworkPolicy 限制）還是 Pod 直連 OK 但透過 Service 不行（可能是 Service selector 設錯或 endpoint 沒有 Ready）。用 kubectl get endpoints 服務名 確認 Service 的 endpoint 列表是否包含正確的 Pod IP，如果 endpoints 是空的，八成是 selector 不匹配——用 kubectl describe svc 看 selector，和 Pod 的 labels 逐一比對。\`,
+  },
+
+  // ========== 資源管理：ResourceQuota 與 LimitRange ==========
+  {
+    title: '資源管理：ResourceQuota 與 LimitRange',
+    subtitle: '多租戶叢集的資源護欄',
+    section: '資源管理',
+    duration: '7',
+    content: (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 font-mono text-sm">
+          <div className="bg-slate-800 p-3 rounded-lg">
+            <p className="text-slate-500 mb-1"># ResourceQuota - 整個 Namespace 的上限</p>
+            <p><span className="text-purple-400">apiVersion</span>: <span className="text-green-400">v1</span></p>
+            <p><span className="text-purple-400">kind</span>: <span className="text-yellow-400">ResourceQuota</span></p>
+            <p><span className="text-purple-400">metadata</span>:</p>
+            <p>  <span className="text-blue-400">name</span>: <span className="text-green-400">team-quota</span></p>
+            <p>  <span className="text-blue-400">namespace</span>: <span className="text-green-400">team-a</span></p>
+            <p><span className="text-purple-400">spec</span>:</p>
+            <p>  <span className="text-blue-400">hard</span>:</p>
+            <p>    <span className="text-blue-400">pods</span>: <span className="text-orange-400">"20"</span></p>
+            <p>    <span className="text-blue-400">requests.cpu</span>: <span className="text-orange-400">"4"</span></p>
+            <p>    <span className="text-blue-400">requests.memory</span>: <span className="text-orange-400">8Gi</span></p>
+            <p>    <span className="text-blue-400">limits.cpu</span>: <span className="text-orange-400">"8"</span></p>
+            <p>    <span className="text-blue-400">limits.memory</span>: <span className="text-orange-400">16Gi</span></p>
+          </div>
+          <div className="bg-slate-800 p-3 rounded-lg">
+            <p className="text-slate-500 mb-1"># LimitRange - 每個 Pod/Container 的預設值</p>
+            <p><span className="text-purple-400">apiVersion</span>: <span className="text-green-400">v1</span></p>
+            <p><span className="text-purple-400">kind</span>: <span className="text-yellow-400">LimitRange</span></p>
+            <p><span className="text-purple-400">metadata</span>:</p>
+            <p>  <span className="text-blue-400">name</span>: <span className="text-green-400">default-limits</span></p>
+            <p><span className="text-purple-400">spec</span>:</p>
+            <p>  <span className="text-blue-400">limits</span>:</p>
+            <p>  - <span className="text-blue-400">type</span>: <span className="text-green-400">Container</span></p>
+            <p>    <span className="text-blue-400">default</span>:</p>
+            <p>      <span className="text-blue-400">cpu</span>: <span className="text-orange-400">200m</span></p>
+            <p>      <span className="text-blue-400">memory</span>: <span className="text-orange-400">256Mi</span></p>
+            <p>    <span className="text-blue-400">defaultRequest</span>:</p>
+            <p>      <span className="text-blue-400">cpu</span>: <span className="text-orange-400">100m</span></p>
+            <p>      <span className="text-blue-400">memory</span>: <span className="text-orange-400">128Mi</span></p>
+            <p>    <span className="text-blue-400">max</span>:</p>
+            <p>      <span className="text-blue-400">memory</span>: <span className="text-orange-400">4Gi</span></p>
+          </div>
+        </div>
+        <div className="bg-k8s-blue/20 border border-k8s-blue/50 p-3 rounded-lg text-sm">
+          <p className="text-k8s-blue font-semibold">💡 搭配使用效果</p>
+          <p className="text-slate-300">ResourceQuota 設上限、LimitRange 設預設值與約束，形成多租戶叢集的資源護欄</p>
+        </div>
+      </div>
+    ),
+    notes: \`ResourceQuota 和 LimitRange 是 K8s 多租戶叢集管理的兩個重要工具，讓平台團隊能夠確保各個 team 的資源使用在合理範圍內，防止某一個 team 或服務把整個叢集的資源吃光，影響到其他 team。
+
+ResourceQuota 作用在 Namespace 層級，設定這個 namespace 裡所有資源的總用量上限。比如你的平台有 16 個 CPU core 和 32 GB 記憶體，你想把它平均分給 4 個 team，每個 team 的 namespace 就設一個 ResourceQuota：requests.cpu: "4"、requests.memory: 8Gi。這樣即使某個 team 的開發者想部署一個超大規格的 Pod 或大量增加 replica 數，只要超過配額就會被 K8s 拒絕，kubectl apply 會回報 exceeded quota 的錯誤。
+
+ResourceQuota 還可以限制各種資源的數量，不只是 CPU 和記憶體：pods（最多幾個 Pod）、services（最多幾個 Service）、secrets（最多幾個 Secret）、configmaps、persistentvolumeclaims 等。這讓你可以做很細粒度的配額管理。用 kubectl describe quota 指令可以看到某個 namespace 目前的配額使用情況，包括已用量和上限，方便做資源規劃。
+
+LimitRange 的作用在於設定 namespace 裡每個 Pod 或 Container 的預設 requests/limits 值，以及最大最小值的約束。當一個開發者沒有在 container spec 裡設定 resources 的時候，LimitRange 的 default 和 defaultRequest 值會自動套用，確保每個容器都有合理的資源設定，不會有完全不設 resources 的「裸容器」跑在叢集上吃掉不受控的資源。max 欄位設定上限——如果開發者設了超過 max 的 limits，K8s 也會拒絕建立。
+
+這兩個資源搭配使用是很常見的實踐：先用 LimitRange 確保每個容器都有預設的資源設定，再用 ResourceQuota 確保整個 namespace 不超過分配的總量。如果你是平台工程師或 SRE，在建立一個新的 namespace 給某個 team 使用時，順手也把 ResourceQuota 和 LimitRange 建好，是非常好的習慣，能防止很多因資源未受控而造成的叢集問題。
+
+一個常見的實際場景：某個 dev 環境的 namespace 裡，有人不小心把 Deployment 的 replicas 設成 100（可能是手誤或 HPA 配置錯誤），如果沒有 ResourceQuota，叢集可能被大量 Pending 的 Pod 淹沒，影響到所有 team 的部署。有了 ResourceQuota 的 pods: "20" 限制，最多只能建立 20 個 Pod，超過的都會被拒絕，影響範圍大幅縮小。這就是護欄（guardrail）的意義：不是不信任 team 成員，而是提前把邊界設好，讓人在邊界內自由發揮，不用擔心意外超出範圍。
+
+在了解這兩個資源的基礎上，你可以思考一個更大的議題：叢集的資源容量規劃（Capacity Planning）。你的叢集總共有多少 CPU 和記憶體？各個 namespace 的配額加起來不應該超過叢集的總容量（甚至要留一些餘量給系統元件和突發需求）。隨著 team 和服務的成長，配額也要定期 review 和調整。有些組織用 K8s 的 VPA（Vertical Pod Autoscaler）在觀察模式下分析各 Pod 的實際資源使用，自動生成建議的 requests/limits 值，大幅降低資源規劃的人工成本。這些都是 K8s 叢集管理的進階話題，等你把基礎操作熟悉了，就可以往這個方向深入。\`,
   },
 
   // ========== Q&A ==========
@@ -1016,6 +1275,21 @@ Label 和 Selector 是 K8s 資源互相關聯的機制，Deployment 找 Pod、Se
 
 最後是進階 kubectl 技巧：port-forward 做本地調試、cp 複製檔案、exec 進容器排查。
 
-今天的內容確實很多，不用擔心一下子記不住，這些都需要反覆操作才會熟悉。現在有大概 10 分鐘的 Q&A 時間，有任何問題都可以問，不管是今天的內容還是以前堆積的疑問都可以。下堂課我們會進入 Service 和 Ingress，讓你的應用程式能夠被外部存取，然後是 PV/PVC 存儲管理。今天辛苦了，大家表現得很好！`,
+今天的內容確實很多，不用擔心一下子記不住，這些都需要反覆操作才會熟悉。現在有大概 10 分鐘的 Q&A 時間，有任何問題都可以問，不管是今天的內容還是以前堆積的疑問都可以。下堂課我們會進入 Service 和 Ingress，讓你的應用程式能夠被外部存取，然後是 PV/PVC 存儲管理。今天辛苦了，大家表現得很好！
+
+讓我用一個實際的面試問題作為今天的收尾，這個問題非常經典：「當你的 Pod 一直在 CrashLoopBackOff，你的排查步驟是什麼？」
+
+理想的回答流程：
+第一步，kubectl get pods 確認 Pod 的狀態和 RESTARTS 次數，確認確實在 CrashLoopBackOff。
+第二步，kubectl describe pod Pod名稱，重點看 Events 區塊（有沒有 Failed、Back-off 等關鍵事件）和 Containers 區塊裡的 Last State（上次退出的狀態碼和原因）。
+第三步，kubectl logs Pod名稱 --previous 看前一次崩潰的 log，這通常是找問題根源最快的方式。如果 log 裡有明確的錯誤訊息（can't connect to database、config file not found、panic），就能直接定位問題。
+第四步，根據錯誤類型判斷下一步：設定問題去確認 ConfigMap 和 Secret；依賴服務連不到確認 Service 和 NetworkPolicy；記憶體不足調高 limits.memory；程式邏輯 bug 查 code 並修復後重新建 image。
+第五步，如果 log 不夠清楚，臨時把 Pod 的 command 改成 sleep 3600，讓容器不崩潰，然後 kubectl exec 進去手動執行原本的啟動指令，觀察完整輸出，找到根本原因。
+
+掌握這套排查流程，加上今天學的所有 kubectl 指令，你就有能力獨立排查大多數的 K8s 問題了。
+
+關於繼續深入學習 K8s 的建議：Kubernetes 官方文件（kubernetes.io/docs）是最權威的資料，Concepts 和 Tasks 這兩個部分特別適合建立系統性理解；Kelsey Hightower 的「Kubernetes The Hard Way」是進階學習的聖經，從零搭建 K8s 叢集，非常能深入理解底層機制；CKAD（Certified Kubernetes Application Developer）認證是不錯的學習目標，考試完全是實際操作題，準備過程本身就是很好的學習。
+
+今天是很充實的一天，你們從不認識 K8s 到現在能夠寫 YAML、部署 Deployment、做滾動更新、用 ConfigMap 管理設定，進步非常紮實。K8s 的學習曲線確實陡，但陡完之後的視野非常開闊——它是現代後端工程師最重要的技能之一，投資學好它絕對值得。繼續保持動手操作的習慣，下次課見！`,
   },
 ]

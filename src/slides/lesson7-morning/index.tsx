@@ -107,7 +107,15 @@ export const slides: Slide[] = [
 
 今天，第七天，我們要學安全和監控。這是讓 K8s 叢集從「能跑」升級到「企業級」的最後一塊拼圖！
 
-記得要持續複習前六天的內容，安全和監控建立在這些基礎之上！好，繼續看今天的內容！`,
+讓我幫大家畫一條學習脈絡：RBAC 安全設定需要理解 namespace 的概念（第四天）；Pod Security Context 建立在容器技術的理解之上（第二、三天）；Network Policy 需要理解 Pod 的標籤系統（第四天）；監控的 Prometheus 用到了 DaemonSet 和 ConfigMap（第五、六天）；日誌管理的 Fluent Bit 也是 DaemonSet 部署、掛載 HostPath Volume（第五、六天）。你看，每一個今天要學的主題，都跟前六天的某個概念有直接的連結！
+
+我特別想說說第五天學的 DaemonSet，今天在日誌管理那個章節你就會發現，Fluent Bit 正是用 DaemonSet 部署的——因為我們需要在每個節點上都跑一個 Fluent Bit 收集日誌。這就是 DaemonSet 設計出來的目的，現在看來是不是特別清晰？學習有時候就是這樣，前面學的東西，要等到後面遇到實際場景才能真正「點亮」。
+
+還有第六天的 Secret，今天在 RBAC 那個章節，我們會提到 default ServiceAccount 的 Token 其實就是以 Secret 的形式存放在叢集裡的。理解了這一點，你就能更深刻地理解為什麼要限制 Pod 對 Secret 的讀取權限，因為 Secret 裡面可能有非常敏感的認證資訊。
+
+所以，前六天的學習不是孤立的知識點，而是相互連結的知識網路。今天的課程，就是這張網路的最後一塊。學完今天，你就真的能把整個 Kubernetes 的技術棧，從最底層的 Linux 到最上層的安全和可觀測性，連成一個完整的圖像。
+
+記得要持續複習前六天的內容，安全和監控建立在這些基礎之上！帶著這樣的視角，我們繼續看今天的內容！`,
     duration: "5"
   },
   {
@@ -271,7 +279,19 @@ rules:
 
 最後，分享一個很實用的技巧：在 CKA 考試中，很多考題會要求你建立 RBAC，然後驗證。記住要先用 kubectl auth can-i 確認權限正確，再繼續做下一題。考試環境中，驗證一下能幫你避免因為設定錯誤而失分。
 
-另外，kubectl create role 和 kubectl create clusterrole 也支援直接在命令列指定 rules，比如：kubectl create role pod-reader --verb=get,list,watch --resource=pods -n production，這樣比寫 YAML 更快，在考試中非常有用。`,
+另外，kubectl create role 和 kubectl create clusterrole 也支援直接在命令列指定 rules，比如：kubectl create role pod-reader --verb=get,list,watch --resource=pods -n production，這樣比寫 YAML 更快，在考試中非常有用。
+
+我再補充幾個在生產環境設計 RBAC 時非常重要的考量。
+
+第一個是「帳號最小化」原則。每一個 ServiceAccount 只應該被一個服務使用，不要讓多個服務共用同一個 ServiceAccount。這樣的好處是：如果其中一個服務的 Token 洩漏，受影響的範圍就只限於這個服務的權限，不會波及其他服務。就像每個員工都有自己的門禁卡，而不是所有人共用一張萬能卡。
+
+第二個是「權限審計」的習慣。定期執行 kubectl get rolebinding,clusterrolebinding --all-namespaces -o wide，列出所有的角色綁定，確認沒有不應該存在的高權限綁定。很多安全問題都是因為開發者在測試時給了一個 ServiceAccount cluster-admin 的權限，之後忘記移除，結果這個漏洞一直存在。把這個審計工作納入定期安全檢查，能有效防範這類問題。
+
+第三個是「最小化 default ServiceAccount」。預設情況下，每個 namespace 都有一個 default ServiceAccount，Pod 如果沒有指定 serviceAccountName 就會自動使用 default。如果你的應用程式不需要存取 K8s API，你應該在 Pod 的 spec 裡設定 automountServiceAccountToken: false，這樣 K8s 就不會自動把 ServiceAccount Token 掛載到 Pod 裡，攻擊者就算進入了 Pod，也找不到可以呼叫 K8s API 的憑證。
+
+第四個是與外部 Identity Provider 整合。在大型企業裡，通常會有統一的身份管理系統（比如 Active Directory、Okta、LDAP）。K8s 可以通過 OIDC（OpenID Connect）協定與這些系統整合，讓用戶用公司帳號登入 K8s，而不是另外管理一套 K8s 的帳號。這樣的好處是：當某個員工離職，只需要在公司的 Identity Provider 停用帳號，他對 K8s 的存取權就自動失效，不需要在 K8s 裡逐一刪除。這是企業級 K8s 安全的重要實踐。
+
+這些 RBAC 的進階概念，是讓你從「會用 K8s」到「能安全地管理 K8s」的重要差距。掌握了這些，你在安全審計和設計企業級存取控制方案時，就有了充分的知識基礎！`,
     duration: "10"
   },
   {
@@ -566,7 +586,7 @@ from:
 
 測試 Network Policy 的時候，可以啟動一個臨時的 test Pod，然後用 kubectl exec 從裡面用 curl 或 wget 嘗試連接目標服務。如果 Network Policy 設定正確，不允許的連接應該會超時或被拒絕。
 
-設定 Network Policy 是一個逐步完善的過程，建議先在開發環境測試，確認所有正常的服務通信都沒有被意外阻斷，再部署到生產環境。
+設定 Network Policy 是一個逐步完善的過程，建議先在開發環境測試，確認所有正常的服務通信都沒有被意外阻斷，再部署到生產環境。最重要的心態是：先求有（先部署 default-deny），再求好（逐步精細化白名單），比什麼都不做強得多。
 
 最後，分享一個調試 Network Policy 的技巧。當你設定了 Network Policy 之後，如果服務突然無法通信，首先要排查的是：是否有 NetworkPolicy 意外阻斷了流量？
 
@@ -574,7 +594,7 @@ from:
 
 如果你使用的是 Cilium CNI，可以用 Hubble UI 來視覺化 Pod 之間的流量，非常直觀地看出哪些流量被允許、哪些被拒絕。這是排查 Network Policy 問題最高效的方式。
 
-調試 Network Policy 最快的方法是用 kubectl exec 進入一個 test Pod，然後用 curl 測試各個目標服務，這樣能直接確認哪些連線通、哪些被擋住。`,
+調試 Network Policy 最快的方法是用 kubectl exec 進入一個 test Pod，然後用 curl 測試各個目標服務，這樣能直接確認哪些連線通、哪些被擋住。確認完畢之後別忘了刪除這個 test Pod，因為測試用的 Pod 通常有較寬鬆的設定，不應該長期存在在叢集裡。`,
     duration: "11"
   },
   {
@@ -702,7 +722,15 @@ Metrics Server 最重要的用途除了讓 kubectl top 能用之外，還是 HPA
 
 順帶一提，HPA（Horizontal Pod Autoscaler）的工作原理是：定期從 Metrics Server 取得 Pod 的 CPU 使用率，和目標使用率（targetCPUUtilizationPercentage）比較，如果超過了，就增加 Pod 副本數；如果低於了，就減少 Pod 副本數（但不會低於 minReplicas）。這整個自動伸縮的機制，底層完全依賴 Metrics Server。所以在任何有 HPA 的叢集裡，Metrics Server 都是不可缺少的核心組件。
 
-你可以用 kubectl get hpa -n production 來查看 HPA 的狀態，裡面會顯示當前的 CPU 使用率、目標使用率、當前副本數和目標副本數，非常直觀。`,
+你可以用 kubectl get hpa -n production 來查看 HPA 的狀態，裡面會顯示當前的 CPU 使用率、目標使用率、當前副本數和目標副本數，非常直觀。
+
+我補充一個在實際工作中很常遇到的場景：某個工程師反映「我的 kubectl top 指令沒有輸出，說 Error from server (ServiceUnavailable)」。這幾乎都是因為 Metrics Server 沒有安裝，或是安裝了但還沒有正常啟動。解決步驟是：先用 kubectl get pods -n kube-system | grep metrics-server 確認 Metrics Server 的 Pod 狀態；如果是 CrashLoopBackOff，用 kubectl logs -n kube-system 查看錯誤；最常見的問題是 TLS 憑證驗證失敗，在非生產環境可以在 Metrics Server 的啟動參數加上 --kubelet-insecure-tls 來跳過驗證。
+
+還有一個容易讓人困惑的地方：Metrics Server 只能看到容器的 CPU 和記憶體使用量，看不到磁碟 I/O、網路流量、自定義業務指標等。如果你需要這些數據，就需要 Prometheus——它通過「Exporter」機制，可以收集幾乎任何你想要的指標。
+
+談到資源使用監控，有一個很重要的最佳實踐是：一定要為每個 Pod 設定 Resource Requests 和 Limits！Requests 告訴 K8s Scheduler「這個 Pod 需要多少資源」，讓 Scheduler 能夠把 Pod 調度到有足夠資源的節點；Limits 設定 Pod 能使用的資源上限，防止某個 Pod 耗盡整個節點的資源，影響到同節點其他的 Pod。Metrics Server 的數據加上 Resource Limits，讓你能清楚地看到每個 Pod 使用了多少配額，有沒有接近上限。
+
+如果某個 Pod 的 CPU 使用率長期都在 95% 以上接近 Limits，那就需要考慮增加 Limits 或者優化應用程式的性能；如果 CPU 使用率長期只有 10-20%，那可能 Limits 設太高了，可以適當降低，這樣能讓節點承載更多的 Pod，提升資源利用率。這種基於實際使用數據來調整資源配置的工作，就是 FinOps（雲端財務最佳化）的一部分，是很多公司的工程師現在很重視的技能。`,
     duration: "8"
   },
   {
@@ -761,7 +789,19 @@ Prometheus 還有告警功能，通過 Alertmanager 來管理和發送告警。�
 
 在 K8s 環境裡，kube-state-metrics 是一個很重要的組件，它把 K8s 物件的狀態（比如 Deployment 的期望副本數、實際副本數、Pod 的狀態等）轉換成 Prometheus 指標暴露出來。kube-prometheus-stack 會自動安裝 kube-state-metrics，讓你可以監控 K8s 物件的狀態，而不只是資源使用率。
 
-舉個例子，kube_deployment_status_replicas_unavailable 這個指標告訴你有多少個 Deployment 的副本是不可用的。如果你設定一個告警規則：當 kube_deployment_status_replicas_unavailable > 0 持續超過 5 分鐘時告警，就能及時發現部署問題。`,
+舉個例子，kube_deployment_status_replicas_unavailable 這個指標告訴你有多少個 Deployment 的副本是不可用的。如果你設定一個告警規則：當 kube_deployment_status_replicas_unavailable > 0 持續超過 5 分鐘時告警，就能及時發現部署問題。
+
+我想再分享幾個在生產環境用 Prometheus 的重要心得。
+
+第一個心得是關於「四個黃金訊號」（Four Golden Signals）。這是 Google SRE 書裡提出的概念，指的是監控任何一個服務時，最重要的四個指標：Latency（延遲，請求需要多少時間才能得到回應）、Traffic（流量，每秒有多少請求）、Errors（錯誤率，有多少請求失敗了）、Saturation（飽和度，系統資源被用了多少、還有多少餘裕）。這四個指標足以讓你在大多數情況下迅速判斷一個服務是否健康。在設計應用程式的 Prometheus 指標時，確保這四個黃金訊號都有被覆蓋到，是一個很好的起點。
+
+第二個心得是 Prometheus 的儲存管理。Prometheus 預設把數據存在本地磁碟，保留 15 天。在大型叢集裡，指標數量非常多，15 天的數據可能佔用幾十 GB 的磁碟。如果你需要更長的保留期（比如 90 天用於趨勢分析），或者需要高可用的 Prometheus，可以考慮 Thanos 或 Cortex 這兩個方案，它們讓 Prometheus 的數據可以儲存到 S3 或 GCS 這類物件存儲系統，實現長期保留和高可用。
+
+第三個心得是善用 Prometheus 的 Recording Rules（預計算規則）。有些 PromQL 查詢很複雜，每次執行都需要大量計算。Recording Rules 讓你可以預先計算這些查詢，把結果存成新的指標，這樣在 Grafana 裡查詢的時候就非常快，不會因為複雜查詢讓 Prometheus 負載過高。這對需要展示大量歷史數據的儀表板特別重要。
+
+第四個心得是 Prometheus Operator 的價值。kube-prometheus-stack 裡的 Prometheus Operator 讓你可以用 ServiceMonitor 和 PrometheusRule 這樣的 CRD 來管理 Prometheus 的配置，而不是直接修改 Prometheus 的 ConfigMap。這完全符合 GitOps 的精神：所有配置都用 YAML 描述，納入 Git 版本管理，通過 CI/CD 自動部署。當你的 SRE 團隊擴大，有多個人需要維護 Prometheus 配置時，用 CRD 的方式管理比手動修改 ConfigMap 安全可靠得多。
+
+Prometheus 是一個非常強大但也相當複雜的系統，業界有整本書專門在討論如何在生產環境運行 Prometheus。今天我們涵蓋的是最核心的概念和入門知識，真正在生產環境用的話，還需要持續深入學習。但掌握了今天這些基礎，你就有了很好的起點！`,
     duration: "11"
   },
   {
@@ -831,6 +871,8 @@ Alertmanager 的 receiver 設定決定告警發往哪裡。Slack 是最常用的
 
 在實際工作中，告警規則的設計是一個持續迭代的過程。建議從最關鍵的幾個指標開始（比如錯誤率、Pod 崩潰次數），先把高優先級的告警設好，然後根據 on-call 的反饋持續調整。每次收到告警之後，問自己：這個告警是否需要人立即介入？如果不需要，就考慮降低嚴重程度或增加 for 時間。告警規則就像程式碼一樣，需要持續維護和優化，才能發揮最大的價值。
 
+有一個很有用的概念叫「SLO（Service Level Objective，服務等級目標）」驅動的告警。傳統的告警是基於資源指標的（比如 CPU 超過 80% 告警），但這種告警跟用戶體驗的關聯不夠直接。SLO 驅動的告警是基於用戶能感知的指標：比如「99.9% 的請求延遲要在 200ms 以內」、「每個月的錯誤率不超過 0.1%」。當你監控到系統即將違反這些 SLO（稱為 Error Budget Burn Rate 過高），就發出告警。這種方式的好處是，每一條告警都直接對應到用戶體驗的影響，工程師能立刻理解告警的業務意義，從而做出更準確的優先級判斷。雖然 SLO 驅動的告警設計起來比較複雜，但它是 Google SRE 文化中非常核心的實踐，也是現代可靠性工程的發展方向。
+
 總結來說，好的告警系統讓你在問題影響用戶之前就能發現並修復，這是 SRE（網站可靠性工程）文化的核心精神！`,
     duration: "10"
   },
@@ -886,7 +928,19 @@ Grafana 的告警功能也很強大，可以在 Grafana 裡直接設定告警規
 
 對於想要深入學習 Grafana 的同學，我推薦去看 Grafana 的官方課程，他們有免費的 Grafana 101 課程，非常適合入門。
 
-最後一個建議：在 Grafana 裡，善用 Variables 功能。你可以定義變數（比如 namespace、pod_name），讓儀表板用戶可以動態選擇要查看的命名空間或 Pod，而不是每次都要修改查詢。這讓同一個儀表板可以複用於不同的服務和環境，大大提升儀表板的實用性。更多儀表板和 Grafana 使用技巧，可以去 grafana.com 官網查看文件！`,
+最後一個建議：在 Grafana 裡，善用 Variables 功能。你可以定義變數（比如 namespace、pod_name），讓儀表板用戶可以動態選擇要查看的命名空間或 Pod，而不是每次都要修改查詢。這讓同一個儀表板可以複用於不同的服務和環境，大大提升儀表板的實用性。
+
+讓我多分享幾個 Grafana 的實用技巧。第一個是「儀表板 as Code」——Grafana 支援把儀表板的設定匯出成 JSON 格式，然後納入 Git 版本控管。這樣當你的儀表板設定好之後，可以把 JSON 文件提交到 Git repo，其他人想要在新環境部署同樣的儀表板，只需要匯入 JSON 就好了，不需要手動重建。搭配 Grafana 的 Provisioning 功能（把儀表板 JSON 放到特定目錄，Grafana 會自動載入），就能在自動化部署的時候也把儀表板一起部署好。
+
+第二個是 Grafana Annotations（注解）。Annotations 讓你可以在圖表上打一個時間點的標記，比如「這個時間點我們做了一次部署」、「這個時間點系統發生了重啟」。有了這些標記，當你看到圖表上某個時間點的異常，可以立刻對照是不是有哪個操作導致的。在 CI/CD 流程裡，可以設定每次部署完成後，自動往 Grafana 發一個 Annotation，這樣就能在儀表板上清楚地看到每次部署對系統指標的影響。
+
+第三個是 Grafana Explore 功能。Explore 是一個交互式的查詢介面，特別適合臨時查詢和排查問題。你可以在 Explore 裡用 PromQL 自由探索各種指標，不需要在儀表板上加 Panel，查完就走。這對新手學習 PromQL 特別有用，你可以即時看到查詢結果，理解每個 PromQL 函數的效果。
+
+第四個是 Grafana 的多租戶管理。在大型企業裡，不同的團隊可能需要看不同的儀表板，但又不想讓他們看到其他團隊的數據。Grafana 支援通過 Organization 和 Team 來管理存取控制，不同的 Organization 之間完全隔離，不同的 Team 可以有不同的儀表板存取權限。
+
+說到 Grafana 的未來，Grafana Labs 這幾年不只在做視覺化工具，還推出了整個可觀測性平台：Grafana Loki（日誌）、Grafana Tempo（分散式追蹤）、Grafana Mimir（大規模 Prometheus）。這個生態的優點是所有工具都無縫整合在 Grafana 裡，讓你可以在一個介面裡同時看指標、日誌、追蹤，做關聯分析。這是可觀測性領域非常重要的發展趨勢，值得持續關注。
+
+更多儀表板和 Grafana 使用技巧，可以去 grafana.com 官網查看文件！`,
     duration: "7"
   },
   {
@@ -1215,7 +1269,23 @@ CKA 考試的形式很特別：它不是選擇題，而是完全的實作考試�
 
 好，我們午餐休息，下午一點見！下午我們要學習 K8s 的最佳實踐、架構設計模式、CI/CD，以及最重要的——職涯發展建議。下午的課程對你的職涯規劃非常有幫助，不要缺席！
 
-感謝大家七天的陪伴，希望這次課程是你 K8s 學習旅程的一個好的起點！`,
+在我們去吃午餐之前，我想跟大家做一個小小的思考練習。請問問自己：在這七天的學習裡，哪一個概念讓你最有「啊哈！原來如此」的感覺？是理解了 Pod 和 Deployment 的關係？是第一次成功跑起來一個 Ingress 路由？還是今天搞清楚了 RBAC 的五個核心物件？記住這個感覺，因為這就是學習的本質——把複雜的事物理解成自己能掌握的東西，然後在此基礎上繼續建立新的理解。
+
+我想說的是，七天的密集課程只是一個開始，不是終點。K8s 的世界非常廣大，還有很多我們來不及深入的主題：Service Mesh（Istio、Linkerd）、GitOps 工作流程（Argo CD、Flux）、多叢集管理、成本最佳化（FinOps）、K8s Operator 開發等等。這些都是業界非常熱門的技術，也是資深 K8s 工程師的必備知識。但這些都不是一週能學會的，而是要在有了紮實基礎之後，在實際工作中慢慢積累。
+
+給大家一個具體的行動計劃建議：這週做一個事情，在你的電腦上用 minikube 或 kind 建立一個本地 K8s 叢集，然後把你工作中現有的某個應用程式（就算只是一個簡單的 Web 服務）容器化，部署到這個本地叢集，加上 Service、Ingress、ConfigMap、HPA。這個小小的實踐，會讓你學到的知識真正固化成技能。
+
+下個月，如果你有辦法在工作中用 K8s 的環境（哪怕只是 staging 環境），嘗試把你們公司的某個服務部署上去，並且設定好 RBAC 和監控。能在真實工作環境中應用，是最快的學習方式。
+
+三個月後，考慮報名 CKA 考試。三個月的練習，配合 killer.sh 的模擬考試，通過 CKA 是完全可行的目標。CKA 認證對履歷的加分非常大，很多公司在篩選 K8s 工程師的時候，CKA 是一個重要的篩選條件。
+
+六個月後，如果你一直有在實踐，你對 K8s 的理解應該已經達到能夠獨立設計和維護生產叢集的程度了。這時候可以開始研究更進階的主題，或者考慮 CKS（Certified Kubernetes Security Specialist）認證，這是安全方面的進階認證。
+
+當然，這只是一個建議的路徑，每個人的情況不同，步調也不同。重要的是保持持續學習的習慣，不要因為離開這個課堂就停止成長。
+
+最後，我想說的是：你們今天完成了一件了不起的事——在七天之內，從基礎開始，建立了一套完整的 Kubernetes 知識體系。這不是每個人都做得到的事情，值得你為自己感到驕傲。接下來的路，雖然還很長，但你已經有了很好的起點。Keep learning, keep building, keep shipping！
+
+感謝大家七天的陪伴和信任，希望這次課程是你 Kubernetes 學習旅程中一個重要的里程碑！加油，大家都會有很好的未來！`,
     duration: "6"
   },
 ]

@@ -91,7 +91,13 @@ export const slides: Slide[] = [
 
 十一點十五到十一點三十五分學環境變數，讓 Linux 知道你的工具放在哪裡。
 
-最後五分鐘課程總結。整個安排非常緊湊，但每個主題都會有實作，大家務必跟上。`,
+最後五分鐘課程總結。整個安排非常緊湊，但每個主題都會有實作，大家務必跟上。
+
+讓我解釋一下為什麼這個順序這樣設計，這樣大家學起來才知道整體的脈絡。我們先學程序管理，因為這是最底層的概念——任何在 Linux 上執行的東西都是程序，不管是 nginx 服務還是一個 Python 腳本，本質上都是程序在記憶體裡跑著。懂了程序是什麼、怎麼查看、怎麼終止，才能理解「服務管理」是在管理什麼。接著學背景執行，是因為很多服務都需要在背景長期跑，而不是佔用一個終端機視窗。然後學 systemd，它是管理這些後台服務的高層框架，也是現代 Linux 的基礎架構。apt 讓你有能力安裝任何你需要的工具和套件。最後的環境變數則是讓所有工具能夠正確被系統找到、讓設定能夠持久存在的關鍵機制。每一個主題都為下一個打基礎，是有邏輯順序的。
+
+學完今天上午之後，你應該能夠做到這幾件事：在一台不熟悉的伺服器上，快速了解目前有哪些服務在跑、它們的狀態如何、資源使用情況；知道一個服務掛掉了，第一步要怎麼診斷；能夠安裝任何你需要的工具；設定好工作環境，讓指令可以在任何地方被找到、設定自己的 alias 提升效率。這些都是工程師上工第一天就需要具備的基本技能，也是後面學 Docker 和 Kubernetes 的基礎。
+
+有幾個學習小建議跟大家分享。今天的實作很多，請務必跟著動手操作，不要只是看。看懂和會做是完全不同的兩個層次，工作中需要的是後者。如果某個步驟沒跟上，請馬上舉手，不要等到後面更複雜的內容才說不會——因為後面的內容都建立在前面的基礎上，一個環節沒學到，後面會越來越難跟上，最後只會越來越挫折。助教就在旁邊，任何時候都可以舉手求助，這不是示弱，這是聰明地利用資源。另外，今天下課後請把今天的操作回家再做一遍，不看投影片、從記憶中把整個流程跑一遍，如果卡住了再查，這種主動提取的練習，是記憶鞏固效果最好的方法，遠比反覆看教材管用得多。`,
     duration: '2',
   },
 
@@ -213,6 +219,10 @@ nano 的操作也要再複習一遍，因為接下來今天會大量使用：Ctr
 程序之間還有「父子關係」。你在 bash 裡執行一個指令，那個指令的程序就是 bash 的子程序。父程序結束了，子程序可能也跟著結束，這個機制跟今天後面要學的背景執行和 nohup 息息相關。
 
 在 Linux 系統上，從你登入的那一刻起，就已經有幾百個甚至上千個程序在跑了：有負責系統初始化的 systemd（PID 1）、有 SSH 連線的 sshd、有你的 shell（bash 或 zsh）、有各種背景服務。這些程序共同維持著系統的運作。你可以把它想成一個龐大的生態系統，每個程序各司其職。
+
+一個程序從誕生到消亡，會經歷幾個不同的狀態，這些狀態用 ps aux 的 STAT 欄位顯示。最常見的是 S（Sleeping），代表程序在等待某件事發生，比如等網路封包、等使用者輸入，這段時間 CPU 是閒著的。R（Runnable/Running）代表程序正在 CPU 上執行，或已就緒等待 CPU 分配時間片。D（Uninterruptible Sleep）代表程序在等待磁碟 I/O 完成，這種狀態不可被信號中斷，如果你看到大量 D 狀態程序，通常代表磁碟是系統瓶頸。T（Stopped）代表程序被暫停，就是你按 Ctrl+Z 之後的狀態。Z（Zombie）代表程序已經結束，但父程序還沒回收它的退出狀態，殭屍程序不佔 CPU 和記憶體，但大量殭屍代表有 bug 的父程序值得調查。
+
+在容器化的世界裡，理解程序還有一個特別重要的面向：每個容器都有自己獨立的程序命名空間（PID namespace）。容器內看到的 PID 1 是容器的入口點程式（entrypoint），而不是宿主機的 systemd。這也是為什麼容器不需要 systemd、為什麼容器的應用程式要直接在前景執行而不是被 systemd 管理。理解這個，後面學容器設計的時候，你就知道為什麼容器的哲學和傳統 VM 不一樣，這是很多初學者困惑的根源。
 
 管理這些程序是 Linux 管理員的日常工作之一，也是在 Kubernetes 裡面除錯的基礎技能——當你 kubectl exec 進一個容器，需要知道裡面什麼程序在跑、哪個程序可能出了問題，這些都是今天要學的技能。`,
     duration: '5',
@@ -339,7 +349,13 @@ htop 是 top 的加強版，有漂亮的彩色介面，彩色長條圖顯示每�
 
 現在大家跟著輸入 top，先感受一下這個動態的畫面。觀察一下你的系統上哪些程序在跑、CPU 和記憶體的使用率各是多少。試著按 M 和 P 切換排序方式，試試按 1 看每顆 CPU，然後按 q 離開。
 
-還有幾個 top 的實用技巧：按 e 可以切換記憶體顯示單位，從 KB 改成 MB 或 GB，在大記憶體伺服器上更容易閱讀。Load Average 那三個數字非常重要，如果持續大於你的 CPU 核心數，代表系統處於超載狀態，任務在排隊等 CPU。在 Kubernetes 節點出問題的時候，top 是確認節點是否過載的第一個工具，過高的 load average 可能導致 Pod 調度延遲或 kubelet 心跳超時，是節點 NotReady 的常見原因之一。`,
+還有幾個 top 的實用技巧：按 e 可以切換記憶體顯示單位，從 KB 改成 MB 或 GB，在大記憶體伺服器上更容易閱讀。Load Average 那三個數字非常重要，如果持續大於你的 CPU 核心數，代表系統處於超載狀態，任務在排隊等 CPU。在 Kubernetes 節點出問題的時候，top 是確認節點是否過載的第一個工具，過高的 load average 可能導致 Pod 調度延遲或 kubelet 心跳超時，是節點 NotReady 的常見原因之一。
+
+Load Average 的解讀再深入一點：三個數字分別代表過去 1 分鐘、5 分鐘、15 分鐘的平均負載。如果你有 4 個 CPU 核心，那 load average 小於 4 代表系統有餘裕；等於 4 代表剛好滿負荷；大於 4 代表有任務在排隊等 CPU，系統可能感覺變慢。觀察三個數字的趨勢也很重要：如果 1 分鐘的值遠大於 15 分鐘的值，代表最近突然出現高負載，可能是某個任務突然跑起來了；如果 1 分鐘小於 15 分鐘，代表負載在下降，系統在恢復中。這個趨勢分析比單一數值更有診斷價值。
+
+%wa 這個欄位也值得特別注意：它是 I/O wait，代表 CPU 在等待磁碟或網路 I/O 完成的時間比例。正常情況下 wa 應該很低（0-5%），如果 wa 很高（超過 20%），代表磁碟是瓶頸，CPU 在等磁碟，這時候問題不是 CPU 不夠快，而是磁碟 I/O 成為了效能瓶頸，可能需要換 SSD、換更快的儲存方案、或是減少 I/O 操作。在 Kubernetes 節點上，如果 etcd 的磁碟讀寫成為瓶頸，你就會看到 wa 飆高，同時 API server 回應變慢、Pod 調度延遲。這是一個經典的生產環境問題。
+
+top 的 us（user space）和 sy（kernel/system space）比例也能透露一些訊息。正常情況下 us 遠大於 sy；如果 sy 異常高，可能代表有大量的系統呼叫（syscall），比如大量的 fork/exec（容器快速啟停）或網路封包處理（DDoS 攻擊），這種情況在 K8s 叢集裡有時候會出現，需要進一步用 perf 或 strace 這樣的進階工具深入分析。這些是進階知識，現在先有個印象，等你真的在生產環境遇到這類問題的時候，知道往這個方向去找原因。`,
     duration: '8',
   },
 
@@ -403,7 +419,15 @@ kill 指令的名字雖然叫「殺」，但它其實是在「傳送信號」（
 
 killall 更方便，直接用程序名稱，不用找 PID。killall nginx 會把所有叫 nginx 的程序都終止掉。注意 killall 是依程序名稱完全比對的，所以 killall ngin 是找不到 nginx 的。如果想用部分名稱比對，用 pkill nginx，pkill 支援正規表示式。
 
-現在大家來做一個小實作：在終端機輸入 sleep 300 &（& 符號稍後會詳細說明，現在先跟著打），然後用 ps aux | grep sleep 找到它的 PID，再用 kill [PID] 把它終止，最後再執行一次 ps aux | grep sleep 確認它不見了。這個流程是工程師日常除錯的標準動作，多練幾次就記住了。`,
+現在大家來做一個小實作：在終端機輸入 sleep 300 &（& 符號稍後會詳細說明，現在先跟著打），然後用 ps aux | grep sleep 找到它的 PID，再用 kill [PID] 把它終止，最後再執行一次 ps aux | grep sleep 確認它不見了。這個流程是工程師日常除錯的標準動作，多練幾次就記住了。
+
+除了 kill 和 killall，還有幾個實用的相關工具值得認識。pkill 和 killall 類似，但使用上更靈活——pkill 支援用正規表示式比對程序名稱，而不是完全比對。pkill nginx 會終止所有名稱包含 nginx 的程序。pkill -u student 可以終止某個特定使用者的所有程序，在多使用者環境下很有用，比如某個使用者跑的程序佔了太多資源。
+
+pgrep 是 pkill 的「只找不殺」版本，它只輸出符合條件的程序 PID，讓你可以先確認會影響哪些程序再決定要不要終止。pgrep nginx 列出所有 nginx 程序的 PID。你可以用指令替換搭配 kill：kill $(pgrep nginx)，把 pgrep 的輸出直接傳給 kill，效果等同 killall nginx 但更靈活。
+
+kill -l 可以列出系統支援的所有信號名稱和編號，總共有幾十個，但工作中常用的就那幾個：1（SIGHUP，重載設定）、2（SIGINT，等同 Ctrl+C）、9（SIGKILL，強制終止）、15（SIGTERM，優雅終止）、19（SIGSTOP，等同 Ctrl+Z 暫停）、18（SIGCONT，繼續暫停的程序）。特別是 kill -CONT PID 可以讓一個被 Ctrl+Z 暫停的程序在背景繼續跑，等同於先 Ctrl+Z 再 bg，但可以從另一個終端機對任意程序用，不受 shell 工作列表的限制。
+
+殭屍程序（Zombie process）的清理也是常見問題。殭屍程序已經執行完畢，但父程序沒有呼叫 wait() 回收它的退出狀態，所以它的 PCB（程序控制區塊）還留在系統裡。你無法直接 kill 殭屍程序（它已經死了），正確做法是找到父程序（ps -o ppid= -p 殭屍PID），對父程序送 SIGCHLD 信號（kill -CHLD 父PID），觸發父程序回收子程序。如果父程序本身有問題，就直接 kill 父程序，父程序死後它的所有殭屍子程序會被 PID 1（init/systemd）收養並自動清理。少量殭屍程序是正常的，如果系統上殭屍程序越來越多，就要調查是哪個程式的 bug 導致沒有正確回收子程序。`,
     duration: '7',
   },
 
@@ -569,7 +593,13 @@ Ctrl+C 和 Ctrl+Z 的差別要特別強調：Ctrl+C 送 SIGINT，程序通常會
 
 休息前我留了一個思考題：你知道 nginx 是怎麼在伺服器開機的時候「自動」啟動的嗎？為什麼你安裝了 nginx 之後，不用每次開機都手動輸入 nginx 指令，它就自己跑起來了？等等學完 systemd，你就知道完整的答案了。可以先在心裡想想你的猜測。
 
-十五分鐘後準時回來，不要遲到！`,
+趁休息的時間，讓我也幫大家複習一下前半段幾個容易混淆的概念。第一個是 SIGTERM 和 SIGKILL 的差異，這個很多人記不牢。SIGTERM 是「禮貌終止」，給程序機會清理資源、關閉連線、把緩衝區的資料寫入磁碟，然後乾淨退出；SIGKILL 是「強制終止」，作業系統直接回收程序的記憶體，不給任何收尾機會，可能導致資料不完整。在生產環境，永遠先試 SIGTERM（kill PID），等幾秒，看程序有沒有自己退出，如果還在跑才考慮 SIGKILL（kill -9 PID）。
+
+第二個容易混淆的是 Ctrl+C 和 Ctrl+Z 的差異。Ctrl+C 送的是 SIGINT 信號，程序收到後通常立刻終止，程序就死了；Ctrl+Z 送的是 SIGTSTP，程序只是被暫停（Stopped 狀態），記憶體還在，用 fg 或 bg 可以讓它繼續。在前景跑一個重要任務時，千萬不要不小心按 Ctrl+C，那樣程序就沒了。如果你想暫停一下去做別的事，按 Ctrl+Z，需要繼續的時候再 fg 回來。
+
+第三個是 & 和 nohup 的搭配。只用 & 把程序放背景，SSH 斷線後程序會死（因為收到 SIGHUP）；nohup 讓程序忽略 SIGHUP，所以 SSH 斷線後程序繼續存活。最安全的背景執行方式是 nohup 你的指令 &，兩個一起用。記住這個公式，工作中會一直用到。
+
+好，趁休息把這幾個概念在腦子裡整理一下，十五分鐘後準時回來，我們繼續下半場！`,
     duration: '1',
   },
 
@@ -793,7 +823,17 @@ Step 4：journalctl -u nginx -f，-f 是 follow（跟隨），即時追蹤日誌
 
 Step 5：systemctl list-units --type=service，列出目前系統上所有 service 類型的 unit，可以一覽系統上所有服務的狀態。每一行顯示：UNIT（服務名稱）、LOAD（是否成功載入設定）、ACTIVE（主狀態）、SUB（細部狀態）、DESCRIPTION（描述）。active 狀態的服務正常運作中；failed 狀態的服務用紅色顯示，代表出了問題，這些是你最應該優先關注的。
 
-在 Kubernetes 的日常管理裡，journalctl -u kubelet -f 是節點出問題時的第一個反應——追蹤 kubelet 的即時日誌，看看發生了什麼錯誤，這是標準的 K8s 節點除錯起手式。大家現在跟著把這五個步驟都做一遍，確認每個步驟的輸出和預期一樣。`,
+在 Kubernetes 的日常管理裡，journalctl -u kubelet -f 是節點出問題時的第一個反應——追蹤 kubelet 的即時日誌，看看發生了什麼錯誤，這是標準的 K8s 節點除錯起手式。大家現在跟著把這五個步驟都做一遍，確認每個步驟的輸出和預期一樣。
+
+關於 journalctl 還有幾個非常實用的進階用法。journalctl -p err -u nginx 只顯示 nginx 的錯誤等級日誌，過濾掉 info 和 warning，讓你快速找到真正的問題。log level 從 0 到 7：0=emerg（系統無法使用）、3=err（錯誤）、4=warning（警告）、6=info（資訊）、7=debug（除錯）。數字越小越嚴重，通常你最關心的是 err（3）以上的等級。
+
+journalctl --since "2026-01-01" --until "2026-01-02" 可以按時間範圍查看特定時段的日誌，在排查「昨晚凌晨發生的問題」時非常有用。更實用的是：journalctl -u nginx --since "5 minutes ago" 只看最近五分鐘，把範圍縮到最小，讓你快速找到剛才發生的問題。
+
+journalctl 搭配 grep 過濾也很常用：journalctl -u nginx | grep -i "error" 找所有含 error 的行（-i 不區分大小寫）；journalctl -u nginx | grep -v "GET /health" 排除健康檢查請求的日誌，讓真正的問題更容易被看到。這個「排除噪音日誌」的技巧在高流量服務上特別重要，不然每秒幾百行的健康檢查日誌會把真正的錯誤淹沒。
+
+journalctl -k 查看 kernel 日誌（等同 dmesg），當你遇到硬體問題、OOM（記憶體不足）殺程序、網路驅動錯誤的時候，kernel log 是重要線索。比如 journalctl -k | grep -i "out of memory" 可以確認系統有沒有發生過 OOM 事件，這是服務莫名消失的常見原因之一，OOM killer 在記憶體耗盡時會強制殺死它認為最耗記憶體的程序，整個過程在 journal 裡都有記錄。
+
+在 K8s 的世界裡，kubectl logs 是容器日誌的查看工具，概念和用法跟 journalctl 非常相似：kubectl logs -f pod名稱 就是追蹤日誌（等同 journalctl -f）；kubectl logs --since=5m pod名稱 看最近五分鐘（等同 --since "5 minutes ago"）；kubectl logs --previous pod名稱 看容器前一次實例的日誌，這在排查 CrashLoopBackOff 時至關重要。學好今天的日誌工具習慣，在 K8s 上查日誌會完全不陌生。`,
     duration: '5',
   },
 
@@ -967,7 +1007,11 @@ Step 4：ncdu /var，分析 /var 目錄的磁碟使用情況。ncdu 啟動後需
 
 Step 5 和 6：sudo apt remove tree ncdu，移除剛才安裝的套件；然後 sudo apt autoremove -y，清理它們帶來的相依套件。你可以用 which tree 確認是不是真的被移除了——如果沒輸出任何東西，代表指令已經不存在了。
 
-這個完整的「安裝、使用、移除、清理」流程，是你以後在伺服器上管理軟體的標準循環。請大家跟著把每個步驟都做一遍，確認每個步驟的輸出和預期一樣，有問題舉手。`,
+這個完整的「安裝、使用、移除、清理」流程，是你以後在伺服器上管理軟體的標準循環。請大家跟著把每個步驟都做一遍，確認每個步驟的輸出和預期一樣，有問題舉手。
+
+補充一個超實用的小技巧：apt list --installed 列出所有已安裝的套件，如果你想看系統上裝了哪些東西，或是確認某個套件有沒有被安裝，這個指令非常方便。配合 grep 過濾更好用，例如 apt list --installed | grep nginx 確認 nginx 是否已安裝。apt list --upgradable 列出所有有新版本可升級的套件，讓你在選擇性升級前先知道有哪些可以更新。
+
+在 Kubernetes 的節點管理裡，apt 也是常用工具。當你需要在 K8s 節點上安裝 containerd、kubeadm、kubelet 的時候，都是透過 apt 來安裝的。而且 K8s 版本管理非常嚴格，通常需要先設定對應的 apt source（套件倉庫來源），然後用 apt install kubelet=1.28.0-00 這種帶版本號的方式安裝特定版本，確保叢集裡所有節點的 K8s 版本一致。用 apt-mark hold kubelet 還可以「凍結」某個套件的版本，防止 apt upgrade 把它意外升級，這在生產叢集的版本管理裡非常重要。`,
     duration: '7',
   },
 
@@ -1156,8 +1200,143 @@ Step 5 和 6：測試確認。輸入 ll，應該看到跟 ls -la 一樣的輸出
 
 這個小小的 .bashrc 設定，能大幅提升你的日常工作效率。隨著你越來越熟悉 Linux，你會不斷新增自己的 alias 和環境變數設定，打造出一個「最順手的工作環境」。
 
-補充一個進階技巧：unalias 指令名稱可以臨時取消一個 alias。例如你設了 alias rm="rm -i"（刪除前詢問），但跑腳本時不希望每次都問，就先 unalias rm，用完再重設。type 指令名稱可以告訴你某個指令是 alias、shell 內建、還是可執行檔，type ll 應該顯示「ll is aliased to...」，是排查「指令行為怪異」的好工具，因為有時候不知道某個指令已被 alias 覆蓋，行為就和預期不同。`,
+補充一個進階技巧：unalias 指令名稱可以臨時取消一個 alias。例如你設了 alias rm="rm -i"（刪除前詢問），但跑腳本時不希望每次都問，就先 unalias rm，用完再重設。type 指令名稱可以告訴你某個指令是 alias、shell 內建、還是可執行檔，type ll 應該顯示「ll is aliased to...」，是排查「指令行為怪異」的好工具，因為有時候不知道某個指令已被 alias 覆蓋，行為就和預期不同。
+
+工程師常用的 alias 集合，分享給大家做參考。alias la="ls -la" 是列出詳細的完整目錄。alias grep="grep --color=auto" 讓 grep 的搜尋結果用顏色高亮顯示，一眼就看到關鍵字在哪裡。alias ..="cd .."、alias ...="cd ../.. " 讓你快速跳上一層或兩層目錄。alias df="df -h" 讓磁碟使用量預設用人類可讀的格式（GB、MB）顯示。alias du="du -h" 同理。alias ps="ps aux" 讓 ps 預設就顯示所有程序的完整資訊，不用每次都打 aux。alias kube="kubectl" 對 Kubernetes 工作者非常實用，因為 kubectl 每天要打幾十次。這些 alias 加到 ~/.bashrc 後，工作效率會明顯提升。
+
+.bashrc、.bash_profile、和 /etc/profile 的關係也稍微說明一下。/etc/profile 是全系統的設定檔，所有使用者登入時都會執行，通常由系統管理員管理。~/.bash_profile 是個人登入設定，只在登入 shell（SSH 連線、本地控制台登入）時執行一次。~/.bashrc 是個人互動式 shell 設定，每次開啟新的互動式 shell 時執行。一般建議把環境變數和 alias 都放在 ~/.bashrc，確保任何情況下開 shell 都能用。如果你的設定寫在 ~/.bash_profile 但在新的終端機視窗沒有效果，就是因為這個差異。很多工程師會在 ~/.bash_profile 裡加上一行 if [ -f ~/.bashrc ]; then . ~/.bashrc; fi，確保登入時也載入 .bashrc，兩個環境保持一致。`,
     duration: '5',
+  },
+
+  // ========== cron 排程任務 ==========
+  {
+    title: 'cron — 定時自動執行任務',
+    subtitle: '讓 Linux 幫你定時做重複的事',
+    section: '系統管理進階',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-lg text-slate-300">
+            <span className="text-k8s-blue font-bold">cron</span> 是 Linux 的任務排程器，讓你設定{' '}
+            <span className="text-green-400 font-bold">在特定時間自動執行</span> 指令或腳本。
+          </p>
+        </div>
+        <div className="bg-slate-800 rounded-lg overflow-hidden">
+          <div className="bg-slate-700/50 px-4 py-2 text-k8s-blue font-semibold text-sm">crontab 格式</div>
+          <pre className="px-4 py-3 text-sm text-green-400 font-mono">{`# 分 時 日 月 週 指令
+# ┌─ 分鐘 (0-59)
+# │ ┌─ 小時 (0-23)
+# │ │ ┌─ 日期 (1-31)
+# │ │ │ ┌─ 月份 (1-12)
+# │ │ │ │ ┌─ 星期 (0-7, 0和7都是週日)
+# │ │ │ │ │
+  * * * * * /path/to/command
+
+# 每天 03:30 跑備份腳本
+30 3 * * * /opt/scripts/backup.sh
+
+# 每小時的第0分執行
+0 * * * * /opt/scripts/health-check.sh
+
+# 每週一早上9點
+0 9 * * 1 /opt/scripts/weekly-report.sh`}</pre>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          {[
+            { cmd: 'crontab -e', desc: '編輯目前使用者的 crontab' },
+            { cmd: 'crontab -l', desc: '列出目前的 crontab 內容' },
+            { cmd: 'crontab -r', desc: '刪除 crontab（小心！）' },
+            { cmd: 'systemctl status cron', desc: '確認 cron 服務是否在跑' },
+          ].map((item, i) => (
+            <div key={i} className="bg-slate-800/50 p-3 rounded-lg">
+              <code className="text-green-400 font-mono text-xs">{item.cmd}</code>
+              <p className="text-slate-400 text-xs mt-1">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="bg-k8s-blue/20 border border-k8s-blue/50 p-3 rounded-lg text-sm">
+          <p className="text-k8s-blue font-semibold">💡 K8s 中的 CronJob</p>
+          <p className="text-slate-300">Kubernetes 也有 CronJob 資源，語法與 Linux cron 完全一致！</p>
+        </div>
+      </div>
+    ),
+    notes: `cron 是 Linux 系統上的定時任務排程器，名字來自希臘文的「時間（chronos）」。有了 cron，你可以讓伺服器在特定的時間自動執行任何指令或腳本，完全不需要人工干預。這在伺服器維運上非常重要：備份、日誌清理、定期健康檢查、報表產生，這些每天都要做但不需要人工操作的事，都適合用 cron 自動化。
+
+cron 的設定是透過 crontab 檔案。每個使用者都有自己的 crontab，用 crontab -e 編輯（會打開預設的文字編輯器，可以用 EDITOR=nano crontab -e 指定用 nano）。crontab 的每一行代表一個定時任務，格式是五個時間欄位加上指令，用空格分隔。
+
+五個時間欄位的語義：第一欄是分鐘（0-59）；第二欄是小時（0-23）；第三欄是日期（1-31）；第四欄是月份（1-12）；第五欄是星期幾（0-7，0 和 7 都代表週日）。每個欄位用 * 代表「每個」，所以五個全是 * 的話代表「每分鐘」執行一次。
+
+幾個常用的時間設定模式：0 * * * * 代表每小時整點執行（分鐘是 0，其他全是 *）；0 3 * * * 代表每天凌晨 3 點執行（凌晨三點整）；30 3 * * 1 代表每週一凌晨 3:30 執行；0 0 1 * * 代表每月 1 號的 0:00 執行（月初）；*/5 * * * * 代表每 5 分鐘執行一次，斜線後面是間隔數值。
+
+一個實際的例子：假設你有一台 nginx 伺服器，日誌每天都在增長，你不想手動清理，可以設定一個每天凌晨 2 點的 cron job，把一個月前的日誌壓縮封存。另一個例子：你有一個 Python 爬蟲腳本需要每小時跑一次，不想一直開著終端機等，用 cron 設定 0 * * * * /opt/scripts/crawler.py > /var/log/crawler.log 2>&1，每小時整點自動跑，輸出存到日誌。
+
+注意幾個常見的陷阱：cron 執行時的環境和你手動 SSH 進去的環境不一樣，PATH 很精簡，你在 .bashrc 裡設的 PATH 對 cron 無效。所以在 crontab 裡最好使用絕對路徑，比如 /usr/bin/python3 而不是 python3，/opt/scripts/backup.sh 而不是 backup.sh。另一個陷阱是工作目錄：cron 執行時的當前目錄是 HOME 目錄，如果你的腳本裡有相對路徑，可能出問題，建議在腳本一開始加上 cd /你需要的目錄 確保在正確的位置執行。
+
+cron job 的輸出如果沒有重定向，預設會發送到使用者的本地郵件。在大多數伺服器上沒有郵件服務，這些輸出就消失了。所以一定要把輸出重定向到日誌檔案：cmd > /var/log/myjob.log 2>&1（把 stdout 和 stderr 都寫入日誌），或是如果任務正常不需要輸出，用 cmd > /dev/null 2>&1 把輸出全部丟棄。不丟棄輸出、又沒有郵件服務接收，cron 就會一直嘗試寄信失敗，浪費資源。
+
+在 Kubernetes 的世界裡，有一個完全對應的資源叫做 CronJob（K8s CronJob）。它的 schedule 欄位使用的語法和 Linux cron 完全一樣！比如 schedule: "0 3 * * *" 代表每天凌晨 3 點在 K8s 叢集裡啟動一個 Pod 執行任務。學好 Linux cron 的語法，等你學到 K8s CronJob 的時候就完全不陌生了，這是非常直接的知識遷移。K8s CronJob 的優勢是可以設定失敗重試、並行控制、歷史保留策略，比 Linux cron 有更多雲端原生的管控功能，但底層的時間語法是一樣的。
+
+快速測試方式：如果你想確認 cron 的時間格式有沒有寫錯，可以用線上工具 crontab.guru（網址就是 crontab.guru），輸入你的時間格式，它會用人類語言告訴你「這個設定會在什麼時候執行」，非常實用，是工程師最愛的 cron 工具之一。
+
+最後提醒：crontab -r 是刪除整個 crontab，不會有確認提示，打錯字就全刪了。在生產環境永遠要先 crontab -l 備份一下目前的內容，再 crontab -e 編輯，養成好習慣。`,
+    duration: '7',
+  },
+
+  // ========== 系統故障排查 SOP ==========
+  {
+    title: '🔧 系統故障排查 SOP',
+    subtitle: '遇到問題不慌，按步驟找原因',
+    section: '系統管理進階',
+    content: (
+      <div className="space-y-4">
+        <p className="text-slate-300 text-sm">遇到「服務掛了」或「系統很慢」，這套 SOP 能幫你快速定位問題：</p>
+        <div className="grid gap-2">
+          {[
+            { step: '1', title: '確認現象', cmd: 'systemctl status 服務名稱', desc: '服務狀態是否 failed？' },
+            { step: '2', title: '看日誌', cmd: 'journalctl -u 服務名稱 -n 50', desc: '找錯誤訊息（error/failed）' },
+            { step: '3', title: '查資源', cmd: 'top 或 htop', desc: 'CPU/記憶體有沒有滿？' },
+            { step: '4', title: '查磁碟', cmd: 'df -h && du -sh /var/log/*', desc: '磁碟有沒有滿？' },
+            { step: '5', title: '查網路', cmd: 'ss -tlnp', desc: 'Port 有沒有被監聽？' },
+            { step: '6', title: '重啟服務', cmd: 'systemctl restart 服務名稱', desc: '確認問題是否修復' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-lg">
+              <span className="bg-k8s-blue text-white w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">
+                {item.step}
+              </span>
+              <div className="flex-1">
+                <span className="text-slate-200 font-semibold text-sm">{item.title}：</span>
+                <code className="text-green-400 font-mono text-xs">{item.cmd}</code>
+              </div>
+              <span className="text-slate-400 text-xs max-w-[160px]">{item.desc}</span>
+            </div>
+          ))}
+        </div>
+        <div className="bg-red-900/30 border border-red-700 p-3 rounded-lg text-sm">
+          <p className="text-red-400 font-semibold">⚠️ 黃金法則</p>
+          <p className="text-slate-300">先診斷再動手！不要「試著重啟看看」，要先知道為什麼才重啟</p>
+        </div>
+      </div>
+    ),
+    notes: `今天最後來一個綜合應用：系統故障排查 SOP。這個 SOP（Standard Operating Procedure，標準作業程序）是把今天學的所有技能串起來，用在最實際的場景：「某個服務掛掉了，怎麼辦？」
+
+先說一個大原則：先診斷，再動手。很多初學者（甚至一些工作幾年的工程師）遇到問題的第一反應是「重啟看看」，這是非常不好的習慣。你不知道問題在哪就重啟，有幾個風險：一、重啟可能暫時解決表面問題，但根本原因沒有修復，幾分鐘後問題又來；二、重啟之前的日誌可能消失，你失去了診斷問題的最佳線索；三、如果問題是資料損壞，重啟可能讓情況更糟。正確的做法是先蒐集足夠的資訊，確認問題的原因，然後針對性地修復，最後再重啟確認修復成功。
+
+**Step 1：確認現象**。用 systemctl status 服務名稱，快速確認服務的當前狀態。Active 那行的關鍵詞：active (running) 代表正常、failed 代表崩潰退出、inactive (dead) 代表服務停了。如果 status 顯示 failed，通常在輸出的最後幾行就有錯誤訊息，先讀那幾行。
+
+**Step 2：看日誌**。journalctl -u 服務名稱 -n 50 看最近 50 行日誌，找 error、failed、cannot、permission denied 這類關鍵字。如果 50 行不夠，用 -n 200 或加上時間範圍：journalctl -u nginx --since "5 minutes ago"。在日誌裡找到錯誤訊息，這是診斷的核心。常見的錯誤類型：port 已被佔用（bind: address already in use）、設定檔語法錯誤（syntax error in 某設定檔）、找不到資源（No such file or directory）、權限不足（Permission denied）。每種錯誤都有對應的修復方法。
+
+**Step 3：查資源**。用 top 或 htop 快速確認 CPU 和記憶體的使用情況。如果 CPU 使用率接近 100% 且持續這樣，可能是某個程序瘋狂消耗 CPU；如果記憶體使用率接近 100% 且大量 Swap 在用，可能是記憶體不足導致 OOM（Out of Memory）殺程序。Linux 的 OOM killer 會在記憶體耗盡時自動殺死它認為最佔記憶體的程序，這是服務突然消失的常見原因之一。確認方法：dmesg | grep -i "out of memory" 或 journalctl -k | grep -i oom，如果有 OOM 的記錄，代表你的服務是被 OOM killer 殺死的，需要加記憶體或優化程式。
+
+**Step 4：查磁碟**。df -h 查看磁碟使用率，如果某個掛載點顯示 100%，就是磁碟滿了，服務可能因為無法寫入日誌或臨時檔案而崩潰。找到是哪個目錄最大用 ncdu 或 du -sh /var/log/* 查看日誌大小，通常問題就在這裡。磁碟滿了的緊急處理：先清理日誌（/var/log/ 下的 .gz 壓縮的舊日誌可以刪掉）、清理 apt 快取（sudo apt-get clean）、清理 Docker 資源（docker system prune）。
+
+**Step 5：查網路**。ss -tlnp 查看哪些 port 正在被監聽，確認服務應該監聽的 port 是否存在。ss 是 netstat 的現代替代品（netstat 在較新的系統上可能沒有預裝）。-t 是 TCP，-l 是 listening，-n 是數字格式不解析名稱，-p 是顯示是哪個程序在監聽。如果 nginx 應該在 port 80 監聽，但 ss -tlnp | grep :80 沒有輸出，代表 nginx 沒有正常啟動或沒有在監聽。如果輸出顯示有其他程序佔用 port 80，就是 port 衝突。
+
+**Step 6：修復並重啟**。根據前面診斷的結果修復問題（改設定、清空間、kill 衝突程序等），然後 systemctl restart 服務名稱，再用 systemctl status 和 curl 確認服務恢復正常。
+
+這個 SOP 在 Kubernetes 節點除錯時同樣適用，把「服務名稱」換成 kubelet 或 containerd，整個流程一模一樣。學好這套思路，面對任何系統問題都不會慌，從容地一步一步找到根本原因，這是 Linux 系統管理員和 DevOps 工程師最核心的能力之一。
+
+真實案例分享：我們曾經有一台 K8s 節點在凌晨突然變成 NotReady，告警在半夜兩點打來。登入節點，systemctl status kubelet 顯示 failed，journalctl -u kubelet -n 100 看到錯誤訊息「failed to sync pod」和一堆 I/O error，df -h 一看，根分區使用率 100%，磁碟滿了！原來是容器的日誌沒有設定大小上限，幾個跑了幾週的 Pod 的日誌把磁碟塞滿了。用 docker system prune 清理掉沒用的 image 和停止的容器，回收了 20GB，kubelet 重啟後節點回到 Ready。後來我們馬上去修改了每個 Pod 的日誌大小限制（logrotation），避免這個問題再次發生。這就是一個完整的「診斷 → 找原因 → 修復 → 預防」的閉環，而且整個過程用的全是今天學的技能。`,
+    duration: '8',
   },
 
   // ========== 課程總結 ==========
@@ -1226,7 +1405,23 @@ apt 套件管理，一定要先 apt update，然後 apt install 安裝、apt rem
 
 今天上午的技能是互相連動的：你用 apt 安裝了 nginx，用 systemctl 啟動並設定開機自啟，用 ps 和 top 確認程序正常，用 journalctl 查看日誌，這就是 Linux 系統管理的完整循環。
 
-課後練習建議：不看投影片，自己從頭把今天的操作做一遍——安裝 nginx、啟動服務、查看狀態、停止重啟、查看日誌、設定環境變數。如果能不靠提示做完，代表真的學會了，不只是「看懂了」。看懂和會做是兩個層次，工作中需要的是會做。有任何問題，課程群組隨時可以問。`,
+課後練習建議：不看投影片，自己從頭把今天的操作做一遍——安裝 nginx、啟動服務、查看狀態、停止重啟、查看日誌、設定環境變數。如果能不靠提示做完，代表真的學會了，不只是「看懂了」。看懂和會做是兩個層次，工作中需要的是會做。有任何問題，課程群組隨時可以問。
+
+讓我用一個完整的情境，把今天上午的所有主題串起來，讓大家看清楚這些技能是如何協同運作的。想像你是一位 DevOps 工程師，剛剛收到告警：網站回應很慢，可能有服務出問題。你的處理流程大概是這樣的。
+
+SSH 進伺服器後，立刻執行 top 看 CPU 和記憶體有沒有異常。假設 CPU 正常，但記憶體使用率很高。用 ps aux --sort=-%mem 找出最耗記憶體的程序，發現 nginx worker 程序數量異常多。
+
+執行 systemctl status nginx，確認服務狀態，看 Active 行有沒有異常訊息。接著 journalctl -u nginx -n 100 看最近的日誌，找到關鍵錯誤：連線沒有被正確關閉，導致 worker 程序不斷累積，記憶體越吃越多。
+
+確認問題後，用 nano /etc/nginx/nginx.conf 修改 keepalive_timeout 設定，然後執行 systemctl reload nginx，讓新設定生效而不中斷現有連線。用 curl http://localhost 測試，服務回應正常了，記憶體使用率也開始下降。
+
+最後，在 ~/.bashrc 裡加上幾個實用的 alias，比如 alias ngs="systemctl status nginx"，讓下次查看 nginx 狀態只需要打三個字母。source ~/.bashrc 讓設定立刻生效，以後就能用縮寫快速操作。
+
+這整個問題排查流程，從登入伺服器到問題解決，用到了今天的 ps、top、systemctl、journalctl、nano、curl、alias 和 .bashrc 所有主題。缺少任何一個，整個流程就無法順暢完成。這就是今天課程設計的核心邏輯——每個技能都不是孤立的，而是互相配合，形成一套完整的 Linux 服務管理工作方式。
+
+今天晚上的加碼挑戰（選做，強烈推薦）：試著安裝 MySQL（sudo apt install mysql-server -y），然後用今天所有的工具來探索它：systemctl status mysql 查看狀態、journalctl -u mysql -n 50 看日誌、ps aux | grep mysql 找程序、systemctl stop mysql 停止服務再 systemctl start mysql 重啟、systemctl enable mysql 設定開機自啟。能把這一整套做下來，代表今天的技能真的學進去了，而且明天學 Docker 的時候，這些基礎會讓你學得特別順。
+
+下午的課程會學網路工具和 Shell 腳本入門，這兩個主題非常實用。網路工具讓你能夠診斷連線問題、查看 port 狀態；Shell 腳本讓你把今天手動做的事情自動化成一個腳本，一鍵執行。大家午餐好好吃，下午繼續衝刺！`,
     duration: '5',
   },
 ]

@@ -187,7 +187,7 @@ RBAC 的核心原則叫「最小權限原則」（Principle of Least Privilege�
           { name: "ClusterRoleBinding", color: "text-purple-400 bg-purple-500/20", desc: "把身份綁定到叢集權限", detail: "在整個叢集範圍內，把 SA 和 ClusterRole 連接起來" },
         ].map((item) => (
           <div key={item.name} className="bg-slate-800/50 p-3 rounded-lg flex items-start gap-3">
-            <span className={`${item.color} px-2 py-1 rounded text-xs font-mono whitespace-nowrap`}>{item.name}</span>
+            <span className={`\${item.color} px-2 py-1 rounded text-xs font-mono whitespace-nowrap`}>{item.name}</span>
             <div>
               <p className="text-white text-sm font-semibold">{item.desc}</p>
               <p className="text-slate-400 text-xs">{item.detail}</p>

@@ -93,7 +93,7 @@ export const slides: Slide[] = [
             { cmd: "cd", desc: "不加參數，等同 cd ~，回家目錄", color: "text-yellow-400" },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-4 bg-slate-800/60 p-2.5 rounded-lg">
-              <code className={`${item.color} font-mono text-sm w-48 flex-shrink-0`}>{item.cmd}</code>
+              <code className={`\${item.color} font-mono text-sm w-48 flex-shrink-0`}>{item.cmd}</code>
               <span className="text-slate-300 text-sm">{item.desc}</span>
             </div>
           ))}
@@ -336,7 +336,7 @@ mkdir 是一個非常直覺的指令，在 Linux 上建立目錄就靠它。最�
             { cmd: "rm -rf mydir", desc: "-f 強制：不詢問確認，直接刪", color: "text-red-400" },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-4 bg-slate-800/60 p-3 rounded-lg">
-              <code className={`${item.color} font-mono text-sm w-44 flex-shrink-0`}>{item.cmd}</code>
+              <code className={`\${item.color} font-mono text-sm w-44 flex-shrink-0`}>{item.cmd}</code>
               <span className="text-slate-300 text-sm">{item.desc}</span>
             </div>
           ))}
@@ -951,8 +951,8 @@ nano 和 vim 最大的差別在這裡：進入 nano 之後，你立刻就可以�
             { key: "Ctrl + U", desc: "Uncut — 貼上（在新位置）", color: "text-yellow-400", important: false },
             { key: "Ctrl + G", desc: "Get Help — 顯示說明", color: "text-purple-400", important: false },
           ].map((item, i) => (
-            <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg ${item.important ? 'bg-slate-700/80 border border-slate-500' : 'bg-slate-800/50'}`}>
-              <kbd className={`${item.color} font-mono text-sm font-bold w-24 flex-shrink-0`}>{item.key}</kbd>
+            <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg \${item.important ? 'bg-slate-700/80 border border-slate-500' : 'bg-slate-800/50'}`}>
+              <kbd className={`\${item.color} font-mono text-sm font-bold w-24 flex-shrink-0`}>{item.key}</kbd>
               <span className="text-slate-300 text-sm">{item.desc}</span>
             </div>
           ))}

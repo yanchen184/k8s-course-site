@@ -412,7 +412,7 @@ kubectl patch pv <pv-name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"
 另外需要注意的是：StorageClass 的 reclaimPolicy 只影響動態建立的 PV。靜態建立的 PV 的回收政策是在 PV YAML 裡的 persistentVolumeReclaimPolicy 欄位直接設定的，和 StorageClass 無關。
 
 最後要強調一點：即使你設定了 Retain 政策，也不代表資料就萬無一失。Retain 只是讓 PV 不被自動刪除，但 PV 背後的存儲（比如 AWS EBS Volume）還是可以被人工在 AWS 控制台裡刪除。所以備份策略還是需要的，不能只靠 Retain 政策。`,
-    duration: "8"
+    duration: "9"
   },
   {
     title: "PV YAML 撰寫",
@@ -505,7 +505,7 @@ kubectl describe pv nfs-pv-01        # 查看詳細資訊
 kubectl get pv -o yaml               # 查看完整 YAML
 
 常見問題：建立 PV 之後狀態一直是 Available，沒有被綁定。可能原因是沒有匹配的 PVC（大小不夠、存取模式不符、StorageClass 不對），或者 PVC 的 selector 條件不符合這個 PV 的標籤。記得用 kubectl describe pvc 查看事件訊息，會有詳細的綁定失敗原因。`,
-    duration: "7"
+    duration: "8"
   },
   {
     title: "PersistentVolumeClaim 是什麼？",
@@ -588,7 +588,7 @@ PVC 的容量和 PV 的容量不一定相同。PVC 申請的是「最小需求�
 PVC 的保護機制：當 PVC 正在被 Pod 使用時，即使你執行 kubectl delete pvc，PVC 也不會立刻被刪除，它會進入 Terminating 狀態，等到沒有 Pod 在使用它之後才真正刪除。這是 K8s 的保護機制，防止正在使用中的儲存被誤刪。
 
 從 Kubernetes 1.16 開始支援 PVC 容量擴展：如果你的 StorageClass 設定了 allowVolumeExpansion: true，你可以直接修改 PVC 的 resources.requests.storage 來擴大容量，不需要刪除重建 PVC。K8s 會自動擴大底層的 PV 和儲存。`,
-    duration: "10"
+    duration: "11"
   },
   {
     title: "PVC YAML 與綁定",
@@ -680,7 +680,7 @@ PVC 的 volumeName 欄位：如果你想強制綁定到某個特定的 PV，可�
 PVC 的 dataSource 欄位：從 K8s 1.18 開始，PVC 支援 dataSource，可以從現有的 Volume 快照（VolumeSnapshot）或另一個 PVC 建立新的 PVC。這對於備份還原和複製環境非常有用。比如你可以先建立一個 MySQL PVC 的快照，然後用這個快照建立新的 PVC，新的 PVC 裡已經有了原始 PVC 的所有資料。
 
 如何刪除 PVC？直接 kubectl delete pvc <name>。但要確保沒有 Pod 在使用這個 PVC，否則 PVC 會一直在 Terminating 狀態。如果確認要強制刪除（通常是因為 Pod 已經刪不掉了），可以 kubectl patch pvc <name> -p '{"metadata":{"finalizers":null}}' 來移除 finalizer，讓 PVC 強制刪除。不過這樣做要謹慎，可能導致資源洩漏。`,
-    duration: "10"
+    duration: "11"
   },
   {
     title: "Pod 使用 PVC",
@@ -764,7 +764,7 @@ volumeMounts:
 readOnly 掛載：如果你想讓 Pod 以唯讀方式掛載 PVC，在 volumeMounts 裡加上 readOnly: true。這樣容器就沒有辦法修改 PV 裡的資料，適合只需要讀取資料的場景。
 
 PVC 狀態會影響 Pod 調度：如果 Pod 引用的 PVC 還在 Pending 狀態，這個 Pod 也會停在 Pending，K8s 不會強行啟動 Pod。可以用 kubectl describe pod <name> 看 Events 部分，會看到 waiting for a volume to be created 或類似的訊息。`,
-    duration: "10"
+    duration: "11"
   },
   {
     title: "休息時間",
@@ -916,7 +916,7 @@ CSI 驅動安裝後，你可以用 kubectl get csidriver 查看已安裝的 CSI 
 Volume Binding Mode 的選擇：WaitForFirstConsumer 是推薦的設定，特別是在多可用區的雲端環境。Immediate 模式下，PVC 建立後 PV 立刻建立，但此時還不知道 Pod 會被調度到哪個可用區，可能導致 PV 建立在 A 可用區，但 Pod 被調度到 B 可用區，掛載就會失敗。WaitForFirstConsumer 模式等到 Pod 被調度後，才在 Pod 所在的可用區建立 PV，避免跨可用區掛載的問題。
 
 最後提一下 StorageClass 的 parameters 欄位，這個欄位完全由 provisioner 定義，不同的 provisioner 支援不同的 parameters。查閱你使用的 CSI 驅動文件，了解支援哪些 parameters，才能充分利用儲存系統的特性。`,
-    duration: "10"
+    duration: "11"
   },
   {
     title: "預設 StorageClass",
@@ -1003,7 +1003,82 @@ Kubernetes 1.26 版之後，支援了多個預設 StorageClass 的機制（之�
 把最常用的 StorageClass 設為預設，其他的讓開發者在 PVC 裡明確指定。這樣既方便又靈活。
 
 好，StorageClass 的部分我們就講到這裡。接下來講今天的重頭戲：StatefulSet！`,
-    duration: "8"
+    duration: "9"
+  },
+
+  {
+    title: "PVC 容量擴展（Volume Expansion）",
+    subtitle: "不重建 PVC，線上擴大儲存空間",
+    section: "StorageClass",
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-k8s-blue font-semibold mb-2">為什麼需要 Volume Expansion？</p>
+          <p className="text-slate-400 text-sm">資料庫的資料量往往難以精確預估，初始申請 20GB 幾個月後可能就不夠用了。Volume Expansion 讓你在不停機、不重建 PVC 的情況下，直接擴大儲存空間。</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-slate-800/50 p-4 rounded-lg">
+            <p className="text-k8s-blue font-semibold mb-2">前提條件</p>
+            <ul className="text-sm text-slate-400 space-y-1">
+              <li>• StorageClass 設定 <span className="text-yellow-400">allowVolumeExpansion: true</span></li>
+              <li>• 底層儲存支援線上擴容（AWS EBS、GCP PD 支援）</li>
+              <li>• K8s 版本 ≥ 1.11（GA in 1.24）</li>
+              <li>• <span className="text-red-400">注意：只能擴大，不能縮小！</span></li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/50 p-4 rounded-lg">
+            <p className="text-k8s-blue font-semibold mb-2">擴容步驟</p>
+            <pre className="text-xs text-slate-400">
+{`# 1. 修改 PVC storage 大小
+kubectl patch pvc mysql-pvc \\
+  -p '{"spec":{"resources":
+  {"requests":{"storage":"50Gi"}}}}'
+
+# 2. 觀察擴容狀態
+kubectl get pvc mysql-pvc
+# 狀態→ FileSystemResizePending
+# Pod 重啟後自動完成 FS resize
+
+# 3. 驗證結果
+kubectl exec -it mysql-0 -- \\
+  df -h /var/lib/mysql`}
+            </pre>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-green-400/10 border border-green-400/30 p-3 rounded-lg">
+            <p className="text-green-400 text-sm font-semibold">✅ 支援 Online Resize 的 CSI</p>
+            <p className="text-slate-400 text-xs mt-1">AWS EBS CSI、GCP PD CSI、Azure Disk CSI（新版本不需重啟 Pod）</p>
+          </div>
+          <div className="bg-yellow-400/10 border border-yellow-400/30 p-3 rounded-lg">
+            <p className="text-yellow-400 text-sm font-semibold">⚠️ 需重啟 Pod 的情況</p>
+            <p className="text-slate-400 text-xs mt-1">舊版 CSI 驅動需在 Pod 重啟時觸發 Filesystem resize（ext4/xfs 自動完成）</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `好，接下來講一個在生產環境非常實用的功能：PVC 容量擴展（Volume Expansion）。
+
+我敢說，每一個在生產環境跑過資料庫的人，都一定遇過「磁碟快滿了怎麼辦」這個問題。傳統的解法很痛苦：先備份資料、停服、換更大的磁碟、恢復資料、重啟服務。整個流程可能需要幾個小時的停機時間。
+
+Kubernetes 搭配支援 Volume Expansion 的 StorageClass，可以讓你在幾乎不停服的情況下完成擴容。
+
+前提條件有三個：第一，StorageClass 必須設定 allowVolumeExpansion: true。如果你的 StorageClass 沒有這個設定，你就沒辦法擴容，必須刪除重建 PVC（這需要停服）。所以我強烈建議在建立 StorageClass 的時候，一定要加上這個設定，哪怕現在不需要，未來也可能需要。
+
+第二，底層儲存系統必須支援線上擴容。AWS EBS 支援，GCP Persistent Disk 支援，Azure Disk 支援。NFS 則不行，因為 NFS 的容量是 NFS 伺服器上目錄的容量，不是獨立分配的，Kubernetes 沒辦法透過 API 去擴展 NFS 伺服器的空間。
+
+第三，K8s 版本要夠新。Volume Expansion 在 1.11 版進入 Beta，在 1.24 版成為正式版（GA）。現代的叢集基本上都支援了，但如果你用的是比較舊的叢集，要確認版本。
+
+擴容的操作非常簡單：用 kubectl patch pvc 把 storage 的大小改成你想要的容量。K8s 會去呼叫 CSI 驅動，CSI 驅動再去擴大底層的儲存（比如把 EBS Volume 從 20GB 擴大到 50GB）。
+
+擴大底層儲存之後，還需要擴大檔案系統（Filesystem）。這個步驟通常在 Pod 重啟時自動完成：K8s 掛載 Volume 的時候，如果偵測到檔案系統比 Volume 小，會自動執行 resize2fs（ext4）或 xfs_growfs（XFS）。
+
+有些先進的 CSI 驅動（比如 AWS EBS CSI Driver 的新版本）支援線上的 Filesystem Resize，不需要重啟 Pod。但這不是所有驅動都支援的，要查閱你用的 CSI 驅動文件確認。
+
+擴容有一個非常重要的限制：只能擴大，不能縮小！這不是 Kubernetes 的限制，而是底層儲存系統（EBS、GCP PD 等）的限制，這些塊存儲設備本身就不支援縮容。如果你的 PVC 太大想縮小，只能手動備份資料、刪除 PVC、建立更小的 PVC、恢復資料。這個流程很麻煩，所以初始容量的估算要合理。
+
+在實際工作中，我建議設定監控警報：當 PV 使用率超過 75% 的時候，發出告警，讓 DevOps 人員有時間在磁碟滿之前擴容。Prometheus + Grafana 可以監控 kubelet_volume_stats_used_bytes 和 kubelet_volume_stats_capacity_bytes 兩個指標，算出使用率。早發現早處理，比等到磁碟滿了服務崩潰再處理好太多了。`,
+    duration: "9"
   },
   {
     title: "自訂 StorageClass",
@@ -1070,7 +1145,7 @@ Longhorn 適合：中小型叢集、需要高可用性（多副本複製）、�
 Rook-Ceph 適合：大型叢集、需要極高的效能和可靠性、有專業的 DevOps 團隊負責維護、需要 Block/File/Object 多種儲存類型。Ceph 功能最強大，但複雜度也最高，需要額外的節點（至少 3 個節點做 OSD）和較高的運維成本。
 
 在本次課程的實作練習裡，我們使用的是 minikube 或 kind 的內建 StorageClass，或者 NFS Provisioner，大家可以根據自己的環境選擇。`,
-    duration: "7"
+    duration: "8"
   },
   {
     title: "StatefulSet 是什麼？",
@@ -1147,7 +1222,7 @@ kubectl delete statefulset mysql --cascade=orphan  # 刪除 StatefulSet，但 Po
 注意：不管哪種方式刪除 StatefulSet，volumeClaimTemplates 建立的 PVC 都不會自動刪除，需要手動清理。這是保護資料的機制。
 
 StatefulSet 暫停（pause）：可以設定 spec.replicas: 0 來暫停 StatefulSet，這樣所有 Pod 都會被刪除，但 PVC 保留。需要恢復時，把 replicas 改回原來的數字，Pod 重建後會重新掛載原來的 PVC，資料還在。`,
-    duration: "10"
+    duration: "12"
   },
   {
     title: "StatefulSet 的穩定 DNS 名稱",
@@ -1226,7 +1301,7 @@ nslookup mysql-headless.default.svc.cluster.local
 StatefulSet Pod 的 hostname 也很特別：每個 Pod 的 hostname 就是 Pod 的名稱（mysql-0、mysql-1 等），而不是隨機生成的字串。你可以在 Pod 裡執行 hostname 命令來驗證。
 
 這種穩定的 DNS 和 hostname 機制，讓分散式系統的各個節點之間可以互相通訊，即使 Pod 重啟，通訊地址也不變。這是 StatefulSet 最核心的價值之一。`,
-    duration: "10"
+    duration: "12"
   },
   {
     title: "volumeClaimTemplates：每個 Pod 獨立 PVC",
@@ -1310,7 +1385,7 @@ volumeClaimTemplates 還有一個好處：每個 Pod 的資料是完全獨立的
 如果你確定不需要 pod-2 的資料了，記得手動執行 kubectl delete pvc mysql-data-mysql-2 來清理。不然這個 PVC（和背後的 EBS Volume）會一直存在，持續產生費用（在雲端環境）。
 
 這個行為是 K8s 刻意設計的安全保護：寧可多花一些儲存費用，也要保護資料不被意外刪除。`,
-    duration: "8"
+    duration: "9"
   },
   {
     title: "MySQL StatefulSet 完整實作",
@@ -1431,7 +1506,7 @@ MySQL 的 Service 設定：你需要兩個 Service：一個 Headless Service（�
 Service 的 clusterIP 設定：如果你只有一個 MySQL Pod，普通 Service 指向這個 Pod 就好。如果有主從複製，你應該設定兩個 Service：一個指向主節點（mysql-0）用於寫入，一個指向所有從節點用於讀取，做讀寫分離。
 
 在本機實作時，可以用 kubectl port-forward svc/mysql 3306:3306 把 MySQL 的 3306 端口轉發到本機，然後用 MySQL Workbench 或 DBeaver 連接，方便驗證資料是否正確存入。`,
-    duration: "12"
+    duration: "14"
   },
   {
     title: "資料持久化驗證",
@@ -1578,7 +1653,7 @@ rm /tmp/etcd-backup-*.db  # 清理本地臨時文件
 快照的大小監控：定期查看快照大小，如果快照突然變很大，可能是叢集裡有異常大量的物件（比如某個應用在瘋狂建立 ConfigMap 或 Event）。可以用 kubectl get events --all-namespaces | wc -l 查看 Event 數量，Event 過多是 etcd 體積膨脹的常見原因。
 
 etcd 還原後的驗證：還原完成後，要確認叢集狀態是否正常。用 kubectl get nodes 確認所有節點都 Ready，kubectl get pods --all-namespaces 確認所有 Pod 狀態，kubectl get pv 確認 PV 資料還在。如果有任何異常，需要進一步排查。`,
-    duration: "10"
+    duration: "12"
   },
   {
     title: "Velero：應用資料備份工具",
@@ -1672,7 +1747,7 @@ Velero 備份的注意事項：Velero 備份 PV 資料有兩種方式：
 在實際使用中，雲端快照方式更常用，因為速度快、成本低（快照的增量計費）。如果需要跨雲遷移，再考慮用 Restic 方式。
 
 Velero 的備份不包括 K8s 集群的節點配置和 etcd，所以 etcd 備份和 Velero 備份是互補的，不能互相替代。`,
-    duration: "10"
+    duration: "12"
   },
   {
     title: "備份計劃建議",
@@ -1740,6 +1815,103 @@ Velero 備份：每天一次，保留最近 30 天的備份。在重大部署之
 最後強調一個心態問題：備份是一種投資，不是浪費資源。在沒有備份的情況下發生資料丟失，業務損失往往遠遠超過備份的成本。建立良好的備份習慣，是一個成熟的工程師和運維團隊必備的能力。從現在開始，把備份納入每個新系統的設計裡，而不是事後再想辦法補救。
 記住：沒有測試過的備份不是備份。定期演練還原流程是每個 DevOps 團隊的必要工作。`,
     duration: "5"
+  },
+
+  {
+    title: "資料庫應用層備份",
+    subtitle: "mysqldump 與 Binlog：比 PV 快照更細粒度的保護",
+    section: "備份策略",
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-k8s-blue font-semibold mb-2">兩種備份維度對比</p>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-blue-400/10 p-3 rounded">
+              <p className="text-blue-400 font-semibold mb-1">PV 快照（基礎設施層）</p>
+              <ul className="text-slate-400 space-y-1">
+                <li>• 備份整個 Volume 的磁碟區塊</li>
+                <li>• 速度快，一致性依賴雲端實作</li>
+                <li>• 無法還原單一資料表或行</li>
+                <li>• 適合：災難恢復、環境複製</li>
+              </ul>
+            </div>
+            <div className="bg-green-400/10 p-3 rounded">
+              <p className="text-green-400 font-semibold mb-1">mysqldump（應用層）</p>
+              <ul className="text-slate-400 space-y-1">
+                <li>• 備份 SQL 邏輯資料（可讀格式）</li>
+                <li>• 搭配 Binlog 可還原到任意時間點</li>
+                <li>• 可還原單一資料庫或資料表</li>
+                <li>• 適合：誤刪資料、精細還原</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-k8s-blue font-semibold mb-2">K8s CronJob 自動備份 MySQL</p>
+          <pre className="text-xs text-slate-400">
+{`apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mysql-backup
+spec:
+  schedule: "0 2 * * *"     # 每天凌晨 2 點
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: mysql:8.0
+            env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            command:
+            - /bin/sh
+            - -c
+            - |
+              DATE=$(date +%Y%m%d-%H%M%S)
+              mysqldump -h mysql-headless \\
+                -u root -p$MYSQL_ROOT_PASSWORD \\
+                --all-databases \\
+                --single-transaction \\
+                | gzip > /backup/full-$DATE.sql.gz
+          volumeMounts:
+          - name: backup-storage
+            mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: mysql-backup-pvc
+          restartPolicy: OnFailure`}
+          </pre>
+        </div>
+      </div>
+    ),
+    notes: `讓我們講一個非常實用的應用層備份方式：mysqldump 配合 Kubernetes CronJob。
+
+前面我們講了 etcd 備份和 Velero 備份，它們都是基礎設施層的備份。但是對於資料庫，我們還需要應用層的備份，兩者互補，不能互相替代。
+
+為什麼需要應用層備份？讓我舉一個非常常見的真實場景：假設你的 MySQL 裡有一個 orders 資料表，今天下午三點，一個工程師在生產環境執行了一個少了 WHERE 條件的 DELETE 語句，把三個月的訂單資料全部刪掉了。這個錯誤在幾秒鐘內就發生了。
+
+如果你的 PV 快照是每天一次，最多還原到昨天的狀態，今天的所有訂單都沒了。但如果你有 Binlog（MySQL 的交易日誌）配合每日全備，你可以這樣做：先把備份還原到昨天的快照，然後重放今天凌晨到三點那個 DELETE 之前的 Binlog，你就只損失了一個誤刪操作之前幾秒鐘的資料。這就是 Point-in-Time Recovery（PITR），是企業級資料庫的標配。
+
+mysqldump 幾個重要選項說明：
+
+--single-transaction 這個選項非常關鍵！它讓 mysqldump 在一個 InnoDB 交易中讀取資料，備份過程中不鎖表，資料庫仍然可以正常讀寫。如果沒有這個選項，mysqldump 預設會鎖表（LOCK TABLES），備份期間業務就停擺了。絕對要加這個選項。
+
+--all-databases 備份所有資料庫。你也可以用 --databases mydb1 mydb2 指定特定資料庫，或者在特定資料庫後面加上資料表名稱只備份特定表。
+
+在 K8s 裡，我們用 CronJob 來排程自動備份。CronJob 的 schedule 語法和 Linux crontab 完全一樣。上面的例子是每天凌晨 2 點執行一次完整備份，把結果 gzip 壓縮後存到一個 backup PVC 裡。
+
+實際生產環境的備份腳本通常還要做更多：執行完備份之後，把備份檔案上傳到 S3 等物件存儲、清理超過保留期限的舊備份、發送 Slack 或 Email 通知（成功或失敗）、驗證備份檔案的完整性（比如嘗試還原到一個測試資料庫）。
+
+關於 Binlog 備份：要讓 MySQL 開啟 Binlog，需要在 my.cnf 裡設定 log_bin = mysql-bin 和 binlog_format = ROW。Binlog 會持續寫入，通常用 mysqlbinlog 工具定期（比如每小時）把新的 Binlog 備份到 S3。有了全備加 Binlog，你就可以還原到任意一個時間點。
+
+最後提一下 MySQL 8.0 引入的 mysqlpump 和 MySQL Shell 的 dump utilities，支援並行備份，對大型資料庫（幾十 GB 以上）效能比傳統 mysqldump 好很多，是更現代的選擇。如果你的資料庫很大，備份時間很長，可以考慮換這些工具。`,
+    duration: "8"
   },
   {
     title: "儲存選擇指南",

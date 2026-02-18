@@ -359,7 +359,7 @@ htop 是 top 的加強版，有漂亮的彩色介面，彩色長條圖顯示每�
               { sig: 'SIGHUP (1)', cmd: 'kill -1 PID', color: 'text-yellow-400', desc: '讓程序重新讀取設定' },
             ].map((item, i) => (
               <div key={i} className="bg-slate-700/50 p-3 rounded-lg">
-                <p className={`font-mono font-bold ${item.color}`}>{item.sig}</p>
+                <p className={`font-mono font-bold \${item.color}`}>{item.sig}</p>
                 <p className="font-mono text-xs text-slate-300 mt-1">{item.cmd}</p>
                 <p className="text-xs text-slate-400 mt-1">{item.desc}</p>
               </div>
@@ -889,7 +889,7 @@ apt search 可以搜尋套件名稱，如果你不確定一個軟體的正確套
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-lg">
               <span className="text-xl">{item.icon}</span>
-              <code className={`font-mono flex-1 text-sm ${item.color}`}>{item.cmd}</code>
+              <code className={`font-mono flex-1 text-sm \${item.color}`}>{item.cmd}</code>
               <span className="text-slate-400 text-xs max-w-[200px]">{item.desc}</span>
             </div>
           ))}

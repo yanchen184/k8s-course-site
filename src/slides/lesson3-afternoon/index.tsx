@@ -1367,7 +1367,7 @@ docker compose events 可以即時查看所有容器的事件（啟動、停止�
 
 生產環境的 compose.prod.yml 通常會包含：指定確切的 Image tag（比如 myapp:1.2.3）而不是 latest；設定資源限制（記憶體和 CPU）；設定 restart: unless-stopped；設定日誌輪轉避免日誌把磁碟撐爆；可能的話設定 TLS 憑證掛載。
 
-還有一個很實用的 Compose 功能是環境變數插值。在 compose.yml 裡面，你可以用 ${VARIABLE_NAME} 或 ${VARIABLE_NAME:-default_value} 來引用環境變數，後者有預設值。結合 .env 檔案（Compose 會自動讀取和 compose.yml 同目錄的 .env 檔案），你可以很方便地管理不同環境的設定。注意：.env 檔案不要提交到 Git，但可以提交一個 .env.example 作為範本，讓新成員知道需要設定哪些變數。這整套組合（基礎 compose.yml + 環境特定的 override + .env 變數）是目前業界最成熟的多環境管理方案之一，大家在工作中可以直接套用。`,
+還有一個很實用的 Compose 功能是環境變數插值。在 compose.yml 裡面，你可以用 \${VARIABLE_NAME} 或 \${VARIABLE_NAME:-default_value} 來引用環境變數，後者有預設值。結合 .env 檔案（Compose 會自動讀取和 compose.yml 同目錄的 .env 檔案），你可以很方便地管理不同環境的設定。注意：.env 檔案不要提交到 Git，但可以提交一個 .env.example 作為範本，讓新成員知道需要設定哪些變數。這整套組合（基礎 compose.yml + 環境特定的 override + .env 變數）是目前業界最成熟的多環境管理方案之一，大家在工作中可以直接套用。`,
     duration: "10"
   },
   {

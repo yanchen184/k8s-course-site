@@ -971,13 +971,13 @@ YAML 重點解析：podSelector 選 app: demo-web 的 Pod，也就是我們要�
           ].map((section, i) => (
             <div
               key={i}
-              className={`bg-${section.color}-900/30 border border-${section.color}-700 p-4 rounded-lg`}
+              className={`bg-\${section.color}-900/30 border border-\${section.color}-700 p-4 rounded-lg`}
             >
-              <p className={`text-${section.color}-400 font-semibold mb-2`}>{section.title}</p>
+              <p className={`text-\${section.color}-400 font-semibold mb-2`}>{section.title}</p>
               <ul className="space-y-1">
                 {section.items.map((item, j) => (
                   <li key={j} className="text-slate-300 text-sm flex items-start gap-2">
-                    <span className={`text-${section.color}-400 mt-0.5`}>•</span>
+                    <span className={`text-\${section.color}-400 mt-0.5`}>•</span>
                     {item}
                   </li>
                 ))}

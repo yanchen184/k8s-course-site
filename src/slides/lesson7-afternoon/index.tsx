@@ -114,13 +114,13 @@ export const slides: Slide[] = [
           ].map((item, i) => (
             <div
               key={i}
-              className={`p-3 rounded-lg border ${i === 6 ? 'bg-k8s-blue/20 border-k8s-blue' : 'bg-slate-800/50 border-slate-700'}`}
+              className={`p-3 rounded-lg border \${i === 6 ? 'bg-k8s-blue/20 border-k8s-blue' : 'bg-slate-800/50 border-slate-700'}`}
             >
               <div className="flex items-center gap-2">
                 <span className="text-xl">{item.icon}</span>
-                <span className={`font-bold text-sm ${i === 6 ? 'text-k8s-blue' : 'text-slate-400'}`}>{item.day}</span>
+                <span className={`font-bold text-sm \${i === 6 ? 'text-k8s-blue' : 'text-slate-400'}`}>{item.day}</span>
               </div>
-              <p className={`font-semibold ${i === 6 ? 'text-white' : 'text-slate-300'}`}>{item.topic}</p>
+              <p className={`font-semibold \${i === 6 ? 'text-white' : 'text-slate-300'}`}>{item.topic}</p>
               <p className="text-slate-500 text-xs">{item.detail}</p>
             </div>
           ))}

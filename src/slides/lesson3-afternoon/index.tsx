@@ -57,7 +57,9 @@ export const slides: Slide[] = [
 
 這些技能是從 Docker 進化到 Kubernetes 的關鍵中間步驟。在 Kubernetes 裡面，你部署的每一個服務都需要對應的 Container Image，而建立 Image 的方式就是 Dockerfile。所以今天下午的課程，是明天 Kubernetes 課程的重要基礎。
 
-好，我們先從 Volume 的深入學習開始，然後進入 Dockerfile，最後是 Docker Compose 的實作。讓我們開始吧！`,
+好，我們先從 Volume 的深入學習開始，然後進入 Dockerfile，最後是 Docker Compose 的實作。讓我們開始吧！
+
+在我們正式開始之前，想提醒大家幾件事。第一，今天下午的實作非常多，請確保你的電腦有網路連線，而且 Docker Desktop 或 Docker Engine 正常運作。如果有任何環境問題，現在就舉手告訴我，我們先把環境搞定，這樣等一下才不會卡在環境問題上。第二，學程式和學工具最好的方法是動手做，所以我每次示範完之後，都會請大家跟著操作一遍。不要只看我操作，你自己手打一遍，錯誤訊息看一遍，才是真正的學習。第三，今天的課程很充實，如果某些概念一時沒聽懂，不用擔心，課程結束後我會留下來回答問題，而且所有的投影片和指令都會給大家帶回去參考。`,
     duration: "5"
   },
   {
@@ -111,7 +113,13 @@ docker volume ls 列出所有的 Volume，docker volume inspect 查看某個 Vol
 
 docker volume rm 刪除一個 Volume，但如果有容器還在使用這個 Volume（不管容器是在執行還是已停止），是無法刪除的。docker volume prune 清除所有沒有被任何容器使用的 Volume，在清理環境的時候很有用，但一定要確認這些 Volume 裡面沒有你需要的資料！這個指令是不可逆的，Volume 刪除之後資料就永遠消失了。
 
-在使用 Named Volume 的時候，有一個很好的慣例：Volume 的命名要有意義，能一眼看出它是哪個服務的資料。比如 mysql-prod-data、nginx-logs、app-uploads 這樣的命名比 data1、vol2 要好得多，在管理大量 Volume 的時候會感謝自己當初命名有意義。`,
+在使用 Named Volume 的時候，有一個很好的慣例：Volume 的命名要有意義，能一眼看出它是哪個服務的資料。比如 mysql-prod-data、nginx-logs、app-uploads 這樣的命名比 data1、vol2 要好得多，在管理大量 Volume 的時候會感謝自己當初命名有意義。
+
+讓我補充一個在實際工作中很有用的小技巧：如果你忘記某個 Volume 裡面放的是什麼資料，可以用 docker volume inspect 看 Mountpoint，然後直接到那個路徑下查看檔案（需要 root 或 sudo 權限）。在 Docker Desktop（Mac/Windows）上，因為 Docker 跑在虛擬機裡面，所以你沒辦法直接從主機訪問 Mountpoint，但可以啟動一個臨時容器，掛載這個 Volume，然後在容器裡面查看檔案內容。比如：docker run --rm -v mydata:/data alpine ls /data。這個技巧在除錯的時候非常有用。
+
+另外，Volume 的一個重要特性是：當你第一次把一個空的 Volume 掛載到容器的某個目錄時，如果那個目錄在 Image 裡面已經有資料了（比如官方 MySQL Image 的 /var/lib/mysql 已經有初始化資料），Docker 會把那些資料複製到 Volume 裡面。但如果 Volume 已經有資料了，則不會覆蓋。這個行為有時候會讓初學者感到困惑，記住這個規則就好了。
+
+好，大家對 Named Volume 的基本操作有問題嗎？有問題現在提出來，我們接著來做一個實際的 MySQL 持久化實作。`,
     duration: "10"
   },
   {
@@ -174,7 +182,15 @@ docker volume rm 刪除一個 Volume，但如果有容器還在使用這個 Volu
 
 容器可以隨意刪除重建，只要 Volume 不刪除，資料就永遠都在。這讓你可以放心地更新應用程式版本，不用擔心資料丟失。
 
-最後要說一下 Volume 的備份方式。一個常用的技巧是利用一個臨時容器來做備份：啟動一個 alpine 容器，同時掛載你要備份的 Volume（/data）和你想存放備份的主機目錄（/backup），然後用 tar 把 /data 的所有內容打包成一個 tar.gz 檔案存到 /backup。這樣做的好處是不需要停止 MySQL 容器就可以備份，因為是在另一個容器裡面做的。不過對於生產環境的資料庫，建議使用 mysqldump 做一致性備份，而不是直接備份資料目錄，避免備份到處於不一致狀態的資料。還原的時候就是反向操作，把 tar 解壓縮到 Volume 目錄裡面。大家理解了嗎？`,
+最後要說一下 Volume 的備份方式。一個常用的技巧是利用一個臨時容器來做備份：啟動一個 alpine 容器，同時掛載你要備份的 Volume（/data）和你想存放備份的主機目錄（/backup），然後用 tar 把 /data 的所有內容打包成一個 tar.gz 檔案存到 /backup。這樣做的好處是不需要停止 MySQL 容器就可以備份，因為是在另一個容器裡面做的。不過對於生產環境的資料庫，建議使用 mysqldump 做一致性備份，而不是直接備份資料目錄，避免備份到處於不一致狀態的資料。還原的時候就是反向操作，把 tar 解壓縮到 Volume 目錄裡面。大家理解了嗎？
+
+讓我再說一個常見的誤區。很多初學者在用 docker rm -f 刪除容器之後，以為資料也跟著消失了，所以就很緊張。其實並沒有！容器刪除不等於 Volume 刪除，這兩件事是完全獨立的。你可以把容器想成是一台「播放器」，Volume 是「光碟」，你可以隨時換一台播放器，但光碟裡面的資料完全不受影響。
+
+另一個很重要的觀念是：如果你啟動一個新的 MySQL 容器，掛載同一個 Volume，MySQL 在啟動的時候會發現資料目錄已經有資料了，它就不會再執行初始化程序，而是直接使用現有的資料。這讓你可以放心地升級 MySQL 版本：先停止並刪除舊容器，啟動新版本的容器但掛載同一個 Volume，MySQL 就會繼續使用你的舊資料（大版本升級建議先查閱官方文件確認相容性）。
+
+還有一個實際案例分享：有一次我的同事不小心執行了 docker volume prune，把所有「未被使用」的 Volume 都清除了，其中包含了一個重要服務的 Volume（當時那個服務的容器剛好是停止狀態）。這個慘痛教訓告訴我們：定期備份、謹慎使用 prune，以及永遠保持容器運行（或用 label 標記重要 Volume）的重要性。這些錯誤在實際工作中都是有代價的，希望大家不要重蹈覆轍。
+
+讓我再補充一個進階的 Volume 技巧：使用 tmpfs 掛載。有時候你需要容器有一個可讀寫的目錄，但你不希望那些資料被持久化（比如存放暫存檔案、session 資訊、或者測試資料），而且你希望這個目錄的讀寫速度盡量快。tmpfs（temporary filesystem）就是這個場景的解決方案：它把資料存在主機的記憶體裡面，速度非常快，容器停止後資料自動消失。使用方式是 docker run --tmpfs /tmp myapp 或在 docker-compose.yml 裡面設定 tmpfs: /tmp。注意 tmpfs 的大小受限於主機記憶體，不要在 tmpfs 裡面存放大量資料。這個技巧在性能測試和需要快速暫存的場景很有用，大家記住有這個選項存在就好了。`,
     duration: "10"
   },
   {
@@ -228,7 +244,13 @@ docker volume rm 刪除一個 Volume，但如果有容器還在使用這個 Volu
 
 docker exec -i 是在執行互動式指令時常用的技巧。-i 代表 interactive（互動式），允許透過標準輸入向容器發送資料。還原資料時，用 {"<"} 把 SQL 檔案的內容發送給 mysql 指令，就能執行裡面的所有 SQL 語句來還原資料。
 
-現在讓我總結一些 Volume 的最佳實踐：第一，為每個服務建立獨立的 Volume，不要讓多個不相關的服務共用同一個 Volume，這樣在管理和備份的時候會更清晰。第二，Volume 的命名要有意義，讓你或你的同事一眼就知道這個 Volume 是哪個服務用的。第三，定期備份，並且定期測試還原流程——很多人備份了但從來不測試還原，結果在真正需要還原的時候發現備份是壞的。第四，永遠不要把應用程式的程式碼放在 Volume 裡面，程式碼應該打包在 Image 裡面。第五，執行 docker volume prune 之前一定要三思，這個指令會刪除所有「未被使用」的 Volume，如果某個容器停止了但 Volume 還有重要資料，也會被清除。要養成在執行 prune 之前先 docker volume ls 確認的習慣。`,
+現在讓我總結一些 Volume 的最佳實踐：第一，為每個服務建立獨立的 Volume，不要讓多個不相關的服務共用同一個 Volume，這樣在管理和備份的時候會更清晰。第二，Volume 的命名要有意義，讓你或你的同事一眼就知道這個 Volume 是哪個服務用的。第三，定期備份，並且定期測試還原流程——很多人備份了但從來不測試還原，結果在真正需要還原的時候發現備份是壞的。第四，永遠不要把應用程式的程式碼放在 Volume 裡面，程式碼應該打包在 Image 裡面。第五，執行 docker volume prune 之前一定要三思，這個指令會刪除所有「未被使用」的 Volume，如果某個容器停止了但 Volume 還有重要資料，也會被清除。要養成在執行 prune 之前先 docker volume ls 確認的習慣。
+
+我想再深入談一下備份策略的設計。在生產環境，備份本身還不夠，你還需要：第一，備份的自動化。手動備份很容易被遺忘，應該設置定時任務（cron job）來自動執行備份，比如每天凌晨自動備份，並把備份檔案上傳到遠端儲存（AWS S3、GCS 或另一台伺服器）。第二，備份的保留策略。你不可能無限期保留所有備份，應該設定保留多少份，比如保留最近 30 天的每日備份，以及每個月月底的備份。第三，最重要的是定期測試還原！很多公司做了備份但從來不測試還原，結果在真正需要的時候才發現備份損壞了。建議每個月至少做一次還原測試，在測試環境把備份還原出來，確認資料完整性。
+
+還有一個 Volume 相關的進階主題：Volume Driver。預設的 Driver 是 local，資料存在本機磁碟。但 Docker 支援插件式的 Volume Driver，讓你可以把 Volume 存在 NFS 共享儲存、AWS EBS、Azure Disk 等雲端儲存上。這在多台伺服器的環境下特別有用，讓多個容器可以共享同一個 Volume。這個主題在 Kubernetes 的課程裡面會深入講解，對應的概念叫 PersistentVolume 和 StorageClass，它們的設計哲學其實跟我們今天學的 Named Volume 非常類似，只是規模更大、管理更複雜一些。大家今天把 Named Volume 學好，明天學 PersistentVolume 就會輕鬆很多。
+
+最後讓我整理一下 Volume 這個主題的核心觀念，幫大家在腦海裡建立清晰的心智模型：容器本身是無狀態且短暫的（可以隨時刪除重建），而 Volume 是有狀態且持久的（獨立於容器的生命週期）。這個設計哲學是雲端原生應用程式的基礎——你的應用程式邏輯和執行環境打包在 Image 裡面，而需要持久化的資料存放在 Volume 裡面，兩者各司其職，讓系統既靈活又可靠。把這個觀念帶到明天的 Kubernetes 課程，你會發現 PersistentVolumeClaim 和 PersistentVolume 背後的設計邏輯跟我們今天學的完全一樣，只是在更大的規模下有更複雜的管理機制而已。好，Volume 的主題就到這裡，我們繼續進入 Dockerfile 的世界！`,
     duration: "10"
   },
   {
@@ -287,7 +309,13 @@ Dockerfile 是一個純文字檔案，裡面包含了一系列的指令，告訴
 
 另外，Dockerfile 可以被提交到 Git 進行版本控制。這意味著你可以追蹤環境的演進歷史，就像追蹤程式碼的歷史一樣。這就是所謂的 Infrastructure as Code（基礎設施即程式碼）的概念，這在現代 DevOps 實踐中非常重要。
 
-好，讓我們來看一個最簡單的 Dockerfile 範例，這是一個 Node.js 應用程式的 Dockerfile。每一行都是一個指令，我會在接下來的幾張投影片裡面詳細解釋每個指令的含義和用法。`,
+好，讓我們來看一個最簡單的 Dockerfile 範例，這是一個 Node.js 應用程式的 Dockerfile。每一行都是一個指令，我會在接下來的幾張投影片裡面詳細解釋每個指令的含義和用法。
+
+讓我帶大家逐行快速看一下這個最簡單的 Dockerfile。第一行 FROM node:18-alpine 說明我們要用 Node.js 18 的 alpine 版本作為基礎映像。為什麼選 alpine？因為它比標準版小很多，之後我們會詳細說明。WORKDIR /app 把後續所有操作的工作目錄設在 /app，這樣不用擔心檔案放到奇怪的地方。然後 COPY package*.json ./ 只複製 package.json 和 package-lock.json，接著 RUN npm install 安裝依賴。為什麼分兩步？這是利用 Layer 快取的技巧，可以讓每次改程式碼後的建構速度加快許多，我們後面的投影片會詳細說明原理。COPY . . 把其他所有程式碼複製進去。EXPOSE 3000 宣告這個應用程式在 3000 埠監聽（只是說明文件，不實際開放）。最後 CMD ["node", "app.js"] 定義容器啟動時要執行的指令。
+
+Dockerfile 的另一個重要特性是它可以被版本控制。當你把 Dockerfile 提交到 Git，你就有了整個環境的歷史記錄。你可以看到每次環境的變更：什麼時候升級了 Node.js 版本、什麼時候增加了新的系統依賴。這對於排除問題（「這個 bug 是在哪次部署之後出現的？」）非常有幫助。這就是 Infrastructure as Code（基礎設施即程式碼）的核心價值所在，在現代 DevOps 和 SRE 的工作中，這個概念非常核心。好，我們開始逐一學習每個 Dockerfile 指令！
+
+在我們深入之前，我想強調一下 Dockerfile 的實際價值。在很多公司，特別是採用微服務架構的公司，每個服務都有自己的 Dockerfile，而且這個 Dockerfile 和程式碼一起住在 Git 倉庫裡面。當新工程師加入的時候，他只需要 git clone 專案，然後 docker build 就能得到和生產環境完全一樣的執行環境，不需要看一頁又一頁的「環境安裝指南」。這種開發體驗的改善是無價的，特別是在大型團隊或遠端工作的環境下。所以 Dockerfile 不只是一個技術工具，它也是一種溝通和協作的方式。`,
     duration: "10"
   },
   {
@@ -342,7 +370,15 @@ scratch 是一個特殊的基礎映像，它是完全空的，什麼都沒有。
 
 接下來是 RUN，用來在建構 Image 的過程中執行 shell 指令。你可以用 RUN 來安裝套件、複製設定、編譯程式碼等等。
 
-這裡有一個非常重要的知識點：每一個 RUN 指令都會建立一個新的 Layer。如果你有多個 RUN 指令，就會建立多個 Layer，這會讓 Image 變大。最佳實踐是把相關的指令合併到同一個 RUN 裡面，用 && 連接。而且，在安裝完 apt 套件之後，要記得刪除 apt 的快取（rm -rf /var/lib/apt/lists/*），否則這些快取會留在 Image 裡面，白白佔用空間。對於 npm，可以在 npm install 之後加 npm cache clean --force；對於 pip，可以加 --no-cache-dir 選項。這些細節加起來，可以讓你的 Image 體積減少很多。大家記住這個技巧，以後寫 Dockerfile 的時候很常用到。`,
+這裡有一個非常重要的知識點：每一個 RUN 指令都會建立一個新的 Layer。如果你有多個 RUN 指令，就會建立多個 Layer，這會讓 Image 變大。最佳實踐是把相關的指令合併到同一個 RUN 裡面，用 && 連接。而且，在安裝完 apt 套件之後，要記得刪除 apt 的快取（rm -rf /var/lib/apt/lists/*），否則這些快取會留在 Image 裡面，白白佔用空間。對於 npm，可以在 npm install 之後加 npm cache clean --force；對於 pip，可以加 --no-cache-dir 選項。這些細節加起來，可以讓你的 Image 體積減少很多。大家記住這個技巧，以後寫 Dockerfile 的時候很常用到。
+
+除了清理 apt 快取之外，還有幾個常見的清理技巧你應該記住：如果你用 pip 安裝 Python 套件，加上 --no-cache-dir 選項可以讓 pip 不保留下載快取；如果用 npm install 或 npm ci 安裝 Node.js 套件，可以在之後加上 npm cache clean --force；如果用 apk 安裝 Alpine 套件，加上 --no-cache 選項讓 apk 不保留快取。這些清理步驟和安裝步驟要放在同一個 RUN 指令裡面，用 && 串接，否則清理步驟會建立新的 Layer，但前面的 Layer 裡面快取依然存在，沒有實際效果。
+
+另外，RUN 指令有兩種格式：shell 格式（直接寫字串，比如 RUN npm install）和 exec 格式（JSON 陣列，比如 RUN ["npm", "install"]）。在 RUN 指令裡面兩種都可以用，通常 shell 格式更好寫，因為可以直接用 && 串接多個指令。但 CMD 和 ENTRYPOINT 強烈建議用 exec 格式，原因我們後面會說。
+
+還有一個要注意的地方：RUN 指令執行的是建構時的指令，和容器執行時的環境無關。比如你在 RUN 裡面 export 了一個環境變數，那個環境變數在容器執行時是不存在的。要在執行時設定環境變數，要用 ENV 指令。這個區別初學者很容易搞混，記住：RUN 是建構時跑的，ENV/CMD/ENTRYPOINT 才是執行時的。
+
+我想補充一個關於 FROM 指令的重要最佳實踐：永遠要指定明確的版本 tag，不要使用 latest。雖然 FROM node:latest 看起來很方便，但它代表「最新版」，每次 docker build 可能會得到不同版本的 Node.js，這會讓你的建構不可重現（今天 build 的和明天 build 的可能行為不同）。正確做法是指定確切的版本，比如 FROM node:18.20.0-alpine，這樣無論何時建構，都能得到完全相同的基礎環境。這個原則在任何 Image 的 FROM 都適用。另外，定期更新基礎映像版本也很重要，因為新版本通常包含安全性修復。建議把更新基礎映像版本納入你的定期維護工作中，這樣就能在享受穩定性的同時，也保持安全性。好，我們繼續學習下一個指令！`,
     duration: "10"
   },
   {
@@ -400,7 +436,13 @@ ADD 和 COPY 的基本功能一樣，但 ADD 有兩個額外的特性：第一�
 
 現在講一個非常重要的最佳化技巧：Layer 快取的最大化利用。Docker 建構 Image 的時候，如果某一層的輸入沒有變化（指令相同、來源檔案相同），Docker 就會直接使用快取的 Layer，不重新執行。這意味著，你應該把不常變動的步驟放在前面，頻繁變動的步驟放在後面。
 
-對於 Node.js 應用程式，最佳實踐是先只 COPY package.json 和 package-lock.json，執行 npm ci 安裝依賴，然後再 COPY 其他程式碼。這樣的話，只要 package.json 沒變，npm ci 那一層就會被快取，不需要重新安裝所有依賴，建構速度大大加快。但如果你一開始就 COPY . .，每次程式碼改動都會讓 npm ci 重新執行，非常慢。這個技巧很重要，請大家牢記！`,
+對於 Node.js 應用程式，最佳實踐是先只 COPY package.json 和 package-lock.json，執行 npm ci 安裝依賴，然後再 COPY 其他程式碼。這樣的話，只要 package.json 沒變，npm ci 那一層就會被快取，不需要重新安裝所有依賴，建構速度大大加快。但如果你一開始就 COPY . .，每次程式碼改動都會讓 npm ci 重新執行，非常慢。這個技巧很重要，請大家牢記！
+
+讓我再深入說明一下 npm ci 和 npm install 的差別，因為在 Dockerfile 裡面兩個都很常見。npm install 會根據 package.json 安裝套件，並更新 package-lock.json；npm ci（ci 代表 clean install）則嚴格按照 package-lock.json 安裝，不允許任何版本變動，而且會先刪除整個 node_modules 再重新安裝。在 Dockerfile 裡面通常推薦用 npm ci，因為它能確保安裝的版本跟 package-lock.json 完全一致，讓你的建構是可重現的（reproducible build）。
+
+另外，如果你的應用程式是生產環境部署，可以加上 --only=production 或 --omit=dev 選項，讓 npm 只安裝 dependencies 而不安裝 devDependencies，這樣可以進一步減小 Image 的大小。測試框架、TypeScript 編譯器、linting 工具等都是 devDependencies，在生產環境的 Image 裡面完全不需要它們。
+
+COPY 指令還有一個常用的技巧：你可以在 COPY 後面加上 --chown=user:group 選項，讓複製過來的檔案屬於指定的使用者和群組，而不是預設的 root。這在你有設定非 root 使用者運行應用程式的時候特別有用，可以避免再額外用 RUN chown 指令來更改檔案擁有者。非 root 使用者運行是一個重要的安全最佳實踐，我們在更進階的課程中會深入討論。`,
     duration: "10"
   },
   {
@@ -466,7 +508,13 @@ ENV 的一個很有用的特性是：在 Dockerfile 後續的指令裡面可以�
 
 EXPOSE 上午已經說過了，它只是一個文件說明，不實際開放埠號。但我想特別強調一下它的重要性：雖然它不開放埠號，但它是一個非常好的文件習慣，讓使用你的 Image 的人知道這個應用程式打算使用哪些埠，然後在 docker run 的時候用 -p 把對應的埠映射出來。
 
-最後說一下 ARG 和 ENV 的差別。ARG 也是定義變數，但它只在建構 Image 的過程中有效，容器啟動之後就沒有了。ARG 主要用於建構時的參數化，比如你要建構不同版本的 Node.js 的 Image，可以用 ARG NODE_VERSION=18，然後 FROM node:$NODE_VERSION-alpine，在 docker build 的時候用 --build-arg NODE_VERSION=20 傳入不同的版本號。而 ENV 是在 Image 裡面持久存在的環境變數，建構時和執行時都有效。大家記住這個差別，在實際使用的時候很常需要在 ARG 和 ENV 之間做選擇。`,
+最後說一下 ARG 和 ENV 的差別。ARG 也是定義變數，但它只在建構 Image 的過程中有效，容器啟動之後就沒有了。ARG 主要用於建構時的參數化，比如你要建構不同版本的 Node.js 的 Image，可以用 ARG NODE_VERSION=18，然後 FROM node:$NODE_VERSION-alpine，在 docker build 的時候用 --build-arg NODE_VERSION=20 傳入不同的版本號。而 ENV 是在 Image 裡面持久存在的環境變數，建構時和執行時都有效。大家記住這個差別，在實際使用的時候很常需要在 ARG 和 ENV 之間做選擇。
+
+讓我補充一個關於 ENV 安全性的重要警告：永遠不要在 ENV 裡面設定密碼或 API Key！ENV 設定的環境變數會被永久烙印在 Image 的每一層裡面，任何能拿到這個 Image 的人都可以用 docker inspect 或 docker history 輕易地讀取到這些環境變數的值。如果你在 Dockerfile 裡面寫了 ENV DB_PASSWORD=mysecret，那這個密碼就嵌入在 Image 裡面了，非常危險。正確做法是在 docker run 的時候用 -e 或 --env-file 傳入敏感資訊，這樣密碼就不會出現在 Image 裡面。
+
+另一個常見的使用場景是 LABEL 指令（跟 ENV 有點類似但用途不同）：LABEL 讓你可以在 Image 上添加元資訊，比如 LABEL maintainer="name@example.com" 或 LABEL version="1.0"。這些 Label 可以用 docker inspect 查看，也可以用 docker images --filter label=... 過濾。對於大型團隊，用 Label 記錄 Image 的維護者、建構時間、Git commit hash 等資訊，是非常好的管理實踐。
+
+最後，提醒大家 EXPOSE 雖然只是文件說明，但它有一個實際的用途：當你用 docker run -P（大寫 P）的時候，Docker 會自動把所有 EXPOSE 的埠映射到主機的隨機高位埠。這在快速測試的時候很方便，不需要指定主機埠。但在生產環境，還是建議用 -p 明確指定埠映射，這樣更可控。`,
     duration: "10"
   },
   {
@@ -524,7 +572,13 @@ ENTRYPOINT 也是設定容器啟動時的指令，但它是固定的，不容易
 
 CMD 和 ENTRYPOINT 的一個常用組合是：用 ENTRYPOINT 設定固定的執行程式，用 CMD 設定預設的參數。比如 ENTRYPOINT ["python", "app.py"] 加上 CMD ["--debug"]。當用 docker run myapp 啟動的時候，會執行 python app.py --debug。如果你用 docker run myapp --production，CMD 的 --debug 就被替換成 --production，但 ENTRYPOINT 的 python app.py 還是不變。
 
-關於指令格式，有兩種：exec 格式（用 JSON 陣列，比如 CMD ["node", "app.js"]）和 shell 格式（直接寫字串，比如 CMD node app.js）。強烈推薦使用 exec 格式，原因是：exec 格式讓你的程式直接成為容器的 PID 1（主程序），可以正確接收 SIGTERM 信號，優雅地關閉；而 shell 格式會用 /bin/sh -c 來執行，你的程式是 shell 的子程序，信號處理可能有問題，docker stop 可能沒辦法優雅地關閉程序。這個細節在生產環境非常重要，請大家記住使用 exec 格式。`,
+關於指令格式，有兩種：exec 格式（用 JSON 陣列，比如 CMD ["node", "app.js"]）和 shell 格式（直接寫字串，比如 CMD node app.js）。強烈推薦使用 exec 格式，原因是：exec 格式讓你的程式直接成為容器的 PID 1（主程序），可以正確接收 SIGTERM 信號，優雅地關閉；而 shell 格式會用 /bin/sh -c 來執行，你的程式是 shell 的子程序，信號處理可能有問題，docker stop 可能沒辦法優雅地關閉程序。這個細節在生產環境非常重要，請大家記住使用 exec 格式。
+
+讓我再補充一個關於 ENTRYPOINT 的進階用法。有一個設計模式叫做「wrapper script」：你寫一個 shell script 作為 ENTRYPOINT，在這個 script 裡面做一些初始化工作（比如等待資料庫就緒、設定環境、執行資料庫遷移），然後在最後用 exec "$@" 來執行 CMD 傳進來的指令。這樣的設計讓你的容器在啟動時可以做一些準備工作，同時還保持 CMD 的靈活性。這在實際生產環境中非常常見，特別是資料庫相關的應用程式。
+
+另外，讓我說明一個 HEALTHCHECK 指令，雖然今天沒有單獨的投影片介紹它，但它和 CMD/ENTRYPOINT 配合使用時很重要。HEALTHCHECK 讓 Docker 定期執行一個指令來檢查容器是否健康，比如 HEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost:3000/health || exit 1。如果健康檢查失敗，Docker 會把容器標記為 unhealthy，但不會自動重啟（要配合 restart 策略或 Compose 的 condition: service_healthy）。在 Docker Compose 的部分我們會再看到健康檢查的實際應用。
+
+最後，CMD 和 ENTRYPOINT 的組合是一個很優雅的設計：把「什麼程式」固定在 ENTRYPOINT，把「預設參數」放在 CMD。使用者執行 docker run 時可以只傳入不同的參數，而不需要每次都寫完整的指令。這讓你的 Image 既有固定的用途（ENTRYPOINT 保證了這點），又有靈活的配置能力（CMD 可被覆蓋），是一個很好的 API 設計。`,
     duration: "10"
   },
   {
@@ -548,7 +602,23 @@ CMD 和 ENTRYPOINT 的一個常用組合是：用 ENTRYPOINT 設定固定的執�
         <p className="text-slate-400 text-sm">提示：試著把我們剛才學的 Dockerfile 指令默寫一遍！</p>
       </div>
     ),
-    notes: "",
+    notes: `各位同學，現在是下午的休息時間，請大家起身活動一下，伸展一下筋骨。連續坐著看螢幕學習很容易讓眼睛和背部疲勞，利用這 15 分鐘好好休息一下，喝點水、上個廁所，等一下後半段的學習效果會更好。
+
+趁這個時間，我來提示一下後半段要學的重點，讓大家有個心理準備。我們等一下要進入的是 docker build 的實際操作，也就是把我們前半段學到的 Dockerfile 知識實際付諸行動，親手建構出一個自訂的 Docker Image。這是整個課程最有成就感的部分之一，因為你會看到自己寫的 Dockerfile 真的變成了一個可以執行的容器。
+
+然後我們會深入學習 Layer 快取機制，搞清楚為什麼有時候建構很快、有時候很慢，以及如何設計 Dockerfile 讓建構速度最大化。接著是 BuildKit 這個新的建構引擎，以及如何用 Alpine 基礎映像和多階段建構大幅縮小 Image 的體積，從幾百 MB 縮到幾十 MB。
+
+最後我們會進入今天最實用的主題：Docker Compose。Compose 讓你用一個 YAML 檔案就能管理多個容器的整套環境，是現代開發工作流程中不可或缺的工具。我們會實際建立一個包含 nginx 和 MySQL 的 Compose 環境，讓大家體驗一鍵啟動整套服務的威力。
+
+休息的時候可以試試這個小練習：在腦海裡默想一下 Dockerfile 的基本指令有哪些、各自的用途是什麼。如果能說出 FROM、RUN、COPY、WORKDIR、ENV、EXPOSE、CMD 和 ENTRYPOINT 的區別，那你上半段學得很紮實了！15 分鐘後見，我們繼續衝！
+
+另外，趁著休息的時間，我也想提醒大家關於學習態度的一些想法。今天這門課涵蓋的內容相當密集，如果你覺得某些部分沒有完全吸收，這非常正常。Docker 和 Kubernetes 是很多工程師花了好幾個月才真正熟悉的技術，我們在一天半的時間裡面快速過一遍，主要目的是讓你有一個完整的概念框架，知道有哪些工具、各自解決什麼問題、基本的使用方式是什麼。真正的熟練需要在實際工作中反覆使用，每次遇到問題查文件、解決問題，慢慢累積下來才會真正內化。
+
+所以不要覺得「啊我今天有些東西沒聽懂，就失敗了」。沒有人是一次就學會的，重要的是你知道問題所在，知道去哪裡找答案。Docker 的官方文件非常詳細，Stack Overflow 上有大量的實際問題和解答，Docker 的官方論壇和 GitHub Issues 也是很好的資源。
+
+在這 15 分鐘的休息時間，我也鼓勵你把上午和前半段下午遇到的問題記下來，等下課再問我，或者在座位上用手機查一下。有時候就是那麼一個關鍵問題的解答，會讓整個概念一下子豁然開朗。
+
+好好休息，補充一下水分和能量，等一下繼續後半段的精彩內容！如果你還沒有 Docker 的練習環境，也可以利用這段時間確認一下，看看是否需要任何幫助。`,
     duration: "15"
   },
   {
@@ -626,7 +696,15 @@ docker build 是建構 Image 的指令。最基本的用法是 docker build -t �
 
 --no-cache 選項讓 Docker 不使用快取，強制從頭重新建構。這在你更新了依賴但快取沒有正確失效的時候很有用。--build-arg 傳入 ARG 的值。
 
-建構成功之後，用 docker images 就能看到你的新 Image。然後用 docker run 啟動它來測試是否正常運作。如果要分享這個 Image，可以 docker push 推送到 Docker Registry（Docker Hub 或私有 Registry）。`,
+建構成功之後，用 docker images 就能看到你的新 Image。然後用 docker run 啟動它來測試是否正常運作。如果要分享這個 Image，可以 docker push 推送到 Docker Registry（Docker Hub 或私有 Registry）。
+
+讓我補充一些 docker build 的重要細節。首先是 Tag 的命名策略。在團隊環境中，一個常見的做法是用 Git commit hash 作為 Image Tag 的一部分，比如 myapp:1.0-a3b4c5d。這樣你就能追蹤到「這個 Image 是從哪個 commit 建構的」，對於除錯和版本回滾非常有幫助。很多 CI/CD 系統（GitHub Actions、GitLab CI 等）都會自動在建構的時候把 commit hash 當作 Tag，讓每次部署都是可追溯的。
+
+另外，關於 docker build 的 --target 選項：在多階段建構（我們等一下會學）裡面，你可以用 --target Stage名稱 來只建構到某個特定的 Stage 為止，後面的 Stage 不建構。這在開發和除錯的時候很有用，比如你只想要建構用的環境，不需要最終的精簡映像，就可以用 --target builder 只建構到 builder Stage。
+
+還有一個常被忽略但很重要的功能：.dockerignore 檔案（我們後面會有專門的投影片講）。如果你的目錄很大，比如有 node_modules 或者 .git 目錄，建構會很慢，因為 Docker 要把整個目錄都傳給 daemon。.dockerignore 可以告訴 Docker 忽略哪些檔案，讓建構快很多。先記住這個概念，等一下我們會詳細說明。
+
+最後，如果你遇到建構失敗，可以用 docker build 加上 --progress=plain 選項，讓輸出更詳細，方便排查問題。這在 CI/CD 環境裡面特別有用，可以看到每個步驟的完整輸出。`,
     duration: "10"
   },
   {
@@ -700,7 +778,15 @@ docker build 是建構 Image 的指令。最基本的用法是 docker build -t �
 
 舉例說明：如果你把 COPY . .（複製所有程式碼）放在 RUN npm install 之前，那麼每次你修改任何一個程式碼檔案，都會讓 COPY . . 的快取失效，進而讓 RUN npm install 也失效，導致每次建構都要重新安裝所有依賴，這可能需要好幾分鐘。
 
-正確的做法是先 COPY package.json package-lock.json ./，這個操作只有在 package.json 改變（也就是依賴改變）的時候才會讓快取失效，然後 RUN npm ci 安裝依賴，最後才 COPY . . 複製其他程式碼。這樣的話，日常開發中只要沒有新增或刪除 npm 套件，建構的時候 npm install 那步都會被快取，建構速度可以快 10 倍以上。這個技巧不只適用於 Node.js，Python 的 requirements.txt、Java 的 pom.xml、Go 的 go.mod 都可以用同樣的方式處理。`,
+正確的做法是先 COPY package.json package-lock.json ./，這個操作只有在 package.json 改變（也就是依賴改變）的時候才會讓快取失效，然後 RUN npm ci 安裝依賴，最後才 COPY . . 複製其他程式碼。這樣的話，日常開發中只要沒有新增或刪除 npm 套件，建構的時候 npm install 那步都會被快取，建構速度可以快 10 倍以上。這個技巧不只適用於 Node.js，Python 的 requirements.txt、Java 的 pom.xml、Go 的 go.mod 都可以用同樣的方式處理。
+
+讓我用一個實際的數字說明快取的重要性。假設你有一個 Node.js 專案，npm install 需要 90 秒。如果你的 Dockerfile 設計不好，每次修改任何一個程式碼檔案，都要重新跑 npm install，每次建構要 90 秒以上。如果你的 Dockerfile 設計得好，只有在 package.json 改變的時候才跑 npm install，其他時候只是 COPY 程式碼，建構可能只需要 5 秒。一天建構 20 次，不好的設計需要 30 分鐘，好的設計只需要 1.7 分鐘，差了將近 20 倍！
+
+除了順序之外，還有一個影響快取的因素：你的指令是否有副作用。有些人在 Dockerfile 裡面用 RUN apt-get update，這個指令每次跑的結果可能不一樣（因為套件倉庫的內容會更新），所以 Docker 有時候無法正確地快取它。這也是為什麼要把 apt-get update 和 apt-get install 放在同一個 RUN 裡面，確保它們一起失效、一起重建，不會出現「快取了舊的 apt-get update 結果，但安裝新的套件版本」這種不一致的情況。
+
+還有，當你在 CI/CD 環境建構 Image 時，每次都是一台乾淨的機器，沒有本地快取。這種情況下，可以用 --cache-from 選項指定一個遠端的 Image 作為快取來源，讓 CI 可以重用之前建構的 Layer。這個進階技巧可以讓 CI 的建構速度大幅提升，有興趣的同學可以課後研究 BuildKit 的 cache exports 功能。
+
+讓我幫大家做一個 Layer 快取的總結。Layer 快取是 Docker 建構效率的核心，理解它的工作原理可以讓你在設計 Dockerfile 時做出更好的決策。核心原則只有一個：「把不常變動的步驟放在前面，把頻繁變動的步驟放在後面」。這樣可以最大化快取命中率，讓每次建構只重建真正需要重建的層。在實際開發中，你的 Dockerfile 順序通常是：FROM -> 安裝系統套件 -> 複製依賴描述檔 -> 安裝應用依賴 -> 複製應用程式碼 -> 設定啟動指令。這個順序反映了「系統套件變動最少，程式碼變動最頻繁」的現實。`,
     duration: "10"
   },
   {
@@ -754,7 +840,13 @@ docker build 是建構 Image 的指令。最基本的用法是 docker build -t �
 
 BuildKit 還有一個很重要的安全特性：Secret 掛載。在建構 Image 的過程中，有時候需要用到一些機密資訊，比如 npm 私有套件的認證 Token、SSH 私鑰等。傳統的做法是把這些設定成環境變數或 ARG，但這樣會把機密資訊留在 Image 的 Layer 裡面，有安全風險。BuildKit 的 --mount=type=secret 讓你可以在建構時掛載機密資訊，但這些資訊不會被包含在最終的 Image 裡面。
 
-啟用 BuildKit 很簡單，在執行 docker build 的時候加上環境變數 DOCKER_BUILDKIT=1 就好了。或者在 Docker 的設定檔（daemon.json）裡面全域啟用，這樣就不需要每次都加環境變數了。Docker Desktop 版本預設已經啟用了 BuildKit，所以 Mac 和 Windows 的用戶可能已經在享受它的好處了。大家可以測試一下，用同樣的 Dockerfile 分別用 BuildKit 和不用 BuildKit 建構，感受一下速度差異。`,
+啟用 BuildKit 很簡單，在執行 docker build 的時候加上環境變數 DOCKER_BUILDKIT=1 就好了。或者在 Docker 的設定檔（daemon.json）裡面全域啟用，這樣就不需要每次都加環境變數了。Docker Desktop 版本預設已經啟用了 BuildKit，所以 Mac 和 Windows 的用戶可能已經在享受它的好處了。大家可以測試一下，用同樣的 Dockerfile 分別用 BuildKit 和不用 BuildKit 建構，感受一下速度差異。
+
+我想再說一個 BuildKit 的進階功能：SSH 掛載（--mount=type=ssh）。有時候你在建構 Image 的過程中，需要從私有的 Git 倉庫 clone 程式碼，或者存取需要 SSH 認證的伺服器。傳統的做法是把 SSH 私鑰複製進去，但這樣很不安全（私鑰會留在 Layer 裡面）。BuildKit 的 SSH 掛載讓你可以把主機的 SSH agent 掛載進去建構環境，使用完之後不會留下任何痕跡在 Image 裡面。這個功能在企業環境中非常實用。
+
+另外，BuildKit 的另一個特性是改進的輸出顯示。傳統的 docker build 輸出一行一行很難一眼看出進度，BuildKit 的輸出會用進度條和彩色標示讓你更直觀地看到哪些 Layer 在建構、哪些在使用快取、整體進度如何。這讓建構的體驗好很多，特別是多階段建構的時候，可以清楚看到不同 Stage 的並行建構狀態。
+
+值得一提的是，BuildKit 現在也是 docker buildx 的基礎。docker buildx 是 Docker 的跨平台建構工具，讓你可以在 x86 的機器上建構 ARM 架構的 Image（比如 Raspberry Pi 用的映像），或者反過來。隨著 Apple Silicon（M1/M2）的普及，跨平台建構變得越來越重要。如果你要在 Mac M1 上建構要部署到 x86 伺服器的 Image，或者反過來，就需要用到 docker buildx。這是一個進階主題，有興趣的同學可以課後深入研究。今天先了解概念，實際工作中有需要再來找我討論！`,
     duration: "10"
   },
   {
@@ -815,7 +907,15 @@ Alpine Linux 是一個非常輕量的 Linux 發行版，整個基礎系統只有
 
 其次是套件管理工具：Alpine 使用 apk 而不是 apt-get。語法類似，但不完全一樣。比如 apk add --no-cache curl，--no-cache 選項讓 apk 不保留本地快取，這樣可以減小 Image 大小。Alpine 的軟體倉庫裡面的套件比 Debian/Ubuntu 少一些，某些比較冷門的套件可能沒有。
 
-除了選擇輕量基礎映像之外，還有一些減小 Image 的技巧：不要在 Image 裡面留下 apt/apk 的快取（在 RUN 指令末尾加清理指令）；不要包含開發工具（測試框架、文件產生工具等）；使用多階段建構（我們等一下會學），把建構工具和最終執行環境分開。`,
+除了選擇輕量基礎映像之外，還有一些減小 Image 的技巧：不要在 Image 裡面留下 apt/apk 的快取（在 RUN 指令末尾加清理指令）；不要包含開發工具（測試框架、文件產生工具等）；使用多階段建構（我們等一下會學），把建構工具和最終執行環境分開。
+
+讓我補充一個關於 Image 大小的實際建議：在選擇基礎映像時，用 Docker Hub 的 Tags 頁面查看不同版本的大小，然後選擇最符合需求的。一般來說，選擇優先順序是：scratch（最小，但需要靜態連結的程式）> alpine（幾 MB，適合大多數應用）> slim（精簡版，基於 Debian，跟標準版相比刪去了很多不必要的套件）> 標準版（最大，但相容性最好）。
+
+如果你的應用程式用 alpine 跑起來有問題（通常是 musl libc 相容性問題），可以先試試 slim 版本，它比標準版小很多，但相容性比 alpine 好。比如 node:18-slim 大約 200MB，比 node:18 的 950MB 小了近 80%，但又比 node:18-alpine 的 112MB 大一些。在相容性和大小之間找到平衡是很重要的實踐技巧。
+
+還有一個不常被提到的技巧：善用 .dockerignore 檔案（我們等一下的投影片會詳細說）可以大幅加快建構速度，因為它減少了傳送給 Docker daemon 的 Build Context 的大小。一個有幾萬個檔案的 node_modules 目錄，如果不被 .dockerignore 排除，每次建構都要打包傳輸，非常浪費時間。把 .dockerignore 和 Alpine 基礎映像配合使用，可以讓建構速度和最終映像大小都得到大幅改善。
+
+最後，讓我分享一個關於 Image 大小和安全性的重要思考方式。每多一個軟體包在你的 Image 裡面，就多一個潛在的安全漏洞。Ubuntu 的 Image 裡面有幾百個預安裝的套件，其中任何一個如果有安全漏洞，都可能成為攻擊的入口。Alpine 因為只有最基本的工具，攻擊面就小得多。這就是為什麼在安全性要求高的環境，大家傾向於使用最精簡的基礎映像，甚至使用 distroless（連 shell 都沒有的映像）。用工具掃描你的 Image 漏洞也很重要，Docker 官方提供 docker scout，以及開源工具 Trivy，都可以分析你的 Image 裡面有哪些已知漏洞，幫助你及時升級有問題的套件。在企業環境中，Image 的安全掃描通常是 CI/CD 流程的一部分，每次建構完自動掃描，如果有高危漏洞就阻止部署。這些進階主題今天先了解概念，實際工作中可以再深入研究。`,
     duration: "10"
   },
   {
@@ -874,7 +974,19 @@ Alpine Linux 是一個非常輕量的 Linux 發行版，整個基礎系統只有
 
 在 Dockerfile 裡面，你可以用 FROM ... AS 給每個 Stage 命名，然後在後面的 Stage 裡面用 COPY --from=Stage名稱 來從前面的 Stage 複製特定檔案。最終的 Image 只包含最後一個 Stage 的內容，前面的 Stage 在建構完成之後就被丟棄了。
 
-這樣做的效果非常顯著。一個 Node.js + TypeScript 應用程式，不用多階段建構可能是 700MB，用了多階段建構可能縮小到 100MB 以下。不只是 Node.js，Go、Java、C++ 等需要編譯的語言也非常適合用多階段建構：用有編譯器的環境建構，用只有執行環境的極簡映像來跑。比如 Go 程式用多階段建構，最終 Image 甚至可以只有幾 MB，因為 Go 可以靜態連結，不需要任何執行環境，可以直接用 scratch 作為基礎映像。`,
+這樣做的效果非常顯著。一個 Node.js + TypeScript 應用程式，不用多階段建構可能是 700MB，用了多階段建構可能縮小到 100MB 以下。不只是 Node.js，Go、Java、C++ 等需要編譯的語言也非常適合用多階段建構：用有編譯器的環境建構，用只有執行環境的極簡映像來跑。比如 Go 程式用多階段建構，最終 Image 甚至可以只有幾 MB，因為 Go 可以靜態連結，不需要任何執行環境，可以直接用 scratch 作為基礎映像。
+
+讓我補充幾個多階段建構的進階技巧。第一，你可以有超過兩個 Stage。比如一個前端 React 應用程式的 Dockerfile 可能有：Stage 1 安裝所有依賴、Stage 2 執行測試（確保測試通過才繼續）、Stage 3 建構生產版本、Stage 4 只包含 nginx 和建構好的靜態檔案。這樣把測試整合進建構流程，確保只有測試通過的程式碼才能被打包成 Image。
+
+第二，你可以用 --target 選項選擇要建構到哪個 Stage 為止。在開發的時候，你可能只想建構到有所有工具的 builder Stage 進行除錯，不需要建構最終的精簡 Image。在生產部署的時候，才建構完整的 Dockerfile 包含最後的精簡 Stage。
+
+第三，不同的 Stage 可以用不同的基礎映像，這點很重要。Builder Stage 用有完整工具的映像（比如 node:18 包含了 npm 和 node-gyp），最終 Stage 用 Alpine 或 distroless 映像（Google 提供的極度精簡映像，甚至沒有 shell）。distroless 映像在安全性上更勝一籌，因為沒有 shell 就沒辦法在容器裡執行任意指令，攻擊面更小。如果你的公司對安全性要求很高，可以考慮使用 distroless 映像作為最終 Stage。
+
+多階段建構和 Alpine 映像搭配使用，是現代 Dockerfile 最佳實踐的核心。大家今天學到這兩個技巧，在工作中馬上就可以用上，效果立竿見影，Image 大小可以縮小到原來的五分之一甚至十分之一，部署速度和安全性都會大幅提升。
+
+讓我再分享一個真實的多階段建構應用案例：一個 React 前端應用程式的 Dockerfile。Stage 1（builder Stage）使用 node:18 作為基礎映像，安裝所有依賴（包括 webpack、babel、react-scripts 等），然後執行 npm run build 把 React 的 JSX 和 ES6+ 程式碼編譯成靜態的 HTML、CSS、JavaScript 檔案，放在 /app/build 目錄。Stage 2（runner Stage）使用 nginx:alpine 作為基礎映像，只做一件事：把 Stage 1 編譯好的靜態檔案複製到 nginx 的靜態檔案目錄，然後讓 nginx 提供這些靜態檔案的服務。最終的 Image 大概只有 23MB 左右（nginx:alpine 本身就很小），而如果你把所有 Node.js 工具也包含進去，那可能會有 800MB 以上。
+
+這個案例很好地體現了多階段建構的精髓：「用大的環境來建構，用小的環境來提供服務。」建構只是一個一次性的過程，你不需要把建構工具帶到生產環境，就像你蓋完房子之後不需要把工地的挖掘機留在房子裡面一樣。這種思維方式一旦建立起來，你看任何的服務容器化需求都會自然而然地想到：「建構環境需要什麼？執行環境需要什麼？能不能用多階段建構分開？」這就是高效的容器化思維。`,
     duration: "15"
   },
   {
@@ -932,7 +1044,13 @@ Alpine Linux 是一個非常輕量的 Linux 發行版，整個基礎系統只有
 
 正確做法是先用 .dockerignore 排除不需要的東西，讓 Build Context 盡可能小。最應該排除的東西有：node_modules（在容器裡面會重新安裝，不需要從主機複製）；.git 目錄（版本控制資訊，佔用空間，不應該出現在 Image 裡面）；.env 檔案（這個最重要，你的密碼、API Key 都在這裡，絕對不能被打包進 Image）；dist 或 build 目錄（多階段建構裡面這些是在容器內部建構的，不需要從外面複製）；測試檔案和文件。
 
-安全性方面，.env 沒有被 .dockerignore 排除是一個非常危險的錯誤。如果你把含有密碼的 .env 用 COPY . . 複製進了 Image，這個 Image 裡面就有你的密碼了。即使你後來用 RUN rm .env 刪除了它，那個密碼還是存在於 Image 的 Layer 歷史裡面，可以被有心人提取出來。所以永遠記得：在 .dockerignore 裡面加上 .env 和所有包含機密的檔案！\`.dockerignore 的語法跟 .gitignore 很像，支援萬用字元和注釋。把這個檔案加到你的每一個有 Dockerfile 的專案裡，這是一個非常基礎但重要的最佳實踐。`,
+安全性方面，.env 沒有被 .dockerignore 排除是一個非常危險的錯誤。如果你把含有密碼的 .env 用 COPY . . 複製進了 Image，這個 Image 裡面就有你的密碼了。即使你後來用 RUN rm .env 刪除了它，那個密碼還是存在於 Image 的 Layer 歷史裡面，可以被有心人提取出來。所以永遠記得：在 .dockerignore 裡面加上 .env 和所有包含機密的檔案！\`.dockerignore 的語法跟 .gitignore 很像，支援萬用字元和注釋。把這個檔案加到你的每一個有 Dockerfile 的專案裡，這是一個非常基礎但重要的最佳實踐。
+
+讓我再說一個 .dockerignore 的進階技巧：你可以用 ! 來排除例外。比如你寫了 * 排除所有檔案，然後用 !src !package.json !package-lock.json 來只包含你需要的檔案。這種白名單方式（先排除所有，再列出需要的）比黑名單方式（列出要排除的）更安全，因為它確保只有你明確允許的檔案才會進入 Build Context，不會意外把敏感檔案加進去。
+
+另外，如果你同一個目錄下有多個 Dockerfile（比如 Dockerfile.dev 和 Dockerfile.prod），.dockerignore 是對所有 Dockerfile 都有效的，沒有辦法針對不同的 Dockerfile 使用不同的 .dockerignore（這是 Docker 的限制，未來可能會改變）。這種情況下，可以考慮把不同環境的 Dockerfile 放在不同的子目錄，每個子目錄有自己的 .dockerignore。
+
+關於 .dockerignore 的測試和驗證：你可以用 docker build 加上 --no-cache 然後觀察建構時間，如果速度明顯加快，說明 .dockerignore 有效。也可以用 docker build --progress=plain 看詳細輸出，查看 Build Context 的大小（會顯示 Sending build context to Docker daemon X.XXMB，這個數字越小越好）。如果你在工作中發現建構很慢，首先要做的就是檢查 Build Context 的大小，然後再考慮最佳化 Layer 快取。這兩個步驟往往可以讓建構速度提升非常多，不需要改動任何程式碼邏輯。`,
     duration: "10"
   },
   {
@@ -972,7 +1090,15 @@ Docker Compose 讓你用一個 YAML 格式的設定檔（通常叫做 docker-com
 
 然後只需要一個指令 docker compose up -d，Compose 就會幫你：建立需要的網路和 Volume（如果不存在的話）、按照依賴關係的順序啟動所有容器、讓所有容器都加入正確的網路。停止整個應用程式也只需要 docker compose down 一個指令。
 
-這不只是方便，更重要的是：這個 docker-compose.yml 檔案可以提交到 Git，讓所有開發者都能用同樣的方式在本地運行整套服務，確保開發環境的一致性。這對於團隊協作非常重要，不會再有「在我的電腦上可以跑，在你的電腦上跑不了」這種問題。大家有沒有感受到 Compose 的威力？讓我們來看看怎麼寫 Compose 檔案。`,
+這不只是方便，更重要的是：這個 docker-compose.yml 檔案可以提交到 Git，讓所有開發者都能用同樣的方式在本地運行整套服務，確保開發環境的一致性。這對於團隊協作非常重要，不會再有「在我的電腦上可以跑，在你的電腦上跑不了」這種問題。大家有沒有感受到 Compose 的威力？讓我們來看看怎麼寫 Compose 檔案。
+
+補充說明一下 Docker Compose 的歷史背景。Compose 原本是一個獨立的工具，叫做 docker-compose（注意是連字號），需要額外安裝。從 Docker Compose V2 開始，它已經整合進 Docker CLI，變成 docker compose（注意是空格，是 docker 的子指令）。如果你在網路上看到舊的教學用的是 docker-compose，功能基本相同，但建議使用新版的 docker compose，因為它效能更好，也是未來的發展方向。
+
+Compose 的另一個非常重要的用途是本地開發環境的標準化。想像你的團隊有 10 個開發者，每個人的電腦上要裝一樣的資料庫版本、一樣的 Redis、一樣的第三方服務。傳統做法是每個人手動安裝，很容易出現版本不一致的問題。用了 Compose，只要把 docker-compose.yml 提交到 Git，新人加入只需要 git clone 然後 docker compose up -d，幾分鐘就有完整的開發環境，不需要手動安裝任何東西。這對於降低新人上手的門檻非常有幫助，也讓環境的維護變得更簡單。
+
+還有一個要提的是：Docker Compose 適用於單台主機上的多容器管理。如果你需要在多台主機上分散式部署容器，Compose 就不夠用了，這時候就需要 Kubernetes。這也是明天課程要解決的問題：當你的服務規模大到一台機器放不下，需要在多台機器上分散運行時，Docker Compose 就到了它的極限，需要更強大的容器編排系統來接手。好，讓我們來學習 Compose 的 YAML 語法！
+
+我還想分享一個使用 Docker Compose 的最佳實踐：把 Compose 當作「開發環境的說明書」。你的 docker-compose.yml 應該能讓一個完全不熟悉這個專案的人，看到它就知道這個服務由哪些部分組成、如何啟動、各個服務之間的關係。這需要你對服務命名要有意義（用 api、web、database 而不是 service1、service2）、對環境變數的設定有清楚的說明（使用 .env.example 範本）、對埠號的映射要合理（不要隨便映射，要符合預期）。一個好的 docker-compose.yml 本身就是一份很好的架構文件，能幫助團隊溝通和協作。`,
     duration: "10"
   },
   {
@@ -1031,7 +1157,17 @@ networks 區塊定義自訂網路。如果只是列出名稱而沒有其他設�
 
 volumes 區塊定義 Named Volume。在範例裡面定義了 mysql-data，Compose 在第一次 up 的時候會自動建立這個 Volume。
 
-depends_on 要特別說明一下：它讓 Compose 按照順序啟動容器，但它只確保被依賴的容器「啟動了」，不確保服務「可以接受請求了」。比如 depends_on: db，只是確保 db 容器被啟動了，但 MySQL 還需要幾秒鐘才能完成初始化並接受連接。所以你的應用程式應該要有重試機制，不要假設 depends_on 列的服務一定是立刻可用的。`,
+depends_on 要特別說明一下：它讓 Compose 按照順序啟動容器，但它只確保被依賴的容器「啟動了」，不確保服務「可以接受請求了」。比如 depends_on: db，只是確保 db 容器被啟動了，但 MySQL 還需要幾秒鐘才能完成初始化並接受連接。所以你的應用程式應該要有重試機制，不要假設 depends_on 列的服務一定是立刻可用的。
+
+讓我補充一些 docker-compose.yml 的進階欄位。restart 策略是生產環境必備的設定，常用的值有：no（預設，不重啟）、always（容器退出就重啟，系統重啟後也重啟）、unless-stopped（手動停止的話不重啟，其他情況重啟）、on-failure（只有非正常退出才重啟，可以加 :3 限制最多重試 3 次）。在生產環境，通常設 unless-stopped 或 always，確保服務在發生意外時自動恢復。
+
+mem_limit 和 cpus 可以限制容器使用的資源。在生產環境，設定資源限制非常重要，否則一個服務消耗大量資源可能影響其他服務，甚至讓整台主機崩潰。比如 mem_limit: 512m 限制記憶體使用不超過 512MB，cpus: 0.5 限制使用不超過半個 CPU 核心。在 Kubernetes 裡面，這對應的是 requests 和 limits 的概念，今天先了解這個想法，明天就能快速對應起來。
+
+logging 欄位可以設定容器的日誌驅動和選項。預設是 json-file，日誌存在主機上；你也可以設定為 syslog 發送到系統日誌，或者用第三方的日誌驅動（比如 fluentd、gelf）把日誌發送到集中式的日誌管理系統（ELK Stack、Splunk 等）。在微服務架構中，日誌的集中管理非常重要，不然你要除錯的時候要去每台機器的每個容器查看日誌，效率極低。
+
+最後，YAML 格式有一個很容易踩的坑：縮排必須完全一致。混用 Tab 和空格，或者不同地方用不同數量的空格，都會導致解析錯誤。建議在你的文字編輯器裡面設定為「Tab 鍵輸入空格」，並且開啟顯示空白字元的功能，這樣就能看到縮排是否一致。
+
+讓我再補充幾個 docker-compose.yml 的實用技巧。第一，可以用 extends 繼承另一個服務的設定，這在你有多個服務共用很多相同設定的時候很有用（比如都需要相同的環境變數和網路）。第二，Compose 支援 profiles 功能，讓你把某些服務標記為特定 profile，只有在明確指定的時候才啟動。比如你可以把 adminer（資料庫管理工具）標記為 profiles: ["tools"]，正常 docker compose up 不會啟動它，但 docker compose --profile tools up 就會啟動。這讓你可以把一些可選的輔助工具放在 compose 檔案裡面，不影響正常的開發流程。第三，scale 功能讓你可以啟動同一個服務的多個實例，比如 docker compose up --scale api=3 會啟動 3 個 api 容器。不過要注意，每個實例的埠號映射不能相同，通常需要搭配 nginx 做負載均衡才能實際使用。這個功能在本地測試高可用架構的時候很有用，讓你不需要完整的 Kubernetes 環境也能模擬多實例部署的場景。好，我們繼續看 Compose 的常用指令！`,
     duration: "15"
   },
   {
@@ -1091,7 +1227,15 @@ docker compose exec 在指定服務的容器裡面執行指令，用法跟 docke
 
 docker compose restart 重新啟動指定的服務，在你修改了環境變數或設定之後，用這個指令讓服務讀取新的設定。
 
-docker compose pull 拉取最新版本的 Image，然後配合 docker compose up -d --force-recreate 讓服務使用新的 Image 重啟。這是更新服務版本的標準流程。大家注意，force-recreate 會重新建立容器，如果你的服務有狀態，要確保狀態都已經持久化在 Volume 裡面。`,
+docker compose pull 拉取最新版本的 Image，然後配合 docker compose up -d --force-recreate 讓服務使用新的 Image 重啟。這是更新服務版本的標準流程。大家注意，force-recreate 會重新建立容器，如果你的服務有狀態，要確保狀態都已經持久化在 Volume 裡面。
+
+讓我再介紹幾個在日常工作中非常常用的 Compose 指令。docker compose config 可以顯示最終合併後的設定，包含所有的變數替換和覆蓋檔案合併之後的結果。這在除錯多環境設定的時候非常有用，可以確認最終的設定是否如預期。
+
+docker compose run 和 docker compose exec 的差別：exec 是在一個已經在運行的容器裡面執行指令，run 是啟動一個全新的容器來執行指令（執行完就退出）。比如你要跑一次性的資料庫遷移腳本，可以用 docker compose run --rm api npm run migrate，這樣會啟動一個新的 api 容器，跑 migrate 指令，然後因為有 --rm 選項，執行完就自動刪除容器。
+
+docker compose events 可以即時查看所有容器的事件（啟動、停止、健康狀態變化等），在監控和除錯的時候很有用。docker compose stats 顯示所有容器的即時資源使用狀況（CPU、記憶體、網路 I/O），幫助你發現哪個服務消耗了過多資源。
+
+最後，docker compose pause 和 docker compose unpause 可以暫停/恢復一個服務，但不刪除容器。這在需要暫時停止某個服務進行維護，又不想丟失容器狀態的時候很有用。這比 stop 和 start 更快速，因為容器不需要重新啟動。這些指令不常用，但在特定情況下非常方便，知道有這些工具存在就好了。`,
     duration: "10"
   },
   {
@@ -1155,7 +1299,13 @@ docker compose pull 拉取最新版本的 Image，然後配合 docker compose up
 
 現在讓我們一起執行 docker compose up -d，然後用 docker compose ps 確認所有服務都啟動了，用 docker compose logs -f 查看日誌，確認沒有錯誤。如果 MySQL 的健康檢查通過了，你應該能看到它的狀態從 starting 變成 healthy。
 
-大家自己試試看，如果有問題，用 docker compose logs 查看哪個服務有錯誤訊息，然後來問我。`,
+大家自己試試看，如果有問題，用 docker compose logs 查看哪個服務有錯誤訊息，然後來問我。
+
+讓我補充一些這個架構設計的思考。為什麼要把 nginx 和 MySQL 分開兩個網路？這是一個安全性和最小權限原則的體現。nginx 需要能夠連到後端服務，所以它在 frontend 和 backend 都有，但如果你有一個純前端服務只需要存取 nginx，它就只需要在 frontend 網路，完全不應該能直接存取 MySQL。這種網路隔離的設計，讓即使某個服務被攻擊，攻擊者也無法輕易橫向移動到其他服務。
+
+關於 healthcheck 的一個重要補充：你可以在 depends_on 裡面用 condition: service_healthy 來依賴健康的服務。比如：depends_on: mysql: condition: service_healthy。這樣 nginx 就會等到 MySQL 的健康檢查通過之後才啟動，避免了 nginx 啟動但 MySQL 還沒就緒的問題。這比普通的 depends_on 更可靠，是生產環境的最佳實踐。
+
+在這個實作完成之後，我建議大家做幾個實驗來加深理解：第一，執行 docker compose ps 查看容器的健康狀態；第二，用 docker compose logs -f mysql 即時查看 MySQL 的啟動日誌；第三，用 docker compose exec mysql mysql -uroot -p 進入 MySQL 的 CLI，創建一個測試表，然後 docker compose down 再 docker compose up -d，確認資料還在；第四，故意在 compose.yml 裡面製造一個錯誤（比如把映像名稱打錯），然後 docker compose config 看看會有什麼提示。這些實驗能讓你對 Compose 的工作方式有更深刻的理解。`,
     duration: "10"
   },
   {
@@ -1211,7 +1361,13 @@ docker compose pull 拉取最新版本的 Image，然後配合 docker compose up
 
 這種模式的好處是：基礎的 compose.yml 可以提交到 Git，不同環境的 override 檔案也可以提交（但不要把含有生產密碼的 env_file 提交，只提交範本）。這樣整個環境的設定都有版本控制，非常容易追蹤和管理。
 
-在大型專案中，這種多檔案的 Compose 策略非常常見。剛才我說的 depends_on 和 healthcheck 配合使用的技巧，也是在多環境中確保服務啟動順序正確的重要方法。大家在實際工作中遇到需要管理多個環境的情況，可以考慮使用這個模式。`,
+在大型專案中，這種多檔案的 Compose 策略非常常見。剛才我說的 depends_on 和 healthcheck 配合使用的技巧，也是在多環境中確保服務啟動順序正確的重要方法。大家在實際工作中遇到需要管理多個環境的情況，可以考慮使用這個模式。
+
+讓我分享一個實際的多環境 Compose 設定範例。開發環境的 compose.override.yml 通常會包含：把程式碼目錄用 Bind Mount 掛載進容器（這樣改程式碼後不需要重建 Image，直接生效）；開啟除錯模式（比如 Node.js 的 --inspect 或 Python 的 debugpy）；設定熱重載（nodemon、flask --debug 等）；暴露更多埠號方便除錯。這些設定在生產環境完全不需要，放在 override 檔案裡面可以保持基礎設定的乾淨。
+
+生產環境的 compose.prod.yml 通常會包含：指定確切的 Image tag（比如 myapp:1.2.3）而不是 latest；設定資源限制（記憶體和 CPU）；設定 restart: unless-stopped；設定日誌輪轉避免日誌把磁碟撐爆；可能的話設定 TLS 憑證掛載。
+
+還有一個很實用的 Compose 功能是環境變數插值。在 compose.yml 裡面，你可以用 ${VARIABLE_NAME} 或 ${VARIABLE_NAME:-default_value} 來引用環境變數，後者有預設值。結合 .env 檔案（Compose 會自動讀取和 compose.yml 同目錄的 .env 檔案），你可以很方便地管理不同環境的設定。注意：.env 檔案不要提交到 Git，但可以提交一個 .env.example 作為範本，讓新成員知道需要設定哪些變數。這整套組合（基礎 compose.yml + 環境特定的 override + .env 變數）是目前業界最成熟的多環境管理方案之一，大家在工作中可以直接套用。`,
     duration: "10"
   },
   {
@@ -1266,7 +1422,21 @@ docker compose pull 拉取最新版本的 Image，然後配合 docker compose up
 
 最後是 Docker Compose，這個是今天最實用的主題。compose.yml 的結構和語法、services/networks/volumes 的定義、各種常用指令（up、down、logs、ps、exec）、healthcheck 的重要性，以及多環境管理的覆蓋檔案模式。
 
-這些技能加上今天上午學的容器生命週期、網路、埠號映射、環境變數等知識，你們現在具備了在生產環境部署和管理容器化應用程式的完整能力。明天我們要進入 Kubernetes，這是在更大規模下管理容器的系統，是現代雲端基礎設施的核心技術。今天的 Dockerfile 和 Compose 知識是進入 Kubernetes 世界的重要基礎。大家今天辛苦了，給自己一個掌聲！`,
+這些技能加上今天上午學的容器生命週期、網路、埠號映射、環境變數等知識，你們現在具備了在生產環境部署和管理容器化應用程式的完整能力。明天我們要進入 Kubernetes，這是在更大規模下管理容器的系統，是現代雲端基礎設施的核心技術。今天的 Dockerfile 和 Compose 知識是進入 Kubernetes 世界的重要基礎。大家今天辛苦了，給自己一個掌聲！
+
+讓我幫大家建立一下這些知識和實際工作場景的連結，讓今天學的東西不只停留在理論層面。
+
+在一般軟體公司的開發流程中，一個功能上線的旅程大概是這樣的：開發者在本機用 Docker Compose 起好整套開發環境（資料庫、快取、後端、前端），然後開始開發。開發完成後，他寫的 Dockerfile 和應用程式碼一起提交到 Git，觸發 CI/CD 流水線。CI/CD 系統（GitHub Actions 或 Jenkins）會自動 docker build 建構 Image，跑測試，然後把 Image 推送到公司的私有 Registry。最後，在部署環境（Kubernetes 集群）把舊的容器換成新的容器，整個部署完成。今天我們學的 Dockerfile 和 Compose，就是這整個流程的核心基礎。
+
+另外，這套技能在薪資談判上也很有幫助。在台灣的就業市場，懂 Docker 和 Kubernetes 的工程師薪資通常比只懂傳統部署的工程師高出 15-30%，因為這套技能讓公司的部署流程更穩定、更可自動化、更好維護。你今天學到的這些，已經讓你在求職市場上有了很強的競爭優勢。
+
+最後，我想鼓勵大家：學習 Docker 和 Kubernetes 的最好方式，就是在實際專案中使用它。如果你現在手邊有任何正在開發的專案，試著把它容器化——寫一個 Dockerfile，然後用 Compose 管理它的依賴服務。哪怕遇到問題，查文件、Google、問我，這些都是學習的過程。真正的學習不是聽懂了，而是自己動手做過。今晚的自願作業就是最好的練習機會，希望大家把握！
+
+在課程結束之前，我也想跟大家說一些關於 Kubernetes 心態準備的話。明天我們要進入的是一個新的世界，Kubernetes 的概念和術語比 Docker 多很多：Node、Pod、Deployment、ReplicaSet、Service、Ingress、ConfigMap、Secret、PersistentVolume、StorageClass...光是這些名詞就讓很多人第一次接觸的時候頭昏眼花。但我保證，只要你理解了 Docker 的基本概念（容器、Image、Volume、Network），再加上今天學的 Dockerfile 和 Compose，你已經有了最重要的基礎，接下來學習 Kubernetes 只是把這些概念「升規格」而已。
+
+比如，Docker Volume 對應 Kubernetes 的 PersistentVolume；Docker Network 對應 Kubernetes 的 Service；docker-compose.yml 的服務定義對應 Kubernetes 的 Deployment；Compose 的依賴管理對應 Kubernetes 的 readinessProbe 和 livenessProbe。這種概念的對應關係，讓你在學習新概念的時候可以把它和已知的概念連結起來，學習曲線會平緩很多。
+
+最後的最後，我想說：學習這些技術的目的是為了解決實際問題，而不是為了追求技術本身。Docker 讓部署更可靠、環境更一致；Kubernetes 讓服務更高可用、更容易擴展。當你在工作中遇到「每次部署都怕怕的」、「我的環境和同事的不一樣」、「流量高峰期服務掛了」這些問題的時候，就是這些技術發揮作用的時候。帶著問題去學技術，學起來會更有動力和方向。我們明天見！`,
     duration: "15"
   },
   {
@@ -1323,7 +1493,17 @@ docker compose pull 拉取最新版本的 Image，然後配合 docker compose up
 
 明天上午我們會先說明為什麼在真正的生產環境，光有 Docker Compose 是不夠的，以及 Kubernetes 是如何解決這些問題的。然後我們會學習 K8s 的基本架構和 kubectl 的使用。下午則是更多的實作，部署一個完整的應用程式。
 
-有任何問題，現在提出來，或者明早我來之前都可以問我。今天大家學習了很多，非常努力，給自己一個掌聲！明天見！`,
+有任何問題，現在提出來，或者明早我來之前都可以問我。今天大家學習了很多，非常努力，給自己一個掌聲！明天見！
+
+讓我在最後分享一些學習資源，以及一些我認為很重要的進階主題，方便大家課後繼續深造。
+
+官方文件永遠是最可靠的資料來源。Docker 的官方文件（docs.docker.com）涵蓋了我們今天學的所有主題，而且有很多進階內容：Dockerfile 最佳實踐指南、Compose 的完整參考文件、BuildKit 的詳細說明。建議大家把這個網站加入書籤，遇到不確定的地方第一個去查官方文件。
+
+關於進階主題，有幾個方向值得深入學習。第一是 Container Security（容器安全性）：如何以非 root 使用者運行容器（USER 指令）、如何掃描 Image 的安全漏洞（docker scout、Trivy）、如何使用唯讀檔案系統（--read-only）。這些在企業環境中非常重要。第二是 Container Monitoring（容器監控）：如何用 Prometheus 和 Grafana 監控容器的資源使用，這是 SRE 工作的核心技能。第三是 GitOps：把 Kubernetes 的部署設定也版本控制在 Git，用 ArgoCD 或 Flux 實現自動化部署，這是現代 DevOps 的前沿實踐。
+
+如果你剛剛加入一家公司，或者公司正在考慮導入容器技術，我建議你從最小的成功案例開始：選一個最簡單的服務，把它容器化，用 Compose 在開發環境跑起來。成功之後再逐步擴大範圍，把更多服務容器化，最終建立一個完整的容器化開發流程。這樣漸進式的導入比一次全面重構風險低得多，也更容易獲得同事和主管的支持。
+
+有任何問題，無論是今天課程的內容，還是你在工作中遇到的實際問題，都歡迎在課後或明天早上問我。我的 LINE/Email 也會在課程結束後提供給大家，課後可以繼續請教。明天見，期待大家的 Kubernetes 旅程！`,
     duration: "10"
   },
 ]

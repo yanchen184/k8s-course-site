@@ -81,7 +81,9 @@ Kubernetes，也叫 K8s，這個縮寫方式很有趣：K 和 s 之間剛好有 
 
 我喜歡用一個比喻來解釋 K8s：如果說 Docker 是工廠裡的「工人」，每個工人負責做一件事也就是跑一個容器，那 K8s 就是這個工廠的「廠長」。廠長不需要親自做每一件事，但它負責安排誰做什麼、確保每個工人都有活幹、某個工人病假了就找人替補、業務旺季要招更多工人。K8s 就是這樣的角色，它管理的是整個容器生態系統的運作。
 
-今天上午我們會先理解 K8s 的架構，搞清楚它裡面有哪些組件、各自是做什麼的、它們之間怎麼互動。下午我們會動手寫 YAML、跑容器、做部署。我保證，今天結束的時候，你們對 Kubernetes 會有一個全新的認識，而且已經可以在本機上跑起自己的 K8s 叢集。好，廢話不多說，讓我們開始！大家今天離「會用 Kubernetes」只有一天的距離了，加油！`,
+今天上午我們會先理解 K8s 的架構，搞清楚它裡面有哪些組件、各自是做什麼的、它們之間怎麼互動。下午我們會動手寫 YAML、跑容器、做部署。我保證，今天結束的時候，你們對 Kubernetes 會有一個全新的認識，而且已經可以在本機上跑起自己的 K8s 叢集。好，廢話不多說，讓我們開始！大家今天離「會用 Kubernetes」只有一天的距離了，加油！
+
+另外，今天學習的時候有一個很重要的心態調整：不要把 Kubernetes 和 Docker 對立起來，而是把它們看成相互配合的工具。Docker 讓你的應用可以容器化，Kubernetes 讓你可以大規模地管理這些容器。它們是黃金搭檔，缺一不可。如果今天有任何地方沒有完全聽懂，完全沒有關係，重要的是跟上大方向，細節可以之後繼續複習。有任何問題都可以隨時舉手，我在這裡幫大家解惑！`,
     duration: "10"
   },
   // ── Slide 2 容器管理痛點 ─────────────────────────
@@ -138,7 +140,11 @@ Kubernetes，也叫 K8s，這個縮寫方式很有趣：K 和 s 之間剛好有 
 
 第四個痛點是服務發現困難。在容器環境裡面，容器的 IP 地址是動態分配的，每次啟動可能都不一樣。如果你的前端容器需要連到後端 API 容器，它怎麼知道後端的 IP 是什麼？你可能要手動維護一個服務清單，或者使用某種額外的服務發現工具。但如果容器在不同機器上，而且會動態增減，這個清單就很難維護。一旦後端 IP 變了，前端連不到，整個服務就掛了。這在微服務架構裡是個非常常見的問題。
 
-第五個痛點是升級和回滾高風險。當你要升級一個服務的時候，你希望做到不停機升級，也就是說新版本慢慢上線，舊版本慢慢下線，用戶感覺不到任何中斷。用純 Docker 要實現這個非常複雜：你要先拉起新版本容器，確認它正常，再慢慢停掉舊版本容器，還要更新負載均衡器。如果新版本有 Bug，要能快速回滾回舊版本。這整個流程，手動做非常容易出錯，一個步驟搞錯可能造成服務中斷。這五個痛點，就是為什麼我們需要 Kubernetes 的根本原因！`,
+第五個痛點是升級和回滾高風險。當你要升級一個服務的時候，你希望做到不停機升級，也就是說新版本慢慢上線，舊版本慢慢下線，用戶感覺不到任何中斷。用純 Docker 要實現這個非常複雜：你要先拉起新版本容器，確認它正常，再慢慢停掉舊版本容器，還要更新負載均衡器。如果新版本有 Bug，要能快速回滾回舊版本。這整個流程，手動做非常容易出錯，一個步驟搞錯可能造成服務中斷。這五個痛點，就是為什麼我們需要 Kubernetes 的根本原因！
+
+說到這裡，我想補充一點：這些痛點不是理論上的問題，而是真實存在於每一家有一定規模的公司。很多工程師在沒有 K8s 之前，要維護幾十台機器的服務，每次部署新版本都是一場噩夢，一個步驟出錯就可能造成服務中斷，還要半夜起來處理事故。有了 K8s 之後，這些問題大部分都自動化了，工程師可以把精力放在真正重要的事情上——開發更好的功能，而不是一直在救火。
+
+而且，這五個痛點是互相關聯的。比如手動管理容易出錯，出錯就造成故障，故障又需要手動恢復，整個就是一個惡性循環。K8s 從根本上解決了這個問題，通過自動化和宣告式管理，把人工介入降到最低，讓系統更穩定、工程師也更有餘裕去做創造性的工作。`,
     duration: "10"
   },
   // ── Slide 3 K8s 解決方案與歷史 ──────────────────
@@ -215,7 +221,11 @@ K8s 具體解決了哪些問題呢？讓我逐一說明：
 
 第四，滾動更新與回滾。K8s 的 Deployment 物件讓你可以做零停機的滾動更新：新版本慢慢上線，舊版本慢慢下線，用戶完全不感知。如果新版本有問題，一個指令 kubectl rollout undo 就可以回滾到上一個版本，非常方便。
 
-現在 K8s 已經是業界標準了。AWS 有 EKS、Google 有 GKE、Azure 有 AKS、Alibaba Cloud 有 ACK，所有主要雲端都有托管的 K8s 服務。學會 K8s，等於獲得了一個可以在任何雲端上工作的通用技能。對大家的職涯發展來說，這非常非常有價值。`,
+現在 K8s 已經是業界標準了。AWS 有 EKS、Google 有 GKE、Azure 有 AKS、Alibaba Cloud 有 ACK，所有主要雲端都有托管的 K8s 服務。學會 K8s，等於獲得了一個可以在任何雲端上工作的通用技能。對大家的職涯發展來說，這非常非常有價值。
+
+值得一提的是，K8s 的開源社群非常活躍。從 2014 年開源到現在，已經有超過三千名貢獻者為 K8s 貢獻了代碼，每隔幾個月就會有新版本發布，不斷加入新功能、修復問題。這個生態系的活力，也是 K8s 成為業界標準的重要原因之一。
+
+根據 CNCF 的調查，全球有超過 90% 的財富 500 強企業在使用 K8s 或者計劃使用 K8s。台灣的很多大型企業，比如科技公司、金融機構、電商平台，也都陸續導入 K8s。所以現在學 K8s，是真的在學業界需要的技能，非常有前景。`,
     duration: "10"
   },
   // ── Slide 4 K8s 整體架構 ─────────────────────────
@@ -297,7 +307,9 @@ kube-proxy 負責處理網路規則，讓外部流量可以到達 Pod，也讓�
 
 Container Runtime 就是實際跑容器的引擎，現在最常用的是 containerd。大家可能知道以前 K8s 用 Docker 作為 Container Runtime，但從 K8s 1.20 之後，Docker 不再被直接支援，改用 containerd 或 CRI-O。不過 containerd 本身就是 Docker 的底層，所以功能上是一樣的。
 
-這就是 K8s 的整體架構，記住這張圖：Control Plane 是大腦，Worker Node 是手腳。`,
+這就是 K8s 的整體架構，記住這張圖：Control Plane 是大腦，Worker Node 是手腳。
+
+這個架構的設計讓 K8s 具有很好的可擴展性：當你的業務增長，需要更多計算資源的時候，只要加入更多的 Worker Node 到叢集裡，叢集的整體能力就自動提升了，而 Control Plane 不需要改動。這種「橫向擴展」的能力，是 K8s 在雲原生時代大受歡迎的關鍵原因之一。`,
     duration: "10"
   },
   // ── Slide 5 Control Plane 深入 ───────────────────
@@ -512,7 +524,13 @@ Pod 是 K8s 的最小調度單位。K8s 不直接管理容器，而是管理 Pod
 
 Pod 還有個重要特性：Pod 本身是「短暫的」，它不是設計來永久存在的。如果一個 Pod 掛了，K8s 不會去修復那個 Pod，而是會建立一個全新的 Pod 來替代它。所以 Pod 的 IP 地址可能會改變，這就是為什麼我們需要 Service 來提供一個穩定的存取入口。
 
-另外要注意：直接建立 Pod 通常不是最佳做法，因為 Pod 沒有自動重建的能力。在實際使用中，我們通常透過 Deployment 來管理 Pod，這樣 K8s 會確保 Pod 的數量維持在期望值。`,
+另外要注意：直接建立 Pod 通常不是最佳做法，因為 Pod 沒有自動重建的能力。在實際使用中，我們通常透過 Deployment 來管理 Pod，這樣 K8s 會確保 Pod 的數量維持在期望值。
+
+讓我再多說一點關於 Pod 的特性。Pod 裡面的每個容器都有自己獨立的文件系統，除非你明確用 Volume 讓它們共享。但是網路命名空間是共享的，這意味著同一個 Pod 裡的兩個容器可以用 localhost 互相通訊，就像是在同一台機器上跑的兩個進程。這個特性讓一些設計模式變得很自然，比如 Sidecar 模式：一個主容器提供核心服務，另一個 sidecar 容器做日誌收集、監控代理或安全代理，Istio 的 Envoy proxy 就是典型的 sidecar 容器。
+
+另外一個重要概念是 Pod 的生命週期短暫性。Pod 被建立、跑著，可能因為各種原因停止，然後被重建。每次重建都是一個全新的 Pod，有新的名稱和新的 IP 地址。理解這個「短暫性」非常重要，它影響了你怎麼設計應用程式：不應該在容器的本地文件系統儲存重要的狀態，因為容器重建後那些資料就消失了。如果需要持久化資料，要使用 PersistentVolume 或者外部資料庫。
+
+最後補充：Pod 什麼時候應該放多個容器？只有當這些容器需要緊密協作、必須共享資源的時候才這麼做。一般的原則是一個微服務等於一個 Deployment，通常一個 Pod 只有一個應用容器。下午我們會親手寫 Pod 的 YAML 定義，到時候這些概念會更清晰。`,
     duration: "10"
   },
   // ── Slide 8 ReplicaSet & Deployment ─────────────
@@ -578,7 +596,11 @@ Deployment 也會保留更新歷史。你可以用 kubectl rollout history 查�
 
 物件層級關係是：Deployment 管理 ReplicaSet，ReplicaSet 管理 Pod，Pod 包含 Container。但作為使用者，你只需要定義 Deployment，K8s 會自動幫你建立對應的 ReplicaSet 和 Pod。
 
-有個重要概念：這整個層級都是宣告式的。你不說「請幫我建立 3 個 Pod」，而是說「我的期望狀態是 3 個 Pod」。K8s 會不斷地對比期望狀態和實際狀態，並採取行動讓它們一致。這種宣告式的方式，讓系統具有很強的自癒能力。`,
+有個重要概念：這整個層級都是宣告式的。你不說「請幫我建立 3 個 Pod」，而是說「我的期望狀態是 3 個 Pod」。K8s 會不斷地對比期望狀態和實際狀態，並採取行動讓它們一致。這種宣告式的方式，讓系統具有很強的自癒能力。
+
+一個常見的問題是：我要幾個副本才夠？這取決於你的應用特性和可靠性需求。一般來說，最少 2 個副本是個好習慣，這樣即使一個 Pod 掛了，還有另一個在服務用戶，不會造成完全中斷。對於重要的生產服務，通常會用 3 到 5 個副本，並且搭配 PodDisruptionBudget 確保在節點維護時也有足夠的副本在線。
+
+Deployment 的 updateStrategy 預設是 RollingUpdate（滾動更新），你可以設定 maxSurge 和 maxUnavailable 來控制更新的速度。比如你有 10 個副本，設定 maxSurge=2、maxUnavailable=0，更新時會先多建立 2 個新版本 Pod，確認健康後再刪除 2 個舊版本 Pod，整個過程中始終保持至少 10 個 Pod 在線服務，用戶完全感知不到版本切換。這就是生產環境零停機升級的實現方式，非常優雅。`,
     duration: "10"
   },
   // ── Slide 9 Service ──────────────────────────────
@@ -638,7 +660,15 @@ Service 的類型有三種：ClusterIP 是預設類型，只在叢集內部可�
 
 Service 透過 Label Selector 來選擇它要把流量送到哪些 Pod。這和 ReplicaSet 的 selector 概念一樣，Service 只會把流量送給有對應 Label 且狀態健康的 Pod。
 
-這四個核心物件，Pod、ReplicaSet、Deployment、Service，是 K8s 的基礎。下午我們會親手寫它們的 YAML 定義。`,
+這四個核心物件，Pod、ReplicaSet、Deployment、Service，是 K8s 的基礎。下午我們會親手寫它們的 YAML 定義。
+
+除了這三種主要 Service 類型之外，還有一種 ExternalName Service，可以讓你在叢集內部用 K8s 的 DNS 名稱來存取叢集外部的服務，比如外部的 RDS 資料庫，在遷移老舊服務到 K8s 的過程中很有用。下午大家動手實作的時候，會對這些概念有更直觀的感受。
+
+讓我再多說一點關於 Pod 的特性。Pod 裡面的每個容器都有自己獨立的文件系統，除非你明確地用 Volume 讓它們共享。但是網路命名空間是共享的，這意味著同一個 Pod 裡的兩個容器可以用 localhost 互相通訊，就像是在同一台機器上跑的兩個進程。這個特性讓一些設計模式變得很自然，比如 Sidecar 模式：一個主容器提供核心服務，另一個 sidecar 容器提供附加功能，比如日誌收集、監控代理、或者安全代理（Istio 就是這樣用的）。
+
+另外一個重要概念是 Pod 的生命週期短暫性。Pod 被建立、跑著、可能因為各種原因停止（比如節點故障、容器崩潰），然後被重建。每次重建都是一個全新的 Pod，有新的名稱、新的 IP 地址。理解這個「短暫性」非常重要，它影響了你怎麼設計應用程式：應用程式不應該在容器的本地文件系統儲存重要的狀態，因為容器重建後那些資料就消失了。如果需要持久化資料，要使用 PersistentVolume 或者外部資料庫。
+
+最後補充一個常見問題：Pod 什麼時候應該放多個容器？答案是：只有當這些容器需要緊密協作、必須共享資源的時候。不要把不相關的服務塞在同一個 Pod 裡，那樣會失去 K8s 調度的靈活性。一般的原則是：一個微服務 = 一個 Deployment = 一個 Pod 模板（通常一個容器）。`,
     duration: "5"
   },
   // ── Slide 10 休息 ───────────────────────────────
@@ -666,7 +696,31 @@ Service 透過 Label Selector 來選擇它要把流量送到哪些 Pod。這和 
 
 趁休息的時候，大家可以思考幾個問題：Control Plane 有哪四個組件？它們各自負責什麼？etcd 為什麼那麼重要？Pod、ReplicaSet、Deployment 的層級關係是什麼？為什麼需要 Service？這些問題如果都能清楚回答，說明你對前半段的理解很紮實。
 
-後半段我們要從理論進入實戰：先安裝 Minikube，在大家的本機上跑起一個 K8s 叢集，然後用 kubectl 真正操作 K8s，建立第一個 Pod。大家準備好了嗎？休息完我們馬上開始！`,
+後半段我們要從理論進入實戰：先安裝 Minikube，在大家的本機上跑起一個 K8s 叢集，然後用 kubectl 真正操作 K8s，建立第一個 Pod。大家準備好了嗎？休息完我們馬上開始！
+
+在這個休息時間，我補充一些額外的思考題，讓大家可以趁機鞏固前半段的學習成果，想不出來沒關係，等一下我們一起討論。
+
+思考題一：如果 etcd 突然掛掉了，整個 K8s 叢集會發生什麼？答案是：已經在跑的 Pod 不會立刻停止，因為它們是由各節點的 kubelet 管理的，kubelet 不直接依賴 etcd 運作。但是你無法建立新的資源、無法刪除現有的資源、無法做任何叢集管理操作，因為所有操作都要經過 API Server，而 API Server 需要讀寫 etcd。所以 etcd 掛了，叢集就進入類似「唯讀」的狀態——現有服務還在跑，但你無法管理它。這就是為什麼 etcd 的高可用性和定期備份這麼重要，在生產環境絕對不能省略。
+
+思考題二：Scheduler 在調度 Pod 時，怎麼決定要把 Pod 放到哪台 Worker Node？Scheduler 有兩個階段：第一是過濾（Filtering），把不符合條件的節點篩選掉，例如資源不夠的節點、帶有不相容 Taint 的節點、不符合 NodeSelector 或 NodeAffinity 規則的節點；第二是評分（Scoring），對剩餘節點打分，考慮因素包括節點剩餘資源量、負載均衡分布等。最終 Scheduler 選分數最高的節點，把 Pod 調度過去。如果多個節點分數相同，則隨機選一個。
+
+思考題三：為什麼說 K8s 是「宣告式」的系統？命令式是「做這件事」——你告訴系統每一步要執行什麼操作，系統照做。宣告式是「我要這個結果」——你描述期望的最終狀態，讓系統自己想辦法達到那個狀態。K8s 的宣告式管理讓系統具有強大的自癒能力：不管發生什麼意外，Reconciliation Loop 會持續把系統拉回到你期望的狀態。這在分散式系統中特別有價值，因為分散式系統任何時候都可能有意外——機器故障、網路中斷、容器崩潰，Reconciliation Loop 會一直默默地修復這些問題，讓你晚上可以好好睡覺。
+
+如果這三個問題你都能清楚回答，代表前半段的理解非常紮實。帶著這些問題去休息，回來我們再一起確認答案，然後進入實戰環節！
+
+另外，趁這個機會，我也想分享一些關於學習 Kubernetes 的心態建議：
+
+第一，不要試圖一次把所有東西都記住。K8s 的生態系非常龐大，官方文件有幾千頁，沒有人能一下子全部記住。重要的是掌握核心概念和最常用的操作，其他的在需要的時候查文件就好。學會查文件，也是一種非常重要的工程師技能。
+
+第二，犯錯是學習的一部分。在本機的 Minikube 上，你可以盡情地嘗試，不用擔心弄壞什麼重要的東西。把叢集刪掉重來是很正常的事，執行 minikube delete 再 minikube start 就可以得到一個全新乾淨的叢集。這種可以「任意實驗」的環境，是學習的最好資源，好好利用它。
+
+第三，動手比看書更有效。K8s 的很多概念，文字描述看起來很抽象，但是實際執行一遍之後就會豁然開朗。今天下午的實戰環節，我建議大家不要只是跟著我打指令，而是在每個步驟之前先思考「這個操作會造成什麼效果」，然後再執行，看看結果是否和預期一樣。這種「預測 → 執行 → 驗證」的學習方式，效果非常好。
+
+好了，去喝杯水、動一動，休息 15 分鐘後我們正式進入 Minikube 和 kubectl 的實戰環節！
+
+最後提醒：如果在安裝 Minikube 的過程中遇到任何問題，請在休息的時候來找我或助教，我們可以幫你解決。常見的問題包括：Docker Desktop 沒有啟動（解法：開啟 Docker Desktop）、Docker 的資源分配不足（解法：在 Docker Desktop Settings → Resources 增加 CPU 和記憶體）、以及網路問題導致 Image 下載失敗（解法：確認網路連線正常，或者使用備用 Mirror）。只要這些問題解決了，Minikube 的安裝通常非常順利。我們休息一下，回來見！
+
+還有一個小提示：可以趁休息的時候看一下 Kubernetes 官方網站 kubernetes.io，上面有非常完整的文件和互動式教學。K8s 的官方文件品質非常高，是你以後學習更進階功能的最好參考資源。特別是 Concepts 章節和 Tasks 章節，Concepts 解釋「為什麼」，Tasks 告訴你「怎麼做」，這兩個章節搭配起來讀，對理解 K8s 非常有幫助。大家好好休息，後半段見！有任何問題都可以隨時舉手，我和助教都在。享受這短暫的休息，回來我們一起進入 K8s 實戰！☸️ 加油！💪`,
     duration: "15"
   },
   // ── Slide 11 Minikube 介紹與安裝 ─────────────────
@@ -738,7 +792,21 @@ Minikube 也提供了一個很方便的 Dashboard，可以用 minikube dashboard
 
 另外，Minikube 還有一個很實用的功能：addons。你可以用 minikube addons list 查看所有可用的 addons，用 minikube addons enable 來啟用，比如 metrics-server、ingress 等。這讓你可以在本機上測試很多進階功能。
 
-現在讓大家動手安裝。如果安裝過程中有任何問題，請舉手，我來幫你解決。通常常見的問題是：Docker 沒有啟動、或者 Docker 的資源分配不夠（要在 Docker Desktop 的設定裡把 CPU 和記憶體調高）。`,
+現在讓大家動手安裝。如果安裝過程中有任何問題，請舉手，我來幫你解決。通常常見的問題是：Docker 沒有啟動、或者 Docker 的資源分配不夠（要在 Docker Desktop 的設定裡把 CPU 和記憶體調高）。
+
+安裝完 Minikube 之後，讓我們來看幾個很有用的 Minikube 管理指令：
+
+minikube status：查看叢集狀態，確認 Control Plane 和 kubelet 都在跑。
+minikube stop：暫停叢集，下次用 minikube start 可以快速恢復，不需要重新建立。
+minikube delete：完全刪除叢集，下次 minikube start 會重新建立一個全新的叢集。
+minikube dashboard：在瀏覽器打開 K8s 的圖形化管理介面，初學的時候很有幫助，可以直觀地看到叢集裡的所有資源。
+minikube ssh：SSH 進入 Minikube 的節點，直接在節點上執行指令，debug 的時候偶爾會用到。
+
+還有一個非常實用的功能：minikube tunnel。當你在本機用 LoadBalancer 類型的 Service 的時候，Minikube 本身不會自動分配外部 IP（因為不是在真正的雲端環境）。執行 minikube tunnel 之後，它會建立一個網路通道，讓 LoadBalancer Service 得到一個本機可以存取的 IP，方便你在本機測試。
+
+另外，Minikube 有豐富的 Addons 系統，可以用 minikube addons list 查看所有可用的插件，用 minikube addons enable [addon-name] 來啟用。常用的 Addons 包括：ingress（啟用 Nginx Ingress Controller，讓你可以測試 Ingress 功能）、metrics-server（啟用 metrics 收集，讓 kubectl top 指令可以用）、dashboard（K8s Dashboard GUI）。這些 Addons 讓 Minikube 的功能非常接近真實的生產 K8s 叢集，是學習測試各種 K8s 功能的好工具。
+
+最後提醒：Minikube 佔用的資源不少，特別是記憶體。如果你的電腦記憶體比較少（8GB 以下），可能會覺得系統有點卡。這時候可以考慮用 minikube start --memory=2048 --cpus=2 來限制 Minikube 使用的資源，讓電腦不要那麼吃力。`,
     duration: "15"
   },
   // ── Slide 12 kubeconfig & Context ───────────────
@@ -793,7 +861,13 @@ kubeconfig 是 kubectl 的設定檔，預設存在 ~/.kube/config 這個路徑�
 
 查看當前 Context：kubectl config current-context
 查看所有 Context：kubectl config get-contexts
-切換 Context：kubectl config use-context [context-name]`,
+切換 Context：kubectl config use-context [context-name]
+
+除了手動管理 kubeconfig，業界有一個非常流行的工具叫做 kubectx，它讓 Context 的切換變得更方便。用 kubectx 你可以很快地列出所有 Context 並且互動式地切換，用 kubens 可以快速切換 Namespace，大大提升工作效率。如果你以後需要同時管理多個叢集，強烈建議安裝這兩個工具。
+
+另外，kubeconfig 檔案支援合併多個叢集的設定。如果你有多個 kubeconfig 檔案，可以用 KUBECONFIG 環境變數把它們合併在一起：KUBECONFIG=~/.kube/config:~/.kube/config2 kubectl config get-contexts。這樣兩個設定檔裡的叢集都會出現在 Context 列表裡，非常方便。
+
+在 Shell 提示符號上顯示當前 Context 也是個好習慣，可以時刻提醒自己在操作哪個叢集。這在 zsh 的 oh-my-zsh 裡有現成的 plugin 可以用，bash 用戶也有對應的解決方案。強烈建議設定這個，可以避免在錯誤的叢集上執行指令的烏龍事件，特別是當你同時管理開發環境和生產環境的時候，一個不小心就可能把生產環境的資源誤刪。`,
     duration: "10"
   },
   // ── Slide 13 kubectl 基本語法 ────────────────────
@@ -894,7 +968,15 @@ kubectl get pods -o wide（查看 Pod 的詳細資訊，包括 IP 和節點）
 kubectl get all（查看所有資源）
 kubectl describe pod [name]（查看某個 Pod 的詳細資訊，很常用在 Debug）
 
-接下來讓我們一一實際演示這些指令。`,
+接下來讓我們一一實際演示這些指令。
+
+有幾個使用 kubectl 的小技巧值得特別提一下：
+
+第一，kubectl explain 指令可以讓你直接在命令列查看任何 K8s 資源欄位的說明，不需要上網查文件。比如 kubectl explain pod.spec.containers 可以列出 Pod 的 containers 欄位有哪些子欄位、各自的類型和說明。在寫 YAML 的時候，這個指令非常好用。
+
+第二，kubectl api-resources 可以列出叢集支援的所有資源類型，包括它們的縮寫（比如 po 是 pods 的縮寫、svc 是 services 的縮寫）和 API 版本。如果你忘了某個資源的縮寫，用這個指令查一下比上網搜尋快多了。
+
+第三，很多 kubectl 指令都支援 --dry-run=client -o yaml 選項，可以在不真正執行的情況下，輸出操作結果的 YAML 格式。這個技巧常用來快速生成 YAML 模板，比如 kubectl create deployment my-app --image=nginx --dry-run=client -o yaml 會輸出一個完整的 Deployment YAML，你可以把它存成檔案然後再修改。`,
     duration: "10"
   },
   // ── Slide 14 kubectl get 系列 ────────────────────
@@ -968,7 +1050,17 @@ kubectl get pods -o wide 會在輸出中多顯示 IP 地址和 Pod 所在的 Nod
 
 kubectl get pod [name] -o yaml 可以以 YAML 格式輸出某個 Pod 的完整定義，包括 K8s 自動加上的欄位，比如 Status、Events 等。這在你想了解一個 Pod 的完整狀態時非常有用，也可以用來學習 YAML 的寫法。
 
-一個技巧：如果你想持續監控 Pod 的狀態，可以加上 -w 或 --watch 選項，kubectl get pods -w。這樣指令不會退出，而是會在 Pod 狀態改變的時候即時更新顯示，就像是 watch 指令一樣。`,
+一個技巧：如果你想持續監控 Pod 的狀態，可以加上 -w 或 --watch 選項，kubectl get pods -w。這樣指令不會退出，而是會在 Pod 狀態改變的時候即時更新顯示，就像是 watch 指令一樣。
+
+讓我再介紹幾個 kubectl get 的進階用法，這些在實際工作中會非常有用。
+
+kubectl get pods --field-selector=status.phase=Running 可以用 Field Selector 來過濾資源，只顯示特定狀態的 Pod。Field Selector 可以組合使用，比如同時過濾狀態和節點。
+
+kubectl get pods -l app=nginx 可以用 Label Selector 來過濾，只顯示有特定 Label 的 Pod。這在微服務架構中很常用，因為通常同一個應用的所有 Pod 都有相同的 Label。
+
+kubectl get events --sort-by=.lastTimestamp 可以查看叢集的事件記錄，並且按時間排序。這在 Debug 的時候很有用，可以看到最近叢集裡發生了什麼事情，比如 Pod 被調度、Image 下載、容器啟動失敗等。
+
+kubectl get pods --show-labels 可以在輸出中顯示每個 Pod 的所有 Label，這樣可以快速確認 Label 設定是否正確，特別是在排查 Service 選不到 Pod 這類問題的時候非常有幫助。`,
     duration: "10"
   },
   // ── Slide 15 kubectl describe & cluster-info ─────
@@ -1037,7 +1129,11 @@ kubectl version 則是查看 kubectl 和 K8s Server 的版本資訊。有時候 
 
 kubectl get nodes -o wide 配合 kubectl describe node 是了解節點狀態的好組合。你可以看到節點的 CPU、記憶體使用情況、分配的 Pod 數量等，這在判斷叢集資源是否充足的時候很有用。
 
-記住：當你在 K8s 裡面遇到問題的時候，排查順序通常是：kubectl get pods（看 Pod 狀態）→ kubectl describe pod（看 Events，找問題）→ kubectl logs（看應用日誌，找更詳細的錯誤）。`,
+記住：當你在 K8s 裡面遇到問題的時候，排查順序通常是：kubectl get pods（看 Pod 狀態）→ kubectl describe pod（看 Events，找問題）→ kubectl logs（看應用日誌，找更詳細的錯誤）。
+
+再補充一個非常常用的 Debug 工具：kubectl port-forward。當你的 Pod 跑起來了，但你想在本機瀏覽器存取它的時候，可以用 kubectl port-forward pod/my-nginx 8080:80，這樣你在本機瀏覽器訪問 localhost:8080，流量就會被轉發到 Pod 的 80 port。這個工具在本地開發和 Debug 的時候超級好用，不需要建立 Service 就可以直接測試 Pod。
+
+另外，kubectl exec -it [pod-name] -- /bin/bash 可以直接進入容器的 shell，就像 docker exec 一樣。這讓你可以在容器內部執行指令，查看環境變數、檢查網路連線、測試其他服務是否可達，是 Debug 時不可或缺的工具。`,
     duration: "10"
   },
   // ── Slide 16 第一個 Pod ──────────────────────────
@@ -1091,7 +1187,21 @@ kubectl get nodes -o wide 配合 kubectl describe node 是了解節點狀態的�
 
 現在你已經在 K8s 上跑了你的第一個容器！雖然和 docker run 很像，但背後的機制完全不同。你發了一個指令給 API Server，API Server 把 Pod 定義存到 etcd，Scheduler 決定把它調度到哪台節點，kubelet 收到任務後調用 containerd 拉取 Image 並啟動容器，最後把狀態回報回來。這一切都在幾秒鐘內自動完成。
 
-kubectl run 主要用在快速測試或 Debug，在實際工作中，我們通常不用 kubectl run，而是寫 YAML 然後用 kubectl apply -f 來建立資源。但 kubectl run 對於快速測試很方便。`,
+kubectl run 主要用在快速測試或 Debug，在實際工作中，我們通常不用 kubectl run，而是寫 YAML 然後用 kubectl apply -f 來建立資源。但 kubectl run 對於快速測試很方便。
+
+讓我們更深入地理解一下剛才發生的事情。當你執行 kubectl run my-nginx --image=nginx，K8s 實際上做了什麼？
+
+首先，kubectl 把你的指令轉換成一個 API 請求，發送給 API Server：「我想在 default Namespace 建立一個 Pod，名稱是 my-nginx，裡面跑 nginx 這個 Image」。API Server 驗證請求沒有問題，把 Pod 的定義存到 etcd，此時 Pod 狀態是 Pending。
+
+接著，Scheduler 透過 Watch 機制發現有個新的 Pending Pod 還沒有被分配到節點。它評估所有可用節點（在 Minikube 的情況下只有一個節點），選定 minikube 節點，然後更新 etcd，把這個 Pod 的 nodeName 設為 minikube。
+
+然後，minikube 節點上的 kubelet 也在持續監聽 API Server。它發現有個 Pod 的 nodeName 是自己，就開始行動：檢查本地有沒有 nginx 的 Image，如果沒有就向 Docker Hub 拉取，然後呼叫 containerd 建立並啟動容器。
+
+最後，kubelet 把 Pod 的狀態更新為 Running，並持續回報給 API Server，你再執行 kubectl get pods 就能看到 Pod 已經 Running 了。
+
+這整個流程通常在幾秒到幾十秒內完成，具體取決於 Image 是否需要下載。理解這個流程，你就真正理解了 K8s 的運作機制，而不只是會打指令。
+
+下午我們建立第一個 Deployment 的時候，流程是一樣的，只是多了 Deployment Controller 和 ReplicaSet 這幾個層級，幫你確保 Pod 的數量永遠維持在期望的狀態。`,
     duration: "10"
   },
   // ── Slide 17 Pod 狀態與管理 ──────────────────────
@@ -1144,7 +1254,13 @@ kubectl delete pod my-nginx 可以刪除 Pod。刪除後，Pod 就消失了。�
 
 注意：我們現在直接用 kubectl run 建立的 Pod，如果這個 Pod 被刪除，它不會自動重建。這是因為我們沒有用任何管理物件（比如 Deployment）來管理它。如果你用 Deployment 建立了 Pod，當 Pod 被刪除時，Deployment 的 Controller 會自動建立一個新的 Pod 來補上，確保副本數維持在期望值。
 
-這就是為什麼在實務上，我們幾乎不會直接建立 Pod，而是用 Deployment 來管理 Pod。Deployment 給了 Pod 「永久性」，而直接建立的 Pod 是「一次性的」。下午我們會學習怎麼寫 Deployment 的 YAML，讓我們的 Pod 具備高可用性。`,
+這就是為什麼在實務上，我們幾乎不會直接建立 Pod，而是用 Deployment 來管理 Pod。Deployment 給了 Pod 「永久性」，而直接建立的 Pod 是「一次性的」。下午我們會學習怎麼寫 Deployment 的 YAML，讓我們的 Pod 具備高可用性。
+
+在這裡我想帶大家做一個有趣的實驗，可以幫助你更直觀地理解 Pod 的特性。首先，讓我們再建立一個 Pod：kubectl run test-pod --image=nginx。等它 Running 之後，記下它的 IP 地址（用 kubectl get pod test-pod -o wide 查看）。然後刪掉它：kubectl delete pod test-pod。
+
+現在，再建立一個同名的 Pod：kubectl run test-pod --image=nginx。等它 Running 之後，再查一次 IP 地址。你會發現這次的 IP 可能和之前不一樣！這就是 Pod 的「短暫性」的直接體現——每次重建都是一個全新的 Pod，有新的 IP。
+
+這個實驗清楚地說明了為什麼需要 Service：如果你的前端直接連到後端 Pod 的 IP，一旦後端 Pod 被重建（即使是因為正常的更新），IP 就變了，前端就連不上了。Service 提供一個穩定的 DNS 名稱和 VIP（虛擬 IP），不管後端 Pod 怎麼重建，Service 的地址永遠不變，它會自動把流量轉到新的健康 Pod。這就是微服務架構在 K8s 裡面穩定運作的基礎。`,
     duration: "10"
   },
   // ── Slide 18 課程總結 ────────────────────────────
@@ -1202,7 +1318,15 @@ kubectl delete pod my-nginx 可以刪除 Pod。刪除後，Pod 就消失了。�
 
 今天最重要的一個概念是：K8s 是宣告式的。你不告訴它「請幫我做這些步驟」，而是告訴它「我想要的最終狀態是什麼」，然後 K8s 的 Reconciliation Loop 會不斷地把實際狀態調整為期望狀態。這個思維方式和傳統的命令式方法不同，需要時間去適應，但一旦適應了，你會發現它非常強大。
 
-下午我們會進入更多實戰操作：YAML 的撰寫、Deployment 的完整操作、ConfigMap、Label、以及更多進階 kubectl 指令。我們會真正動手部署一個應用程式。大家午休好，下午見！`,
+下午我們會進入更多實戰操作：YAML 的撰寫、Deployment 的完整操作、ConfigMap、Label、以及更多進階 kubectl 指令。我們會真正動手部署一個應用程式。大家午休好，下午見！
+
+在進入午休之前，我想再強調一個今天最重要的核心思想：「宣告式管理」和「自癒」。在傳統的運維方式中，工程師需要追蹤系統的每一個狀態、手動處理每一個異常。在 K8s 的世界裡，你只需要宣告你的期望狀態，K8s 負責讓現實符合你的期望，不管中間發生了什麼問題。這個思維的轉變，比學習任何具體的指令都更重要。
+
+另外，給大家一個學習 K8s 的建議：動手練習比看文件重要十倍。K8s 的概念看起來很多，但只要你實際操作幾次，很快就會熟悉。今天下午我們會大量動手操作，每一個概念都會有對應的實際練習。學完之後，建議大家回家也繼續用 Minikube 自己練習，嘗試部署你自己的應用程式，這樣才能真正把知識內化。
+
+下午見，午休愉快！记住把今天上午的五大核心點帶著走：K8s 架構（Control Plane + Worker Node）、四個核心物件（Pod / ReplicaSet / Deployment / Service）、宣告式管理、Minikube 叢集操作、以及 kubectl 基礎指令。這是 K8s 旅程的起點，接下來每天都會越來越有趣！
+
+期待大家下午的實作，有問題隨時提問！繼續加油，Kubernetes 的大門已經為你們打開了！ 加油！下午見大家！☸️`,
     duration: "10"
   },
 ]

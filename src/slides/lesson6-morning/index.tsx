@@ -47,7 +47,19 @@ export const slides: Slide[] = [
 
 然後會有 15 分鐘的休息時間，讓大家去上廁所、喝咖啡。下午我們會繼續講 Resource Quota 和 Taints、Tolerations，最後用 20 分鐘做總結。
 
-今天學完之後，大家就能理解為什麼 Kubernetes 要把組態和程式碼分開管理，這個概念其實來自於 12 Factor App 的設計原則，是現代雲端應用非常重要的一個概念，我們今天也會提到。`,
+今天學完之後，大家就能理解為什麼 Kubernetes 要把組態和程式碼分開管理，這個概念其實來自於 12 Factor App 的設計原則，是現代雲端應用非常重要的一個概念，我們今天也會提到。
+
+我想先問一下大家，昨天晚上有沒有繼續練習？有沒有遇到什麼問題？如果有的話，等一下回顧環節可以提出來，我們一起討論。
+
+今天的課程在整個 Kubernetes 學習旅程裡，屬於「讓應用程式在 K8s 上跑得好」的關鍵階段。前幾天我們學了怎麼把應用跑起來，今天要學的是怎麼把它管理好。這包括：設定的管理、敏感資料的處理、資源的合理分配，以及如何讓 Kubernetes 把你的 Pod 放到最適合的節點上。
+
+有一個很重要的職場背景我想先分享：在很多公司，K8s 叢集是多個團隊共用的。就像公司的辦公室，大家共用空間，但每個部門有自己的區域。如果一個部門佔用太多空間，其他部門就沒地方用了。ResourceQuota 就是解決這個問題的機制。同樣地，生產環境的密碼和開發環境的密碼不一樣，如果寫死在程式碼裡就很麻煩——這就是 ConfigMap 和 Secret 要解決的問題。
+
+好，讓我們開始吧！首先回顧昨天的內容。
+
+今天這三個主題其實在工作上都非常實用，我在過去幾年帶過的學員裡，最常聽到的問題就是：「我的 ConfigMap 改了但 Pod 沒更新」和「我的 Secret 怎麼設才安全」。所以今天特別針對這些常見的誤區進行深入說明，相信大家學完之後，對 Kubernetes 的組態管理會有很完整的認識。
+
+還有一件事想先提醒大家：今天的內容比較偏向「觀念理解」和「最佳實踐」，不像前幾天有很多命令要背。重點是理解每個機制的原理和適用場景，這樣在工作上遇到問題的時候才能做出正確的判斷。好，我們開始！`,
     duration: "5"
   },
   {
@@ -112,7 +124,27 @@ export const slides: Slide[] = [
 
 （等待 1-2 分鐘讓學生提問，如果沒有問題就繼續往下）
 
-好，那我們就開始今天的課程，從 ConfigMap 開始。`,
+好，那我們就開始今天的課程，從 ConfigMap 開始。
+
+讓我來補充幾個昨天常見的問題點，以防大家有類似的疑惑：
+
+關於 RollingUpdate 的進一步說明：很多同學昨天問，如果 maxUnavailable=0 且 maxSurge=1，更新過程是怎樣的？答案是：K8s 會先建立一個新 Pod，等它 Ready 之後，再刪除一個舊 Pod，再建一個新 Pod……這樣一進一出地滾動更新。這種策略叫做「先起新再停舊」，服務不會中斷，但會暫時有比設定多一個 Pod 在跑。
+
+關於 readinessProbe 的常見誤解：有些同學以為 readiness 失敗就是 Pod 壞掉了，其實不是。readiness 只是說這個 Pod 暫時不接流量，可能是因為它在做初始化、資料庫連線還沒建立好，或者是被暫時降載。一旦 readiness 恢復正常，流量就會自動回來。
+
+關於 HPA 的擴縮行為：HPA 擴容比縮容快。K8s 預設擴容可以很快（幾秒內決定），但縮容會等一段時間（預設 5 分鐘）才確認要縮容。這個設計是為了避免流量波動造成的頻繁擴縮，也叫做「冷卻時間」（cooldown period）。
+
+關於 Ingress 的 TLS 終止：昨天提到 Ingress 可以做 TLS 終止，意思是 HTTPS 的加解密在 Ingress Controller 這一層處理，後端的服務和 Pod 之間的通訊可以是 HTTP。這樣後端服務不需要處理 TLS，開發比較簡單，但要確保 Ingress Controller 和後端之間的網路是安全的（一般叢集內部網路是可信的）。
+
+好，如果沒有其他問題，我們正式開始今天的課程。今天的第一個主題是 ConfigMap，也是整個上午最核心的部分之一。大家打起精神，準備好了嗎？
+
+再補充幾個昨天課程的延伸知識點，這些可能在實際工作中很有用：
+
+關於 Deployment 的 Pause 功能：kubectl rollout pause deployment/myapp 可以暫停 rollout，這樣你可以一次做多個修改，最後再 kubectl rollout resume 恢復，把所有修改打包成一次 rollout。這在需要同時更新鏡像和環境變數的時候很有用，避免觸發兩次 rollout。
+
+關於 Service 的 ExternalName 類型：除了 ClusterIP、NodePort、LoadBalancer 這三種，還有一個比較特殊的 ExternalName 類型。它讓你可以建立一個 K8s Service 指向叢集外的 DNS 名稱，比如 RDS 資料庫的 endpoint。這樣應用程式可以用 Service 名稱連接外部服務，方便未來把外部服務遷移進叢集。
+
+關於 HPA 的 scale-down 穩定窗口：預設情況下，HPA 縮容有一個穩定窗口（stabilizationWindowSeconds），預設是 300 秒（5 分鐘）。這表示即使 CPU 降低了，HPA 也會等 5 分鐘確認流量真的降下來了，才會縮容。這樣可以避免因為短暫的流量波動造成頻繁的擴縮（即所謂的「抖動」或 flapping）。在 K8s 1.18 之後，你可以自訂這個窗口大小。好，現在真的開始講 ConfigMap 了！`,
     duration: "10"
   },
   {
@@ -169,7 +201,15 @@ ConfigMap 就像一個設定檔的容器，你把所有的設定放進去，然�
 
 舉個實際的例子：你有一個 Node.js 應用，在開發環境連的是本機資料庫，在生產環境連的是雲端資料庫。你只需要在開發環境和生產環境分別建立內容不同的 ConfigMap，但 Pod 的 YAML 設定可以完全一樣，都是從同一個 ConfigMap 名稱讀取設定。
 
-這樣的設計有很多好處：一、程式碼和設定分離，程式碼更乾淨；二、不同環境只需要改 ConfigMap，不需要改程式碼；三、設定的變更可以獨立追蹤；四、團隊合作更方便，開發者不需要知道生產環境的設定。`,
+這樣的設計有很多好處：一、程式碼和設定分離，程式碼更乾淨；二、不同環境只需要改 ConfigMap，不需要改程式碼；三、設定的變更可以獨立追蹤；四、團隊合作更方便，開發者不需要知道生產環境的設定。
+
+另外補充一點：ConfigMap 本身是 Kubernetes 叢集裡的一個資源物件，儲存在 etcd 裡，和 Pod、Deployment 一樣，可以用 kubectl 管理。它的大小有限制，最多 1 MiB，如果需要存放更大的設定，可能需要考慮其他方案，比如把設定檔存放在掛載的 Volume 或外部設定管理系統。
+
+讓我舉個更具體的實際例子，讓大家感受 ConfigMap 解決了什麼問題：
+
+假設你有一個電商平臺，部署在三個環境：development（開發）、staging（測試）、production（生產）。每個環境連接的資料庫不同、第三方 API 的 endpoint 不同、日誌等級也不同（dev 要 DEBUG，prod 要 INFO）。如果這些設定都寫死在程式碼或 Docker Image 裡，你就需要三個不同的 Image，維護起來非常麻煩。
+
+有了 ConfigMap，你可以讓三個環境跑同一個 Image，只是在各自的 Namespace 裡放不同內容的 ConfigMap。應用程式啟動時讀取 ConfigMap 取得對應環境的設定，完全不需要改動程式碼。這正是「Build Once, Deploy Anywhere」的核心理念。`,
     duration: "5"
   },
   {
@@ -244,7 +284,33 @@ kubectl create configmap app-config --from-literal=DB_HOST=mydb.example.com --fr
 
 第四種是從目錄建立。如果你有一個目錄，裡面有好幾個設定檔，你可以一次把整個目錄轉成 ConfigMap。K8s 會把目錄裡每個檔案都變成一個 key，key 是檔案名稱，value 是檔案內容。
 
-在實際工作中，我最常用的是 YAML 宣告式，因為可以和程式碼一起放進 git，方便追蹤變更。字面值方式適合快速測試。`,
+在實際工作中，我最常用的是 YAML 宣告式，因為可以和程式碼一起放進 git，方便追蹤變更。字面值方式適合快速測試。
+
+讓我們現在做一個小練習，大家跟著我一起操作：
+
+步驟一：建立一個測試用的設定檔。在你的工作目錄建立一個 nginx.conf 的檔案，內容就寫簡單的 nginx 配置。
+
+步驟二：用 --from-file 方式建立 ConfigMap：kubectl create configmap nginx-config --from-file=nginx.conf
+
+步驟三：查看結果：kubectl get configmap nginx-config -o yaml。你會看到整個 nginx.conf 的內容都被存進了 ConfigMap 的 data 區段裡，key 就是 "nginx.conf"，value 是整個檔案內容。
+
+步驟四：現在試試 YAML 方式。把剛才的輸出存成一個 yaml 檔案，然後刪掉原來的 ConfigMap，再用 kubectl apply -f 重新建立。這樣就從命令式改成了宣告式管理。
+
+還有一個細節要注意：ConfigMap 的 key 必須是合法的 DNS 子域名，只能包含英文字母、數字、連字號、底線和點號。如果你的設定 key 包含其他字元（比如空格），就需要做特殊處理。
+
+另外，從目錄建立 ConfigMap 的時候，只有普通檔案會被包含，子目錄和隱藏檔案（以 . 開頭的檔案）預設不會被包含。如果需要包含特定的子目錄裡的檔案，就要個別指定。
+
+最後分享一個實用技巧：你可以用 kubectl create configmap --dry-run=client -o yaml 先預覽要建立的 ConfigMap 的 YAML，確認無誤後再執行。比如：kubectl create configmap app-config --from-literal=key=value --dry-run=client -o yaml。這個技巧在寫自動化腳本的時候很常用。
+
+再補充幾個關於 ConfigMap 管理的進階技巧：
+
+第一，ConfigMap 的 Namespace 隔離：ConfigMap 是 Namespace 作用域的資源，不同 Namespace 裡的 Pod 不能直接引用其他 Namespace 的 ConfigMap。如果你有多個 Namespace 需要共用同一份設定，需要把 ConfigMap 複製到每個 Namespace，或者使用工具自動同步，比如 Reflector 這個 operator，可以把 ConfigMap 跨 Namespace 同步。
+
+第二，ConfigMap 的更新策略：當你需要更新 ConfigMap 的時候，最安全的做法是先建立新版本的 ConfigMap（名稱加上 v2 或新的 hash），再更新 Deployment 或 StatefulSet 引用新的 ConfigMap，最後確認一切正常後刪除舊版。這樣如果新設定有問題，可以快速回滾到舊版。
+
+第三，使用 Kustomize 管理 ConfigMap：Kustomize 是 kubectl 內建的設定管理工具，可以從 properties 檔案或者環境變數檔案自動生成 ConfigMap，還可以自動在名稱後面加上內容的 hash，這樣每次設定改變都會生成新的 ConfigMap 名稱，Pod 也會自動觸發滾動更新。這是一個非常實用的技巧，推薦大家課後研究 Kustomize 的 configMapGenerator 功能。
+
+第四，ConfigMap 的標籤管理：給 ConfigMap 加上合適的標籤可以方便管理。比如加上 app: myapp 和 version: v2 的標籤，就可以用 kubectl get configmap -l app=myapp 快速列出所有相關的 ConfigMap，也可以用 kubectl delete configmap -l app=myapp,version=v1 批量刪除舊版。`,
     duration: "10"
   },
   {
@@ -310,7 +376,29 @@ envFrom 是「全部注入」的方式。你在 container 的 spec 裡加上 env
 
 這一點很多初學者會搞錯，覺得改了 ConfigMap 就生效了，結果應用程式還是用舊的設定，然後很困惑。所以一定要記住：環境變數注入 = 需要重啟才生效。
 
-等一下我們講 Volume 掛載的方式，那個是可以自動更新的，我們比較一下就知道差別在哪裡。`,
+等一下我們講 Volume 掛載的方式，那個是可以自動更新的，我們比較一下就知道差別在哪裡。
+
+補充一個進階技巧：envFrom 可以設定 prefix，比如：
+envFrom:
+- configMapRef:
+    name: app-config
+  prefix: APP_
+
+這樣 ConfigMap 裡的所有 key 在注入時都會加上 APP_ 前綴。如果 ConfigMap 裡有 DB_HOST，注入後就變成 APP_DB_HOST。這個技巧可以避免不同 ConfigMap 的 key 互相衝突。
+
+另外，如果你在 envFrom 裡引用了一個不存在的 ConfigMap，Pod 會啟動失敗。但你可以加上 optional: true，讓這個 ConfigMap 變成可選的，就算 ConfigMap 不存在也不影響 Pod 啟動。這在開發環境比較方便，但生產環境一般不建議用，因為少了設定可能導致應用程式行為異常。
+
+讓我們做個快速的動手練習：先建立一個 ConfigMap，然後建立一個 Pod 使用 envFrom 注入，進到 Pod 裡用 env 命令查看環境變數，確認設定確實注入成功了。
+
+讓我再深入說明一個實際工作中常見的場景：假設你有一個 Python Flask 應用，在本地開發時設定是放在 .env 檔案裡，部署到 K8s 的時候想改用 ConfigMap。你可以這樣做：
+
+一、把 .env 檔案的內容整理成 key=value 格式。
+二、用 kubectl create configmap app-config --from-env-file=.env 建立 ConfigMap。注意這裡用的是 --from-env-file 而不是 --from-file，兩個有很大的差別：--from-env-file 會把 .env 裡的每行 key=value 解析成 ConfigMap 的獨立 key-value 對，--from-file 則是把整個檔案當成一個 value。
+三、在 Pod 的 spec 裡用 envFrom 引用這個 ConfigMap，所有環境變數就自動注入了。
+
+另外，有一個 ConfigMap 引用不存在的情況需要說明：如果你在 envFrom 裡引用了一個不存在的 ConfigMap，Pod 的建立會失敗，狀態會是 CreateContainerConfigError。你可以用 kubectl describe pod 查看詳細的錯誤訊息。如果你希望 ConfigMap 不存在時 Pod 也能啟動，可以設定 optional: true，這樣 K8s 就會忽略不存在的 ConfigMap，Pod 正常啟動，只是少了那些環境變數。
+
+在微服務架構裡，env valueFrom 的方式特別有用，因為你可能有一個共用的 ConfigMap 存放所有服務共用的設定（比如日誌服務的 endpoint），然後各個服務只選取自己需要的 key 注入。這樣做比每個服務有一個完全獨立的 ConfigMap 要更好維護。`,
     duration: "8"
   },
   {
@@ -376,7 +464,21 @@ Volume 掛載和環境變數注入最大的差別在於：Volume 掛載的內容
 
 Volume 掛載特別適合 Nginx、Apache 這類需要設定檔的應用程式，或者是需要讀取 JSON/YAML 格式設定的應用程式。
 
-還有一個小技巧：如果你不想把整個目錄掛載，只想掛載特定的 key，可以在 volumes 裡的 configMap 下面加 items 區段，指定要掛載哪些 key 以及對應的檔案名稱。這樣你可以精確控制掛載的內容。`,
+還有一個小技巧：如果你不想把整個目錄掛載，只想掛載特定的 key，可以在 volumes 裡的 configMap 下面加 items 區段，指定要掛載哪些 key 以及對應的檔案名稱。這樣你可以精確控制掛載的內容。
+
+另外要注意一個陷阱：如果你把 ConfigMap 掛載到一個容器內已有內容的目錄（比如 /etc），那個目錄原有的內容會被隱藏掉，只剩下 ConfigMap 的 key 對應的檔案。這可能導致應用程式找不到原本需要的系統檔案而出錯。解決方法是用 subPath 掛載，這樣只掛載特定的 key 為特定路徑下的單一檔案，不影響目錄裡其他的內容。subPath 的用法是在 volumeMounts 裡加上 subPath 欄位。但要注意，使用 subPath 的話，這個檔案就不會隨 ConfigMap 的更新而自動更新，需要重啟 Pod 才行。這也是一個常見的陷阱，大家要記住。
+
+讓我再分享一個 Volume 掛載的實用場景——Nginx 設定熱更新：
+
+假設你的 Nginx 設定（nginx.conf）放在 ConfigMap 裡，透過 Volume 掛載到容器的 /etc/nginx/conf.d/ 目錄。當你更新 ConfigMap 後，過一兩分鐘，掛載的設定檔就會更新。但 Nginx 本身不知道設定檔被更新了，還是在用舊的設定提供服務。
+
+解決方案一：讓 Nginx 在設定檔更新後自動 reload。你可以在 Pod 裡加一個 sidecar 容器，定期檢查設定檔的修改時間（或者計算 MD5），如果發現設定檔改了，就對 Nginx 主進程發送 SIGHUP 信號（nginx -s reload）觸發熱重載。
+
+解決方案二：讓 Kubernetes 幫你觸發 rollout。更新 ConfigMap 後，手動執行 kubectl rollout restart deployment/nginx。這樣更可靠，因為不依賴 sidecar 的邏輯是否正確。
+
+解決方案三：用版本化 ConfigMap，每次更新就換一個新名稱的 ConfigMap，並更新 Deployment 引用新的 ConfigMap。這樣 Deployment 會自動觸發滾動更新，每個新 Pod 都會拿到最新的設定，舊 Pod 逐步關閉。
+
+三個方案各有優缺點，根據你對更新延遲的容忍度和維護複雜度來選擇。在要求嚴格的生產環境，我比較推薦方案三，因為整個流程是透明可控的。`,
     duration: "7"
   },
   {
@@ -441,7 +543,21 @@ Volume 掛載：更新 ConfigMap 之後，大概一到兩分鐘之內，掛載�
 
 （等待問題，然後繼續）
 
-接下來我們進入今天最重要的主題：Secret！`,
+接下來我們進入今天最重要的主題：Secret！
+
+補充說明一下 kubelet 同步週期的詳細機制：kubelet 每隔 configMapAndSecretChangeDetectionStrategy 設定的時間就會去檢查有沒有新的 ConfigMap 版本。預設是 Watch 機制，當 ConfigMap 變更時，API Server 會主動通知 kubelet，所以更新延遲通常比 60 秒短很多，可能只有幾秒。但 kubelet 把新的 ConfigMap 內容寫到節點上的 Volume，再讓容器讀到，整個過程加起來可能是 1-2 分鐘。
+
+還有一個細節：kubelet 的 syncFrequency 設定控制 kubelet 同步 Pod 狀態的頻率，預設是 1 分鐘。但 ConfigMap Volume 的更新是透過另一個機制，所以可能有點不同。總之，給 2 分鐘的緩衝時間是一個安全的估計。
+
+在生產環境中遇到問題時，可以用這個命令確認容器裡的設定是否已經更新：kubectl exec -it <pod-name> -- cat /etc/config/my-key。如果還是舊的值，就等一下再試，或者直接重啟 Pod 確保使用最新設定。
+
+最後，我來補充一個完整的更新流程給大家：一、修改 ConfigMap YAML 並 apply；二、用 kubectl get configmap 確認更新成功；三、如果是環境變數注入，執行 kubectl rollout restart deployment/myapp；四、如果是 Volume 掛載，等待 1-2 分鐘；五、用 kubectl exec 進容器確認設定已更新。這個流程適用於生產環境的設定變更。
+
+關於 immutable ConfigMap 的補充：immutable: true 是 K8s 1.21 GA 的功能，在舊版本的叢集不支援。如果你的叢集版本比較舊，可能不能用這個功能，需要在操作規範上要求團隊不要直接修改線上的 ConfigMap，而是要走版本化更新流程。
+
+另外分享一個生產環境的應急場景：有一次我們的應用程式突然連不上資料庫，緊急排查後發現是 ConfigMap 裡的資料庫 hostname 被誤改了。當時應用程式是用環境變數注入的，所以排查的時候要先進 Pod 看 env 的值，對比 ConfigMap 的值，發現兩個不一樣就知道是 Pod 還沒重啟，或者是 ConfigMap 改了但還沒重啟。這個排查步驟很重要，大家記住：Pod 裡的環境變數 = 啟動時的 ConfigMap 快照，不代表 ConfigMap 現在的值。
+
+這個血淚教訓讓我們在之後的流程中加了一個要求：修改 ConfigMap 後必須立即觸發 rollout restart，並且在 CI/CD 流水線裡加上自動化測試，確認 Pod 重啟後設定正確生效。`,
     duration: "10"
   },
   {
@@ -501,7 +617,21 @@ Secret 有幾種類型：
 kubernetes.io/tls 是 TLS 憑證類型，用於 Ingress 的 HTTPS 設定。
 kubernetes.io/dockerconfigjson 是 Docker Registry 認證，讓 K8s 可以從私有 Registry 拉取映像檔。
 
-接下來我們看看怎麼建立 Secret。`,
+接下來我們看看怎麼建立 Secret。
+
+補充說明 Secret 的安全設計思路：Kubernetes 的設計者在設計 Secret 的時候，考慮的安全威脅模型是「如果某個人取得了叢集節點的磁碟存取權」。用 tmpfs 儲存 Secret 就能防止這種情況下密碼洩漏。但如果攻擊者直接能存取 etcd，或者有叢集管理員權限，那 Secret 的保護就沒什麼用了。所以 Secret 的安全性必須配合 etcd 加密和 RBAC 才能發揮作用。
+
+另外補充一下，在某些合規要求嚴格的環境（比如金融業、醫療業），光靠 K8s 內建的 Secret 可能不夠，需要使用符合法規要求的 HSM（硬體安全模組）或雲端 KMS（金鑰管理服務）來保管加密金鑰。這些都是 Secret 安全性深入之後的進階主題，大家有興趣可以課後研究。
+
+讓我再多說幾個 Secret 類型的使用細節，讓大家在實際操作時更清楚：
+
+關於 kubernetes.io/tls 類型的 Secret：這個類型有固定的 key 名稱，tls.crt（憑證）和 tls.key（私鑰）。當你在 Ingress 裡引用 TLS Secret 的時候，Ingress Controller 就會用這個憑證和私鑰來做 HTTPS 加解密。如果憑證快要到期了，你只需要更新 Secret 的內容，大多數 Ingress Controller 都支援自動重新讀取憑證，不需要重啟 Pod。
+
+關於 kubernetes.io/dockerconfigjson 類型的 Secret：這個用來存放 Docker Registry 的認證資訊。建立之後，有兩種方式讓 Pod 使用：一是在 Pod spec 裡加上 imagePullSecrets；二是在 ServiceAccount 裡加上 imagePullSecrets，這樣所有使用該 ServiceAccount 的 Pod 都自動繼承拉取設定，不需要每個 Pod 單獨設定，更方便管理。
+
+關於 kubernetes.io/service-account-token 類型的 Secret：這個 K8s 會自動建立，用來存放 ServiceAccount 的 token，讓 Pod 裡的應用程式可以用這個 token 和 K8s API Server 通訊。在 K8s 1.24 之後，這種 Secret 不會自動建立了，改用 Bound Service Account Token（有時效性），更安全。
+
+最後，提醒大家 Secret 的 stringData 和 data 的關係：你可以同時使用 stringData 和 data 兩個區段。stringData 的值會覆蓋 data 中相同 key 的值。在實際操作中，建議只用其中一個，不要混用，避免搞混。`,
     duration: "8"
   },
   {
@@ -586,7 +716,37 @@ Docker Registry Secret 讓你可以從私有 Registry 拉取映像檔。建立�
 
 讓我們來練習一下，大家打開終端機，建立一個 Secret：kubectl create secret generic db-secret --from-literal=username=admin --from-literal=password=secret123
 
-然後用 kubectl get secret db-secret -o yaml 查看，你會看到 data 區段裡的值是 base64 編碼的。`,
+然後用 kubectl get secret db-secret -o yaml 查看，你會看到 data 區段裡的值是 base64 編碼的。
+
+我再補充幾個實際工作中常見的坑：
+
+第一個坑：echo 後面忘了加 -n。在 Linux 上，echo 預設會在輸出的最後加上換行符（\n）。如果你用 echo "admin" | base64，base64 的輸入是 "admin\n"，編碼結果是 YWRtaW4K，而不是 YWRtaW4=。這樣在 K8s 解碼的時候，值會包含一個多餘的換行符，可能導致認證失敗。所以一定要用 echo -n "admin" | base64。
+
+第二個坑：Windows 和 Linux 的換行符不同。如果你在 Windows 上用 PowerShell 建立 base64，編碼的格式可能和 Linux 不同。建議統一在 Linux 或 macOS 上操作，或者用 kubectl 命令行工具自動編碼。
+
+第三個坑：從檔案建立 Secret 的時候，如果檔案末尾有多餘的換行符，可能導致解碼後的值不符合預期。可以用 tr -d '\n' 去除換行符：cat password.txt | tr -d '\n' | base64。
+
+第四個坑：忘記更新 Secret 後重啟 Pod。和 ConfigMap 一樣，透過環境變數注入的 Secret 需要重啟 Pod 才能生效。Volume 掛載的 Secret 可以自動更新，但同樣需要應用程式支援熱重載。
+
+第五個坑：Secret 的大小限制。和 ConfigMap 一樣，單個 Secret 最大是 1 MiB。如果你的 TLS 憑證鏈很長，可能會接近這個限制。
+
+讓我繼續補充幾個關於 Secret 安全建立方式的實用技巧：
+
+在 CI/CD 環境中安全建立 Secret 的方式：假設你用 GitHub Actions 或 GitLab CI 做部署，密碼不應該出現在 CI 腳本的明文裡。正確做法是把密碼存在 CI/CD 平台的 Secret 變數（GitHub 叫 Secrets，GitLab 叫 Variables），然後在 CI 腳本裡用環境變數引用：
+
+kubectl create secret generic db-secret \
+  --from-literal=password=$DB_PASSWORD \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+這樣 CI 腳本裡看不到密碼，密碼只存在 CI/CD 平台裡，安全多了。
+
+另一個技巧：使用 kubectl create secret 的 --from-file 選項，把密碼存在臨時檔案裡，建立完 Secret 後立即刪除臨時檔案：
+
+echo -n "$DB_PASSWORD" > /tmp/db-password
+kubectl create secret generic db-secret --from-file=password=/tmp/db-password
+rm -f /tmp/db-password
+
+還有一個實用的命令：kubectl get secret db-secret -o jsonpath='{.data.password}' | base64 -d 可以直接查看 Secret 的解碼後的值，在排查問題時很方便。但注意這個命令的輸出要小心，不要把密碼洩漏到日誌系統。`,
     duration: "10"
   },
   {
@@ -668,7 +828,27 @@ Volume 掛載比較安全，原因如下：
 
 所以正確的做法是：密碼、API 金鑰等敏感資訊，永遠用 Volume 掛載，不要用環境變數。設定性的資訊（比如服務 URL、功能開關）可以用環境變數，因為這些不是機密資訊。
 
-當然，如果你的應用程式只能從環境變數讀取設定，那也沒辦法，但要知道這樣做的風險。`,
+當然，如果你的應用程式只能從環境變數讀取設定，那也沒辦法，但要知道這樣做的風險。
+
+還要補充一點關於 defaultMode 的設定：當你把 Secret 掛載成 Volume，預設的檔案權限是 0644（擁有者可讀寫，群組和其他人可讀）。但是密碼這類的 Secret 最好設成只有擁有者可讀，也就是 0400 或 0600。可以在 volumes 設定裡加上 defaultMode: 0400 來設定。
+
+另外，Volume 掛載的 Secret 和 ConfigMap 一樣，當 Secret 更新時，掛載的檔案也會在 1-2 分鐘內自動更新。但如果你用了 subPath，那就不會自動更新，需要重啟 Pod。
+
+總結：對於 Secret，Volume 掛載是更安全的選擇。如果應用程式不支援從檔案讀取密碼，才退而求其次用環境變數，並且要格外小心安全配置。
+
+讓我再補充一個關於 Secret 使用的常見架構問題：
+
+很多初學者問：「我的資料庫密碼放在 Secret 裡，但應用程式連不到資料庫的時候，我怎麼知道是密碼錯了還是其他問題？」
+
+排查步驟如下：
+第一步，確認 Secret 是否存在：kubectl get secret db-secret -n your-namespace。
+第二步，確認 Pod 是否正確掛載或注入了 Secret：kubectl describe pod your-pod，查看 Volumes 和 Environment 區段。
+第三步，進到 Pod 裡確認實際取到的值：如果是 Volume 掛載，cat /etc/secrets/password；如果是環境變數，echo $DB_PASSWORD。
+第四步，用確認到的密碼手動測試連線：在 Pod 裡直接用命令列工具（如 mysql -h dbhost -u user -p）測試。
+
+這個排查流程適用於大部分的 Secret 相關問題。記住一個核心原則：出了問題先確認「Pod 裡實際拿到的值是什麼」，而不是「Secret 裡設定的值是什麼」，因為兩者可能因為快取或更新延遲而不一致。
+
+還有一個常見的安全陷阱：在 kubectl exec 進 Pod 排查問題時，環境變數裡的密碼可能被記錄進 shell history 或 terminal 的 scrollback buffer。排查完之後記得清除 history（history -c），或者在排查時用 env | grep -v PASSWORD 這樣的方式排除敏感資訊的顯示。`,
     duration: "10"
   },
   {
@@ -747,7 +927,19 @@ Sealed Secrets 是另一個工具，它讓你可以把加密過的 Secret 存到
 四、定期輪換 Secret。
 五、監控 Secret 的存取記錄。
 
-好，Secret 的部分我們講得差不多了。大家有問題嗎？`,
+好，Secret 的部分我們講得差不多了。大家有問題嗎？
+
+補充一點關於稽核日誌（audit log）的重要性：K8s 提供了稽核日誌功能，可以記錄所有對 API Server 的請求，包括誰在什麼時間存取了哪個 Secret。在安全合規要求嚴格的環境，開啟稽核日誌是必要的。你可以設定 audit policy，讓所有對 secrets 資源的請求都被記錄下來，然後整合到 SIEM（安全資訊與事件管理）系統做監控和告警。
+
+讓我再多分享一些關於 K8s Secret 安全性的業界最佳實踐和相關工具：
+
+關於 Vault Agent Injector：HashiCorp Vault 提供一個叫做 Vault Agent Injector 的工具，它以 Mutating Webhook 的方式運作。當你的 Pod 被建立時，這個 webhook 會自動注入一個 sidecar 容器，這個 sidecar 從 Vault 取得 Secret，寫進共用的 Volume，再由主容器讀取。整個過程中，Secret 只存在於 Pod 的記憶體和臨時 Volume 裡，不會出現在 K8s Secret 裡，安全性更高。
+
+關於 CSI Secret Store Driver：這是另一個進階方案，叫做 Secrets Store CSI Driver。它讓你可以把 Vault、AWS Secrets Manager、Azure Key Vault 等外部 Secret 儲存的內容，以 CSI Volume 的方式掛載到 Pod 裡，就像掛載一個普通的 Volume 一樣，非常自然。
+
+關於 Pod Security Admission：K8s 1.25 之後，PSP（PodSecurityPolicy）被廢棄，改用 Pod Security Admission (PSA)。你可以設定 Namespace 的安全等級（privileged/baseline/restricted），restricted 等級會要求 Pod 不能以 root 身份運行，這樣就算攻擊者進到了 Pod，也沒有 root 權限去讀 /proc 或其他敏感路徑。
+
+這些都是企業級 K8s 安全架構的重要元素。對安全感興趣的同學，建議去讀 CNCF 的 Cloud Native Security Whitepaper，裡面有非常完整的雲原生安全框架介紹。好，Secret 的部分全部講完了，我們準備繼續。`,
     duration: "7"
   },
   {
@@ -774,7 +966,66 @@ Sealed Secrets 是另一個工具，它讓你可以把加密過的 Secret 存到
 
 休息的時候可以消化一下剛才學的 ConfigMap 和 Secret，有什麼問題等一下回來可以問我。
 
-10:25 我們準時繼續，接下來會講 Resource Quota 和調度策略，這些對管理多租戶 Kubernetes 叢集非常重要。`,
+10:25 我們準時繼續，接下來會講 Resource Quota 和調度策略，這些對管理多租戶 Kubernetes 叢集非常重要。
+
+【講師備注：休息時間可做的事】
+
+趁休息時間，講師可以：
+
+一、整理一下待會要講的 Resource Quota 範例，確認 demo 環境準備好了。可以預先建立好一個 Namespace team-a，待會直接在上面示範 ResourceQuota 和 LimitRange 的效果。
+
+二、準備一個故意超出 ResourceQuota 的 YAML，這樣可以讓學生看到 K8s 報的錯誤訊息。報錯訊息大概是：「Error from server (Forbidden): pods ... is forbidden: exceeded quota: team-quota, requested: cpu=2, used: cpu=3, limited: cpu=4」這樣的格式，讓學生親眼看到限制的效果很有教育意義。
+
+三、準備 Taint 和 Toleration 的示範。如果有 minikube 環境，可以建立多個節點，分別加上不同的 Taint，然後示範哪些 Pod 能排程到哪些節點。
+
+四、記得提醒大家：午休之後的課程是資料儲存（PV/PVC/StatefulSet），讓學生有心理準備。
+
+五、如果有學生在休息時間問問題，注意時間控制，15 分鐘後要準時繼續。
+
+【課程連接提示】
+
+休息前我們講完了 ConfigMap 和 Secret，這是 Kubernetes 組態管理的兩大核心。
+
+休息後我們要講的 Resource Quota 和 LimitRange，是組態管理的延伸——這次不是管「設定內容」，而是管「資源用量」。這對多租戶叢集至關重要，很多大公司的 K8s 叢集都有幾十個甚至幾百個 Namespace，分給不同的團隊使用。沒有資源管控，很容易出現一個團隊的應用出問題，把整個叢集的資源都吃光，影響其他所有人的情況。
+
+然後我們會講調度策略——Taints、Tolerations 和 Affinity。這是 Kubernetes 調度器的進階功能，讓你可以精細控制 Pod 被調度到哪裡。比如，有 GPU 的節點只給深度學習任務用，某些合規要求高的服務只能跑在特定的節點上，等等。
+
+這些概念環環相扣，都是企業級 K8s 叢集管理的必備技能。大家休息完回來繼續衝！
+
+【回來後的開場白】
+
+好，大家都回來了！讓我們繼續。之前講 ConfigMap 和 Secret 的時候，有沒有想到什麼問題？
+
+（等待 1 分鐘，如果有問題回答，沒有就繼續）
+
+好，現在我們來講 Resource Quota。這個主題和 ConfigMap、Secret 的概念不太一樣，它不是管「設定」，而是管「資源」。準備好了嗎？我們開始！
+
+【講師備注：休息時間利用建議】
+
+在這 15 分鐘的休息時間，可以做以下準備：
+
+一、確認下半段課程的 demo 環境已準備好。建立一個叫做 team-a 的 Namespace：kubectl create namespace team-a。然後準備好 ResourceQuota 的 YAML 檔案，待會可以直接 apply 示範。
+
+二、準備一個「故意超出配額」的 Pod YAML，比如請求 10 CPU 的 Pod，然後在課堂上 apply，讓學員看到 forbidden 的錯誤訊息。這樣的 fail 示範比只講成功的示範更有教育意義。
+
+三、如果時間允許，可以幫一些需要幫助的學員在休息時間解答問題，但注意 15 分鐘後要準時繼續。
+
+四、在白板上寫下接下來要講的四個主題：ResourceQuota、LimitRange、Taints/Tolerations、Node/Pod Affinity，讓學員知道後半段的脈絡。
+
+五、可以趁這個時間喝杯水，保持聲音狀態好，後半段的課程還有 1 小時 40 分鐘要講。
+
+【課程節奏規劃】
+休息後回來的節奏：
+- ResourceQuota：12 分鐘（含 demo）
+- LimitRange：13 分鐘（含實作練習）
+- 5 分鐘緩衝（問答）
+- Taints & Tolerations：10 分鐘
+- Node Affinity：8 分鐘
+- Pod Affinity & Anti-Affinity：12 分鐘
+- 最佳實踐 + 重點回顧：20 分鐘
+- 下午預告：5 分鐘
+
+按照這個節奏，12:00 可以準時結束。如果某個環節需要延伸，可以在最佳實踐環節稍微壓縮。`,
     duration: "15"
   },
   {
@@ -836,7 +1087,42 @@ services、persistentvolumeclaims、secrets、configmaps 等是各種 K8s 物件
 
 你可以用 kubectl describe resourcequota team-quota -n team-a 查看目前的資源使用情況和剩餘配額。
 
-在實際工作中，給不同的團隊或不同的環境（dev/staging/prod）設定不同的 ResourceQuota 是很常見的做法。生產環境通常會給最多資源，開發環境給少一些，以降低成本。`,
+在實際工作中，給不同的團隊或不同的環境（dev/staging/prod）設定不同的 ResourceQuota 是很常見的做法。生產環境通常會給最多資源，開發環境給少一些，以降低成本。
+
+讓我補充一些關於 CPU 單位的說明，因為很多人剛開始會搞混：
+
+CPU 的單位是 "cores"（核心數）。1 個 CPU core 等於 1000m（milliCPU）。所以 500m 就是半個 CPU core，2000m 就是 2 個 CPU core，寫成 "2" 也可以。
+
+記憶體的單位有 Ki、Mi、Gi（二進位）和 k、M、G（十進位）。建議用 Mi 和 Gi，比較直觀。1 Gi = 1024 Mi，1 Mi = 1024 Ki。
+
+requests 是排程的依據，K8s 調度器會確保節點有足夠的資源滿足 Pod 的 requests。limits 是上限，Pod 的實際用量不能超過 limits。如果 CPU 超過 limits，進程會被節流（throttle）；如果記憶體超過 limits，Pod 會被 OOM Kill（Out of Memory Kill，記憶體不足強制殺掉）。
+
+所以一般建議 requests 設比較保守的值（你確定會用到的資源），limits 設寬鬆一點（最壞情況下的資源用量）。requests 太高會導致 Pod 排程不出去，requests 太低可能導致多個 Pod 搶同一個節點的資源，出現效能問題。
+
+ResourceQuota 還支援 scopeSelector，讓你可以只對特定範圍（比如 BestEffort QoS 的 Pod）設定配額。這是進階用法，大家有興趣可以課後研究 Kubernetes 的 QoS（Quality of Service）機制。
+
+讓我再示範一下 ResourceQuota 的實際操作流程，讓大家對整個流程有更清楚的認識：
+
+步驟一：建立 Namespace 和 ResourceQuota
+kubectl create namespace team-a
+kubectl apply -f team-quota.yaml
+
+步驟二：確認 Quota 已設定
+kubectl describe resourcequota team-quota -n team-a
+這個命令會顯示每個資源的上限（Hard）和目前使用量（Used），讓你看到還剩多少可用。
+
+步驟三：嘗試建立一個超出配額的 Pod
+kubectl apply -f large-pod.yaml -n team-a
+如果超出配額，K8s 會立刻報錯，大概像這樣：
+Error from server (Forbidden): pods "large-pod" is forbidden: exceeded quota: team-quota, requested: requests.cpu=5, used: requests.cpu=3, limited: requests.cpu=4
+
+步驟四：建立一個合理大小的 Pod
+如果 Pod 沒有設定 requests/limits，在有 ResourceQuota 的 Namespace 裡也會被拒絕，報錯訊息是：
+Error from server (Forbidden): error when creating "pod.yaml": pods "my-pod" is forbidden: failed quota: team-quota: must specify limits.cpu,limits.memory
+
+所以必須同時設定 requests 和 limits，或者先設定 LimitRange 提供預設值，Pod 才能成功建立。
+
+關於 ResourceQuota 和 Namespace 的生命週期：如果你刪除一個 Namespace，裡面的所有 ResourceQuota 也會一起被刪除。如果你建立 Namespace 的時候就設好 ResourceQuota，整個生命週期可以一起管理，比較乾淨。可以用 Namespace 的 YAML 配合 kubectl apply 一次性建立 Namespace + ResourceQuota，這也是 GitOps 的推薦做法。`,
     duration: "12"
   },
   {
@@ -909,7 +1195,22 @@ LimitRange 控制的是單個 Container 或 Pod 的資源設定，確保每個 P
 一、LimitRange：設定合理的預設值和上限，保護節點不被單個容器佔用太多資源。
 二、ResourceQuota：設定這個團隊可以使用的總資源量。
 
-這樣團隊成員可以自由在自己的 Namespace 裡工作，不需要每次都設定資源，但又不會影響到其他團隊。`,
+這樣團隊成員可以自由在自己的 Namespace 裡工作，不需要每次都設定資源，但又不會影響到其他團隊。
+
+讓我補充幾個實際操作中的重要細節：
+
+LimitRange 的 type 可以是 Container、Pod 或 PersistentVolumeClaim。Container 類型是最常用的，針對每個容器設定限制。Pod 類型是對整個 Pod（可能有多個容器）設定總量限制。PersistentVolumeClaim 類型是對 PVC 的容量設定限制，防止某個 PVC 申請太大的存儲空間。
+
+關於 defaultRequest 和 default 的關係：如果你設定了 default（limits）但沒有設定 defaultRequest（requests），K8s 會把 defaultRequest 設成跟 default 一樣的值。這樣 requests = limits，Pod 的 QoS 等級就是 Guaranteed（最高級別），表示 K8s 保證給這個 Pod 它申請的資源。反之，如果設了 defaultRequest 但沒有設 default，則沒有預設的 limits。
+
+Kubernetes 的 QoS（服務品質）等級有三種：
+第一種是 Guaranteed：requests == limits，K8s 保證資源供給，最不容易被驅逐。
+第二種是 Burstable：requests < limits，或者部分有設定，正常情況下有保障，但資源緊張時可能被限制或驅逐。
+第三種是 BestEffort：完全沒有設定 requests 和 limits，最容易被驅逐，資源不足時這種 Pod 最先被殺掉。
+
+在設計 LimitRange 的時候，要根據你的叢集節點規格和業務需求來設定合理的 default 和 max 值。太保守的 max 可能限制某些需要較多資源的服務，太寬鬆的 max 可能讓某個 Container 佔用太多資源影響鄰居。
+
+最後分享一個實用的管理技巧：你可以用 kubectl get limitrange -n team-a 列出 Namespace 裡的 LimitRange，用 kubectl describe limitrange -n team-a 查看詳細設定。這個在排查 Pod 建立失敗、資源不足等問題的時候很有用。`,
     duration: "13"
   },
   {
@@ -989,7 +1290,21 @@ Pod 要容忍這個 Taint，需要在 spec.tolerations 裡設定對應的 Tolera
 
 有一個特殊情況：你可以用 operator: "Exists" 來容忍所有有這個 key 的 Taint，不管 value 是什麼。或者完全省略 key 和 value，用 operator: "Exists"，就可以容忍所有 Taint。系統元件（如 kube-proxy）通常是這樣設定的，確保它們可以在任何節點上運行。
 
-注意：Taints 和 Tolerations 只是說哪些節點可以運行哪些 Pod，但不是說一定要去哪個節點。比如你的 Pod 有容忍某個 Taint 的 Toleration，但這個 Pod 也可以去其他沒有 Taint 的節點。如果你想強制 Pod 必須去特定節點，需要配合 Node Affinity 使用。`,
+注意：Taints 和 Tolerations 只是說哪些節點可以運行哪些 Pod，但不是說一定要去哪個節點。比如你的 Pod 有容忍某個 Taint 的 Toleration，但這個 Pod 也可以去其他沒有 Taint 的節點。如果你想強制 Pod 必須去特定節點，需要配合 Node Affinity 使用。
+
+補充幾個重要的細節：
+
+K8s 的控制面節點（master node）預設有一個 Taint：node-role.kubernetes.io/control-plane:NoSchedule。這就是為什麼普通的 Pod 不會被調度到 master 節點上。如果你想在 master 節點跑 Pod（比如在開發環境用 single-node cluster），需要移除這個 Taint：kubectl taint nodes --all node-role.kubernetes.io/control-plane-。
+
+另外，K8s 自己也會在節點出問題的時候自動加 Taint，比如：
+node.kubernetes.io/not-ready:NoExecute - 節點不就緒時
+node.kubernetes.io/unreachable:NoExecute - 節點不可達時
+node.kubernetes.io/memory-pressure:NoSchedule - 記憶體壓力高時
+node.kubernetes.io/disk-pressure:NoSchedule - 磁碟壓力高時
+
+這些 Taint 是系統自動管理的，不需要你手動操作。當節點恢復正常，這些 Taint 會被自動移除。如果你的 Pod 需要在節點不健康的時候仍然運行（比如監控 agent），可以為這些 Taint 加上對應的 Toleration。
+
+對於 NoExecute 的 Taint，你還可以設定 tolerationSeconds，表示 Pod 可以在節點加上這個 Taint 之後再繼續運行多少秒。時間到了就會被驅逐。這個在節點維護場景很有用：先加 NoExecute Taint，Pod 有 300 秒的時間優雅關閉，300 秒後才被強制驅逐。`,
     duration: "10"
   },
   {
@@ -1064,7 +1379,18 @@ Lt：標籤的值小於指定的值
 
 實際使用場景：在雲端環境中，你可能有不同的節點類型，比如標準型（general purpose）、記憶體優化型、GPU 型。你可以給節點打標籤，然後用 Node Affinity 把不同類型的工作負載調度到對應的節點上。
 
-另外，在多可用區（Multi-AZ）部署的時候，Node Affinity 也很常用。比如你要讓資料庫 Pod 只在特定可用區的節點上運行，以滿足數據主權要求。`,
+另外，在多可用區（Multi-AZ）部署的時候，Node Affinity 也很常用。比如你要讓資料庫 Pod 只在特定可用區的節點上運行，以滿足數據主權要求。
+
+進一步補充：Node Affinity 和 nodeSelector 可以同時使用，如果同時設定，兩者的條件都必須滿足才能調度。所以可以用 nodeSelector 做簡單的基本條件匹配，再用 Node Affinity 做更複雜的條件篩選。
+
+關於 nodeSelectorTerms 的結構：nodeSelectorTerms 是一個陣列，陣列裡的每個 item 是 OR 關係（滿足任一個就可以）。每個 item 裡面的 matchExpressions 是 AND 關係（全部都要滿足）。所以你可以表達很複雜的邏輯，比如「節點在 us-east-1a 且有 GPU，或者節點在 us-west-2a 且有 SSD」。
+
+在實際工作中，給節點打標籤的時候，建議使用有意義的標籤體系，比如：
+topology.kubernetes.io/zone: us-east-1a（可用區，K8s 內建的）
+node.kubernetes.io/instance-type: m5.xlarge（實例類型，雲服務商通常會自動打）
+custom.company.com/gpu: "true"（自訂的功能標籤）
+
+這樣在寫 Node Affinity 的時候，規則更清晰，也更容易維護。`,
     duration: "8"
   },
   {
@@ -1136,7 +1462,22 @@ topology.kubernetes.io/region 是地區粒度，意思是「同一個地區」�
 
 在實際工作中，我建議用 preferred 模式（軟性偏好）而不是 required 模式，這樣調度器有更多彈性，降低 Pod Pending 的風險。
 
-好，Taints & Tolerations、Node Affinity、Pod Affinity 這幾個概念我們都講完了。這些是比較進階的調度策略，大家可以課後多練習。`,
+好，Taints & Tolerations、Node Affinity、Pod Affinity 這幾個概念我們都講完了。這些是比較進階的調度策略，大家可以課後多練習。
+
+讓我補充一個很實用的 Pod Anti-Affinity 場景：在實際生產環境中，對於關鍵服務（比如 API 閘道、核心業務服務），我們通常會同時使用 Node Anti-Affinity 和 Zone Anti-Affinity 兩個層次的分散策略。
+
+舉個具體的例子：假設你有一個重要的 API 服務，在 us-east 地區有 3 個可用區（us-east-1a、us-east-1b、us-east-1c），每個可用區有多台節點。你要把 API 服務的 3 個副本分散到 3 個不同的可用區，並且在每個可用區內盡量分散到不同節點。這樣的設計可以抵禦單一可用區故障，也能抵禦同一可用區內單一節點故障。
+
+另外要提到 Topology Spread Constraints，這是 K8s 1.19 之後新增的功能，比 Pod Anti-Affinity 更直觀地表達「把 Pod 均勻分散到各個 Zone」的需求。用 Pod Anti-Affinity 要寫很多配置，而 Topology Spread Constraints 可以更簡潔地表達同樣的意圖。這是一個較新的功能，大家有興趣可以查看文件研究一下。
+
+最後總結一下調度策略的選擇：
+- 需要節點隔離（某些節點專用）→ Taint + Toleration
+- Pod 偏好或必須去某種節點 → Node Affinity
+- Pod 要和某些 Pod 住在一起 → Pod Affinity
+- Pod 要遠離某些 Pod（高可用分散）→ Pod Anti-Affinity
+- 均勻分散到多個 Zone → Topology Spread Constraints
+
+這幾個機制可以組合使用，讓你對 K8s 的調度行為有很高的控制力。`,
     duration: "12"
   },
   {
@@ -1207,7 +1548,19 @@ RBAC 最小權限原則：每個服務帳戶只能存取它需要的 Secret。
 
 資源管理：每個 Namespace 都要設 ResourceQuota 和 LimitRange，所有 Pod 都要設 requests 和 limits。requests 影響調度，limits 影響資源使用上限。requests 設太低，Pod 可能被調度到資源不足的節點；limits 設太低，Pod 可能因為超出限制而被 OOM Kill。
 
-調度策略：根據需求選擇合適的調度機制。Taints 和 Tolerations 用於節點隔離，Node Affinity 用於節點偏好，Pod Anti-Affinity 用於高可用分散部署。`,
+調度策略：根據需求選擇合適的調度機制。Taints 和 Tolerations 用於節點隔離，Node Affinity 用於節點偏好，Pod Anti-Affinity 用於高可用分散部署。
+
+補充幾個在企業實際落地時的經驗分享：
+
+一、設定管理工具化。單純手動管理 ConfigMap 和 Secret 在規模大的時候非常困難。建議使用 GitOps 工具，比如 ArgoCD 或 Flux，讓所有 K8s 資源（包括 ConfigMap）的變更都透過 git PR 來管理，有完整的審查和稽核流程。
+
+二、Secret 的 GitOps 方案。純 GitOps 的難題是 Secret 不能直接放進 git。推薦的解決方案是 Sealed Secrets + ArgoCD 的組合，或者 ESO（External Secrets Operator）+ Vault/AWS Secrets Manager 的組合。
+
+三、定期稽核 ConfigMap 和 Secret。隨著時間累積，叢集裡的 ConfigMap 和 Secret 可能越來越多，有些已經沒有任何 Pod 在用了，但沒有人刪除。建議定期用工具掃描（比如 kubectl 配合腳本），找出沒有被任何工作負載引用的 ConfigMap 和 Secret，清理掉以降低安全風險和管理複雜度。
+
+四、監控和告警。使用 Prometheus + Grafana 監控 Namespace 的資源使用情況，設定告警在資源使用接近 ResourceQuota 上限的時候通知管理員。這樣可以提前發現問題，避免 Pod 因為配額不足而無法建立的情況。
+
+五、調度策略的文件化。Taints、Node Affinity 等調度策略如果沒有文件記錄，後來的管理員可能不知道為什麼某些 Pod 不能在某些節點上跑。建議把調度策略的設計決策記錄在 wiki 或 README 裡，方便團隊成員理解叢集的設計意圖。`,
     duration: "10"
   },
   {
@@ -1268,7 +1621,19 @@ Resource Quota 和 LimitRange 是配合使用的：ResourceQuota 控制 Namespac
 
 下午我們會進入資料儲存的主題，講 PersistentVolume、PersistentVolumeClaim、StorageClass 和 StatefulSet。這些是有狀態應用（比如資料庫）在 Kubernetes 中運行的基礎，非常重要。
 
-大家午休 1 個小時，下午 1 點準時繼續。有任何問題現在可以問，或者午休期間傳訊息給我也可以。`,
+大家午休 1 個小時，下午 1 點準時繼續。有任何問題現在可以問，或者午休期間傳訊息給我也可以。
+
+讓我來出幾個思考題給大家在午休時可以想一想：
+
+第一題：如果你的應用程式的設定（比如功能開關 feature flag）需要能夠在不重啟應用的情況下立即生效，你應該用 ConfigMap 的哪種使用方式，並且應用程式需要做什麼額外的工作？
+
+第二題：假設你的叢集有 3 個節點，你部署了一個有 3 個副本的應用。你希望這 3 個副本分散在 3 個不同的節點上，但是如果其中一個節點故障，剩下的 2 個副本還能繼續服務，你應該怎麼設定？（提示：考慮 Pod Anti-Affinity 的 required vs preferred 模式）
+
+第三題：你的團隊有一個 Namespace，ResourceQuota 設定了 requests.cpu: "8"。目前已經用了 6 CPU。你要建立一個新的 Pod，需要 3 CPU requests。這個 Pod 能建立成功嗎？如果不能，你有哪些解決方案？
+
+第四題：假設你誤把一個包含資料庫密碼的設定放進了 ConfigMap 而不是 Secret，你應該怎麼處理？只是把它移到 Secret 就夠了嗎？（提示：想想 git 歷史記錄的問題）
+
+這些問題沒有標準答案，但思考這些問題可以幫助你更深入理解今天學的內容。大家午休愉快，下午見！`,
     duration: "10"
   },
   {
@@ -1314,7 +1679,25 @@ Resource Quota 和 LimitRange 是配合使用的：ResourceQuota 控制 Namespac
 
 我們還會做一個實作：部署一個 MySQL StatefulSet，驗證資料在 Pod 重啟後還在。
 
-好，午休愉快！下午 1 點準時開始。`,
+在開始下午課程之前，大家可以先思考幾個問題：
+
+第一，為什麼 Deployment 不適合跑資料庫？想想看，如果你有一個 MySQL Deployment，有 2 個 replica，這 2 個 Pod 的資料是怎麼管理的？它們會不會互相衝突？
+
+第二，如果一個 Pod 重啟了，它之前寫進容器 filesystem 的資料還在嗎？為什麼？
+
+第三，如果你要在 K8s 裡跑一個需要主從複製（master-replica）的資料庫，比如 MySQL 或 PostgreSQL，你覺得應該怎麼架構？
+
+帶著這些問題去享受午休，下午我們一一解答。
+
+另外提醒大家：下午的課程實作比較多，確保你的 kubectl 環境正常運作，如果有問題午休時找我或助教解決。
+
+預計下午的實作環節包括：
+一、手動建立 PV 和 PVC，驗證綁定過程
+二、用 StorageClass 動態建立 PV，對比靜態和動態的差別
+三、部署 MySQL StatefulSet，寫入資料，刪除 Pod 後驗證資料還在
+四、擴縮 StatefulSet，觀察 Pod 的有序啟動和關閉
+
+這些實作相當有趣，特別是第三個，親眼看到 Pod 重啟後資料還在，是很有成就感的體驗。好，午休愉快，13:00 見！`,
     duration: "5"
   },
 ]

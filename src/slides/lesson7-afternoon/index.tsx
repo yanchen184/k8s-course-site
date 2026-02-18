@@ -50,7 +50,9 @@ export const slides: Slide[] = [
 
 我相信學一個技術最好的方式，不是背文件，而是在一個完整的場景裡，把每個工具都用在它該用的地方，讓你真正體會為什麼需要它。我在業界帶過很多工程師，凡是能在實際專案裡跑過一遍完整流程的，技術成長速度都是其他人的兩三倍。
 
-今天下午的主線是：先做一個完整的三層式應用部署，然後故意把它弄壞，練習排查故障，接著設定高可用配置，最後看看 CI/CD 怎麼跟 K8s 整合。這整個流程，就是你們將來在真實工作中會一直重複的循環：部署、壞掉、排查、修好、優化。準備好了嗎？我們開始！`,
+今天下午的主線是：先做一個完整的三層式應用部署，然後故意把它弄壞，練習排查故障，接著設定高可用配置，最後看看 CI/CD 怎麼跟 K8s 整合。這整個流程，就是你們將來在真實工作中會一直重複的循環：部署、壞掉、排查、修好、優化。準備好了嗎？我們開始！
+
+如果有人今天是第一次這麼系統化地接觸 Kubernetes，也別擔心，今天下午的節奏我會盡量照顧到每個人。有卡住的地方就舉手，不要悶在那邊等——遇到問題是很正常的，我們一起解決，這才是真正的學習。`,
     duration: "3"
   },
 
@@ -139,7 +141,9 @@ Day 5，網路與安全。Ingress 讓外部的流量有個統一的入口，根�
 
 Day 6，可觀測性。系統上線之後，你怎麼知道它有沒有問題？怎麼在問題發生前就察覺到異常？Prometheus 收集指標，Grafana 畫出漂亮的儀表板，Loki 做日誌聚合，再加上告警規則，讓你的系統「透明」起來。
 
-Day 7 就是今天。我們要用一個真實的場景，把前六天所有的知識點全部用一遍。你會發現，每一個你曾經「好像懂了」的概念，放到整合場景裡都會重新變清晰，因為你看到了它在整個系統裡扮演的角色。這種體驗是任何文件都無法給你的。開始吧！`,
+Day 7 就是今天。我們要用一個真實的場景，把前六天所有的知識點全部用一遍。你會發現，每一個你曾經「好像懂了」的概念，放到整合場景裡都會重新變清晰，因為你看到了它在整個系統裡扮演的角色。這種體驗是任何文件都無法給你的。開始吧！
+
+我想在進入實戰之前，再補充一個學習心態上的重點。很多人學完理論之後會覺得「我好像都懂了，但如果讓我獨立從零開始建一個環境，我不確定能不能做到」。這種感覺是完全正常的，它叫做「知識幻覺」——你讀了步驟，腦子裡有畫面，但手上還沒有肌肉記憶。今天下午的演練，就是要把知識幻覺轉換成真實的能力。每次你的手指打出一個 kubectl 指令，看到它真正運行，看到 Pod 狀態從 Pending 變成 Running，那個瞬間就是知識轉換成能力的時刻。這個轉換是任何回顧或複習都替代不了的，所以等一下請認真地跟著每一個步驟操作，不要只是看我示範。七天的課程設計有它的遞進邏輯，今天是整個旅程的最後一站，也是最精華的一站，一起把它走完！另外我想提醒大家：學習不是一次性的事件，今天學完不代表你已經「學會了 Kubernetes」。真正的掌握是在反覆使用中建立起來的。所以我鼓勵大家在課後找時間把今天的演練再獨立做一遍，不看筆記，看看自己哪些步驟記得住、哪些會卡關，那些卡關點就是你還需要加強的地方。`,
     duration: "10"
   },
 
@@ -243,7 +247,13 @@ postgres-svc.yaml 建立一個 ClusterIP Service，這樣 Backend 就可以用 p
 
 apply 完每個 YAML 之後，立刻跑 kubectl get pods -n demo-app 確認狀態。Pod 從 Pending 轉成 ContainerCreating 再轉成 Running 是正常的，大概等 30 秒到 1 分鐘。如果 3 分鐘後還在 Pending，就需要排查了——通常是 PVC 沒有可用的 PV，或者節點資源不足。
 
-等兩個 Pod 都是 Running 之後，我們來驗證 Backend 真的可以連到資料庫。用 kubectl exec 進到 Backend Pod 裡，試著用 psql 或 curl 連一下資料庫的健康檢查端點。如果回應正常，恭喜，第一層和第二層之間的連線已經通了！有任何問題舉手，我們一起解決。`,
+等兩個 Pod 都是 Running 之後，我們來驗證 Backend 真的可以連到資料庫。用 kubectl exec 進到 Backend Pod 裡，試著用 psql 或 curl 連一下資料庫的健康檢查端點。如果回應正常，恭喜，第一層和第二層之間的連線已經通了！有任何問題舉手，我們一起解決。
+
+在等待 Pod 進入 Running 狀態的期間，我來說一個在生產環境常見的問題：資料庫 Pod 起來了，但後端 Pod 一直在 CrashLoopBackOff。這通常是因為後端啟動時嘗試連接資料庫，但資料庫還沒完全就緒（PostgreSQL 需要一點時間初始化），連線失敗導致後端程序退出，K8s 就不斷重啟。解決方法有兩個：一是在後端程式碼裡加入重試邏輯（這是更健壯的做法，讓應用自己處理短暫的連線失敗）；二是使用 Init Container，在主容器啟動之前先執行一個等待資料庫就緒的容器，確認資料庫可以連線之後，主容器才啟動。今天我們的環境是受控的，不太可能遇到這個時序問題，但在真實的生產部署中，這是值得注意的細節。
+
+另一個常見的問題是 PVC 一直停在 Pending。這通常有幾個原因：你的叢集沒有可用的 StorageClass，沒有足夠的可用儲存空間，或者 accessModes 不符合（比如你要 ReadWriteMany 但 StorageClass 只支援 ReadWriteOnce）。用 kubectl describe pvc postgres-pvc -n demo-app 看 Events，通常會有很清楚的錯誤訊息說明原因。在我們的練習環境，StorageClass 應該是預先配置好的，如果有問題請叫我過去看。
+
+還有一個實務上的重要技巧：當你要驗證 Backend 能不能連到資料庫時，不一定要進到容器裡。更快的方式是看 Backend 的 log：kubectl logs -f -l app=backend -n demo-app（用 -l 標籤選擇器，而不是打整個 Pod 名稱）。如果後端成功連到資料庫，log 裡通常會有「Database connected」或類似的訊息；如果失敗，會看到連線錯誤。養成用 log 快速判斷狀態的習慣，比每次都 exec 進容器要高效很多。好，大家都完成了嗎？我們繼續往前。順帶一提，在真實的生產環境中，部署資料庫到 Kubernetes 之前需要評估幾個問題：你的儲存後端是否支援你需要的 I/O 效能（SSD vs HDD、本地存儲 vs 網路存儲）？你的備份策略是什麼（定期 pg_dump、連續 WAL 備份、或者用 Velero 做整個 PVC 的快照）？你的資料庫版本升級計劃是什麼？對於需要高 I/O 效能和低延遲的資料庫，很多公司選擇把資料庫保留在傳統 VM 上，只把無狀態的應用服務遷移到 K8s，這也是一個合理的架構決策。不是所有東西都適合跑在 K8s 上，理解邊界和取捨，是成熟工程師的標誌。在今天的練習環境裡，我們把 PostgreSQL 放進 K8s 主要是為了學習目的，讓整個三層架構完整，讓大家體驗 PVC 和 Secret 的實際用法。大家完成了嗎？確認 postgres 和 backend 都是 Running 之後，我們馬上繼續部署前端和 Ingress！`,
     duration: "20"
   },
 
@@ -293,7 +303,15 @@ apply 完 ingress.yaml 之後，用 kubectl get ingress -n demo-app 確認 Ingre
 
 最後，執行完整驗證：kubectl get all -n demo-app 看所有資源狀態，應該看到 6 個 Pod 都是 Running，6 個 Service 都在，1 個 Ingress。然後用 curl http://demo.local/api/health 測試 Backend 是否透過 Ingress 可以存取。如果回傳 200 OK，再打開瀏覽器輸入 http://demo.local，看到前端頁面並且頁面上的資料是從資料庫來的，那就大功告成了！
 
-這是一個很大的里程碑。從零建立一個命名空間，到一個完整可用的三層 Web 應用，用了大概 15 分鐘和不到 20 個 kubectl 指令。這就是 Kubernetes 宣告式管理的威力——你只需要描述你想要什麼狀態，K8s 幫你把它實現。大家給自己鼓個掌！`,
+這是一個很大的里程碑。從零建立一個命名空間，到一個完整可用的三層 Web 應用，用了大概 15 分鐘和不到 20 個 kubectl 指令。這就是 Kubernetes 宣告式管理的威力——你只需要描述你想要什麼狀態，K8s 幫你把它實現。大家給自己鼓個掌！
+
+讓我補充幾個在真實生產環境中，Ingress 設定的進階技巧。第一個是 TLS 終止。你的 Ingress 可以配置 HTTPS，讓所有進到叢集的流量都加密。做法是先把 SSL 憑證存成 K8s Secret（kubectl create secret tls my-tls-secret --cert=path/to/cert.crt --key=path/to/key.key），然後在 Ingress 的 spec.tls 區塊引用這個 Secret。Ingress Controller（通常是 nginx-ingress）會自動處理 TLS 握手，後端接到的流量可以是未加密的 HTTP，這個模式叫做 TLS 終止（TLS termination）。如果你用 cert-manager 這個工具，還可以自動申請和更新 Let's Encrypt 憑證，完全自動化 HTTPS 的生命週期。
+
+第二個技巧是 Ingress 的 annotation。不同的 Ingress Controller 支援不同的 annotation，用來調整行為。比如 nginx-ingress 的常用 annotation：nginx.ingress.kubernetes.io/rewrite-target 可以重寫路徑（比如把 /api/v1/users 重寫成 /users）；nginx.ingress.kubernetes.io/proxy-body-size 可以設定上傳檔案大小限制；nginx.ingress.kubernetes.io/rate-limit 可以設定請求速率限制。這些設定讓 Ingress 不只是個路由器，而是一個功能豐富的 API 閘道。
+
+第三個是排查 Ingress 不通的思路。如果你 apply 了 Ingress 但瀏覽器打開是 404 或 502，排查順序是這樣的：第一步，確認 Ingress 資源有正確建立（kubectl get ingress -n demo-app），看 ADDRESS 欄位是否有 IP 或 hostname；第二步，確認 Backend Service 可以正常存取（kubectl port-forward svc/frontend-svc 8080:80 -n demo-app 然後打 localhost:8080 看有沒有頁面）；第三步，看 Ingress Controller 的 log（通常在 ingress-nginx 命名空間，kubectl logs -n ingress-nginx deploy/ingress-nginx-controller）；第四步，確認 Ingress 的 host 設定和你瀏覽器輸入的 URL 一致（包括有沒有設定 /etc/hosts 或 DNS）。很多時候 Ingress 本身是對的，問題出在沒有把 demo.local 指向正確的 IP。
+
+最後，做完整個部署，花一分鐘用 kubectl get all -n demo-app 看一遍所有資源的清單，感受一下你用這麼少的指令建立了這麼完整的系統。這種全貌感是很重要的，以後你維護或修改這個系統，腦子裡要有這張完整的地圖。我再分享一個實務技巧：kubectl get all 並不會列出 Ingress、ConfigMap、Secret、PVC 等資源，所以如果你想看命名空間裡的「真的所有東西」，需要用 kubectl get all,ingress,configmap,secret,pvc -n demo-app 或者用 kubectl api-resources 列出所有資源類型，再一一查詢。在工程實務中，很多人會用 kubectl get all -n xxx 卻發現少了 Ingress 而迷惑，知道這個細節可以避免誤解。`,
     duration: "20"
   },
 
@@ -395,7 +413,15 @@ apply 完 ingress.yaml 之後，用 kubectl get ingress -n demo-app 確認 Ingre
 
 場景三，ImagePullBackOff：我會故意把 Frontend 的映像名稱打錯一個字母，讓 K8s 找不到這個映像。我們會用 describe 看到 Failed to pull image 的 Events，確認是映像名稱錯誤，修正 YAML 後重新 apply。
 
-每一種故障的排查流程都是：get pods 發現異常 → describe 看 Events 找線索 → logs 看應用層 log → 根據線索修復 → 驗證修復有效。把這個流程刻進你的肌肉記憶裡。`,
+每一種故障的排查流程都是：get pods 發現異常 → describe 看 Events 找線索 → logs 看應用層 log → 根據線索修復 → 驗證修復有效。把這個流程刻進你的肌肉記憶裡。
+
+實際操作場景一，CrashLoopBackOff 排查：我把 Backend 的 Deployment 改成引用一個不存在的環境變數名稱（把 DB_URL 改成 DATABASE_URL），然後 apply。你會先看到 Pod 狀態變成 CrashLoopBackOff，RESTARTS 數字開始增加。這時候執行 kubectl logs backend-xxx --previous -n demo-app，看最後幾行的錯誤訊息，可能是「Error: DATABASE_URL is not defined」或「Cannot connect to undefined」。找到了這個線索，去 backend-configmap.yaml 裡確認環境變數名稱，發現應該是 DB_URL 而不是 DATABASE_URL，修正後重新 apply ConfigMap，然後執行 kubectl rollout restart deployment/backend -n demo-app 強制觸發 Pod 重建，讓新的 ConfigMap 生效。等新 Pod 起來，確認 RESTARTS 沒有繼續增加，表示修復成功。
+
+場景二，OOMKilled 排查：我把 Backend Deployment 的 resources.limits.memory 改成 10Mi（這對一個 Node.js 應用來說極度不夠），apply 後 Pod 起來然後迅速 OOMKilled 重啟。用 kubectl describe pod backend-xxx -n demo-app，在最下面的 Events 區塊或 Containers 區塊，你會看到 Last State 顯示 OOMKilled，Exit Code 是 137（128 + 9，9 是 SIGKILL 的訊號數字）。診斷確認之後，把 limits.memory 改成一個合理的值（比如 256Mi 或 512Mi），apply 後驗證 Pod 穩定運行不再重啟。
+
+場景三，ImagePullBackOff 排查：我把 Frontend Deployment 的 image 名稱打錯一個字（比如從 my-frontend:v1.0 改成 my-frontned:v1.0），apply 後 Pod 一直停在 ImagePullBackOff 或 ErrImagePull 狀態。kubectl describe pod frontend-xxx -n demo-app，在 Events 裡看到 Failed to pull image "my-frontned:v1.0": rpc error: code = Unknown desc = failed to pull and unpack image ...。確認是 image 名稱拼錯了，修正 YAML 重新 apply，等 Pod 成功 pull 映像並進入 Running 狀態。
+
+還有一個非常有用的排查場景：你的 Pod 是 Running，但服務沒有回應。這時候要懷疑的是 Service Selector 有沒有對到正確的 Pod。執行 kubectl get endpoints backend-svc -n demo-app，如果 ENDPOINTS 欄位是空的（<none>），代表這個 Service 沒有找到任何匹配的 Pod。然後比對 Service 的 selector（spec.selector）和 Pod 的 labels（metadata.labels），確認它們完全吻合。這個「Service Selector 和 Pod Labels 不符」的問題，是初學者最容易犯的錯誤之一，但用 kubectl get endpoints 很容易診斷出來。大家把這些工具和場景都試一遍，有問題隨時叫我！最後分享一個排查效率的心法：當你面對一個你完全不理解的 Kubernetes 錯誤，試試把錯誤訊息直接複製到搜尋引擎，通常 Stack Overflow、GitHub Issues 或 Kubernetes 官方文件都有相關討論。Kubernetes 的錯誤訊息設計得相對清晰，大部分的常見問題都有前人踩過坑留下記錄。善用社群的知識積累，是快速排查問題的重要能力之一。當然，今天我們在現場，有任何問題直接問我。`,
     duration: "25"
   },
 
@@ -420,7 +446,7 @@ apply 完 ingress.yaml 之後，用 kubectl get ingress -n demo-app 確認 Ingre
         </div>
       </div>
     ),
-    notes: `好，休息時間到！大家辛苦了。剛才兩場實戰演練很有份量，請起來走一走，喝點水，讓眼睛和頸椎休息一下。如果剛才有任何操作卡住、沒跟上，趁這 15 分鐘來找我或助教，我們幫你補上。14:45 準時繼續，下半場同樣精彩！`,
+    notes: `好，休息時間到！大家辛苦了。剛才兩場實戰演練很有份量，請起來走一走，喝點水，讓眼睛和頸椎休息一下。如果剛才有任何操作卡住、沒跟上，趁這 15 分鐘來找我或助教，我們幫你補上。14:45 準時繼續，下半場同樣精彩！請記得補充水分，和旁邊的同學聊聊剛才遇到的問題，有時候同學之間的相互解說是最有效的學習方式。`,
     duration: "1"
   },
 
@@ -486,7 +512,19 @@ PDB 有兩種寫法：minAvailable 設最少要有幾個 Pod 可用，或者 max
 
 最後驗證 PDB 有效的方式：kubectl drain 一個節點（如果你的叢集有多個節點的話），觀察它驅逐 Pod 的時候是否有遵守 PDB 的約束，不讓可用 Pod 數量低於 minAvailable。
 
-HPA + PDB 是一對黃金搭檔：HPA 讓你的應用能彈性應對流量波動，PDB 讓你的維護操作不會影響服務可用性。這兩個一起設，才能說你的 Kubernetes 部署達到「生產就緒」的水準。`,
+HPA + PDB 是一對黃金搭檔：HPA 讓你的應用能彈性應對流量波動，PDB 讓你的維護操作不會影響服務可用性。這兩個一起設，才能說你的 Kubernetes 部署達到「生產就緒」的水準。
+
+讓我說說如何驗證 HPA 真的有效。光設定好 HPA 不夠，你需要確認它在壓力下確實會觸發擴容。一個簡單的壓力測試方法：先在 Backend Pod 裡或任意一個 Pod 裡，執行一個無限迴圈消耗 CPU（while true; do true; done &），然後觀察 kubectl get hpa -n demo-app 的 TARGETS 欄位，看 CPU 使用率是否上升。當 CPU 超過你設定的 70% 閾值，HPA 應該會在 1-2 分鐘內增加 Pod 數量。你可以開兩個終端機視窗，一個跑 watch kubectl get hpa -n demo-app，另一個跑 watch kubectl get pods -n demo-app，同時觀察 HPA 的 REPLICAS 數字和 Pod 數量的變化，那個畫面非常有說服力。
+
+在真實生產環境中，HPA 有幾個常見的陷阱要注意。第一個是「HPA 設好了但沒有反應」——最常見的原因是 metrics-server 沒有安裝或沒有正常運行。kubectl top pods -n demo-app，如果這個指令報錯說 metrics not available，就確定是 metrics-server 的問題。可以用 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml 安裝（需要網路）。第二個陷阱是「HPA 快速擴容，但縮容太慢」——HPA 預設的縮容行為比較保守，因為縮容太激進會造成流量高峰時手忙腳亂。可以在 HPA spec 的 behavior 區塊設定 scaleDown 的策略，比如設定縮容前的穩定視窗（stabilizationWindowSeconds）。
+
+關於 PDB 的進階用法：PDB 也可以用百分比來設定。比如 minAvailable: 50%，表示不管 Deployment 有幾個副本，至少要有 50% 保持可用。這在副本數量動態變化（比如 HPA 正在擴縮容）的時候特別有用，因為你的 PDB 不需要跟著 HPA 的 maxReplicas 一起調整。另外，PDB 只對「計畫性中斷」（voluntary disruption）有效，比如 kubectl drain、Deployment 升級、節點維護。它不能防止節點硬體故障（non-voluntary disruption）——節點突然掛掉，上面的 Pod 還是會消失。這是 PDB 的一個常見誤解，要澄清清楚。
+
+我們再來做一個完整的驗證流程：先確認 HPA 和 PDB 都建立成功（kubectl get hpa,pdb -n demo-app）；然後模擬一個節點排水操作（如果你的叢集有多個節點，kubectl drain <node-name> --ignore-daemonsets），觀察 Kubernetes 是否尊重 PDB 的約束，不讓可用 Pod 數量低於 minAvailable；最後 kubectl uncordon <node-name> 讓節點恢復正常排程。這個完整流程走過一遍，你就對 HPA + PDB 的實際行為有了直觀的理解。在面試時被問到「如何做 Kubernetes 叢集的無停機升級」，這就是你的答案框架：Rolling Update + readinessProbe + PDB，三者缺一不可。
+
+最後，關於選擇 HPA 的指標：我們今天用的是 CPU，這是最常見的選擇，但不一定是最好的選擇。對於 I/O 密集型的應用，CPU 使用率可能很低，但吞吐量已經到達瓶頸。對於這類應用，更適合用自定義指標（custom metrics）來觸發 HPA，比如 RPS（每秒請求數）、佇列長度、或者回應延遲。Kubernetes 支援透過 Custom Metrics API 和 External Metrics API 讓 HPA 根據任意指標擴縮容，配合 Prometheus Adapter 就可以把 Prometheus 收集的任何指標當作 HPA 的觸發條件。這是進階話題，大家有興趣可以課後研究。在結束這個環節之前，我想強調一個容易被忽略的點：HPA 的擴容不是瞬時的，從偵測到 CPU 超標到新 Pod 真正起來可以服務，中間有一段時間差——大概 1-3 分鐘（包括 HPA 的反應時間、Pod 的啟動時間、readinessProbe 的等待時間）。這意味著 HPA 適合應對「緩慢上升的流量」，但不適合應對「瞬間湧入的流量尖峰」（比如秒殺活動、直播帶貨開播瞬間）。對於可預期的高流量事件，最好提前手動擴容，等活動結束再讓 HPA 縮容回去。另外，也可以設定 HPA 的 scaleUp.stabilizationWindowSeconds 為更短的時間，讓它對流量上升更加敏感，在短暫的流量高峰時也能快速反應。這些細節就是從「會用 HPA」到「用好 HPA」的差距。
+
+補充一個關於 HPA 和 cluster autoscaler 的協作方式：HPA 負責在現有節點上增加 Pod，但如果現有節點的資源已經不夠，新增的 Pod 會停在 Pending 狀態——這時候 cluster autoscaler 就會偵測到有 Pending 的 Pod，自動往雲端請求新增節點，讓新節點加入叢集後，那些 Pending 的 Pod 就能被排程上去。HPA 和 cluster autoscaler 的組合，讓你的應用可以在不事先預留資源的情況下，按需彈性擴展到幾乎無上限的規模。這就是雲原生架構最吸引人的特性之一：基礎設施跟著業務需求自動伸縮，不需要人工干預。`,
     duration: "30"
   },
 
@@ -558,7 +596,15 @@ GitOps 是一種具體的 CD 實踐方式：把所有基礎設施的期望狀態
 
 ArgoCD 有一個很棒的 Web UI，可以視覺化地看到每個應用的部署狀態：哪些資源是健康的（綠燈）、哪些有問題（紅燈）、目前 deploy 的是哪個版本、和 Git 有沒有 out of sync。回滾也非常簡單：在 UI 上點「History」，找到你要的 commit，點「Rollback」，ArgoCD 就把叢集的狀態回退到那個時間點。再也不需要手動找舊的 YAML 去 apply。
 
-這套流程建立之後，開發者的工作流程就很乾淨：寫程式碼、開 PR、merge、等幾分鐘，新版本就自動上線了。不需要任何人手動 deploy，不需要任何人記得跑哪些指令。而且每次部署都有完整的 audit trail，出了問題一眼就能看到是哪個 commit 引起的。這是現代工程團隊的正確打開方式。`,
+這套流程建立之後，開發者的工作流程就很乾淨：寫程式碼、開 PR、merge、等幾分鐘，新版本就自動上線了。不需要任何人手動 deploy，不需要任何人記得跑哪些指令。而且每次部署都有完整的 audit trail，出了問題一眼就能看到是哪個 commit 引起的。這是現代工程團隊的正確打開方式。
+
+讓我說一下 GitHub Actions workflow 的基本結構，讓大家有個具體的印象。一個典型的 CI workflow YAML 大概長這樣：最頂層的 on 區塊定義觸發條件（push to main、或者 pull_request）；jobs 區塊裡定義一個或多個 job，每個 job 在一個獨立的 runner 環境裡跑（通常是 ubuntu-latest）；job 裡面的 steps 是具體的操作，每個 step 可以是 uses（使用一個預建的 Action，比如 actions/checkout 取代碼、docker/build-push-action 建映像）或者 run（直接跑 shell 指令）。典型的 CI job 的 steps 大概是：checkout → setup tools → run tests → build image → push image → update config repo。理解了這個結構，你就能看懂大部分 GitHub Actions 的 workflow 文件。
+
+ ArgoCD 的設定也值得說得更具體一些。把 ArgoCD 安裝到叢集之後（kubectl create namespace argocd && kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml），你需要在 ArgoCD 裡建立一個 Application 資源，告訴它：「我要監聽這個 Git repository 的這個路徑，把裡面的 YAML sync 到叢集的這個命名空間」。ArgoCD Application 的 spec 裡主要有兩個部分：source（Git repository URL、分支、路徑）和 destination（叢集 API server URL、命名空間）。設定好之後，ArgoCD 就會自動開始同步。
+
+關於 GitOps 的一個重要原則：叢集的狀態應該完全由 Git 決定，任何手動的 kubectl apply 或 kubectl edit 都應該避免。為什麼？因為如果你手動修改了叢集狀態，ArgoCD 會把它偵測為「和 Git 不同步」，然後根據設定的同步策略，可能會把你的手動修改覆蓋回 Git 的狀態。這在剛開始用 GitOps 的人身上是很常見的困惑——「我明明 kubectl edit 改了設定，怎麼過幾分鐘又變回去了？」。答案就是 ArgoCD 的 auto-sync 把它改回來了。正確的做法是修改 Git repo 裡的 YAML，提 PR，merge，讓 ArgoCD 自動同步。
+
+最後說一個大家可能有的疑問：我的公司沒有用 GitHub Actions，用的是 Jenkins 或 GitLab CI，這套 GitOps 流程還適用嗎？當然適用！GitOps 的核心是「Git 是唯一的真相來源，工具負責把 Git 狀態同步到叢集」，和你用什麼 CI 工具無關。Jenkins、GitLab CI、Tekton、CircleCI，只要 CI 工具能在 pipeline 執行完成後更新 config repo 的 YAML（image tag），ArgoCD 就能把它同步到叢集。這是 GitOps 的優雅之處：CI 和 CD 工具解耦，可以各自選擇最適合的工具。最後補充一個常見的誤解：GitOps 不是「所有東西都放到 Git 裡就好了」，它要求的是「所有叢集狀態的變更都要透過 Git 走」。如果你有手動建立的資源（kubectl create 沒有存 YAML）、或者有用 helm upgrade 直接升級而沒有更新 Git，這些都是 GitOps 的反模式。一個嚴格的 GitOps 實踐，甚至會把 ArgoCD 設定成 read-only 模式（禁止任何人直接 kubectl apply 到叢集，所有變更必須走 Git PR 流程），這樣就從根本上杜絕了 drift 的可能性。雖然聽起來很嚴格，但對於需要合規審計的企業環境，這種強制性反而是優點。`,
     duration: "25"
   },
 
@@ -635,7 +681,13 @@ ArgoCD 有一個很棒的 Web UI，可以視覺化地看到每個應用的部署
 
 第五個：部署策略。RollingUpdate 加上 maxUnavailable: 0 是零停機部署的基礎。maxUnavailable: 0 表示在滾動更新過程中，不允許任何一個 Pod 變成不可用，這樣在任何時刻都有 100% 的副本在提供服務。但只有這個還不夠，還要搭配 readinessProbe——新 Pod 通過 readiness check 之後，才算「可用」，K8s 才會繼續關掉下一個舊 Pod。這樣才能真正確保「舊 Pod 退役之前，新 Pod 已經準備好接手」。對於需要更嚴格零停機保證的服務，可以考慮 Blue/Green 部署：同時跑新舊兩個版本，用 Service 的 selector 瞬間切換流量，確認新版本 OK 之後再關掉舊版本。
 
-第六個：可觀測性。Log 一定要結構化成 JSON 格式，不要用純文字。結構化 Log 的好處是機器可以解析，可以用 jq 過濾、用 Loki 查詢、用 ELK 搜索。你的應用程式一定要暴露 /metrics 端點，讓 Prometheus 可以抓取指標。告警規則要基於 SLO（Service Level Objective）而不是隨便設一個閾值——比如「99.9% 的請求在 500ms 內完成」，告警就根據這個目標設計，而不是「CPU 超過 80% 就告警」這種意義模糊的規則。`,
+第六個：可觀測性。Log 一定要結構化成 JSON 格式，不要用純文字。結構化 Log 的好處是機器可以解析，可以用 jq 過濾、用 Loki 查詢、用 ELK 搜索。你的應用程式一定要暴露 /metrics 端點，讓 Prometheus 可以抓取指標。告警規則要基於 SLO（Service Level Objective）而不是隨便設一個閾值——比如「99.9% 的請求在 500ms 內完成」，告警就根據這個目標設計，而不是「CPU 超過 80% 就告警」這種意義模糊的規則。
+
+我想補充幾個具體的 YAML 範例，讓這些最佳實踐不只是理念，而是你可以直接拿去用的設定。關於 securityContext，一個完整的設定大概長這樣：在 pod level 設 runAsNonRoot: true、runAsUser: 1000、fsGroup: 1000（fsGroup 讓 volume 的檔案屬於這個 group，讓非 root 用戶可以讀寫）；在 container level 設 readOnlyRootFilesystem: true、allowPrivilegeEscalation: false、capabilities.drop: ["ALL"]（丟棄所有 Linux capabilities）。這些設定結合在一起，讓你的容器在最小化的權限下運行，即使被攻破，攻擊者的活動空間也非常有限。
+
+關於健康檢查的具體設定，有幾個參數要理解：initialDelaySeconds 是容器啟動後多久才開始執行第一次 probe，給應用程式一點啟動時間；periodSeconds 是 probe 的執行頻率；failureThreshold 是連續幾次失敗後才觸發動作（kill 或 remove from endpoints）；successThreshold 是連續幾次成功後才算恢復（只對 readiness 有意義）。調對這幾個參數，可以避免「應用程式剛啟動就被 liveness 殺掉」或「應用程式已經掛了但 readiness 還沒偵測到，流量繼續打進來」這兩種極端。
+
+最後一個重要的實踐：Kubernetes YAML 的版本控管。所有的 YAML 檔案都應該在 Git 裡，任何對叢集的變更都應該透過 PR 進行，而不是直接 kubectl edit。這樣的好處是：每次變更都有記錄（git log）、可以 code review（PR 流程）、可以快速回滾（git revert）。當你的 YAML 加上 Git 版本控管，再加上我們之前說的 GitOps 流程，就形成了一個閉環：所有變更都在 Git 裡，ArgoCD 負責把 Git 狀態同步到叢集，誰也不需要直接操作叢集。這就是成熟的 Kubernetes 工程團隊的工作方式。所以今天學的六個最佳實踐不是孤立的，它們是一個整體：資源管理確保穩定性、健康檢查確保可用性、安全配置確保安全性、標籤策略確保可管理性、部署策略確保無停機、可觀測性確保可診斷性。缺少任何一個，系統都有明顯的弱點。把這六個都做好，你的 Kubernetes 部署才真正稱得上「生產就緒」。`,
     duration: "20"
   },
 
@@ -688,7 +740,11 @@ Kubernetes 核心資源：Pod、Deployment、Service 這三個是一切的骨架
 
 整合實戰：今天下午的所有演練，就是把上面六天的知識點全部融合在一個真實場景裡。三層式部署、故障排查、HPA 和 PDB、CI/CD 和 GitOps、最佳實踐清單，這些不是獨立的知識點，而是一個系統的不同面向。掌握了今天的整合視角，你對 Kubernetes 的理解就從「會用一些指令」進化到「理解整個系統的設計哲學」。
 
-這個差距，是你七天前和七天後的你的最大不同。`,
+這個差距，是你七天前和七天後的你的最大不同。
+
+我在帶過很多批學員之後，觀察到一件事：真正能把課程知識轉化為工作能力的人，有一個共同的特點——他們在課程結束後的兩個禮拜內，找了一個實際的場景動手做了一遍。不是重新上課，不是又看了一遍文件，而是找一個屬於自己的需求，不管是個人的 side project、公司的一個小服務、還是自己的部落格，就把它 Kubernetes 化。這個過程很可能會卡關很多次，但每一次卡關和解決，都比看十遍教材更有價值。
+
+所以我給每個人一個回家作業：在接下來的兩個禮拜，找一個你真正在意的應用程式（哪怕是一個最簡單的 Hello World Web App），把它完整地部署到 Kubernetes 上——建 Namespace、寫 Deployment、設 Service、加 Ingress、設定健康檢查和資源限制。如果你完成了這個作業，你可以在課程 Line 群組貼出你的 kubectl get all 結果，我很樂意給你 review 和建議。這個小小的挑戰，是從「學了 Kubernetes」到「會用 Kubernetes」的最後一步。我期待在群組裡看到大家的成果！讓我再說一個關於學習 Kubernetes 的心態建議。Kubernetes 的生態系統非常龐大，除了核心 K8s 之外，還有 Helm、ArgoCD、Istio、Knative、Tekton、Velero、Crossplane……一個新手看到這個清單可能會感到不知所措。我的建議是：不要試圖一次學完所有東西，先把核心的 Kubernetes 概念（Pod、Deployment、Service、Ingress、ConfigMap、Secret、PV/PVC、RBAC、HPA、PDB）徹底搞懂並熟練，這是基礎；然後根據你的工作需求，有方向性地學習生態系工具。如果你的公司有 Helm charts，就深入學 Helm；如果要做 GitOps，就專注 ArgoCD；如果要做流量精細控制，才考慮 Istio。聚焦比廣撒網更有效。這七天課程給了你這個「基礎」，接下來根據需求一點一點往外擴展，每一步都會比你想像的更輕鬆，因為你已經有了紮實的基礎。`,
     duration: "15"
   },
 
@@ -794,7 +850,13 @@ Kubernetes 核心資源：Pod、Deployment、Service 這三個是一切的骨架
 
 我想說一件事：學技術最難的不是理解概念，而是在不確定的時候繼續動手。很多人在遇到不懂的東西時會退縮，說「等我搞清楚了再試」，然後永遠沒有試。你們沒有，你們在還不確定的情況下，還是把指令打出去，看看會發生什麼，然後根據結果調整。這種學習態度，比任何知識點都更有價值，它會讓你在 Kubernetes 之後的所有技術學習裡都受益。
 
-所以請給自己一個真心的掌聲。你已經不是初學者了。從今天開始，你是一個有 Kubernetes 實戰經驗的工程師，你有資格在履歷上寫上這個技能，有資格在技術討論中分享你的觀點，有資格繼續往更深、更廣的方向探索。恭喜你們！`,
+所以請給自己一個真心的掌聲。你已經不是初學者了。從今天開始，你是一個有 Kubernetes 實戰經驗的工程師，你有資格在履歷上寫上這個技能，有資格在技術討論中分享你的觀點，有資格繼續往更深、更廣的方向探索。恭喜你們！
+
+我想說最後一件事。技術會一直進步，Kubernetes 本身也在不斷演化——三年前還沒有 Gateway API，五年前 Containerd 還不是主流，十年前 Kubernetes 根本還不存在。技術棧會變，但你今天建立起來的能力是不會消失的：閱讀技術文件的能力、動手試驗的勇氣、看到錯誤訊息不慌張去找根因的習慣、把複雜系統拆解成可管理模組的思維。這些是跨技術、跨時代的核心工程師素養。只要你保持學習的習慣、保持動手的慣性，不管技術怎麼演化，你都能快速跟上。這七天，只是你漫長技術旅程的一個節點，而這個節點讓你站上了一個更高的平台。往前走，加油！
+
+在我們做 Q&A 之前，有一件事我想請大家做：填寫課後問卷。我知道大家課程結束都很想趕快休息或回家，但這個問卷的回饋對我改進課程非常重要。你哪個部分覺得講太快了？哪個實戰演練最有幫助？有什麼你希望課程增加或減少的主題？這些回饋會直接影響下一期學員的學習體驗。填寫大約需要 5 分鐘，請大家幫個忙，我非常感謝。
+
+另外，請大家加入課程的 Line 群組（如果還沒加的話）。我會在群組裡分享一些課後補充資源，比如課程 YAML 範例的 GitHub 連結、推薦的學習資源清單、以及我覺得值得關注的 Kubernetes 相關新聞和工具。群組也是大家互相交流、分享遇到的問題和解決方案的地方。我也會定期在群組裡回答問題，你們不用擔心課後就聯絡不到我。好，現在我們開始 Q&A 環節，有任何問題請舉手！`,
     duration: "10"
   },
 
@@ -842,7 +904,49 @@ Kubernetes 核心資源：Pod、Deployment、Service 這三個是一切的骨架
 
 關於繼續學習的路線，我建議大家接下來可以考慮 CKA 認證（Certified Kubernetes Administrator），這個認證在業界非常有公信力。準備過程本身也是很好的學習機會。另外，Helm 也是值得深入學習的工具，它讓 K8s 應用的部署和管理更加標準化。
 
-感謝各位這七天的陪伴和參與，希望這門課對大家有實質的幫助。課後如果有任何問題，歡迎透過提供的聯絡方式繼續討論。祝大家在 K8s 的學習和工作道路上一切順利！`,
+感謝各位這七天的陪伴和參與，希望這門課對大家有實質的幫助。課後如果有任何問題，歡迎透過提供的聯絡方式繼續討論。祝大家在 K8s 的學習和工作道路上一切順利！
+
+讓我分享一些我在帶課程的過程中，學員最常問的問題，也許可以給還沒想到問什麼的同學一些啟發。
+
+第一個常見問題：「Kubernetes 適合小公司或者小型專案嗎？」這是個很好的問題，答案是「不一定」。Kubernetes 的學習曲線陡峭、運維複雜度高，對於只有一兩個服務的小型應用，可能 Docker Compose + 一台 VPS 就完全夠用，引入 K8s 反而是過度工程。一般的建議是：如果你的服務需要高可用、自動擴縮容、複雜的流量路由、多環境部署管理，或者你的工程師規模已經讓「誰來管 deploy」變成一個問題，那 K8s 的好處才會超過它帶來的複雜度。如果你只有 2 個工程師和 1 個服務，先別急著上 K8s。
+
+第二個常見問題：「我在公司想導入 Kubernetes，但主管覺得現有的 VM 方式已經夠用，怎麼說服他？」這個問題沒有通用答案，但有幾個角度可以試：一是從成本角度，K8s 的 bin packing（資源填充）能力可以讓伺服器利用率從 30-40% 提升到 60-70%，幫公司省 VM 費用；二是從可靠性角度，K8s 的自動重啟、健康檢查、滾動更新讓 MTTR（平均修復時間）大幅縮短；三是從工程師生產力角度，標準化的部署流程讓新人上手更快，GitOps 讓部署記錄可審計。但最有力的說服，往往是一個小的 proof of concept——找一個非核心的服務，先在 K8s 上跑起來，讓數據說話。
+
+第三個常見問題：「Kubernetes 和 Serverless（比如 AWS Lambda）有什麼差別，什麼時候選哪個？」Serverless 的優勢是「按用量付費 + 極致簡單」，你不需要管理任何伺服器或容器，程式碼 deploy 上去就能跑，不用的時候不收費。Kubernetes 的優勢是「控制力 + 靈活性 + 可移植性」，你可以跑任何容器化的應用，有完整的網路和資源控制，可以跑在任何雲或本地環境。對於需要長時間運行的服務（API server、資料庫），K8s 更合適；對於事件驅動的短時間任務（圖片壓縮、傳送郵件），Serverless 更合適。很多公司是混合使用的：核心服務跑 K8s，邊緣任務用 Lambda。
+
+第四個常見問題：「我剛接手一個 Kubernetes 叢集，什麼都不熟，從哪裡開始？」我的建議清單：第一，先搞懂叢集有哪些 namespace（kubectl get ns），有哪些 deployment 在跑（kubectl get deploy -A）；第二，找到監控系統（Grafana dashboard），看懂各個 namespace 的 CPU 和記憶體使用狀況；第三，找到 CI/CD pipeline 的設定，理解一次 deploy 是怎麼走的；第四，找兩三個最重要的服務，仔細讀它們的 YAML，理解每個設定的用意；第五，主動製造一個低風險的變更（比如改一個設定值），走完整個 deploy 流程，驗證你理解了整個鏈路。這五個步驟，是快速接手一個不熟悉的 K8s 叢集的有效路徑。
+
+第五個常見問題：「Kubernetes 有哪些安全漏洞是要特別注意的？」幾個最重要的安全點：第一，不要讓 Kubernetes API Server 對公網開放，應該透過 VPN 或 bastion host 存取；第二，定期輪換 Service Account token 和 kubeconfig credential；第三，開啟 Audit Logging，記錄所有對 API Server 的操作，以便事後審計；第四，掃描容器映像的已知漏洞（Trivy、Clair 等工具），在 CI pipeline 裡加入映像掃描步驟；第五，使用 Admission Controller（比如 OPA/Gatekeeper）來強制執行安全策略，比如禁止 privileged container、禁止 hostNetwork、禁止使用特定 namespace 的映像。安全是一個持續的工作，不是設定一次就完事的。
+
+第六個常見問題：「如果我想準備 CKA 考試，大概要花多少時間，有什麼建議？」CKA 的範圍比這門課更廣，涵蓋叢集建置（kubeadm）、etcd 備份與還原、叢集升級、網路設定等。有 Kubernetes 實際使用經驗的人，通常 2-3 個月的專注備考可以通過。建議的備考策略：買一個 Killer.sh 的模擬考試環境，反覆練習（他們的模擬題比正式考題難，但考過模擬題，正式考題就不會太難）；把 kubectl 的 cheat sheet 背熟，考試是允許查 kubernetes.io 文件的，但查文件要花時間，熟悉常用指令和 YAML 結構可以節省大量時間；設定一個本地的練習環境（kind 或 minikube），每天花 1-2 小時動手練習，比看視頻有效多了。
+
+好，還有什麼問題嗎？這個時間是你們的，不要客氣，有任何技術問題、職涯問題、選型問題，都可以提出來。我會在這裡到 17:00，一個問題都不想跳過。今天這門課能走到這一步，是每個人共同努力的結果，謝謝大家！
+
+讓我再深入回答幾個進階問題，趁這個時間把大家可能心裡有但還沒問出口的疑惑一起解決。
+
+關於 Kubernetes 升級的問題：很多人問「叢集 K8s 版本升級怎麼做，會停機嗎？」。K8s 的升級分兩個層面：control plane（API Server、etcd、Controller Manager、Scheduler）的升級，和 worker node 的升級。用 kubeadm 管理的叢集，可以用 kubeadm upgrade apply 升級 control plane，這個過程 control plane 會短暫不可用（幾分鐘），但 worker node 上跑的應用通常不受影響（除非應用對 API Server 有直接依賴）。Worker node 的升級通常是逐個 drain → 升級 kubelet → uncordon，配合 PDB 可以做到對應用完全無感的滾動升級。如果是用雲端託管的 K8s（GKE、EKS、AKS），升級流程更簡單，通常是在控制台點幾個按鈕，雲端提供商幫你處理所有的複雜度。
+
+關於 Kubernetes 的 etcd 備份：etcd 是 K8s 的核心資料庫，儲存所有 K8s 資源的狀態。如果 etcd 資料損毀或丟失，整個叢集的狀態就消失了。所以 etcd 的定期備份是絕對必要的。備份指令是 etcdctl snapshot save，配合 cronjob 定期執行，把備份存到 S3 或 GCS 等物件儲存。如果你用的是雲端託管的 K8s，雲端提供商通常會幫你自動備份 etcd，但要確認備份策略和 RPO（Recovery Point Objective）是否滿足你的要求。
+
+關於多叢集管理：當一個公司有多個 K8s 叢集（比如 dev、staging、production，或者多個地區），如何統一管理這些叢集？有幾個工具值得了解：kubectx 和 kubens 讓你快速切換 kubeconfig context；Lens 是一個 K8s 的 GUI 管理工具，可以同時連接多個叢集；ArgoCD 支援 multi-cluster 管理，可以從一個 ArgoCD 控制多個目標叢集；Rancher 是更完整的多叢集管理平台。多叢集管理是一個進階話題，但隨著業務規模擴大，你早晚會面對。
+
+關於服務網格（Service Mesh）：有同學可能聽過 Istio 或 Linkerd，問說「這跟 Kubernetes 有什麼關係，我需要學嗎？」Service Mesh 是在 K8s 之上的一個額外層，主要解決微服務之間的通訊問題：mTLS（服務間加密）、流量可觀測性（詳細的服務間延遲和錯誤率追蹤）、流量管控（A/B 測試、Canary 部署、熔斷器）。對於服務數量少於 10 個的系統，通常不需要 Service Mesh；服務數量多、安全要求高、需要精細流量控制的場景，Service Mesh 才真正發揮價值。不要過早引入，但了解它解決什麼問題是必要的。
+
+關於 Kubernetes 的費用控制：在雲端跑 K8s，節點成本往往是最大的支出。幾個省錢的技巧：第一，設定 Cluster Autoscaler，讓叢集根據 Pod 的需求自動新增或移除節點，空閒的節點不付錢；第二，使用 Spot/Preemptible 節點（價格比 on-demand 便宜 60-90%，但可能被雲端業者收回），配合 PDB 和多副本確保服務可用性；第三，用 VPA（Vertical Pod Autoscaler）分析應用的實際資源使用，幫你找出 requests 設太高的地方，釋放浪費的資源；第四，設定 namespace 的 ResourceQuota，防止某個團隊意外把節點資源全用光。
+
+問題到這裡大家還有什麼想問的嗎？關於技術的、關於職涯的、關於這門課的，都可以。我在這裡陪大家到 17:00，有問題就說，別客氣！
+
+如果大家都沒有問題，我再主動分享幾個我覺得工程師在使用 Kubernetes 時容易忽略的「軟技能」。第一個是「YAML 審查能力」。在大型團隊裡，K8s 的 YAML 也需要 code review，就像程式碼一樣。能夠看出「這個 Deployment 忘了設 liveness probe」、「這個 readinessProbe 的 initialDelaySeconds 太短，應用還沒起來就被踢出 endpoints」、「這個 resource limits 設得太寬鬆，有安全風險」——這種審查能力是高階工程師的標誌。養成這個能力的方式很簡單：多看、多寫、多問「為什麼這樣設？」。第二個是「事後分析（Postmortem）能力」。當生產環境出了問題，不是修好就算了，而是要寫一份事後分析報告：描述事件的時間線、根本原因、影響範圍、修復過程、以及防止再次發生的改進措施。Postmortem 不是為了追責，而是為了讓整個團隊從這次事件學習，防止相同的問題再次發生。這個習慣在 SRE 文化中非常重要，Google 的 Site Reliability Engineering（SRE）書籍對此有非常好的討論，強烈推薦大家看。第三個是「容量規劃（Capacity Planning）能力」。不是等到節點資源不夠了才想到要加節點，而是根據歷史使用趨勢、業務成長預測，提前規劃資源需求。結合 Prometheus 的歷史數據和 predict_linear 函數，可以預測「按照目前的成長速度，多少天後磁碟會滿？多少天後 CPU 會達到瓶頸？」，讓你提前行動而不是被動應付。
+
+在我們正式結束之前，我想再一次感謝大家這七天的耐心和認真。教學是一種雙向的學習，每次學員的提問都讓我更深入地思考某個概念；每次看到學員在演練中遇到問題並解決問題時臉上的表情，都讓我感受到教學的意義。謝謝你們讓這七天充滿活力和意義。祝大家在接下來的技術旅程中，勇敢探索，持續成長。再見！
+
+如果還有時間，我想多分享幾個關於 Kubernetes 學習資源的建議。書單方面，「Kubernetes in Action」（作者 Marko Luksa）是我見過最詳細、最有深度的 K8s 書籍，適合系統性深入學習；「Site Reliability Engineering」（Google SRE 書）不是純粹講 K8s，但對理解生產環境的思維框架非常重要；「The DevOps Handbook」讓你理解 DevOps 文化的背景，對理解為什麼需要 CI/CD 和 GitOps 很有幫助。線上課程方面，Kodekloud 有非常好的 CKA、CKAD 備考課程，課程內有互動式的終端機環境，不需要自己準備叢集就能練習。YouTube 頻道方面，TechWorld with Nana 的 K8s 相關影片品質很高，講解清晰，很適合補充視覺化的理解。
+
+最後，我想說一件關於「技術社群」的事。學技術不是一個人的旅程。加入社群、參加 Meetup（台灣有 Kubernetes Taiwan User Group）、在 Twitter/X 上追蹤 K8s 相關的工程師和項目、參與開源項目的 Issue 討論，這些都是讓你持續成長、保持在技術前沿的方式。學技術最快的方法之一，是和比你厲害的人在一起，觀察他們怎麼思考問題、怎麼找解答、怎麼評估技術選型。社群是最容易接觸到這些人的地方。希望大家不只把這七天的學習帶回家，也把「持續學習、參與社群」的習慣帶回家。這才是長期在技術道路上走得遠的真正秘訣。
+
+在最後這幾分鐘，我想給每個人留下一個「行動清單」，讓今天的結束是下一個開始的起點。這週內請做三件事：第一，把課程的 GitHub Repo clone 下來，把所有的 YAML 範例都讀一遍，對不懂的設定加上你自己的注釋，這個帶有你個人理解的 Repo 比任何筆記本都有價值；第二，在你的電腦上裝好 kind 或 minikube，建立你的第一個本地 K8s 叢集，哪怕今晚只是 kubectl get nodes 看到節點 Ready，也是一個很棒的開始；第三，決定你的下一個目標是什麼——考 CKAD？把公司的某個服務容器化？在部落格上寫一篇 Kubernetes 入門文章？把目標具體寫下來，告訴你的朋友或貼在 Line 群，讓承諾讓你繼續行動。學習這件事，從來都不是看完一門課就結束的，它是一個持續行動的旅程。你已經有了很棒的起點，接下來的每一步都由你自己來走。我非常期待看到大家的成長，也期待未來在某個技術社群、某個開源專案的 PR、或者某場 KubeCon 的講台上，再次看到大家的身影。感謝你們，再見！
+
+在現場 Q&A 的最後，我想留幾分鐘讓大家彼此認識一下。你旁邊的同學可能是你未來的同事、技術夥伴、或者一個你在深夜排查 Bug 時可以問問題的朋友。工程師的世界比你想像的小——很多時候，某個技術問題的解決方案就藏在你認識的某個人的腦子裡。建立這個人際網絡，是參加線下課程最珍貴、也是最容易被忽略的收穫。來，和你旁邊的同學交換一下聯絡方式吧！這是今天最後一個「作業」，簡單但重要。好，時間差不多了，感謝大家今天下午的投入和配合，希望這七天的課程是你 Kubernetes 旅程一個很好的起點，我們 Line 群見！記得填問卷、加群組、和旁邊同學交換聯絡方式，這三件事都很重要，缺一不可。`,
     duration: "45"
   },
 ]

@@ -53,7 +53,17 @@ export const slides: Slide[] = [
 
 這個故事告訴我們：安全不是「等有時間再說」的事，而是從一開始就要建立的基礎。K8s 本身設計非常安全，但如果你不去設定，就等於把大門敞開。
 
-今天早上課程安排如下：RBAC 權限管理（40分鐘）、Pod Security（25分鐘）、Network Policy（20分鐘）、休息（15分鐘）、監控基礎（25分鐘）、日誌管理（20分鐘）、課程總結與 CKA 認證建議（15分鐘）。好，讓我們開始今天的最後一段精彩旅程！`,
+今天早上課程安排如下：RBAC 權限管理（40分鐘）、Pod Security（25分鐘）、Network Policy（20分鐘）、休息（15分鐘）、監控基礎（25分鐘）、日誌管理（20分鐘）、課程總結與 CKA 認證建議（15分鐘）。好，讓我們開始今天的最後一段精彩旅程！
+
+在正式開始之前，我想跟大家分享一下今天學完之後你能做到什麼。學完 RBAC，你可以設計一套完整的存取控制策略，讓不同的團隊成員和自動化工具只擁有他們需要的最小權限；學完 Pod Security，你可以讓你的容器在最安全的設定下運行，大幅降低被攻擊的風險；學完 Network Policy，你可以實現叢集內部的網路隔離，就算有一個服務被攻陷，攻擊者也無法在叢集內部自由移動；學完 Prometheus 和 Grafana，你可以建立一個完整的監控系統，隨時掌握叢集和應用程式的健康狀態；學完 EFK Stack，你可以建立集中化的日誌系統，讓問題排查效率大幅提升。
+
+這些技能，都是一個真正能在生產環境獨當一面的 K8s 工程師必須具備的能力。今天學完之後，你就具備了這些能力的基礎。接下來還需要大量的實踐來鞏固，但起點已經建立了，接下來就是不斷地做、不斷地踩坑、不斷地成長。祝大家今天學習順利，讓我們開始吧！
+
+在我們開始之前，我想先做個小的互動問答。在座的同學，有沒有人上週在工作上實際使用過 K8s？舉手讓我看看。（等待）很好！對於沒有舉手的同學，今天之後你就會有信心開始在工作中嘗試了。K8s 的學習曲線確實比較陡，但只要方法對、基礎扎實，進步是非常快的。我們七天課程的設計，就是要讓你在最短的時間內，建立最紮實的基礎。
+
+所以今天請大家把握這最後的機會，全神貫注，把每一個概念都內化。這七天的內容是你未來在雲端和 DevOps 領域發展的重要基礎，投資在學習上的時間，一定會有豐厚的回報！
+
+記住，學習 K8s 是一段旅程，不是一個終點。今天我們把這段旅程的基礎建設得非常紮實，接下來就靠你自己不斷地往前走。加油！`,
     duration: "10"
   },
   {
@@ -95,7 +105,9 @@ export const slides: Slide[] = [
 
 第六天，我們學了組態和儲存，包括 ConfigMap、Secret、PV 和 PVC。學完這些，我們的應用程式才真正達到了「生產就緒」的狀態。
 
-今天，第七天，我們要學安全和監控。這是讓 K8s 叢集從「能跑」升級到「企業級」的最後一塊拼圖！`,
+今天，第七天，我們要學安全和監控。這是讓 K8s 叢集從「能跑」升級到「企業級」的最後一塊拼圖！
+
+記得要持續複習前六天的內容，安全和監控建立在這些基礎之上！好，繼續看今天的內容！`,
     duration: "5"
   },
   {
@@ -146,8 +158,20 @@ RBAC 的核心原則叫「最小權限原則」（Principle of Least Privilege�
 
 這個故事的教訓是：不要以為你的系統不會被攻擊。只要連到網路的系統，就有被攻擊的可能。你的責任是讓攻擊者就算進來了，也做不了什麼。RBAC 就是這樣一層防護。
 
-還有一個常見錯誤：很多開發環境為了方便，會給所有人或所有 ServiceAccount 綁定 cluster-admin 最高權限。這在開發時圖方便，但如果帶到生產環境，或者配置被洩漏，後果不堪設想。這就像把公司所有辦公室的萬能鑰匙發給每個人，包括實習生、訪客和外包廠商。請記住：cluster-admin 只給真正需要的人，而且要有正當理由！`,
-    duration: "10"
+還有一個常見錯誤：很多開發環境為了方便，會給所有人或所有 ServiceAccount 綁定 cluster-admin 最高權限。這在開發時圖方便，但如果帶到生產環境，或者配置被洩漏，後果不堪設想。這就像把公司所有辦公室的萬能鑰匙發給每個人，包括實習生、訪客和外包廠商。請記住：cluster-admin 只給真正需要的人，而且要有正當理由！
+
+講完了背景故事，我們來看 K8s 裡的 RBAC 具體是怎麼工作的。在 K8s 裡，所有的操作都要通過 API Server。不管是 kubectl get pods，還是你的應用程式呼叫 K8s API 讀取 ConfigMap，都要通過 API Server。API Server 在收到請求時，會做三件事：
+
+第一，Authentication（認證）：確認「你是誰」。K8s 支援多種認證方式：Service Account Token（叢集內部的應用程式使用）、X.509 客戶端憑證（管理員和 kubectl 使用）、Bearer Token、OpenID Connect（整合外部 Identity Provider 如 Google、GitHub）等。
+
+第二，Authorization（授權）：確認「你能做什麼」。RBAC 就在這個階段工作。API Server 會查看你的身份對應的 Role 和 RoleBinding，判斷你是否有權限執行這個操作。如果沒有，就返回 403 Forbidden 錯誤。
+
+第三，Admission Control（准入控制）：進行額外的驗證和修改。Pod Security Standards 就是在這個階段工作的。
+
+理解了這個三層架構，你就能更清楚地知道 RBAC 在整個 K8s 安全體系中的位置。
+
+記住，RBAC 是 K8s 安全的第一道防線，設計好了能讓叢集安全性大幅提升。最好的習慣是：有疑問就查 kubectl auth can-i，確認了再繼續！`,
+    duration: "11"
   },
   {
     title: "RBAC 五大核心物件",
@@ -243,7 +267,11 @@ rules:
 
 這個驗證步驟在 CKA 考試中非常重要！當你設定完 RBAC，一定要用 kubectl auth can-i 驗證一下，確保設定是正確的。考官的評分系統就是用類似的方式來驗證你的設定是否符合要求的。
 
-在生產環境中，所有的 RBAC 設定都應該透過 Git 管理，不要直接在叢集上用 kubectl create，因為這樣沒有版本記錄，出問題時很難追溯。建議用 kubectl apply -f 來套用 YAML 文件，並把這些 YAML 文件納入 GitOps 的工作流程。`,
+在生產環境中，所有的 RBAC 設定都應該透過 Git 管理，不要直接在叢集上用 kubectl create，因為這樣沒有版本記錄，出問題時很難追溯。建議用 kubectl apply -f 來套用 YAML 文件，並把這些 YAML 文件納入 GitOps 的工作流程。
+
+最後，分享一個很實用的技巧：在 CKA 考試中，很多考題會要求你建立 RBAC，然後驗證。記住要先用 kubectl auth can-i 確認權限正確，再繼續做下一題。考試環境中，驗證一下能幫你避免因為設定錯誤而失分。
+
+另外，kubectl create role 和 kubectl create clusterrole 也支援直接在命令列指定 rules，比如：kubectl create role pod-reader --verb=get,list,watch --resource=pods -n production，這樣比寫 YAML 更快，在考試中非常有用。`,
     duration: "10"
   },
   {
@@ -309,8 +337,14 @@ Security Context 就是 K8s 提供的容器安全配置機制，分 Pod 層級�
 
 fsGroup 這個設定是設定 Volume 掛載時的群組 ID。當你的應用需要讀寫 PersistentVolume，設定 fsGroup 可以確保掛載的 Volume 具有正確的群組所有權，讓非 root 用戶的容器能夠讀寫 Volume。
 
-在實際工作中，建議每個應用程式的 Pod 都設定這些安全選項，特別是 runAsNonRoot、readOnlyRootFilesystem 和 allowPrivilegeEscalation: false，這三個是最基本的安全底線。你的 DevOps 團隊可以把這些設定作為強制要求，通過 Pod Security Standards（下一個主題）或者 OPA Gatekeeper 來強制執行。`,
-    duration: "12"
+在實際工作中，建議每個應用程式的 Pod 都設定這些安全選項，特別是 runAsNonRoot、readOnlyRootFilesystem 和 allowPrivilegeEscalation: false，這三個是最基本的安全底線。你的 DevOps 團隊可以把這些設定作為強制要求，通過 Pod Security Standards（下一個主題）或者 OPA Gatekeeper 來強制執行。
+
+一個很常見的實際問題是：我把 readOnlyRootFilesystem 設為 true 之後，我的 nginx Pod 啟動失敗了！這是因為 nginx 預設需要寫入 /var/cache/nginx、/var/run、/tmp 這些目錄。解決方法是用 emptyDir Volume 掛載這些目錄：在 volumes 裡定義 emptyDir，然後在 volumeMounts 裡把需要寫入的目錄掛載進去。這樣根文件系統是只讀的，但特定的目錄可以寫入，應用程式也能正常運行。
+
+另一個要注意的事是：如果你的容器需要綁定 1024 以下的埠（比如綁定 80 或 443），那在 Linux 下預設需要 CAP_NET_BIND_SERVICE 這個 Capability。如果你已經用 drop: ["ALL"] 去掉了所有 Capability，但應用需要綁定低埠，就需要用 add: ["NET_BIND_SERVICE"] 明確加回來。不過更好的做法是讓容器監聽高埠（比如 8080），然後在 Service 層面做埠映射。
+
+設定好這些安全選項後，建議用 kubectl describe pod 查看 Security Context 是否如預期套用，這是確認設定正確的好方法。`,
+    duration: "13"
   },
   {
     title: "Pod Security Standards",
@@ -369,8 +403,22 @@ Pod Security Standards 定義了三個安全等級，讓叢集管理員可以根
 
 一個常見問題：enforce Restricted 之後，如果有一個 Pod 不符合要求，它就無法啟動，這在生產環境可能造成服務中斷。所以我建議先在 staging 環境啟用 enforce 模式，讓開發者習慣在 Restricted 等級下開發和測試，然後才在 production 環境啟用。
 
-記住，Pod Security Standards 是 admission controller，它在 API Server 層面審核 Pod 創建請求。不符合標準的 Pod 根本不會被 API Server 接受，連進入 etcd 的機會都沒有。這是一個非常強力的防護機制。`,
-    duration: "13"
+記住，Pod Security Standards 是 admission controller，它在 API Server 層面審核 Pod 創建請求。不符合標準的 Pod 根本不會被 API Server 接受，連進入 etcd 的機會都沒有。這是一個非常強力的防護機制。
+
+我來補充一下 Pod Security Standards 的實際落地建議。在一個成熟的企業環境裡，通常的做法是：
+
+kube-system namespace 設定 Privileged 等級，因為系統元件需要特殊權限。像 calico、flannel、coredns 等系統元件都在這裡，它們需要存取主機資源。
+
+一般應用的 namespace 設定 Baseline 等級（用 enforce 模式），這樣能防止最常見的高風險配置，同時不需要應用程式做太多改動。
+
+對於有更高安全要求的 namespace（比如金融數據處理、個人資料存儲），設定 Restricted 等級，並且要求開發團隊確保應用符合所有安全要求再部署。
+
+一個實用的審查命令是：kubectl get pods --all-namespaces -o json | kubectl-neat | grep -v "securityContext"，這樣可以看出哪些 Pod 沒有設定 Security Context，作為安全審查的起點。
+
+另外，OPA Gatekeeper 和 Kyverno 是兩個很流行的 Policy Engine，可以做比 Pod Security Standards 更細緻的策略控制。比如「不允許使用 latest 標籤的映像」、「必須設定 resource limits」、「容器映像必須來自受信任的 registry」等。這些策略在大型企業的 K8s 治理中非常重要。
+
+ Pod Security Standards 是強制安全基準的最有效手段，建議所有新建的 K8s 叢集都預設啟用 Baseline 等級，有需要的服務再逐步升級到 Restricted。`,
+    duration: "14"
   },
   {
     title: "Network Policy：零信任網路",
@@ -425,8 +473,24 @@ podSelector: {} 代表選擇這個 namespace 裡的所有 Pod。policyTypes: [In
 3. 測試確認服務正常運行
 4. 再部署「預設拒絕所有 Egress」策略（如果需要）
 
-注意，Network Policy 是加法，不是減法。你先設定「全部拒絕」，然後一條一條地「加白名單」。`,
-    duration: "10"
+注意，Network Policy 是加法，不是減法。你先設定「全部拒絕」，然後一條一條地「加白名單」。
+
+讓我用一個具體的三層架構例子說明 Network Policy 的設計思路。假設你有一個典型的 Web 應用：前端（frontend）、後端 API（backend）、資料庫（database）。
+
+理想的網路策略應該是：
+- frontend 可以被外部流量訪問（從 Ingress Controller）
+- frontend 可以訪問 backend 的 API 埠（比如 8080）
+- backend 可以訪問 database 的資料庫埠（比如 5432）
+- database 不能發出任何出站流量（Egress 全拒）
+- frontend 和 database 之間不能直接通信
+- 監控系統（monitoring namespace）可以訪問所有 Pod 的 metrics 埠（9090）
+
+這樣的策略，就算攻擊者進入了 frontend，他也只能訪問 backend；就算進入了 backend，他也只能訪問資料庫，而且只能用資料庫協議。這大大限制了攻擊者的行動空間。
+
+在設計 Network Policy 的時候，建議用圖表畫出你的服務通信圖，然後根據這個圖一條一條地寫 NetworkPolicy，確保每條必要的通信路徑都被允許，其他的都被阻斷。
+
+設計 Network Policy 前，先畫出服務的通信圖，確認哪些連線是必要的，然後逐一開放，其他全部拒絕，這是最可靠的做法。`,
+    duration: "11"
   },
   {
     title: "Network Policy 實作",
@@ -502,8 +566,16 @@ from:
 
 測試 Network Policy 的時候，可以啟動一個臨時的 test Pod，然後用 kubectl exec 從裡面用 curl 或 wget 嘗試連接目標服務。如果 Network Policy 設定正確，不允許的連接應該會超時或被拒絕。
 
-設定 Network Policy 是一個逐步完善的過程，建議先在開發環境測試，確認所有正常的服務通信都沒有被意外阻斷，再部署到生產環境。`,
-    duration: "10"
+設定 Network Policy 是一個逐步完善的過程，建議先在開發環境測試，確認所有正常的服務通信都沒有被意外阻斷，再部署到生產環境。
+
+最後，分享一個調試 Network Policy 的技巧。當你設定了 Network Policy 之後，如果服務突然無法通信，首先要排查的是：是否有 NetworkPolicy 意外阻斷了流量？
+
+可以用這個指令查看所有 NetworkPolicy：kubectl get networkpolicy --all-namespaces。查看特定 Policy 的詳細規則：kubectl describe networkpolicy policy-name -n namespace。
+
+如果你使用的是 Cilium CNI，可以用 Hubble UI 來視覺化 Pod 之間的流量，非常直觀地看出哪些流量被允許、哪些被拒絕。這是排查 Network Policy 問題最高效的方式。
+
+調試 Network Policy 最快的方法是用 kubectl exec 進入一個 test Pod，然後用 curl 測試各個目標服務，這樣能直接確認哪些連線通、哪些被擋住。`,
+    duration: "11"
   },
   {
     title: "☕ 中場休息",
@@ -532,7 +604,52 @@ from:
 
 休息結束之後，我們要進入監控和日誌的世界。監控和日誌是生產環境的「眼睛」，沒有了監控，你就是在黑暗中飛行，不知道你的應用程式狀態是好是壞，也不知道何時出問題。我們會介紹業界最常用的監控方案 Prometheus 和 Grafana，以及日誌管理的 EFK Stack。
 
-10 點 40 分準時繼續，大家放輕鬆，好好休息一下！`,
+10 點 40 分準時繼續，大家放輕鬆，好好休息一下！
+
+休息時間，我再給大家分享一個思考框架，可以在喝咖啡的時候想一想。
+
+在生產環境中，安全是一個「深度防禦」（Defense in Depth）的概念。就像城堡的防禦不只有城牆，還有護城河、城門、守衛、內部的不同區域都有各自的門禁一樣，K8s 的安全也是多層的：
+
+第一層：叢集邊界。確保 API Server 不暴露在公網、使用強認證機制（不要用簡單的 token）、控制誰能用 kubectl 連接到叢集。
+
+第二層：命名空間隔離。不同的團隊或環境使用不同的 namespace，用 Network Policy 隔離 namespace 之間的流量，用 RBAC 確保每個人只能訪問自己的 namespace。
+
+第三層：Pod 和容器安全。用 Security Context 讓容器以非 root 身份運行、只讀根文件系統、禁止提升權限，用 Pod Security Standards 強制執行這些設定。
+
+第四層：應用程式安全。確保你的應用程式自身的安全，定期掃描容器映像的漏洞（可以用 Trivy 或 Snyk），保持映像的更新。
+
+第五層：監控和告警。就算前面四層都設好了，也需要監控來發現異常行為。異常的 API 調用、突然飆升的資源使用率、未預期的網路連接——這些都可能是攻擊的跡象。
+
+這五層防禦加起來，才是真正的企業級 K8s 安全架構。今天我們已經涵蓋了其中很重要的幾個層面。
+
+好，時間快到了，請大家慢慢回到位置，我們馬上開始下半段！
+
+我還想跟大家分享一個真實的生產環境故事，關於監控的重要性。
+
+有一家電商公司，他們的 K8s 叢集跑了十幾個微服務。某天午夜，他們的訂單服務突然開始報錯，錯誤率從 0% 跳升到 30%。但是因為沒有監控告警，沒有人知道發生了什麼事。用戶在結帳的時候不斷遇到錯誤，客服電話開始爆炸。等到早上工程師上班，才發現問題，花了一個小時才排查出是某個 ConfigMap 的配置錯誤。這中間，損失的訂單轉換、用戶的體驗傷害、品牌形象的損失，都是實實在在的商業損失。
+
+如果他們有 Prometheus + Grafana + Alertmanager，在錯誤率超過 1% 的時候，就會自動發告警到 PagerDuty，On-call 的工程師就會在幾分鐘內收到通知，而不是等到第二天早上。這中間的差距，就是「有監控」和「沒監控」的差距。
+
+在現代的工程文化裡，「可觀測性」（Observability）是一個核心能力。可觀測性包括三個支柱：指標（Metrics，就是 Prometheus 負責的）、日誌（Logs，就是 EFK 負責的）、追蹤（Traces，是 Jaeger 或 Zipkin 負責的，我們今天不會深入，但你知道有這個東西）。一個可觀測性完整的系統，讓工程師能夠在出問題的時候，快速定位問題在哪裡。這是高效工程團隊和一般工程團隊的重要區別。
+
+好，時間到了，請大家回到位置，我們馬上開始！
+
+另外，在休息的時候，我想讓大家思考一個問題：如果你現在要向你的主管解釋為什麼公司需要引入 K8s 安全和監控機制，你會怎麼說？
+
+這是一個很實際的職場問題。技術工程師往往知道「要做什麼」，但在向管理層解釋的時候，需要轉換成「為什麼要做」、「不做會有什麼風險」、「做了有什麼收益」。
+
+可以從這三個角度來說：
+第一，成本：安全事故的成本遠高於建立安全機制的成本。Tesla 的挖礦事件讓他們損失了數萬美元的 AWS 費用。
+第二，聲譽：一旦用戶資料洩漏，品牌聲譽的損失可能是無法用金錢衡量的。
+第三，效率：有了好的監控系統，工程師排查問題的時間從幾個小時縮短到幾分鐘，團隊的生產力大幅提升。
+
+學會把技術決策轉換成商業語言，是從工程師走向資深工程師、架構師的重要一步。好，真的去休息了，等一下見！
+
+最後，讓我說一個職場上的觀察：那些在公司裡被視為「不可替代」的工程師，往往不是寫程式最快的人，而是那些能夠在出問題的時候快速定位和解決問題的人。這種能力，來自於對系統的深入了解，來自於完善的監控和日誌系統，也來自於豐富的排障經驗。今天下午你學完這些工具，就往「不可替代」這個目標又近了一步！
+
+好了，真的請大家去休息了！15 分鐘後準時回來，我們繼續今天的最後一段精彩課程！
+
+記得回來後不要分心，下半段同樣精彩！ 大家加油，後半段見！！~`,
     duration: "15"
   },
   {
@@ -581,7 +698,11 @@ kubectl top pods --all-namespaces`}</pre>
 
 Metrics Server 最重要的用途除了讓 kubectl top 能用之外，還是 HPA（Horizontal Pod Autoscaler）的數據來源。HPA 根據 CPU 或記憶體使用率自動調整 Pod 的副本數量。如果沒有 Metrics Server，HPA 就無法工作。
 
-但要注意，Metrics Server 只保存最新的資源使用數據，不做歷史數據的存儲。也就是說，你只能看到「現在」的資源使用情況，不能查看「昨天」或「上週」的歷史趨勢。如果你需要歷史數據和時間序列分析，就需要 Prometheus，我們下一個主題就是它。`,
+但要注意，Metrics Server 只保存最新的資源使用數據，不做歷史數據的存儲。也就是說，你只能看到「現在」的資源使用情況，不能查看「昨天」或「上週」的歷史趨勢。如果你需要歷史數據和時間序列分析，就需要 Prometheus，我們下一個主題就是它。
+
+順帶一提，HPA（Horizontal Pod Autoscaler）的工作原理是：定期從 Metrics Server 取得 Pod 的 CPU 使用率，和目標使用率（targetCPUUtilizationPercentage）比較，如果超過了，就增加 Pod 副本數；如果低於了，就減少 Pod 副本數（但不會低於 minReplicas）。這整個自動伸縮的機制，底層完全依賴 Metrics Server。所以在任何有 HPA 的叢集裡，Metrics Server 都是不可缺少的核心組件。
+
+你可以用 kubectl get hpa -n production 來查看 HPA 的狀態，裡面會顯示當前的 CPU 使用率、目標使用率、當前副本數和目標副本數，非常直觀。`,
     duration: "8"
   },
   {
@@ -634,7 +755,83 @@ Prometheus 的查詢語言叫 PromQL（Prometheus Query Language）。PromQL 是
 
 安裝 Prometheus 最簡單的方式是用 kube-prometheus-stack 這個 Helm Chart。它會自動安裝 Prometheus、Grafana、AlertManager，以及一套預設的告警規則和 Grafana 儀表板。只需要幾行 Helm 指令就能搞定。
 
-Prometheus 還有告警功能，通過 Alertmanager 來管理和發送告警。你可以設定各種告警規則，比如「如果某個 Pod 的記憶體使用率超過 80% 持續 5 分鐘，就發告警到 Slack」。Alertmanager 還支援告警路由、靜默（Silence）和聚合，避免告警風暴的問題。`,
+Prometheus 還有告警功能，通過 Alertmanager 來管理和發送告警。你可以設定各種告警規則，比如「如果某個 Pod 的記憶體使用率超過 80% 持續 5 分鐘，就發告警到 Slack」。Alertmanager 還支援告警路由、靜默（Silence）和聚合，避免告警風暴的問題。
+
+讓我再補充一個重要的概念：Prometheus 的數據模型。Prometheus 裡的每一個指標都有一個名稱（metric name）和一組標籤（labels）。標籤是鍵值對，用來區分同一個指標的不同維度。比如 http_requests_total 這個指標，可以有 method="GET"、path="/api/users"、status="200" 這些標籤。通過標籤，你可以對指標進行非常靈活的過濾和聚合。
+
+在 K8s 環境裡，kube-state-metrics 是一個很重要的組件，它把 K8s 物件的狀態（比如 Deployment 的期望副本數、實際副本數、Pod 的狀態等）轉換成 Prometheus 指標暴露出來。kube-prometheus-stack 會自動安裝 kube-state-metrics，讓你可以監控 K8s 物件的狀態，而不只是資源使用率。
+
+舉個例子，kube_deployment_status_replicas_unavailable 這個指標告訴你有多少個 Deployment 的副本是不可用的。如果你設定一個告警規則：當 kube_deployment_status_replicas_unavailable > 0 持續超過 5 分鐘時告警，就能及時發現部署問題。`,
+    duration: "11"
+  },
+  {
+    title: "Alertmanager 告警設定",
+    subtitle: "讓問題在你睡著前先叫醒你",
+    section: "監控基礎",
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-k8s-blue font-semibold mb-2">PrometheusRule 告警規則範例</p>
+          <pre className="text-slate-300 text-xs font-mono">{String.raw`apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: app-alerts
+  namespace: monitoring
+spec:
+  groups:
+  - name: app.rules
+    rules:
+    - alert: HighErrorRate
+      expr: |
+        rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod {{ $labels.pod }} 錯誤率過高"
+        description: "錯誤率 {{ $value | humanizePercentage }} 超過 5%"`}</pre>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-yellow-400 font-semibold text-sm mb-1">Alertmanager 路由設定（發 Slack）</p>
+          <pre className="text-slate-300 text-xs font-mono">{String.raw`route:
+  receiver: slack-critical
+  routes:
+  - match: {severity: critical}
+    receiver: slack-critical
+receivers:
+- name: slack-critical
+  slack_configs:
+  - channel: '#k8s-alerts'
+    api_url: 'https://hooks.slack.com/T.../...'
+    title: '{{ .CommonAnnotations.summary }}'
+    text: '{{ .CommonAnnotations.description }}'`}</pre>
+        </div>
+        <div className="bg-red-400/10 border border-red-400/30 p-3 rounded-lg">
+          <p className="text-red-400 text-sm font-semibold">⚠️ 告警疲勞（Alert Fatigue）：告警太多反而沒人看，設定 for: 5m 避免瞬間抖動觸發告警！</p>
+        </div>
+      </div>
+    ),
+    notes: `好，現在我們來看整個監控體系中非常重要的一環：Alertmanager 告警設定。Prometheus 可以幫你收集所有指標，Grafana 可以讓你漂亮地展示它們，但這兩個都是「你主動去看」的工具。在生產環境，你不可能 24 小時盯著儀表板。這時候就需要 Alertmanager——它讓系統在出問題的時候主動叫你。
+
+Alertmanager 的告警流程分三步：第一步，在 Prometheus 中定義 PrometheusRule（告警規則），告訴 Prometheus「什麼情況下要告警」；第二步，Prometheus 計算 PromQL 表達式，如果條件持續滿足（by: 5m 的意思是持續 5 分鐘），就把告警事件發送給 Alertmanager；第三步，Alertmanager 根據設定的路由規則，把告警發送到對應的渠道——Slack、PagerDuty、Email、Line 等等。
+
+PrometheusRule 是 kube-prometheus-stack 提供的 CRD。讓我解釋這個 YAML 的關鍵部分：
+
+expr 是 PromQL 表達式，rate(http_requests_total{status=~"5.."}[5m]) 計算的是最近 5 分鐘內 HTTP 5xx 錯誤的速率。如果這個值大於 0.05（也就是每秒超過 0.05 個錯誤），就觸發告警。
+
+for: 5m 是一個非常重要的設定，意思是「條件必須持續 5 分鐘才觸發告警」。沒有 for，一個瞬間的流量高峰就會觸發告警，這叫做「抖動」（flapping）。有了 for: 5m，系統先等 5 分鐘確認這不是瞬間問題，才真正發告警。
+
+labels 裡的 severity 是告警的嚴重程度，常見的有 critical（需要立即處理，半夜也要叫醒 on-call）、warning（需要注意但可以等到明天處理）、info（只是提示信息）。
+
+annotations 裡的 summary 和 description 是人類可讀的告警說明。支援 Go template 語法，可以用 {{ $labels.pod }} 引用標籤的值，用 {{ $value | humanizePercentage }} 把數字格式化成百分比。
+
+Alertmanager 的 receiver 設定決定告警發往哪裡。Slack 是最常用的選擇，設定 api_url（Slack 的 Incoming Webhook URL）和 channel 就好了。title 和 text 用 Go template 格式化告警內容。
+
+最後要提醒大家一個重要概念：「告警疲勞」（Alert Fatigue）。如果你設定的告警太多、太頻繁，工程師就會開始忽略告警通知，這比沒有告警系統還要危險！設定告警的黃金原則是：每一條告警都應該是需要人介入處理的事件。監控趨勢用 Grafana 看，不要用告警。建議從少量、高信噪比的告警開始，然後根據實際的 on-call 經驗逐步調整。
+
+在實際工作中，告警規則的設計是一個持續迭代的過程。建議從最關鍵的幾個指標開始（比如錯誤率、Pod 崩潰次數），先把高優先級的告警設好，然後根據 on-call 的反饋持續調整。每次收到告警之後，問自己：這個告警是否需要人立即介入？如果不需要，就考慮降低嚴重程度或增加 for 時間。告警規則就像程式碼一樣，需要持續維護和優化，才能發揮最大的價值。
+
+總結來說，好的告警系統讓你在問題影響用戶之前就能發現並修復，這是 SRE（網站可靠性工程）文化的核心精神！`,
     duration: "10"
   },
   {
@@ -687,7 +884,9 @@ Grafana 最受歡迎的功能是它的預建儀表板生態。在 grafana.com/da
 
 Grafana 的告警功能也很強大，可以在 Grafana 裡直接設定告警規則，當指標超過閾值時，發送通知到 Slack、PagerDuty、Email 等渠道。不過在 kube-prometheus-stack 的架構裡，告警通常是在 Prometheus Alertmanager 那層處理，Grafana 的告警更多是作為補充。
 
-對於想要深入學習 Grafana 的同學，我推薦去看 Grafana 的官方課程，他們有免費的 Grafana 101 課程，非常適合入門。`,
+對於想要深入學習 Grafana 的同學，我推薦去看 Grafana 的官方課程，他們有免費的 Grafana 101 課程，非常適合入門。
+
+最後一個建議：在 Grafana 裡，善用 Variables 功能。你可以定義變數（比如 namespace、pod_name），讓儀表板用戶可以動態選擇要查看的命名空間或 Pod，而不是每次都要修改查詢。這讓同一個儀表板可以複用於不同的服務和環境，大大提升儀表板的實用性。更多儀表板和 Grafana 使用技巧，可以去 grafana.com 官網查看文件！`,
     duration: "7"
   },
   {
@@ -735,7 +934,17 @@ Fluentd（或更輕量的 Fluent Bit）是日誌收集和轉發器。它以 Daem
 
 Kibana 是 Elasticsearch 的視覺化介面。通過 Kibana，你可以搜索日誌、創建儀表板、設置告警等。Kibana 的 Discover 功能讓你可以用 KQL（Kibana Query Language）語法快速搜索日誌，比如 kubernetes.namespace: production AND level: error 來搜索 production namespace 裡的錯誤日誌。
 
-需要提一下的是，現在也有很多公司在用 Grafana Loki 來替代 EFK Stack。Loki 是 Grafana Labs 推出的輕量級日誌存儲系統，它的設計思想跟 Prometheus 很像：不對日誌內容建立全文索引（這樣節省大量存儲和計算資源），只對日誌的標籤（labels）建立索引。Loki 的優點是資源消耗少、成本低、與 Grafana 無縫整合；缺點是搜索功能沒有 Elasticsearch 強大。如果你的日誌量不是特別大，Loki 是一個很好的選擇。`,
+需要提一下的是，現在也有很多公司在用 Grafana Loki 來替代 EFK Stack。Loki 是 Grafana Labs 推出的輕量級日誌存儲系統，它的設計思想跟 Prometheus 很像：不對日誌內容建立全文索引（這樣節省大量存儲和計算資源），只對日誌的標籤（labels）建立索引。Loki 的優點是資源消耗少、成本低、與 Grafana 無縫整合；缺點是搜索功能沒有 Elasticsearch 強大。如果你的日誌量不是特別大，Loki 是一個很好的選擇。
+
+關於 EFK vs Loki 的選擇，我再補充幾個判斷標準：
+
+如果你的日誌量非常大（每天幾個 TB），Elasticsearch 的全文索引功能雖然強大，但存儲成本和計算資源消耗也很大。這種情況下，Loki 的成本優勢就非常明顯了。
+
+如果你需要對日誌內容做複雜的全文搜索（比如在所有日誌裡搜索特定的錯誤碼或用戶 ID），Elasticsearch 的搜索能力是 Loki 無法比擬的。
+
+如果你的團隊已經在用 Grafana 看 Prometheus 指標，那使用 Loki 可以讓你在同一個 Grafana 介面裡同時看指標和日誌，甚至可以把指標和日誌關聯起來看（Grafana 的 Correlate 功能），大大提升排障效率。
+
+很多中小型公司現在都在從 EFK 遷移到 Loki，因為運維更簡單、成本更低。但 Elasticsearch 的生態和功能仍然是業界最成熟的，如果你在大型企業工作，遇到 EFK 的機率仍然很高。`,
     duration: "10"
   },
   {
@@ -798,8 +1007,84 @@ Fluent Bit 的配置文件（通常是 ConfigMap）需要設定：
 
 一個最佳實踐是：讓你的應用程式輸出結構化日誌（JSON 格式）。結構化日誌比純文字日誌更容易解析、搜索和分析。比如，輸出 {"level":"error","message":"database connection failed","timestamp":"2024-01-15T10:00:00Z"} 這樣的 JSON 日誌，在 Kibana 裡就可以直接按照 level、message 等字段來過濾，非常方便。
 
-在 Kibana 裡，你可以用 Discover 功能搜索日誌：選擇時間範圍，用 KQL 語法輸入查詢條件，比如 kubernetes.namespace_name: production AND log.level: error。這樣就能快速找到 production namespace 裡的所有錯誤日誌，不管那個 Pod 現在是否還在運行。`,
-    duration: "10"
+在 Kibana 裡，你可以用 Discover 功能搜索日誌：選擇時間範圍，用 KQL 語法輸入查詢條件，比如 kubernetes.namespace_name: production AND log.level: error。這樣就能快速找到 production namespace 裡的所有錯誤日誌，不管那個 Pod 現在是否還在運行。
+
+另外，Kubernetes Audit Log（稽核日誌）也是一個非常重要的安全監控手段，和應用日誌是不同的東西。K8s Audit Log 記錄了所有對 API Server 的操作：誰在什麼時間做了什麼。比如「用戶 admin 在 10:30 刪除了 production namespace 的 Deployment」、「ServiceAccount app-sa 在 10:31 嘗試列出 Secrets 但被拒絕」。
+
+啟用 Audit Log 需要在 API Server 的設定中指定 audit policy 文件和 audit log 的路徑。在生產環境，建議把 Audit Log 也整合到你的 EFK 或 Loki 系統中，並設定告警規則（比如：有人嘗試存取 Secrets 被拒絕、有人刪除了 PV 等高風險操作）。這樣你就能在安全事件發生時，有完整的稽核記錄可以追溯。
+
+日誌管理設定完之後，建議定期查看 Kibana 的 Discover 功能，確認日誌收集正常，沒有遺漏任何重要的 namespace 或服務。另外，設定日誌保留策略也很重要，生產環境通常保留 30-90 天，既要能追查問題，又要控制儲存成本。`,
+    duration: "11"
+  },
+  {
+    title: "Kibana 日誌查詢實戰",
+    subtitle: "KQL 查詢 + 結構化日誌 = 排障神器",
+    section: "日誌管理",
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">常用 KQL 查詢語法</p>
+          <pre className="text-slate-300 text-xs font-mono">{String.raw`# 找 production namespace 的錯誤
+kubernetes.namespace_name: "production" AND log.level: "error"
+
+# 找特定 Pod 的最近日誌
+kubernetes.pod_name: "backend-*" AND @timestamp > now-30m
+
+# 找包含特定關鍵字的日誌
+message: "connection refused" OR message: "timeout"
+
+# 組合查詢：特定服務的高延遲日誌
+service.name: "payment-api" AND responseTimeMs > 3000`}</pre>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-k8s-blue font-semibold text-sm mb-1">📋 事件排查 SOP</p>
+            <ol className="text-slate-400 text-xs space-y-1 list-decimal list-inside">
+              <li>Grafana 告警通知</li>
+              <li>看指標確認受影響服務</li>
+              <li>Kibana 搜尋該服務錯誤日誌</li>
+              <li>用 requestId 追蹤完整呼叫鏈</li>
+              <li>找到根因，修復並復盤</li>
+            </ol>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-yellow-400 font-semibold text-sm mb-1">✅ 結構化日誌最佳實踐</p>
+            <pre className="text-slate-300 text-xs font-mono">{String.raw`{
+  "level": "error",
+  "service": "checkout",
+  "requestId": "req-abc123",
+  "userId": "u-456",
+  "error": "DB timeout",
+  "durationMs": 5012
+}`}</pre>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `好，現在我們來看 Kibana 的實際操作和日誌查詢技巧。掌握了這些技巧，你在排查生產問題的時候效率會大幅提升。
+
+Kibana 的核心查詢語言是 KQL（Kibana Query Language）。KQL 的語法非常直觀，讓我逐一說明：
+
+最基本的查詢是 field: value，比如 kubernetes.namespace_name: "production" 就是找所有來自 production 命名空間的日誌。用 AND 和 OR 可以組合多個條件，括號可以控制優先級。
+
+萬用字元（Wildcard）非常好用：kubernetes.pod_name: "backend-*" 可以找到所有名稱以 backend- 開頭的 Pod 的日誌，不管後面的 hash 是什麼。這在 Deployment 創建的 Pod 名稱有隨機後綴時特別有用。
+
+範圍查詢用 > 、< 、>= 、<= ，比如 responseTimeMs > 3000 找出所有回應時間超過 3 秒的請求，這對找出慢查詢非常有效。
+
+@timestamp > now-30m 這樣的相對時間查詢，可以快速聚焦在最近一段時間的日誌，不需要手動選擇時間範圍。
+
+接下來我要強調一個非常重要的最佳實踐：結構化日誌（Structured Logging）。
+
+傳統的日誌長這樣：「2024-01-15 10:00:00 ERROR checkout service: database connection timeout after 5012ms, userId=u-456, requestId=req-abc123」這樣的純文字日誌，在 Kibana 裡只能做全文搜索，沒辦法按照欄位篩選或統計。
+
+結構化日誌改用 JSON 格式輸出，每個重要的字段都作為獨立的 JSON key。這樣 Fluentd/Fluent Bit 在收集日誌時會自動解析 JSON，把每個字段都索引到 Elasticsearch。然後在 Kibana 裡，你可以直接按照 userId、requestId、durationMs 等字段來過濾和聚合，威力強大很多。
+
+最有用的字段是 requestId（請求追蹤 ID）。每個進入系統的請求都應該有一個唯一的 requestId，這個 ID 在整個請求的處理過程中一直傳遞下去（包括微服務之間的呼叫）。當你在 Kibana 裡搜索這個 requestId，就能找到這個請求在每個服務裡的日誌，把完整的請求路徑串起來，快速定位問題在哪個環節發生的。
+
+實際的排查流程通常是這樣的：首先 Grafana 告警告訴你錯誤率上升了；然後看 Grafana 儀表板確認是哪個服務出問題、從什麼時間點開始；接著打開 Kibana，搜索那個服務那個時間段的 error 日誌；從日誌裡找到某個有問題的 requestId；用這個 requestId 再搜索，追蹤整個請求的完整路徑；最後找到根因，可能是資料庫超時、某個上游服務異常等。
+
+這套組合技——Prometheus 負責告警、Grafana 負責呈現趨勢、Kibana 負責深入排查日誌——就是現代生產環境可觀測性實踐的標準工作流程。掌握了這套流程，你在面試時說「我有生產環境排障經驗」就有底氣了！`,
+    duration: "8"
   },
   {
     title: "CKA 認證攻略",
@@ -857,8 +1142,14 @@ CKA 考試的形式很特別：它不是選擇題，而是完全的實作考試�
 
 第四，一定要在 killer.sh 上練習。killer.sh 是官方提供的模擬考試環境，它的題目比真實考試更難，但環境非常接近。建議至少做兩遍，第一遍不懂的就查，第二遍計時自己做。
 
-第五，善用 --dry-run=client -o yaml 技巧。這讓你可以用命令式指令生成 YAML 模板，然後再修改。比如 kubectl create deployment myapp --image=nginx --dry-run=client -o yaml > myapp.yaml，這樣就快速生成了一個 Deployment 的 YAML 模板，你只需要修改需要改的部分就好了。`,
-    duration: "10"
+第五，善用 --dry-run=client -o yaml 技巧。這讓你可以用命令式指令生成 YAML 模板，然後再修改。比如 kubectl create deployment myapp --image=nginx --dry-run=client -o yaml > myapp.yaml，這樣就快速生成了一個 Deployment 的 YAML 模板，你只需要修改需要改的部分就好了。
+
+最後給大家一個非常實用的考前準備建議：在家裡用 minikube 或 kind 建立一個練習環境，每天做 5-10 道練習題，持續一個月。重點練習以下操作：排查 Pod 啟動失敗（ImagePullBackOff、CrashLoopBackOff、Pending 等）；etcd 的備份和恢復；升級叢集版本；建立各種 RBAC 設定；設定 NetworkPolicy；處理 Node NotReady 問題。
+
+另外，考試前一定要確保你能快速打出常用的 kubectl 指令，不需要查文件。特別是 kubectl get events --sort-by=.lastTimestamp、kubectl describe pod、kubectl logs --previous 這些排查問題的指令，要做到肌肉記憶的程度。祝大家考試順利！
+
+最後祝大家 CKA 一次通過！記得考試當天要早點睡，考試前確認好網路環境和相機，準時進入考試。加油！`,
+    duration: "11"
   },
   {
     title: "學習資源與課程結語",
@@ -922,7 +1213,9 @@ CKA 考試的形式很特別：它不是選擇題，而是完全的實作考試�
 
 最後，我想說的是：學習 K8s 的最好方式是動手實踐。不要光看教程，要在自己的環境裡動手部署、動手設定、動手排錯。每次動手的時候，你都會遇到新的問題，解決了這些問題，你的技能就會真正提升。
 
-好，我們午餐休息，下午一點見！下午我們要學習 K8s 的最佳實踐、架構設計模式、CI/CD，以及最重要的——職涯發展建議。下午的課程對你的職涯規劃非常有幫助，不要缺席！`,
-    duration: "5"
+好，我們午餐休息，下午一點見！下午我們要學習 K8s 的最佳實踐、架構設計模式、CI/CD，以及最重要的——職涯發展建議。下午的課程對你的職涯規劃非常有幫助，不要缺席！
+
+感謝大家七天的陪伴，希望這次課程是你 K8s 學習旅程的一個好的起點！`,
+    duration: "6"
   },
 ]

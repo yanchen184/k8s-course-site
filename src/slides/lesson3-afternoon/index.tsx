@@ -932,7 +932,7 @@ Alpine Linux 是一個非常輕量的 Linux 發行版，整個基礎系統只有
 
 正確做法是先用 .dockerignore 排除不需要的東西，讓 Build Context 盡可能小。最應該排除的東西有：node_modules（在容器裡面會重新安裝，不需要從主機複製）；.git 目錄（版本控制資訊，佔用空間，不應該出現在 Image 裡面）；.env 檔案（這個最重要，你的密碼、API Key 都在這裡，絕對不能被打包進 Image）；dist 或 build 目錄（多階段建構裡面這些是在容器內部建構的，不需要從外面複製）；測試檔案和文件。
 
-安全性方面，.env 沒有被 .dockerignore 排除是一個非常危險的錯誤。如果你把含有密碼的 .env 用 COPY . . 複製進了 Image，這個 Image 裡面就有你的密碼了。即使你後來用 RUN rm .env 刪除了它，那個密碼還是存在於 Image 的 Layer 歷史裡面，可以被有心人提取出來。所以永遠記得：在 .dockerignore 裡面加上 .env 和所有包含機密的檔案！`.dockerignore 的語法跟 .gitignore 很像，支援萬用字元和注釋。把這個檔案加到你的每一個有 Dockerfile 的專案裡，這是一個非常基礎但重要的最佳實踐。`,
+安全性方面，.env 沒有被 .dockerignore 排除是一個非常危險的錯誤。如果你把含有密碼的 .env 用 COPY . . 複製進了 Image，這個 Image 裡面就有你的密碼了。即使你後來用 RUN rm .env 刪除了它，那個密碼還是存在於 Image 的 Layer 歷史裡面，可以被有心人提取出來。所以永遠記得：在 .dockerignore 裡面加上 .env 和所有包含機密的檔案！\`.dockerignore 的語法跟 .gitignore 很像，支援萬用字元和注釋。把這個檔案加到你的每一個有 Dockerfile 的專案裡，這是一個非常基礎但重要的最佳實踐。`,
     duration: "10"
   },
   {

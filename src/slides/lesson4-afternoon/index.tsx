@@ -1150,7 +1150,7 @@ nicolaka/netshoot 是一個在 K8s 社群非常受歡迎的 debug image，裡面
 
 kubectl debug node/節點名 -it --image=busybox 可以在一個 Node 上起一個 debug Pod，並且掛載 Node 的根檔案系統到 /host 目錄，讓你可以直接看 Node 上的系統日誌（/host/var/log/）、查看 kubelet 的設定、檢查磁碟空間等 Node 層級的排查。這在懷疑是 Node 本身有問題（磁碟滿了、記憶體洩漏、內核錯誤）的時候特別有用。
 
-一個進階的網路排查場景：你有一個服務 A 怎麼樣都連不到服務 B，但看起來兩個 Service 的設定都正確。這時候系統性的排查步驟是：先確認 Pod IP（kubectl get pods -o wide），然後在服務 A 的 Pod 裡用 netshoot 直接 curl 服務 B 的 Pod IP，確認是 Pod 層面就不通（可能是 NetworkPolicy 限制）還是 Pod 直連 OK 但透過 Service 不行（可能是 Service selector 設錯或 endpoint 沒有 Ready）。用 kubectl get endpoints 服務名 確認 Service 的 endpoint 列表是否包含正確的 Pod IP，如果 endpoints 是空的，八成是 selector 不匹配——用 kubectl describe svc 看 selector，和 Pod 的 labels 逐一比對。\`,
+一個進階的網路排查場景：你有一個服務 A 怎麼樣都連不到服務 B，但看起來兩個 Service 的設定都正確。這時候系統性的排查步驟是：先確認 Pod IP（kubectl get pods -o wide），然後在服務 A 的 Pod 裡用 netshoot 直接 curl 服務 B 的 Pod IP，確認是 Pod 層面就不通（可能是 NetworkPolicy 限制）還是 Pod 直連 OK 但透過 Service 不行（可能是 Service selector 設錯或 endpoint 沒有 Ready）。用 kubectl get endpoints 服務名 確認 Service 的 endpoint 列表是否包含正確的 Pod IP，如果 endpoints 是空的，八成是 selector 不匹配——用 kubectl describe svc 看 selector，和 Pod 的 labels 逐一比對。`,
   },
 
   // ========== 資源管理：ResourceQuota 與 LimitRange ==========
@@ -1214,7 +1214,7 @@ LimitRange 的作用在於設定 namespace 裡每個 Pod 或 Container 的預設
 
 一個常見的實際場景：某個 dev 環境的 namespace 裡，有人不小心把 Deployment 的 replicas 設成 100（可能是手誤或 HPA 配置錯誤），如果沒有 ResourceQuota，叢集可能被大量 Pending 的 Pod 淹沒，影響到所有 team 的部署。有了 ResourceQuota 的 pods: "20" 限制，最多只能建立 20 個 Pod，超過的都會被拒絕，影響範圍大幅縮小。這就是護欄（guardrail）的意義：不是不信任 team 成員，而是提前把邊界設好，讓人在邊界內自由發揮，不用擔心意外超出範圍。
 
-在了解這兩個資源的基礎上，你可以思考一個更大的議題：叢集的資源容量規劃（Capacity Planning）。你的叢集總共有多少 CPU 和記憶體？各個 namespace 的配額加起來不應該超過叢集的總容量（甚至要留一些餘量給系統元件和突發需求）。隨著 team 和服務的成長，配額也要定期 review 和調整。有些組織用 K8s 的 VPA（Vertical Pod Autoscaler）在觀察模式下分析各 Pod 的實際資源使用，自動生成建議的 requests/limits 值，大幅降低資源規劃的人工成本。這些都是 K8s 叢集管理的進階話題，等你把基礎操作熟悉了，就可以往這個方向深入。\`,
+在了解這兩個資源的基礎上，你可以思考一個更大的議題：叢集的資源容量規劃（Capacity Planning）。你的叢集總共有多少 CPU 和記憶體？各個 namespace 的配額加起來不應該超過叢集的總容量（甚至要留一些餘量給系統元件和突發需求）。隨著 team 和服務的成長，配額也要定期 review 和調整。有些組織用 K8s 的 VPA（Vertical Pod Autoscaler）在觀察模式下分析各 Pod 的實際資源使用，自動生成建議的 requests/limits 值，大幅降低資源規劃的人工成本。這些都是 K8s 叢集管理的進階話題，等你把基礎操作熟悉了，就可以往這個方向深入。`,
   },
 
   // ========== Q&A ==========

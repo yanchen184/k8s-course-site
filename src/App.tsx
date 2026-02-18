@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+﻿import { useState, useEffect, useCallback, useMemo } from 'react'
 import { slides as lesson1MorningSlides } from './slides/lesson1-morning/index'
 import type { Slide } from './slides/lesson1-morning/index'
 
@@ -184,8 +184,15 @@ function buildSections(slides: Slide[]): SectionEntry[] {
   return Array.from(map.values())
 }
 
+// 從 URL hash 取得初始課程 index
+function getLessonIndexFromHash(): number {
+  const hash = window.location.hash.replace('#', '')
+  const idx = LESSONS.findIndex(l => l.id === hash)
+  return idx >= 0 ? idx : 0
+}
+
 function App() {
-  const [currentLesson, setCurrentLesson] = useState(0)
+  const [currentLesson, setCurrentLesson] = useState(getLessonIndexFromHash)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showNotes, setShowNotes] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -194,6 +201,22 @@ function App() {
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
   const [slides, setSlides] = useState<Slide[]>(lesson1MorningSlides)
   const [loading, setLoading] = useState(false)
+
+  // 切換課程（同步 URL hash）
+  const switchLesson = useCallback((idx: number) => {
+    switchLesson(idx)
+    window.location.hash = LESSONS[idx].id
+  }, [])
+
+  // 監聽瀏覽器上一頁/下一頁
+  useEffect(() => {
+    const onHashChange = () => {
+      const idx = getLessonIndexFromHash()
+      switchLesson(idx)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   // 載入課程
   useEffect(() => {
@@ -340,7 +363,7 @@ function App() {
                       return (
                         <button
                           key={l.id}
-                          onClick={() => setCurrentLesson(idx)}
+                          onClick={() => switchLesson(idx)}
                           className={`w-full text-left px-3 py-2 rounded text-base transition-colors ${
                             idx === currentLesson
                               ? 'bg-blue-600/30 text-blue-300 font-semibold border border-blue-600/40'
@@ -545,7 +568,7 @@ function App() {
                 {LESSONS.map((l, i) => (
                   <button
                     key={l.id}
-                    onClick={() => { setCurrentLesson(i); setShowMenu(false) }}
+                    onClick={() => { switchLesson(i); setShowMenu(false) }}
                     className={`text-left p-4 rounded-xl border-2 transition-all ${
                       i === currentLesson
                         ? 'border-blue-500 bg-blue-500/20'

@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Slide styles */
+.slide {
+  @apply min-h-screen flex flex-col items-center justify-center p-8;
+}
+
+/* Code block styles */
+pre {
+  @apply bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto;
+}
+
+code {
+  @apply font-mono;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}

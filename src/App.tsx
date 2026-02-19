@@ -196,7 +196,7 @@ function App() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showNotes, setShowNotes] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768)
   const [showQA, setShowQA] = useState(false)
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
   const [slides, setSlides] = useState<Slide[]>(lesson1MorningSlides)
@@ -304,7 +304,7 @@ function App() {
       {/* ===== LEFT SIDEBAR ===== */}
       <aside
         className={`fixed top-0 left-0 h-full z-30 flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'w-[420px]' : 'w-0 overflow-hidden'
+          sidebarOpen ? 'w-full md:w-[420px]' : 'w-0 overflow-hidden'
         }`}
         style={{ background: 'rgba(15,23,42,0.97)', borderRight: '1px solid rgba(51,65,85,0.7)' }}
       >
@@ -548,8 +548,9 @@ function App() {
 
       {/* ===== MAIN CONTENT ===== */}
       <div
-        className="flex-1 flex flex-col transition-all duration-300"
-        style={{ marginLeft: sidebarOpen ? '420px' : '0' }}
+        className={`flex-1 flex flex-col transition-all duration-300 ${
+          sidebarOpen ? 'md:ml-[420px]' : ''
+        }`}
       >
         {/* Top progress bar */}
         <div className="fixed top-0 left-0 right-0 h-1 bg-slate-700 z-50">
@@ -558,6 +559,27 @@ function App() {
             style={{ width: `${((currentSlide + 1) / slides.length) * 100}%` }}
           />
         </div>
+
+        {/* Hamburger Menu Button (Mobile Only) */}
+        <button
+          onClick={() => setSidebarOpen(prev => !prev)}
+          className="md:hidden fixed top-4 left-4 z-50 p-3 bg-slate-800/90 hover:bg-slate-700 rounded-lg transition-colors border border-slate-600 shadow-lg"
+          title="切換側邊欄"
+        >
+          <svg
+            className="w-6 h-6 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </button>
 
         {/* 課程選擇浮層 */}
         {showMenu && (
@@ -664,7 +686,9 @@ function App() {
         )}
 
         {/* Bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm border-t border-slate-700/50 z-20" style={{ paddingLeft: sidebarOpen ? '420px' : '0' }}>
+        <div className={`fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm border-t border-slate-700/50 z-20 ${
+          sidebarOpen ? 'md:pl-[420px]' : ''
+        }`}>
           <div className="max-w-5xl mx-auto flex items-center justify-between px-4 py-3">
             <div className="flex gap-2 items-center">
               <button

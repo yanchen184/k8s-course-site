@@ -3,10 +3,15 @@ name: Auto Fix Issue with AI
 on:
   issues:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to fix'
+        required: true
+        type: number
 
 jobs:
   auto-fix:
-    if: contains(github.event.issue.labels.*.name, 'auto-fix')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -14,6 +19,39 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Determine issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "number=${{ inputs.issue_number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check auto-fix label (skip for workflow_dispatch)
+        if: github.event_name == 'issues'
+        run: |
+          LABELS='${{ toJson(github.event.issue.labels.*.name) }}'
+          if ! echo "$LABELS" | grep -q "auto-fix"; then
+            echo "Issue does not have auto-fix label, skipping"
+            exit 0
+          fi
+
+      - name: Get issue details
+        id: get_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_JSON=$(gh issue view ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} --json title,body)
+          TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+          BODY=$(echo "$ISSUE_JSON" | jq -r '.body')
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          {
+            echo 'body<<EOF'
+            echo "$BODY"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -24,7 +62,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create fix script
+      - name: Create and run fix script
+        id: fix
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ISSUE_TITLE: ${{ steps.get_issue.outputs.title }}
+          ISSUE_BODY: ${{ steps.get_issue.outputs.body }}
         run: |
           cat > fix-issue.mjs << 'SCRIPT'
           import fs from 'fs';
@@ -34,7 +77,6 @@ jobs:
           const ISSUE_TITLE = process.env.ISSUE_TITLE;
           const ISSUE_BODY = process.env.ISSUE_BODY;
 
-          // Get all source files
           function getAllFiles(dir, extensions = ['.ts', '.tsx', '.js', '.jsx', '.css', '.html', '.json', '.md']) {
             let results = [];
             try {
@@ -54,208 +96,132 @@ jobs:
             return results;
           }
 
-          // Read file contents (limit size)
-          function readFileSafe(filePath, maxSize = 8000) {
+          function readFileSafe(filePath, maxSize = 6000) {
             try {
               const content = fs.readFileSync(filePath, 'utf-8');
-              return content.length > maxSize ? content.slice(0, maxSize) + '\n... (truncated)' : content;
+              return content.length > maxSize ? content.slice(0, maxSize) + '\n...(truncated)' : content;
             } catch (e) {
               return '';
             }
           }
 
-          // Call Gemini API using fetch
           async function callGemini(prompt) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-            const body = {
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 8192
-              }
-            };
-
-            console.log('API URL:', url.replace(GEMINI_API_KEY, '***'));
-            console.log('Request body size:', JSON.stringify(body).length, 'bytes');
 
             const response = await fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body)
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+              })
             });
 
-            console.log('Response status:', response.status);
+            console.log('Gemini API status:', response.status);
 
             if (!response.ok) {
-              const errorText = await response.text();
-              console.log('Error response:', errorText);
-              throw new Error(`API error: ${response.status} - ${errorText}`);
+              const err = await response.text();
+              throw new Error(`API error ${response.status}: ${err}`);
             }
 
             const json = await response.json();
-            console.log('Response keys:', Object.keys(json));
 
             if (json.error) {
               throw new Error(`Gemini error: ${json.error.message}`);
             }
 
-            const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            console.log('Response text length:', text.length);
-
-            if (!text) {
-              console.log('Full response:', JSON.stringify(json, null, 2));
-            }
-
-            return text;
+            return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
           }
 
           async function main() {
-            console.log('=== Auto Fix Issue with Gemini ===');
+            console.log('=== Auto Fix Issue ===');
             console.log('Issue:', ISSUE_TITLE);
-            console.log('API Key present:', !!GEMINI_API_KEY);
-            console.log('API Key length:', GEMINI_API_KEY?.length || 0);
-            console.log('');
+            console.log('API Key exists:', !!GEMINI_API_KEY);
 
-            // Gather codebase context
             const files = getAllFiles('.');
-            console.log('Found', files.length, 'source files');
+            console.log('Found', files.length, 'files');
 
             let codeContext = '';
-            const filesToInclude = files.slice(0, 25);
-            for (const file of filesToInclude) {
-              const content = readFileSafe(file, 4000);
+            for (const file of files.slice(0, 20)) {
+              const content = readFileSafe(file);
               if (content) {
-                codeContext += `\n### File: ${file}\n\`\`\`\n${content}\n\`\`\`\n`;
+                codeContext += `\n### ${file}\n\`\`\`\n${content}\n\`\`\`\n`;
               }
             }
-            console.log('Code context size:', codeContext.length, 'chars');
 
-            // Create prompt for Gemini
-            const prompt = `You are a senior developer tasked with fixing a GitHub issue.
+            const prompt = `You are fixing a GitHub issue. Analyze and provide a solution.
 
-## Issue Title
-${ISSUE_TITLE}
+## Issue: ${ISSUE_TITLE}
 
-## Issue Description
-${ISSUE_BODY || 'No description provided'}
+## Description
+${ISSUE_BODY || 'No description'}
 
-## Repository Files
+## Code Files
 ${codeContext}
 
-## Your Task
-Analyze the issue and provide a fix. Respond with ONLY a JSON object in this exact format:
+## Response Format
+Respond with ONLY this JSON (no other text):
 
 \`\`\`json
 {
-  "analysis": "Brief explanation of the problem and solution",
+  "analysis": "What the issue is about",
   "files_to_modify": [
-    {
-      "path": "README.md",
-      "new_content": "The complete new file content here"
-    }
+    {"path": "file.md", "new_content": "complete file content"}
   ],
-  "summary": "One-line summary of what was fixed"
+  "summary": "Brief fix description"
 }
 \`\`\`
 
-Rules:
-- Provide COMPLETE file contents in new_content, not partial changes
-- If modifying README.md, include the full updated README
-- Output ONLY the JSON block with no additional text before or after`;
+Important: Provide COMPLETE file content, not diffs.`;
 
-            console.log('Prompt length:', prompt.length, 'chars');
-            console.log('Calling Gemini API...');
-
+            console.log('Calling Gemini...');
             const response = await callGemini(prompt);
-            console.log('Raw response preview:', response.substring(0, 500));
+            console.log('Response length:', response.length);
+            console.log('Response preview:', response.substring(0, 300));
 
-            // Extract JSON from response
-            let jsonStr = response;
-            const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-            if (jsonMatch) {
-              jsonStr = jsonMatch[1];
-            } else {
-              // Try to find raw JSON
-              const rawMatch = response.match(/\{[\s\S]*\}/);
-              if (rawMatch) {
-                jsonStr = rawMatch[0];
-              }
+            const match = response.match(/```json\s*([\s\S]*?)\s*```/) || response.match(/(\{[\s\S]*\})/);
+            if (!match) {
+              throw new Error('No JSON found in response');
             }
 
-            let fix;
-            try {
-              fix = JSON.parse(jsonStr);
-            } catch (e) {
-              console.log('Failed to parse JSON:', e.message);
-              console.log('Attempted to parse:', jsonStr.substring(0, 1000));
-              fs.writeFileSync('fix-result.json', JSON.stringify({
-                success: false,
-                reason: 'Failed to parse JSON response',
-                rawResponse: response.substring(0, 2000)
-              }));
-              return;
-            }
-
+            const fix = JSON.parse(match[1]);
             console.log('Analysis:', fix.analysis);
-            console.log('Summary:', fix.summary);
 
-            // Apply fixes
-            let filesChanged = [];
-
-            for (const file of fix.files_to_modify || []) {
-              if (file.path && file.new_content) {
-                console.log(`Modifying: ${file.path}`);
-                const dir = path.dirname(file.path);
-                if (dir && dir !== '.') {
-                  fs.mkdirSync(dir, { recursive: true });
-                }
-                fs.writeFileSync(file.path, file.new_content);
-                filesChanged.push(file.path);
+            let changed = [];
+            for (const f of fix.files_to_modify || []) {
+              if (f.path && f.new_content) {
+                const dir = path.dirname(f.path);
+                if (dir !== '.') fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(f.path, f.new_content);
+                changed.push(f.path);
+                console.log('Modified:', f.path);
               }
             }
 
             fs.writeFileSync('fix-result.json', JSON.stringify({
-              success: filesChanged.length > 0,
-              analysis: fix.analysis,
+              success: changed.length > 0,
               summary: fix.summary,
-              filesChanged
-            }, null, 2));
-
-            console.log('Fix complete!', filesChanged.length, 'files changed');
+              filesChanged: changed
+            }));
           }
 
           main().catch(err => {
             console.error('Error:', err.message);
-            console.error('Stack:', err.stack);
-            fs.writeFileSync('fix-result.json', JSON.stringify({
-              success: false,
-              reason: err.message
-            }));
+            fs.writeFileSync('fix-result.json', JSON.stringify({ success: false, reason: err.message }));
             process.exit(1);
           });
           SCRIPT
 
-      - name: Run AI fix
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-        run: node fix-issue.mjs
+          node fix-issue.mjs
 
-      - name: Check fix result
+      - name: Check result
         id: check
         run: |
-          if [ -f fix-result.json ]; then
-            SUCCESS=$(cat fix-result.json | jq -r '.success')
-            SUMMARY=$(cat fix-result.json | jq -r '.summary // "No summary"')
-            echo "success=$SUCCESS" >> $GITHUB_OUTPUT
-            echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
-            cat fix-result.json
-          else
-            echo "success=false" >> $GITHUB_OUTPUT
-            echo "summary=Fix script failed" >> $GITHUB_OUTPUT
-          fi
+          cat fix-result.json
+          SUCCESS=$(jq -r '.success' fix-result.json)
+          SUMMARY=$(jq -r '.summary // "No changes"' fix-result.json)
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
         if: steps.check.outputs.success == 'true'
@@ -263,42 +229,32 @@ Rules:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "fix: ${{ steps.check.outputs.summary }}"
-          title: "AI Fix: ${{ github.event.issue.title }}"
+          title: "AI Fix: ${{ steps.get_issue.outputs.title }}"
           body: |
-            ## Auto-generated fix for #${{ github.event.issue.number }}
+            ## Auto-fix for #${{ steps.issue.outputs.number }}
 
-            **Issue:** ${{ github.event.issue.title }}
-
+            **Issue:** ${{ steps.get_issue.outputs.title }}
             **Summary:** ${{ steps.check.outputs.summary }}
 
             ---
-            This PR was automatically generated by AI (Gemini 1.5 Flash).
-            Please review the changes carefully before merging.
+            Generated by AI (Gemini 1.5 Flash). Please review carefully.
 
-            Closes #${{ github.event.issue.number }}
-          branch: auto-fix/issue-${{ github.event.issue.number }}
+            Closes #${{ steps.issue.outputs.number }}
+          branch: auto-fix/issue-${{ steps.issue.outputs.number }}
           delete-branch: true
 
-      - name: Comment on issue (success)
+      - name: Comment on success
         if: steps.check.outputs.success == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🤖 AI has analyzed this issue and created a fix!\n\nA Pull Request has been opened. Please review the changes.\n\n**Summary:** ${{ steps.check.outputs.summary }}`
-            })
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
+            --body "🤖 AI has created a fix! A PR has been opened. Summary: ${{ steps.check.outputs.summary }}"
 
-      - name: Comment on issue (failed)
+      - name: Comment on failure
         if: steps.check.outputs.success != 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🤖 AI attempted to analyze this issue but encountered an error.\n\nThis may require manual intervention or more details in the issue description.`
-            })
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
+            --body "🤖 AI could not generate a fix for this issue. Manual intervention may be required."

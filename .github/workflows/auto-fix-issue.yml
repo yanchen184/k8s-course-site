@@ -105,32 +105,53 @@ jobs:
             }
           }
 
-          async function callGemini(prompt) {
+          // Helper function to sleep
+          const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+          async function callGemini(prompt, maxRetries = 5) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-              })
-            });
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              console.log(`Attempt ${attempt}/${maxRetries}...`);
 
-            console.log('Gemini API status:', response.status);
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+                })
+              });
 
-            if (!response.ok) {
-              const err = await response.text();
-              throw new Error(`API error ${response.status}: ${err}`);
+              console.log('Gemini API status:', response.status);
+
+              // Handle rate limit (429)
+              if (response.status === 429) {
+                const errorJson = await response.json();
+                const retryInfo = errorJson.error?.details?.find(d => d.retryDelay);
+                const waitTime = retryInfo ? parseInt(retryInfo.retryDelay) + 5 : 60;
+                console.log(`Rate limited. Waiting ${waitTime} seconds before retry...`);
+
+                if (attempt < maxRetries) {
+                  await sleep(waitTime * 1000);
+                  continue;
+                }
+                throw new Error(`Rate limit exceeded after ${maxRetries} attempts`);
+              }
+
+              if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`API error ${response.status}: ${err}`);
+              }
+
+              const json = await response.json();
+
+              if (json.error) {
+                throw new Error(`Gemini error: ${json.error.message}`);
+              }
+
+              return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
             }
-
-            const json = await response.json();
-
-            if (json.error) {
-              throw new Error(`Gemini error: ${json.error.message}`);
-            }
-
-            return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
           }
 
           async function main() {

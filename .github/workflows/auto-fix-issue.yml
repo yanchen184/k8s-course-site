@@ -1,4 +1,4 @@
-name: Auto Fix Issue with AI
+name: AI Auto Fix Issue
 
 on:
   issues:

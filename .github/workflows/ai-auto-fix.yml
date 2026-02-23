@@ -112,7 +112,7 @@ jobs:
 
           async function callGemini(prompt, maxRetries) {
             maxRetries = maxRetries || 3;
-            const models = ['gemma-3-27b-it', 'gemini-2.0-flash'];
+            const models = ['gemma-3n-e4b-it', 'gemma-3-27b-it', 'gemini-2.0-flash'];
 
             for (const model of models) {
               console.log('Trying model: ' + model);

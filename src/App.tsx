@@ -199,6 +199,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768)
   const [showQA, setShowQA] = useState(false)
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(() => window.innerWidth < 768)
   const [slides, setSlides] = useState<Slide[]>(lesson1MorningSlides)
   const [loading, setLoading] = useState(false)
 
@@ -303,8 +304,8 @@ function App() {
 
       {/* ===== LEFT SIDEBAR ===== */}
       <aside
-        className={`fixed top-0 left-0 h-full z-30 flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'w-full md:w-[420px]' : 'w-0 overflow-hidden'
+        className={`fixed top-0 left-0 h-[100dvh] z-30 flex flex-col overflow-hidden touch-pan-y transition-all duration-300 ${
+          sidebarOpen ? 'w-full md:w-[420px]' : 'w-0'
         }`}
         style={{ background: 'rgba(15,23,42,0.97)', borderRight: '1px solid rgba(51,65,85,0.7)' }}
       >
@@ -316,6 +317,11 @@ function App() {
           </div>
           <p className="text-slate-400 text-base mt-1">{lesson.label} · {lesson.title}</p>
         </div>
+
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
 
         {/* 課程切換（依天分組，可收合） */}
         <div className="p-4 border-b border-slate-700/50 flex-shrink-0">
@@ -383,86 +389,99 @@ function App() {
         </div>
 
         {/* 章節大綱（本堂課） */}
-        <div className="flex-1 overflow-y-auto py-3">
-          <p className="text-slate-500 text-sm uppercase tracking-wider px-5 mb-3">章節大綱</p>
-          {loading ? (
-            <div className="px-5 text-slate-500 text-lg">載入中...</div>
-          ) : (
-            <div className="space-y-0.5">
-              {sections.map((section) => {
-                const isCurrent = currentSlide >= section.firstIndex &&
-                  (sections[sections.indexOf(section) + 1]
-                    ? currentSlide < sections[sections.indexOf(section) + 1].firstIndex
-                    : true)
+        <div className="py-3">
+          <button
+            type="button"
+            aria-expanded={!sectionsCollapsed}
+            aria-controls="section-outline-content"
+            onClick={() => setSectionsCollapsed(prev => !prev)}
+            className="w-full px-5 mb-2 flex items-center justify-between text-left"
+          >
+            <span className="text-slate-500 text-sm uppercase tracking-wider">章節大綱</span>
+            <span className="text-slate-500 text-sm">{sectionsCollapsed ? '▶' : '▼'}</span>
+          </button>
+          {!sectionsCollapsed && (
+            <div id="section-outline-content">
+              {loading ? (
+                <div className="px-5 text-slate-500 text-lg">載入中...</div>
+              ) : (
+                <div className="space-y-0.5">
+                  {sections.map((section) => {
+                    const isCurrent = currentSlide >= section.firstIndex &&
+                      (sections[sections.indexOf(section) + 1]
+                        ? currentSlide < sections[sections.indexOf(section) + 1].firstIndex
+                        : true)
 
-                return (
-                  <button
-                    key={section.name}
-                    onClick={() => goToSlide(section.firstIndex)}
-                    className={`w-full text-left px-5 py-3 transition-all group ${
-                      isCurrent
-                        ? 'bg-blue-600/20 border-l-4 border-blue-500'
-                        : 'hover:bg-slate-700/40 border-l-4 border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-lg font-semibold leading-tight ${
-                        isCurrent ? 'text-blue-300' : 'text-slate-300 group-hover:text-white'
-                      }`}>
-                        {section.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-slate-500 text-sm">{section.totalMinutes} 分鐘</span>
-                      <span className="text-slate-600 text-sm">·</span>
-                      <span className="text-slate-500 text-sm">{section.slideCount} 張</span>
-                    </div>
-                    {/* 演講稿字數統計 */}
-                    <div className="mt-2 space-y-1 bg-slate-800/50 rounded-lg p-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 text-sm font-medium">預計</span>
-                        <span className="text-slate-300 text-sm font-bold">{section.totalExpectedChars.toLocaleString()} 字</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 text-sm font-medium">實際</span>
-                        <span className={`text-sm font-bold ${
-                          section.totalActualChars >= section.totalExpectedChars * 0.8
-                            ? 'text-green-400'
-                            : section.totalActualChars >= section.totalExpectedChars * 0.5
-                            ? 'text-yellow-400'
-                            : 'text-red-400'
-                        }`}>
-                          {section.totalActualChars.toLocaleString()} 字
-                        </span>
-                      </div>
-                      {/* 進度條 */}
-                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden mt-1">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            section.totalActualChars >= section.totalExpectedChars * 0.8
-                              ? 'bg-green-500'
-                              : section.totalActualChars >= section.totalExpectedChars * 0.5
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (section.totalActualChars / section.totalExpectedChars) * 100)}%` }}
-                        />
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-sm font-semibold ${
-                          section.totalActualChars >= section.totalExpectedChars * 0.8
-                            ? 'text-green-400'
-                            : 'text-slate-500'
-                        }`}>
-                          {section.totalExpectedChars > 0
-                            ? `${Math.round((section.totalActualChars / section.totalExpectedChars) * 100)}%`
-                            : '—'}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
+                    return (
+                      <button
+                        key={section.name}
+                        onClick={() => goToSlide(section.firstIndex)}
+                        className={`w-full text-left px-5 py-3 transition-all group ${
+                          isCurrent
+                            ? 'bg-blue-600/20 border-l-4 border-blue-500'
+                            : 'hover:bg-slate-700/40 border-l-4 border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-lg font-semibold leading-tight ${
+                            isCurrent ? 'text-blue-300' : 'text-slate-300 group-hover:text-white'
+                          }`}>
+                            {section.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-slate-500 text-sm">{section.totalMinutes} 分鐘</span>
+                          <span className="text-slate-600 text-sm">·</span>
+                          <span className="text-slate-500 text-sm">{section.slideCount} 張</span>
+                        </div>
+                        {/* 演講稿字數統計 */}
+                        <div className="mt-2 space-y-1 bg-slate-800/50 rounded-lg p-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 text-sm font-medium">預計</span>
+                            <span className="text-slate-300 text-sm font-bold">{section.totalExpectedChars.toLocaleString()} 字</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 text-sm font-medium">實際</span>
+                            <span className={`text-sm font-bold ${
+                              section.totalActualChars >= section.totalExpectedChars * 0.8
+                                ? 'text-green-400'
+                                : section.totalActualChars >= section.totalExpectedChars * 0.5
+                                ? 'text-yellow-400'
+                                : 'text-red-400'
+                            }`}>
+                              {section.totalActualChars.toLocaleString()} 字
+                            </span>
+                          </div>
+                          {/* 進度條 */}
+                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden mt-1">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                section.totalActualChars >= section.totalExpectedChars * 0.8
+                                  ? 'bg-green-500'
+                                  : section.totalActualChars >= section.totalExpectedChars * 0.5
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
+                              }`}
+                              style={{ width: `${Math.min(100, (section.totalActualChars / section.totalExpectedChars) * 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-sm font-semibold ${
+                              section.totalActualChars >= section.totalExpectedChars * 0.8
+                                ? 'text-green-400'
+                                : 'text-slate-500'
+                            }`}>
+                              {section.totalExpectedChars > 0
+                                ? `${Math.round((section.totalActualChars / section.totalExpectedChars) * 100)}%`
+                                : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -473,7 +492,7 @@ function App() {
           const totalActual = slides.reduce((sum, s) => sum + (s.notes || '').length, 0)
           const pct = totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0
           return (
-            <div className="px-5 py-4 border-t border-slate-700/50 flex-shrink-0">
+            <div className="px-5 py-4 border-t border-slate-700/50">
               <p className="text-slate-400 text-base font-semibold uppercase tracking-wider mb-3">📝 演講稿總計</p>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -500,7 +519,7 @@ function App() {
 
         {/* ❓ Q&A 學員預期問題 */}
         {qaItems.length > 0 && (
-          <div className="border-t border-slate-700/50 flex-shrink-0">
+          <div className="border-t border-slate-700/50">
             <button
               onClick={() => setShowQA(prev => !prev)}
               className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-slate-800/50 transition-colors"
@@ -528,7 +547,7 @@ function App() {
         )}
 
         {/* 進度 */}
-        <div className="px-5 py-4 border-t border-slate-700/50 flex-shrink-0">
+        <div className="px-5 py-4 border-t border-slate-700/50">
           <div className="flex justify-between text-base text-slate-400 mb-2">
             <span>投影片進度</span>
             <span className="font-bold">{currentSlide + 1} / {slides.length} 張</span>
@@ -543,6 +562,7 @@ function App() {
             <span>⏱ {currentMinutes} 分</span>
             <span>共 {totalMinutes} 分</span>
           </div>
+        </div>
         </div>
       </aside>
 

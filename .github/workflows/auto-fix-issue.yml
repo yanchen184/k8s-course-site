@@ -9,6 +9,8 @@ on:
         description: 'Issue number to fix'
         required: true
         type: number
+  repository_dispatch:
+    types: [auto-fix]
 
 jobs:
   auto-fix:
@@ -24,6 +26,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "number=${{ inputs.issue_number }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "number=${{ github.event.client_payload.issue_number }}" >> $GITHUB_OUTPUT
           else
             echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
           fi

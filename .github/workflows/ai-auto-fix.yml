@@ -78,8 +78,8 @@ jobs:
           import path from 'path';
 
           const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-          const ISSUE_TITLE = process.env.ISSUE_TITLE;
-          const ISSUE_BODY = process.env.ISSUE_BODY;
+          const ISSUE_TITLE = process.env.ISSUE_TITLE || 'Unknown Issue';
+          const ISSUE_BODY = process.env.ISSUE_BODY || 'No description provided';
 
           function getAllFiles(dir, extensions = ['.ts', '.tsx', '.js', '.jsx', '.css', '.html', '.json', '.md']) {
             let results = [];
@@ -197,7 +197,7 @@ jobs:
 ## Issue: ${ISSUE_TITLE}
 
 ## Description
-${ISSUE_BODY || 'No description'}
+${ISSUE_BODY}
 
 ## Code Files
 ${codeContext}
@@ -292,7 +292,7 @@ Important: Provide COMPLETE file content, not diffs.`;
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
-            --body "🤖 AI has created a fix! A PR has been opened. Summary: ${{ steps.check.outputs.summary }}"
+            --body "?? AI has created a fix! A PR has been opened. Summary: ${{ steps.check.outputs.summary }}"
 
       - name: Comment on failure
         if: steps.check.outputs.success != 'true'
@@ -300,4 +300,4 @@ Important: Provide COMPLETE file content, not diffs.`;
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
-            --body "🤖 AI could not generate a fix for this issue. Manual intervention may be required."
+            --body "?? AI could not generate a fix for this issue. Manual intervention may be required."

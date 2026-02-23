@@ -112,50 +112,68 @@ jobs:
           // Helper function to sleep
           const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-          async function callGemini(prompt, maxRetries = 5) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+          async function callGemini(prompt, maxRetries = 3) {
+            // Try multiple models - gemma has more generous free tier limits
+            const models = ['gemma-3-27b-it', 'gemini-2.0-flash'];
 
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              console.log(`Attempt ${attempt}/${maxRetries}...`);
+            for (const model of models) {
+              console.log(`Trying model: ${model}`);
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
-              const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-                })
-              });
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                console.log(`Attempt ${attempt}/${maxRetries}...`);
 
-              console.log('Gemini API status:', response.status);
+                try {
+                  const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: prompt }] }],
+                      generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+                    })
+                  });
 
-              // Handle rate limit (429)
-              if (response.status === 429) {
-                const errorJson = await response.json();
-                const retryInfo = errorJson.error?.details?.find(d => d.retryDelay);
-                const waitTime = retryInfo ? parseInt(retryInfo.retryDelay) + 5 : 60;
-                console.log(`Rate limited. Waiting ${waitTime} seconds before retry...`);
+                  console.log('API status:', response.status);
 
-                if (attempt < maxRetries) {
-                  await sleep(waitTime * 1000);
-                  continue;
+                  if (response.status === 429) {
+                    const errorJson = await response.json();
+                    const retryInfo = errorJson.error?.details?.find(d => d.retryDelay);
+                    const waitTime = retryInfo ? parseInt(retryInfo.retryDelay) + 5 : 60;
+                    console.log(`Rate limited. Waiting ${waitTime} seconds...`);
+
+                    if (attempt < maxRetries) {
+                      await sleep(waitTime * 1000);
+                      continue;
+                    }
+                    // Try next model instead of throwing
+                    console.log(`Model ${model} rate limited, trying next...`);
+                    break;
+                  }
+
+                  if (!response.ok) {
+                    const err = await response.text();
+                    console.log(`Error with ${model}: ${err}`);
+                    break; // Try next model
+                  }
+
+                  const json = await response.json();
+                  if (json.error) {
+                    console.log(`API error: ${json.error.message}`);
+                    break; // Try next model
+                  }
+
+                  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  if (text) {
+                    console.log(`Success with model: ${model}`);
+                    return text;
+                  }
+                } catch (e) {
+                  console.log(`Error: ${e.message}`);
+                  if (attempt === maxRetries) break;
                 }
-                throw new Error(`Rate limit exceeded after ${maxRetries} attempts`);
               }
-
-              if (!response.ok) {
-                const err = await response.text();
-                throw new Error(`API error ${response.status}: ${err}`);
-              }
-
-              const json = await response.json();
-
-              if (json.error) {
-                throw new Error(`Gemini error: ${json.error.message}`);
-              }
-
-              return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
             }
+            throw new Error('All models failed or rate limited');
           }
 
           async function main() {

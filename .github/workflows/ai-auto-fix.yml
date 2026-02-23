@@ -66,14 +66,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create and run fix script
-        id: fix
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ISSUE_TITLE: ${{ steps.get_issue.outputs.title }}
-          ISSUE_BODY: ${{ steps.get_issue.outputs.body }}
+      - name: Create fix script
         run: |
-          cat > fix-issue.mjs << 'SCRIPT'
+          cat > fix-issue.mjs << 'ENDOFSCRIPT'
           import fs from 'fs';
           import path from 'path';
 
@@ -81,7 +76,8 @@ jobs:
           const ISSUE_TITLE = process.env.ISSUE_TITLE || 'Unknown Issue';
           const ISSUE_BODY = process.env.ISSUE_BODY || 'No description provided';
 
-          function getAllFiles(dir, extensions = ['.ts', '.tsx', '.js', '.jsx', '.css', '.html', '.json', '.md']) {
+          function getAllFiles(dir, extensions) {
+            extensions = extensions || ['.ts', '.tsx', '.js', '.jsx', '.css', '.html', '.json', '.md'];
             let results = [];
             try {
               const list = fs.readdirSync(dir);
@@ -92,7 +88,7 @@ jobs:
                   if (!['node_modules', '.git', 'dist', 'build', '.next', '.github'].includes(file)) {
                     results = results.concat(getAllFiles(filePath, extensions));
                   }
-                } else if (extensions.some(ext => file.endsWith(ext))) {
+                } else if (extensions.some(function(ext) { return file.endsWith(ext); })) {
                   results.push(filePath);
                 }
               }
@@ -100,7 +96,8 @@ jobs:
             return results;
           }
 
-          function readFileSafe(filePath, maxSize = 6000) {
+          function readFileSafe(filePath, maxSize) {
+            maxSize = maxSize || 6000;
             try {
               const content = fs.readFileSync(filePath, 'utf-8');
               return content.length > maxSize ? content.slice(0, maxSize) + '\n...(truncated)' : content;
@@ -109,19 +106,20 @@ jobs:
             }
           }
 
-          // Helper function to sleep
-          const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+          function sleep(ms) {
+            return new Promise(function(resolve) { setTimeout(resolve, ms); });
+          }
 
-          async function callGemini(prompt, maxRetries = 3) {
-            // Try multiple models - gemma has more generous free tier limits
+          async function callGemini(prompt, maxRetries) {
+            maxRetries = maxRetries || 3;
             const models = ['gemma-3-27b-it', 'gemini-2.0-flash'];
 
             for (const model of models) {
-              console.log(`Trying model: ${model}`);
-              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+              console.log('Trying model: ' + model);
+              const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY;
 
               for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                console.log(`Attempt ${attempt}/${maxRetries}...`);
+                console.log('Attempt ' + attempt + '/' + maxRetries + '...');
 
                 try {
                   const response = await fetch(url, {
@@ -137,38 +135,43 @@ jobs:
 
                   if (response.status === 429) {
                     const errorJson = await response.json();
-                    const retryInfo = errorJson.error?.details?.find(d => d.retryDelay);
+                    const retryInfo = errorJson.error && errorJson.error.details && errorJson.error.details.find(function(d) { return d.retryDelay; });
                     const waitTime = retryInfo ? parseInt(retryInfo.retryDelay) + 5 : 60;
-                    console.log(`Rate limited. Waiting ${waitTime} seconds...`);
+                    console.log('Rate limited. Waiting ' + waitTime + ' seconds...');
 
                     if (attempt < maxRetries) {
                       await sleep(waitTime * 1000);
                       continue;
                     }
-                    // Try next model instead of throwing
-                    console.log(`Model ${model} rate limited, trying next...`);
+                    console.log('Model ' + model + ' rate limited, trying next...');
                     break;
                   }
 
                   if (!response.ok) {
                     const err = await response.text();
-                    console.log(`Error with ${model}: ${err}`);
-                    break; // Try next model
+                    console.log('Error with ' + model + ': ' + err);
+                    break;
                   }
 
                   const json = await response.json();
                   if (json.error) {
-                    console.log(`API error: ${json.error.message}`);
-                    break; // Try next model
+                    console.log('API error: ' + json.error.message);
+                    break;
                   }
 
-                  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  const candidates = json.candidates || [];
+                  const firstCandidate = candidates[0] || {};
+                  const content = firstCandidate.content || {};
+                  const parts = content.parts || [];
+                  const firstPart = parts[0] || {};
+                  const text = firstPart.text || '';
+
                   if (text) {
-                    console.log(`Success with model: ${model}`);
+                    console.log('Success with model: ' + model);
                     return text;
                   }
                 } catch (e) {
-                  console.log(`Error: ${e.message}`);
+                  console.log('Error: ' + e.message);
                   if (attempt === maxRetries) break;
                 }
               }
@@ -185,44 +188,40 @@ jobs:
             console.log('Found', files.length, 'files');
 
             let codeContext = '';
-            for (const file of files.slice(0, 20)) {
+            const filesToProcess = files.slice(0, 20);
+            for (const file of filesToProcess) {
               const content = readFileSafe(file);
               if (content) {
-                codeContext += `\n### ${file}\n\`\`\`\n${content}\n\`\`\`\n`;
+                codeContext += '\n### ' + file + '\n```\n' + content + '\n```\n';
               }
             }
 
-            const prompt = `You are fixing a GitHub issue. Analyze and provide a solution.
-
-## Issue: ${ISSUE_TITLE}
-
-## Description
-${ISSUE_BODY}
-
-## Code Files
-${codeContext}
-
-## Response Format
-Respond with ONLY this JSON (no other text):
-
-\`\`\`json
-{
-  "analysis": "What the issue is about",
-  "files_to_modify": [
-    {"path": "file.md", "new_content": "complete file content"}
-  ],
-  "summary": "Brief fix description"
-}
-\`\`\`
-
-Important: Provide COMPLETE file content, not diffs.`;
+            const prompt = 'You are fixing a GitHub issue. Analyze and provide a solution.\n\n' +
+              '## Issue: ' + ISSUE_TITLE + '\n\n' +
+              '## Description\n' + ISSUE_BODY + '\n\n' +
+              '## Code Files\n' + codeContext + '\n\n' +
+              '## Response Format\n' +
+              'Respond with ONLY this JSON (no other text):\n\n' +
+              '```json\n' +
+              '{\n' +
+              '  "analysis": "What the issue is about",\n' +
+              '  "files_to_modify": [\n' +
+              '    {"path": "file.md", "new_content": "complete file content"}\n' +
+              '  ],\n' +
+              '  "summary": "Brief fix description"\n' +
+              '}\n' +
+              '```\n\n' +
+              'Important: Provide COMPLETE file content, not diffs.';
 
             console.log('Calling Gemini...');
             const response = await callGemini(prompt);
             console.log('Response length:', response.length);
             console.log('Response preview:', response.substring(0, 300));
 
-            const match = response.match(/```json\s*([\s\S]*?)\s*```/) || response.match(/(\{[\s\S]*\})/);
+            const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+            const objectMatch = response.match(/(\{[\s\S]*\})/);
+            const match = jsonMatch || objectMatch;
+
             if (!match) {
               throw new Error('No JSON found in response');
             }
@@ -231,7 +230,8 @@ Important: Provide COMPLETE file content, not diffs.`;
             console.log('Analysis:', fix.analysis);
 
             let changed = [];
-            for (const f of fix.files_to_modify || []) {
+            const filesToModify = fix.files_to_modify || [];
+            for (const f of filesToModify) {
               if (f.path && f.new_content) {
                 const dir = path.dirname(f.path);
                 if (dir !== '.') fs.mkdirSync(dir, { recursive: true });
@@ -248,14 +248,20 @@ Important: Provide COMPLETE file content, not diffs.`;
             }));
           }
 
-          main().catch(err => {
+          main().catch(function(err) {
             console.error('Error:', err.message);
             fs.writeFileSync('fix-result.json', JSON.stringify({ success: false, reason: err.message }));
             process.exit(1);
           });
-          SCRIPT
+          ENDOFSCRIPT
 
-          node fix-issue.mjs
+      - name: Run fix script
+        id: fix
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ISSUE_TITLE: ${{ steps.get_issue.outputs.title }}
+          ISSUE_BODY: ${{ steps.get_issue.outputs.body }}
+        run: node fix-issue.mjs
 
       - name: Check result
         id: check
@@ -280,7 +286,7 @@ Important: Provide COMPLETE file content, not diffs.`;
             **Summary:** ${{ steps.check.outputs.summary }}
 
             ---
-            Generated by AI (Gemini 2.0 Flash). Please review carefully.
+            Generated by AI (Gemini). Please review carefully.
 
             Closes #${{ steps.issue.outputs.number }}
           branch: auto-fix/issue-${{ steps.issue.outputs.number }}
@@ -292,7 +298,7 @@ Important: Provide COMPLETE file content, not diffs.`;
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
-            --body "?? AI has created a fix! A PR has been opened. Summary: ${{ steps.check.outputs.summary }}"
+            --body "AI has created a fix! A PR has been opened. Summary: ${{ steps.check.outputs.summary }}"
 
       - name: Comment on failure
         if: steps.check.outputs.success != 'true'
@@ -300,4 +306,4 @@ Important: Provide COMPLETE file content, not diffs.`;
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
-            --body "?? AI could not generate a fix for this issue. Manual intervention may be required."
+            --body "AI could not generate a fix for this issue. Manual intervention may be required."

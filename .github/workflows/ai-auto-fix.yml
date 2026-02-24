@@ -276,13 +276,24 @@ jobs:
           branch: auto-fix/issue-${{ steps.issue.outputs.number }}
           delete-branch: true
 
+      - name: Auto merge PR
+        if: steps.check.outputs.success == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sleep 5
+          PR_NUMBER=$(gh pr list --repo ${{ github.repository }} --head auto-fix/issue-${{ steps.issue.outputs.number }} --json number -q '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr merge $PR_NUMBER --repo ${{ github.repository }} --squash --delete-branch || echo "Auto-merge failed, PR needs manual review"
+          fi
+
       - name: Comment on success
         if: steps.check.outputs.success == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ steps.issue.outputs.number }} --repo ${{ github.repository }} \
-            --body "AI has created a fix! A PR has been opened. Summary: ${{ steps.check.outputs.summary }}"
+            --body "AI has created and merged a fix! Summary: ${{ steps.check.outputs.summary }}"
 
       - name: Comment on failure
         if: steps.check.outputs.success != 'true'

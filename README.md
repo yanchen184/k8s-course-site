@@ -2,6 +2,33 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## Project Description
+This is a K8s course website designed to help learners understand Kubernetes and its ecosystem.
+
+## Tech Stack
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+
+## Getting Started
+To get started with the project, follow these steps:
+1. Install the dependencies:
+   ```bash
+   npm install
+   ```
+2. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Project Structure
+The project structure is organized as follows:
+- `src/`: Contains the source code for the application.
+- `public/`: Contains static assets like images and the index.html file.
+- `package.json`: Contains project metadata and dependencies.
+- `vite.config.js`: Configuration file for Vite.
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh

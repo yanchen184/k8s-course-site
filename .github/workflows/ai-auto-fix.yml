@@ -191,49 +191,38 @@ jobs:
               }
             }
 
-            const prompt = 'You are fixing a GitHub issue. Analyze and provide a solution.\n\n' +
-              '## Issue: ' + ISSUE_TITLE + '\n\n' +
-              '## Description\n' + ISSUE_BODY + '\n\n' +
-              '## Code Files\n' + codeContext + '\n\n' +
-              '## Response Format\n' +
-              'Respond with ONLY this JSON (no other text):\n\n' +
-              '```json\n' +
-              '{\n' +
-              '  "analysis": "What the issue is about",\n' +
-              '  "files_to_modify": [\n' +
-              '    {"path": "file.md", "new_content": "complete file content"}\n' +
-              '  ],\n' +
-              '  "summary": "Brief fix description"\n' +
-              '}\n' +
-              '```\n\n' +
-              'Important: Provide COMPLETE file content, not diffs.';
+            const prompt = 'Fix this GitHub issue by modifying files.\n\n' +
+              'Issue: ' + ISSUE_TITLE + '\n' + ISSUE_BODY + '\n\n' +
+              'Files:\n' + codeContext + '\n\n' +
+              'Reply with ONLY valid JSON (no markdown):\n' +
+              '{"path":"file.md","content":"full file content","summary":"what you fixed"}\n\n' +
+              'Rules:\n' +
+              '- One file only\n' +
+              '- Full content, no diffs\n' +
+              '- No markdown code blocks';
 
             console.log('Calling OpenAI...');
             const response = await callOpenAI(prompt);
             console.log('Response length:', response.length);
             console.log('Response preview:', response.substring(0, 300));
 
-            const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-            const objectMatch = response.match(/(\{[\s\S]*\})/);
-            const match = jsonMatch || objectMatch;
-
-            if (!match) {
-              throw new Error('No JSON found in response');
+            var jsonStr = response.trim();
+            if (jsonStr.startsWith('```')) {
+              var jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+              if (jsonMatch) jsonStr = jsonMatch[1];
             }
 
-            const fix = JSON.parse(match[1]);
-            console.log('Analysis:', fix.analysis);
+            console.log('Parsing JSON...');
+            var fix = JSON.parse(jsonStr);
+            console.log('Summary:', fix.summary);
 
-            let changed = [];
-            const filesToModify = fix.files_to_modify || [];
-            for (const f of filesToModify) {
-              if (f.path && f.new_content) {
-                const dir = path.dirname(f.path);
-                if (dir !== '.') fs.mkdirSync(dir, { recursive: true });
-                fs.writeFileSync(f.path, f.new_content);
-                changed.push(f.path);
-                console.log('Modified:', f.path);
-              }
+            var changed = [];
+            if (fix.path && fix.content) {
+              var dir = path.dirname(fix.path);
+              if (dir !== '.') fs.mkdirSync(dir, { recursive: true });
+              fs.writeFileSync(fix.path, fix.content);
+              changed.push(fix.path);
+              console.log('Modified:', fix.path);
             }
 
             fs.writeFileSync('fix-result.json', JSON.stringify({

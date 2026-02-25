@@ -53,7 +53,7 @@ async function callOpenAI(prompt, maxRetries) {
           'Authorization': 'Bearer ' + OPENAI_API_KEY
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: 'You are a helpful assistant that fixes GitHub issues. Always respond with valid JSON only.' },
             { role: 'user', content: prompt }
@@ -92,7 +92,7 @@ async function callOpenAI(prompt, maxRetries) {
 
       const text = json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
       if (text) {
-        console.log('Success with OpenAI GPT-4o-mini');
+        console.log('Success with OpenAI GPT-4o');
         return text;
       }
     } catch (e) {

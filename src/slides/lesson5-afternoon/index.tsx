@@ -1141,6 +1141,40 @@ YAML 重點解析：podSelector 選 app: demo-web 的 Pod，也就是我們要�
 
 【問】我設定了 NetworkPolicy 但感覺沒有效果，從任何 Pod 都能連到被保護的 Pod，這是什麼原因？
 
-【答】最常見的原因是 CNI 不支援 NetworkPolicy。Kubernetes 的 NetworkPolicy 資源只是一個規則聲明，真正執行網路隔離的是 CNI（Container Network Interface）。Flannel（很多入門教程用的 CNI）預設不支援 NetworkPolicy；你需要 Calico、Cilium、或 Canal 等支援 NetworkPolicy 的 CNI。確認方式：kubectl get pods -n kube-system，看有沒有 calico-node 或 cilium 的 Pod；或者用 kubectl get pods -n kube-system -o wide 看節點上跑的網路元件。如果確認 CNI 支援，再檢查 podSelector 的 Label 是否正確匹配到 Pod。`,
+【答】最常見的原因是 CNI 不支援 NetworkPolicy。Kubernetes 的 NetworkPolicy 資源只是一個規則聲明，真正執行網路隔離的是 CNI（Container Network Interface）。Flannel（很多入門教程用的 CNI）預設不支援 NetworkPolicy；你需要 Calico、Cilium、或 Canal 等支援 NetworkPolicy 的 CNI。確認方式：kubectl get pods -n kube-system，看有沒有 calico-node 或 cilium 的 Pod；或者用 kubectl get pods -n kube-system -o wide 看節點上跑的網路元件。如果確認 CNI 支援，再檢查 podSelector 的 Label 是否正確匹配到 Pod。
+
+【預期難搞學員問題 — 第五堂下午】
+
+Q：ClusterIP、NodePort、LoadBalancer、Ingress 該怎麼選？
+
+A：先問流量來源與治理需求。內部通訊優先 ClusterIP，對外 HTTP 多半是 Ingress，LoadBalancer 用在入口層或非 HTTP，NodePort 通常留給測試與過渡。
+
+Q：Ingress 和 Gateway API 會不會很快替代關係？
+
+A：Gateway API 是趨勢，但生態與工具成熟度仍在演進。現階段多數團隊仍以 Ingress 為主，逐步引入 Gateway API 比一次切換更穩。
+
+Q：TLS 憑證自動更新最怕失敗，怎麼降低風險？
+
+A：建立可監控的續期流程與提前告警，不要只看部署成功。並且保留手動補救路徑，確保控制器異常時仍可快速續期。
+
+Q：Service DNS 偶發失敗時，先查應用還是先查 CoreDNS？
+
+A：先確認故障範圍，再分層排查。若多服務同時失敗，先看 DNS 平台；若單服務失敗，先看 selector 與 endpoint。不要一開始就深挖單點。
+
+Q：NetworkPolicy 一上 default deny，會不會全站斷線？
+
+A：有可能，所以要分階段導入。先觀測現況流量，再逐步收斂，最後才全面封鎖。安全策略必須配合驗證，不是一次梭哈。
+
+Q：我怎麼確認 CNI 真的有實作 NetworkPolicy？
+
+A：看官方能力矩陣與實際驗證結果，不要只看文件宣稱。建議準備一組最小允許/拒絕測試案例，作為每次升級後的回歸檢查。
+
+Q：externalTrafficPolicy 設 Local 保留客戶端 IP，代價是什麼？
+
+A：代價是流量可能不均與節點可用性壓力增加。你得到真實來源 IP，但也要承擔路由與容量配置的複雜度。
+
+Q：對外發布前，最小檢查清單應包含哪些？
+
+A：至少要有健康檢查、TLS、限流或 WAF、可觀測性、回滾路徑與權限最小化。把發布視為風險控制流程，而不是單純打開入口。`,
   },
 ]

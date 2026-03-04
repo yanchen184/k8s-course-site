@@ -235,6 +235,8 @@ function App() {
   const [manualAudienceUrl, setManualAudienceUrl] = useState<string | null>(null)
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
   const [clockTick, setClockTick] = useState(() => Date.now())
+  const [timerPaused, setTimerPaused] = useState(false)
+  const [pausedElapsed, setPausedElapsed] = useState(0)
   const audienceWindowRef = useRef<Window | null>(null)
   const pendingAudienceSlideRef = useRef<number | null>(null)
   const lastAudienceSignalAtRef = useRef<number | null>(null)
@@ -353,6 +355,8 @@ function App() {
     setViewMode('single')
     setSessionId(null)
     setSessionStartedAt(null)
+    setTimerPaused(false)
+    setPausedElapsed(0)
     setPresenterError(null)
     setManualAudienceUrl(null)
     setPresenterSyncStatus('idle')
@@ -393,9 +397,25 @@ function App() {
   const lesson = LESSONS[currentLesson]
   const sections = useMemo(() => buildSections(slides), [slides])
   const nextSlidePreview: Slide | null = slides[currentSlide + 1] || null
-  const elapsedSeconds = sessionStartedAt ? Math.max(0, Math.floor((clockTick - sessionStartedAt) / 1000)) : 0
+  const elapsedSeconds = timerPaused
+    ? pausedElapsed
+    : sessionStartedAt
+    ? Math.max(0, Math.floor((clockTick - sessionStartedAt) / 1000))
+    : 0
   const elapsedMinutes = Math.floor(elapsedSeconds / 60)
   const elapsedRemainderSeconds = elapsedSeconds % 60
+
+  const toggleTimerPause = useCallback(() => {
+    if (timerPaused) {
+      // Resume: adjust sessionStartedAt so elapsed time stays the same
+      setSessionStartedAt(Date.now() - pausedElapsed * 1000)
+      setTimerPaused(false)
+    } else {
+      // Pause: save current elapsed time
+      setPausedElapsed(elapsedSeconds)
+      setTimerPaused(true)
+    }
+  }, [timerPaused, pausedElapsed, elapsedSeconds])
 
   useEffect(() => {
     if (isAudienceView && !sessionId) {
@@ -1003,7 +1023,7 @@ function App() {
               <p className="text-2xl text-slate-300">載入課程中...</p>
             </div>
           ) : isPresenterModeEnabled ? (
-            <div className="w-full max-w-[1500px] grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)] gap-6" key={`${currentLesson}-${currentSlide}`}>
+            <div className="w-full max-w-[1800px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(500px,1.2fr)] gap-6" key={`${currentLesson}-${currentSlide}`}>
               <div className="bg-slate-900/60 border border-slate-700 rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-4 text-xs text-slate-500">
                   <span>{lesson.day}</span>
@@ -1070,14 +1090,14 @@ function App() {
                   )}
                 </div>
 
-                <div className="bg-black/70 border border-slate-700 rounded-xl p-4 h-[380px] flex flex-col">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm uppercase tracking-wide text-slate-400">Speaker notes</h3>
-                    <span className="text-xs text-slate-400">
-                      {slide.duration || '2-3'} min · {(slide.notes || '').length} chars
+                <div className="bg-black/70 border border-slate-700 rounded-xl p-6 flex-1 min-h-[500px] flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg uppercase tracking-wide text-blue-400 font-semibold">📝 演講稿</h3>
+                    <span className="text-sm text-slate-400">
+                      ⏱ {slide.duration || '2-3'} min · {(slide.notes || '').length} 字
                     </span>
                   </div>
-                  <div className="text-sm text-slate-200 whitespace-pre-line leading-relaxed overflow-y-auto pr-1">
+                  <div className="text-xl text-slate-100 whitespace-pre-line leading-relaxed overflow-y-auto pr-2 flex-1">
                     {slide.notes?.trim() ? slide.notes : 'No notes for this slide yet.'}
                   </div>
                 </div>
@@ -1085,9 +1105,22 @@ function App() {
                 <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-400">Presenter timer</span>
-                    <span className="text-slate-200 font-semibold tabular-nums">
-                      {elapsedMinutes}:{elapsedRemainderSeconds.toString().padStart(2, '0')}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-semibold tabular-nums text-lg ${timerPaused ? 'text-amber-400' : 'text-slate-200'}`}>
+                        {elapsedMinutes}:{elapsedRemainderSeconds.toString().padStart(2, '0')}
+                      </span>
+                      <button
+                        onClick={toggleTimerPause}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                          timerPaused
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            : 'bg-amber-600 hover:bg-amber-500 text-white'
+                        }`}
+                        title={timerPaused ? '繼續計時' : '暫停計時'}
+                      >
+                        {timerPaused ? '▶ 繼續' : '⏸ 暫停'}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-xs">
                     <span className="text-slate-500">{presenterStatusLabel}</span>
@@ -1147,10 +1180,10 @@ function App() {
 
         {/* Speaker notes */}
         {!isPresenterModeEnabled && showNotes && slide.notes && (
-          <div className="fixed bottom-16 right-4 left-4 md:left-auto md:w-[640px] bg-black/95 backdrop-blur-sm rounded-lg p-6 text-white border border-slate-700 max-h-[45vh] overflow-y-auto z-20 shadow-2xl">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-blue-400 font-semibold">📝 演講稿</h3>
-              <div className="flex gap-4 text-slate-400 text-xs">
+          <div className="fixed bottom-16 right-4 left-4 md:left-auto md:w-[800px] bg-black/95 backdrop-blur-sm rounded-xl p-8 text-white border border-slate-700 max-h-[70vh] overflow-y-auto z-20 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-blue-400 font-semibold text-xl">📝 演講稿</h3>
+              <div className="flex gap-4 text-slate-400 text-sm">
                 <span>⏱ {slide.duration || '2-3'} 分鐘</span>
                 <span className={slide.notes.length >= parseInt(slide.duration || '2') * 150 ? 'text-green-400' : 'text-yellow-400'}>
                   {slide.notes.length} / {parseInt(slide.duration || '2') * 150} 字
@@ -1158,7 +1191,7 @@ function App() {
                 </span>
               </div>
             </div>
-            <div className="text-slate-200 whitespace-pre-line leading-relaxed text-sm">
+            <div className="text-slate-100 whitespace-pre-line leading-loose text-xl">
               {slide.notes}
             </div>
           </div>

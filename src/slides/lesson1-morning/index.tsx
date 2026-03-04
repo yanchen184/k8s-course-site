@@ -31,18 +31,18 @@ export const slides: Slide[] = [
         <div className="grid grid-cols-2 gap-4 mt-8 text-base">
           <div className="bg-slate-800/50 p-4 rounded-lg">
             <p className="text-k8s-blue font-semibold">講師</p>
-            <p>謝智宇</p>
+            <p>陳彥彤</p>
           </div>
           <div className="bg-slate-800/50 p-4 rounded-lg">
             <p className="text-k8s-blue font-semibold">助教</p>
-            <p>陳彥彤</p>
+            <p>葉祈佑</p>
           </div>
         </div>
       </div>
     ),
     notes: `大家好，非常歡迎大家來到這個 Kubernetes 從新手到叢集管理員的實務課程！
 
-我是今天的講師謝智宇，大家可以叫我智宇老師。旁邊這位是助教陳彥彤，如果大家在上課過程中有任何操作問題，或是電腦環境出了狀況，都可以舉手請助教過來協助，不用擔心打擾到其他人。
+我是今天的講師陳彥彤，大家可以叫我彥彤老師。旁邊這位是助教葉祈佑，如果大家在上課過程中有任何操作問題，或是電腦環境出了狀況，都可以舉手請助教過來協助，不用擔心打擾到其他人。
 
 在正式進入 Kubernetes 之前，我們需要先打好基礎，特別是 Linux 的基礎。你可能會問：我來學 K8s，為什麼要先學 Linux？這是個很好的問題。因為 Kubernetes 完全是建構在 Linux 之上的，所有的節點、Pod、容器，底層都是 Linux 在運作。如果你不懂 Linux，你在操作 K8s 的時候會非常吃力，尤其是在除錯或是排查問題的時候。
 

@@ -31,18 +31,18 @@ export const slides: Slide[] = [
         <div className="grid grid-cols-2 gap-4 mt-8 text-base">
           <div className="bg-slate-800/50 p-4 rounded-lg">
             <p className="text-k8s-blue font-semibold">講師</p>
-            <p>謝智宇</p>
+            <p>陳彥彤</p>
           </div>
           <div className="bg-slate-800/50 p-4 rounded-lg">
             <p className="text-k8s-blue font-semibold">助教</p>
-            <p>陳彥彤</p>
+            <p>葉祈佑</p>
           </div>
         </div>
       </div>
     ),
     notes: `大家好，歡迎來到 Kubernetes 入門課程的第一堂課。
 
-我是今天的講師謝智宇，旁邊這位是助教陳彥彤，如果有任何問題都可以舉手發問，或者找助教協助。
+我是今天的講師陳彥彤，旁邊這位是助教葉祈佑，如果有任何問題都可以舉手發問，或者找助教協助。
 
 在正式開始 Kubernetes 之前，我們需要先打好基礎。今天的主題是 Linux 操作入門，為什麼要先學 Linux 呢？因為 Kubernetes 是建構在 Linux 之上的，所有的容器、Pod 都是在 Linux 環境中執行。
 

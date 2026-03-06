@@ -1399,7 +1399,125 @@ find 還支援邏輯運算，比如 find . -name "*.log" -mtime +30 找超過 30
     duration: "8",
   },
 
-  // ===== 20. 總結 =====
+  // ===== 20. Linux 有趣彩蛋 =====
+  {
+    title: "🎮 Linux 有趣彩蛋",
+    subtitle: "工程師的幽默感",
+    section: "輕鬆時刻",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="bg-slate-800/60 border border-yellow-600/50 p-4 rounded-xl">
+            <p className="text-yellow-400 font-bold text-lg mb-2">🚂 sl — 蒸汽火車</p>
+            <p className="text-slate-300 text-sm mb-2">當你把 <code className="text-green-400">ls</code> 打成 <code className="text-red-400">sl</code>...</p>
+            <div className="bg-slate-900/60 p-2 rounded font-mono text-xs text-green-400">
+              $ sl<br/>
+              <span className="text-slate-500"># 一台 ASCII 蒸汽火車跑過螢幕！</span>
+            </div>
+            <p className="text-slate-400 text-xs mt-2">安裝：<code className="text-blue-300">sudo apt install sl</code></p>
+          </div>
+          <div className="bg-slate-800/60 border border-blue-600/50 p-4 rounded-xl">
+            <p className="text-blue-400 font-bold text-lg mb-2">🐄 cowsay — 牛說話</p>
+            <p className="text-slate-300 text-sm mb-2">讓一隻 ASCII 牛說你指定的話</p>
+            <div className="bg-slate-900/60 p-2 rounded font-mono text-xs text-green-400">
+              $ cowsay "Hello K8s!"<br/>
+              <span className="text-slate-500"># 一隻牛會說出這句話</span>
+            </div>
+            <p className="text-slate-400 text-xs mt-2">安裝：<code className="text-blue-300">sudo apt install cowsay</code></p>
+          </div>
+          <div className="bg-slate-800/60 border border-green-600/50 p-4 rounded-xl">
+            <p className="text-green-400 font-bold text-lg mb-2">🔮 fortune — 隨機格言</p>
+            <p className="text-slate-300 text-sm mb-2">隨機顯示一句格言或笑話</p>
+            <div className="bg-slate-900/60 p-2 rounded font-mono text-xs text-green-400">
+              $ fortune | cowsay<br/>
+              <span className="text-slate-500"># 組合技：讓牛說隨機格言</span>
+            </div>
+            <p className="text-slate-400 text-xs mt-2">安裝：<code className="text-blue-300">sudo apt install fortune</code></p>
+          </div>
+          <div className="bg-slate-800/60 border border-purple-600/50 p-4 rounded-xl">
+            <p className="text-purple-400 font-bold text-lg mb-2">💊 cmatrix — 駭客任務</p>
+            <p className="text-slate-300 text-sm mb-2">螢幕上顯示綠色數字雨</p>
+            <div className="bg-slate-900/60 p-2 rounded font-mono text-xs text-green-400">
+              $ cmatrix<br/>
+              <span className="text-slate-500"># 按 q 離開 Matrix 世界</span>
+            </div>
+            <p className="text-slate-400 text-xs mt-2">安裝：<code className="text-blue-300">sudo apt install cmatrix</code></p>
+          </div>
+        </div>
+        <div className="bg-yellow-900/20 border border-yellow-600/50 p-3 rounded-lg">
+          <p className="text-yellow-400 font-bold mb-2">🎯 小練習（放鬆一下）</p>
+          <p className="text-slate-300 text-sm">試試看：<code className="text-green-300">sudo apt install sl cowsay -y && sl && cowsay "Linux is fun!"</code></p>
+        </div>
+      </div>
+    ),
+    notes: `在結束今天的課程之前，讓我們來點輕鬆的！Linux 的工程師們其實很有幽默感，在系統裡藏了很多好玩的「彩蛋」。
+
+**sl — 蒸汽火車（Steam Locomotive）**
+
+這是最經典的 Linux 彩蛋。當你打字太快，把 ls（列出目錄）打成 sl 的時候，如果你安裝了這個套件，螢幕上會跑出一台完整的 ASCII 蒸汽火車！而且你按 Ctrl+C 還停不下來，火車一定要跑完才行。
+
+這個程式的作者是日本工程師 Toyoda Masashi，他的本意就是「懲罰」打字太快太粗心的人。非常有趣的是，這個「懲罰工具」反而成為 Linux 上最受歡迎的彩蛋之一。
+
+安裝方式：sudo apt install sl
+執行：sl
+
+你還可以加選項：
+- sl -l：火車變小
+- sl -a：有人從火車窗戶揮手
+- sl -F：火車飛起來
+- sl -e：允許 Ctrl+C 中斷
+
+**cowsay — 牛說話**
+
+這個程式會讓一隻 ASCII 畫的牛「說」出你指定的文字。看起來很無聊對吧？但它其實在很多地方有實際用途：
+
+1. 讓系統訊息更顯眼——有些管理員會在伺服器的 MOTD（登入歡迎訊息）用 cowsay，讓重要警告更醒目
+2. 在腳本輸出加入一點幽默感
+3. 配合 fortune 使用
+
+安裝：sudo apt install cowsay
+執行：cowsay "Hello K8s!"
+
+cowsay 還有很多其他動物可選：cowsay -l 列出所有可用的動物，然後用 -f 選擇，比如 cowsay -f tux "Linux!" 會讓企鵝說話。
+
+**fortune — 隨機格言**
+
+fortune 會隨機顯示一句格言、笑話或冷知識。這個程式的歷史非常悠久，早在 1970 年代的 Unix 就有了。
+
+安裝：sudo apt install fortune
+執行：fortune
+
+經典組合技：fortune | cowsay
+這會讓牛隨機說一句格言！很多人會把這行加到 .bashrc 裡，每次開終端機就看到一句隨機的話。
+
+**cmatrix — 駭客任務效果**
+
+還記得電影《駭客任務》裡那個著名的綠色數字雨嗎？cmatrix 就是在終端機上重現這個效果。
+
+安裝：sudo apt install cmatrix
+執行：cmatrix
+按 q 離開
+
+這個程式純粹就是好玩，沒有實際用途。但當你需要在同事面前假裝你在做很厲害的「駭客」工作時...（開玩笑的）
+
+**更多彩蛋**
+
+- apt moo：執行 apt moo 會出現一隻 ASCII 牛，這是 apt 套件管理器內建的彩蛋
+- vim :help 42：在 vim 編輯器裡輸入這個命令，會顯示「42」的典故（出自《乞丐英雄傳》）
+- yes：這個指令會無限印出 "y"，原本是設計來自動回答需要確認的程式
+
+**為什麼 Linux 有這麼多彩蛋？**
+
+這反映了 Unix/Linux 的文化：實用主義加上工程師的幽默感。這些程式都是工程師在業餘時間寫的，目的就是好玩。開源社群不只是在做「嚴肅的工作」，也在享受寫程式的樂趣。
+
+現在大家可以試試看！先安裝：sudo apt install sl cowsay fortune cmatrix -y
+然後玩玩看：sl、cowsay "你好"、fortune | cowsay、cmatrix
+
+這些彩蛋雖然沒有實際工作用途，但它們代表了 Linux 社群的文化：嚴謹但不無聊，專業但有幽默感。好，輕鬆時刻結束，我們來做今天的總結！`,
+    duration: "5",
+  },
+
+  // ===== 21. 總結 =====
   {
     title: "今日下午總結",
     subtitle: "完整指令清單 + 明日預告",

@@ -60,7 +60,98 @@ export const slides: Slide[] = [
     duration: "3"
   },
 
-  // ========== 課程大綱 ==========
+  // ========== 47 小時課程總覽 ==========
+  {
+    title: "47 小時完整課程大綱",
+    subtitle: "從 Linux 新手到 Kubernetes 叢集管理員",
+    section: "課程總覽",
+    content: (
+      <div className="space-y-4">
+        <div className="grid gap-2">
+          {[
+            { day: "Day 1", icon: "🐧", am: "Linux 基礎入門", pm: "Linux 指令實作", color: "text-green-400" },
+            { day: "Day 2", icon: "⚙️", am: "程式與服務管理", pm: "Docker 入門", color: "text-blue-400" },
+            { day: "Day 3", icon: "🐳", am: "容器進階操作", pm: "Dockerfile & Compose", color: "text-blue-400" },
+            { day: "Day 4", icon: "☸️", am: "Kubernetes 架構", pm: "kubectl 與 YAML", color: "text-k8s-blue" },
+            { day: "Day 5", icon: "📦", am: "工作負載管理", pm: "Service & Ingress", color: "text-k8s-blue" },
+            { day: "Day 6", icon: "💾", am: "組態管理", pm: "持久化儲存", color: "text-k8s-blue" },
+            { day: "Day 7", icon: "🛡️", am: "安全與監控", pm: "實戰演練 & 畢業", color: "text-yellow-400" },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-3 bg-slate-800/50 p-2.5 rounded-lg">
+              <span className="text-2xl w-10 text-center">{item.icon}</span>
+              <span className={`font-bold w-16 ${item.color}`}>{item.day}</span>
+              <div className="flex-1 grid grid-cols-2 gap-4 text-sm">
+                <span className="text-slate-300">☀️ {item.am}</span>
+                <span className="text-slate-400">🌙 {item.pm}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-center gap-6 mt-3 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+            <span className="text-slate-400">Linux 基礎</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+            <span className="text-slate-400">Docker 容器</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-k8s-blue rounded-full"></div>
+            <span className="text-slate-400">Kubernetes</span>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `這是整個 47 小時課程的完整大綱，讓學員一開始就對整個學習旅程有清晰的概念。
+
+**課程設計理念：**
+
+這個課程是循序漸進的設計，每一天都建立在前一天的基礎上：
+
+**第一階段：Linux 基礎（Day 1）**
+- 上午：從零開始認識 Linux，理解為什麼要學、跟 Windows 有什麼不同、怎麼連線
+- 下午：實際動手操作，學習檔案操作、目錄導覽、權限管理等核心指令
+
+為什麼先學 Linux？因為 Docker 和 Kubernetes 都是在 Linux 上運作的。不懂 Linux，後面會很辛苦。這是地基。
+
+**第二階段：Docker 容器化（Day 2-3）**
+- Day 2 上午：學習程式管理、服務管理、apt 套件安裝——這些是操作 Linux 伺服器的日常
+- Day 2 下午：正式進入 Docker，理解容器概念、學會 docker run、docker ps 等基本操作
+- Day 3 上午：深入容器操作——網路、Volume、環境變數、資源限制
+- Day 3 下午：學會寫 Dockerfile 建構自己的映像檔，以及用 Docker Compose 管理多容器應用
+
+Docker 是 Kubernetes 的基礎。Pod 裡面跑的就是容器。不懂容器，學 K8s 只能死記硬背。
+
+**第三階段：Kubernetes 核心（Day 4-6）**
+- Day 4：K8s 架構概念 + kubectl 基本操作 + YAML 撰寫
+- Day 5：Deployment、HPA、DaemonSet、StatefulSet 等工作負載，以及 Service、Ingress 讓外部可以存取
+- Day 6：ConfigMap、Secret 組態管理，PV、PVC 持久化儲存
+
+這三天是 K8s 的核心知識，學完你就能獨立操作一個 K8s 叢集。
+
+**第四階段：企業實戰（Day 7）**
+- 上午：RBAC 權限控制、Prometheus + Grafana 監控、EFK 日誌收集——企業環境必備
+- 下午：三場實戰演練，把七天學的東西串在一起，最後是畢業典禮和 Q&A
+
+**為什麼這個順序很重要？**
+
+我見過很多人直接跳進 K8s，結果連 Pod 為什麼起不來都不會查。因為他們不會 docker logs，不會進容器裡面看，不懂 Linux 怎麼排查問題。
+
+這個課程的設計是：先打好基礎，再往上蓋。每一天都是前一天的延伸。到最後一天，你已經具備了完整的知識鏈條。
+
+**給學員的提醒：**
+
+這七天的學習量很大，不要期望一次全部記住。重要的是：
+1. 理解「為什麼」比記住「怎麼做」更重要
+2. 課後一定要自己動手練習
+3. 把學到的東西跟工作上的場景連結
+
+七天之後，你會從「完全不懂」變成「知道該怎麼開始」。這已經是非常大的進步了。`,
+    duration: "5"
+  },
+
+  // ========== 今日課程大綱 ==========
   {
     title: "今日課程大綱",
     section: "課程總覽",

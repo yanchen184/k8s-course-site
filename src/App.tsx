@@ -242,7 +242,6 @@ function App() {
   const lastAudienceSignalAtRef = useRef<number | null>(null)
   const hasReceivedInitialSyncRef = useRef(false)
   const audienceManualNavRef = useRef(false)
-  const audienceManualTimerRef = useRef<number | null>(null)
   const isAudienceView = viewMode === 'audience'
   const isPresenterModeEnabled = viewMode === 'presenter' && Boolean(sessionId)
   const { latestMessage, transportStatus, sendMessage } = usePresentationChannel(sessionId)
@@ -315,12 +314,6 @@ function App() {
 
   const audienceNav = useCallback((direction: 'next' | 'prev') => {
     audienceManualNavRef.current = true
-    if (audienceManualTimerRef.current) {
-      window.clearTimeout(audienceManualTimerRef.current)
-    }
-    audienceManualTimerRef.current = window.setTimeout(() => {
-      audienceManualNavRef.current = false
-    }, 10000)
     if (direction === 'next') {
       goToSlide(currentSlide + 1)
     } else {

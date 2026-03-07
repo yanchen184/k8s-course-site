@@ -8,6 +8,10 @@ interface AudienceViewProps {
   slide: Slide | null
   loading: boolean
   connectionState: AudienceConnectionState
+  currentSlide: number
+  totalSlides: number
+  onPrev: () => void
+  onNext: () => void
 }
 
 function getConnectionLabel(state: AudienceConnectionState): string {
@@ -32,6 +36,10 @@ export default function AudienceView({
   slide,
   loading,
   connectionState,
+  currentSlide,
+  totalSlides,
+  onPrev,
+  onNext,
 }: AudienceViewProps) {
   const showWaitingState = loading || connectionState === 'loading'
   const showError = connectionState === 'missing-session' || connectionState === 'unsupported'
@@ -117,6 +125,35 @@ export default function AudienceView({
           </div>
         )}
       </div>
+
+      {/* Navigation buttons */}
+      {!showWaitingState && !showError && totalSlides > 0 && (
+        <div className="fixed bottom-6 left-0 right-0 flex items-center justify-center gap-4 z-20">
+          <button
+            onClick={onPrev}
+            disabled={currentSlide <= 0}
+            className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all
+              bg-slate-800/80 border border-slate-600/60 text-slate-200
+              hover:bg-slate-700/80 hover:border-slate-500
+              disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-800/80"
+          >
+            ← Prev
+          </button>
+          <span className="text-slate-400 text-sm tabular-nums min-w-[80px] text-center">
+            {currentSlide + 1} / {totalSlides}
+          </span>
+          <button
+            onClick={onNext}
+            disabled={currentSlide >= totalSlides - 1}
+            className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all
+              bg-slate-800/80 border border-slate-600/60 text-slate-200
+              hover:bg-slate-700/80 hover:border-slate-500
+              disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-800/80"
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   )
 }

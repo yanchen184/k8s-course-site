@@ -365,6 +365,11 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isAudienceView) {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+          e.preventDefault(); nextSlide()
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          e.preventDefault(); prevSlide()
+        }
         return
       }
 
@@ -656,6 +661,10 @@ function App() {
         slide={slide || null}
         loading={loading}
         connectionState={audienceConnectionState}
+        currentSlide={currentSlide}
+        totalSlides={slides.length}
+        onPrev={prevSlide}
+        onNext={nextSlide}
       />
     )
   }

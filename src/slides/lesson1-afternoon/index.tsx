@@ -1846,7 +1846,613 @@ find ~ -name "*.txt"
     duration: "5",
   },
 
-  // ===== 26. 總結 =====
+  // ===== 26. 中階延伸實作練習 =====
+  {
+    title: "Linux 中階延伸實作練習",
+    subtitle: "Day 1 下午進階補充",
+    section: "延伸實作練習",
+    content: (
+      <div className="space-y-5">
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 text-sm font-semibold mb-2">🕒 建議時間</p>
+            <p className="text-3xl font-bold text-white">45 分鐘</p>
+            <p className="text-slate-400 text-sm mt-2">適合完成基礎練習後往上挑戰</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-green-400 text-sm font-semibold mb-2">🧩 練習形式</p>
+            <p className="text-2xl font-bold text-white">指令組合 + 觀念驗證</p>
+            <p className="text-slate-400 text-sm mt-2">開始接近真實維運的思考方式</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-yellow-400 text-sm font-semibold mb-2">🎯 目標</p>
+            <p className="text-lg font-semibold text-white">把單點技能串成完整流程</p>
+            <p className="text-slate-400 text-sm mt-2">從會下指令走到會判斷與驗證</p>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-5 gap-3 text-sm">
+          {[
+            { title: "導覽結構", count: "3 題", desc: "多層目錄、相對路徑、ls 欄位" },
+            { title: "檔案操作", count: "4 題", desc: "cp -p、mv、遞迴複製、驗證" },
+            { title: "內容分析", count: "5 題", desc: "tail、less、head、wc" },
+            { title: "nano", count: "2 題", desc: "建立 YAML、剪貼與搜尋" },
+            { title: "搜尋過濾", count: "4 題", desc: "grep / find / pipe 組合" },
+          ].map((item, i) => (
+            <div key={i} className="bg-slate-800/40 border border-slate-700 p-3 rounded-xl">
+              <p className="text-k8s-blue font-semibold">{item.title}</p>
+              <p className="text-white text-lg font-bold">{item.count}</p>
+              <p className="text-slate-400 text-xs mt-1">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 rounded-xl">
+          <p className="text-yellow-400 font-bold mb-2">使用建議</p>
+          <ul className="text-slate-300 text-sm space-y-1">
+            <li>• 如果現場時間不夠，這段可以直接轉為課後延伸練習。</li>
+            <li>• 先自己在終端機完成，再用 notes 當講師檢討參考。</li>
+            <li>• 重點不是寫得快，而是知道每一步為什麼這樣做。</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    notes: `這一段是第一天下午的中階延伸實作練習，主要給已經完成基礎練習、想把熟練度再往上推的學員。
+
+使用方式建議：
+1. 可以當場讓速度快的學員繼續做
+2. 也可以保留為課後作業，下一堂開場快速檢討
+3. 帶題時請強調「驗證結果」和「理解差異」，不要只核對指令字串
+
+參考答案同樣放在 notes，學員畫面不會直接看到。`,
+    duration: "3",
+  },
+
+  {
+    title: "中階延伸 Part 1",
+    subtitle: "目錄結構與導覽",
+    section: "延伸實作練習",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-3 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 font-semibold mb-2">練習 1</p>
+            <p className="text-slate-300">用一條指令建立：</p>
+            <code className="block mt-2 text-green-300 text-xs bg-slate-900/60 p-2 rounded">~/k8s-lab/{"{"}deployments/{"{"}dev,staging,prod{"}"},services,configs{"}"}</code>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 font-semibold mb-2">練習 2</p>
+            <p className="text-slate-300">假設你目前在 <code className="text-green-300">/home/student/k8s-lab/deployments/dev</code>：</p>
+            <ul className="text-slate-300 mt-2 space-y-1">
+              <li>• <code className="text-green-300">cd /etc/..</code> 會到哪裡？</li>
+              <li>• <code className="text-green-300">cd ../../services</code> 的完整絕對路徑是什麼？</li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 font-semibold mb-2">練習 3</p>
+            <p className="text-slate-300">解釋這行 <code className="text-green-300">ls -l</code> 輸出的每個欄位：</p>
+            <code className="block mt-2 text-green-300 text-xs bg-slate-900/60 p-2 rounded">drwxr-xr-x 4 student student 4096 Mar 07 14:30 projects</code>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `中階 Part 1 參考答案
+
+練習 1：
+mkdir -p ~/k8s-lab/{deployments/{dev,staging,prod},services,configs}
+
+練習 2：
+1. cd /etc/.. 會到根目錄 /
+2. ../../services 的完整路徑是 /home/student/k8s-lab/services
+
+練習 3：
+- d：目錄
+- rwxr-xr-x：owner / group / others 權限
+- 4：硬連結數量
+- 第一個 student：擁有者
+- 第二個 student：所屬群組`,
+    duration: "7",
+  },
+
+  {
+    title: "中階延伸 Part 2",
+    subtitle: "檔案操作組合技",
+    section: "延伸實作練習",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-green-400 font-semibold mb-2">練習 4</p>
+            <p className="text-slate-300">依序完成以下流程：</p>
+            <ol className="text-slate-300 list-decimal list-inside mt-2 space-y-1">
+              <li>建立 <code className="text-green-300">nginx.yaml</code> 與 <code className="text-green-300">redis.yaml</code></li>
+              <li>複製到 <code className="text-green-300">~/k8s-lab/configs/</code></li>
+              <li>把 <code className="text-green-300">nginx.yaml</code> 改名成 <code className="text-green-300">nginx-config.yaml</code></li>
+              <li>遞迴備份 <code className="text-green-300">~/k8s-lab/</code> 到 <code className="text-green-300">~/k8s-lab-backup/</code></li>
+              <li>刪除 <code className="text-green-300">redis.yaml</code></li>
+              <li>用 <code className="text-green-300">ls -R</code> 驗證結果</li>
+            </ol>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-green-400 font-semibold mb-1">練習 5</p>
+              <p className="text-slate-300">比較 <code className="text-green-300">cp</code> 與 <code className="text-green-300">cp -p</code> 的差異，以及什麼情況要保留 metadata。</p>
+            </div>
+            <div>
+              <p className="text-green-400 font-semibold mb-1">練習 6</p>
+              <p className="text-slate-300">為什麼同一個磁碟分割區內，<code className="text-green-300">mv</code> 幾乎瞬間完成，而 <code className="text-green-300">cp</code> 需要等待？</p>
+            </div>
+            <div>
+              <p className="text-green-400 font-semibold mb-1">練習 7</p>
+              <p className="text-slate-300">把 <code className="text-green-300">~/k8s-lab/deployments/dev/</code> 下所有 <code className="text-green-300">.yaml</code> 複製到 <code className="text-green-300">~/k8s-lab/configs/</code></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `中階 Part 2 參考答案
+
+練習 4：
+touch ~/k8s-lab/deployments/dev/nginx.yaml ~/k8s-lab/deployments/dev/redis.yaml
+cp ~/k8s-lab/deployments/dev/*.yaml ~/k8s-lab/configs/
+mv ~/k8s-lab/configs/nginx.yaml ~/k8s-lab/configs/nginx-config.yaml
+cp -r ~/k8s-lab/ ~/k8s-lab-backup/
+rm ~/k8s-lab/deployments/dev/redis.yaml
+ls -R ~/k8s-lab/
+
+練習 5：
+- cp：一般複製
+- cp -p：保留原始權限、擁有者和時間戳記
+- 備份設定檔或部署腳本時通常要保留 metadata
+
+練習 6：
+mv 在同一個分割區多半只是改 metadata，cp 則真的會複製檔案內容
+
+練習 7：
+cp ~/k8s-lab/deployments/dev/*.yaml ~/k8s-lab/configs/`,
+    duration: "10",
+  },
+
+  {
+    title: "中階延伸 Part 3",
+    subtitle: "內容查看與分析",
+    section: "延伸實作練習",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 8</p>
+              <p className="text-slate-300">即時監控 <code className="text-green-300">/var/log/nginx/access.log</code>，有新請求就立刻顯示。</p>
+            </div>
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 9</p>
+              <p className="text-slate-300">用一行指令統計 <code className="text-green-300">/var/log/syslog</code> 的總行數。</p>
+            </div>
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 10</p>
+              <p className="text-slate-300">在 <code className="text-green-300">less</code> 中：</p>
+              <ul className="text-slate-300 mt-2 space-y-1">
+                <li>• 搜尋 <code className="text-green-300">error</code></li>
+                <li>• 跳到下一個結果</li>
+                <li>• 反向搜尋 <code className="text-green-300">warning</code></li>
+                <li>• 跳到檔案最末尾</li>
+              </ul>
+            </div>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 11</p>
+              <p className="text-slate-300">分別顯示 <code className="text-green-300">/etc/passwd</code> 的前 5 行與最後 5 行。</p>
+            </div>
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 12</p>
+              <p className="text-slate-300">解釋 <code className="text-green-300">wc -l</code>、<code className="text-green-300">wc -w</code>、<code className="text-green-300">wc -c</code> 各自統計什麼。</p>
+              <code className="block mt-2 text-green-300 text-xs bg-slate-900/60 p-2 rounded">$ wc /etc/hosts{"\n"}9 27 225 /etc/hosts</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `中階 Part 3 參考答案
+
+練習 8：
+tail -f /var/log/nginx/access.log
+
+練習 9：
+wc -l /var/log/syslog
+
+練習 10：
+1. /error
+2. n
+3. ?warning
+4. G
+
+練習 11：
+head -n 5 /etc/passwd
+tail -n 5 /etc/passwd
+
+練習 12：
+-l：行數
+-w：字數
+-c：字元 / 位元組數
+9 27 225 /etc/hosts 代表 9 行、27 個字、225 個字元`,
+    duration: "10",
+  },
+
+  {
+    title: "中階延伸 Part 4-5",
+    subtitle: "nano 與搜尋指令進階",
+    section: "延伸實作練習",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-blue-400 font-semibold mb-1">練習 13</p>
+              <p className="text-slate-300">用 <code className="text-green-300">nano</code> 建立 <code className="text-green-300">~/k8s-lab/deployments/dev/nginx.yaml</code>，輸入 Pod YAML，儲存、搜尋 <code className="text-green-300">nginx</code>、再離開。</p>
+            </div>
+            <div>
+              <p className="text-blue-400 font-semibold mb-1">練習 14</p>
+              <p className="text-slate-300">在 nano 中剪下目前一行，移到檔案最後一行再貼上，寫出快捷鍵順序。</p>
+            </div>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-yellow-400 font-semibold mb-1">練習 15</p>
+              <p className="text-slate-300">分別寫出：</p>
+              <ul className="text-slate-300 mt-2 space-y-1">
+                <li>• 不分大小寫搜尋 <code className="text-green-300">error</code></li>
+                <li>• 顯示行號</li>
+                <li>• 只顯示符合的行數</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-yellow-400 font-semibold mb-1">練習 16</p>
+              <p className="text-slate-300">遞迴搜尋 <code className="text-green-300">~/k8s-lab/</code> 下所有包含 <code className="text-green-300">nginx</code> 的行。</p>
+            </div>
+            <div>
+              <p className="text-yellow-400 font-semibold mb-1">練習 17</p>
+              <p className="text-slate-300">用 <code className="text-green-300">find</code> 找出：</p>
+              <ul className="text-slate-300 mt-2 space-y-1">
+                <li>• 家目錄下所有目錄</li>
+                <li>• 最近 1 天內修改過的檔案</li>
+                <li>• 大於 1MB 的檔案</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-yellow-400 font-semibold mb-1">練習 18</p>
+              <p className="text-slate-300">解釋：<code className="text-green-300">grep "error" /var/log/syslog | wc -l</code></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `中階 Part 4-5 參考答案
+
+練習 13：
+nano ~/k8s-lab/deployments/dev/nginx.yaml
+Ctrl + O -> Enter
+Ctrl + W -> nginx -> Enter
+Ctrl + X
+
+練習 14：
+Ctrl + K -> 移到最後一行 -> Ctrl + U
+
+練習 15：
+grep -i "error" /var/log/syslog
+grep -n "error" /var/log/syslog
+grep -ic "error" /var/log/syslog
+
+練習 16：
+grep -r "nginx" ~/k8s-lab/
+
+練習 17：
+find ~ -type d
+find ~ -mtime -1
+find ~ -size +1M
+
+練習 18：
+- grep 先篩出包含 error 的行
+- pipe 把結果交給 wc -l
+- 最後得到 error 行數`,
+    duration: "15",
+  },
+
+  // ===== 27. 進階情境實作 =====
+  {
+    title: "Linux 進階情境實作",
+    subtitle: "Day 1 下午 Capstone Challenge",
+    section: "進階情境實作",
+    content: (
+      <div className="space-y-5">
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 text-sm font-semibold mb-2">🕒 建議時間</p>
+            <p className="text-3xl font-bold text-white">60 分鐘</p>
+            <p className="text-slate-400 text-sm mt-2">適合當成第一天的總整合挑戰</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-green-400 text-sm font-semibold mb-2">🧠 核心形式</p>
+            <p className="text-2xl font-bold text-white">情境題 + 指令鏈</p>
+            <p className="text-slate-400 text-sm mt-2">把 Linux 指令放進真實 DevOps 場景</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-yellow-400 text-sm font-semibold mb-2">🎯 目標</p>
+            <p className="text-lg font-semibold text-white">從操作走到排查與判斷</p>
+            <p className="text-slate-400 text-sm mt-2">開始出現 K8s manifest、log triage、清理策略</p>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-4 gap-3 text-sm">
+          {[
+            { title: "專案建置", count: "2 題", desc: "manifest、namespace、備份驗證" },
+            { title: "日誌分析", count: "3 題", desc: "tail、grep、less、ls | wc" },
+            { title: "搜尋過濾", count: "3 題", desc: "find、grep、pipe 鏈" },
+            { title: "綜合排查", count: "2 題", desc: "故障排查、報告輸出、清理風險" },
+          ].map((item, i) => (
+            <div key={i} className="bg-slate-800/40 border border-slate-700 p-3 rounded-xl">
+              <p className="text-k8s-blue font-semibold">{item.title}</p>
+              <p className="text-white text-lg font-bold">{item.count}</p>
+              <p className="text-slate-400 text-xs mt-1">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 rounded-xl">
+          <p className="text-yellow-400 font-bold mb-2">帶題建議</p>
+          <ul className="text-slate-300 text-sm space-y-1">
+            <li>• 這一段更像實戰挑戰，不建議逐字背答案。</li>
+            <li>• 如果第一天下午時間不足，可以保留到課後或下一堂開場檢討。</li>
+            <li>• 帶題時請強調「排查順序」與「安全意識」，而不只是指令有沒有打對。</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    notes: `這一段進階情境實作的定位，是把第一天下午學到的所有 Linux 基礎操作，包裝成比較貼近 DevOps 現場的題目。
+
+重點提醒：
+1. 這不是要求每位學員在現場全部做完的必修項目
+2. 比較適合當成進階挑戰、課後作業，或下一堂開場快速 review
+3. 答案在 notes，但請優先引導學員自己說出推理過程，再對照指令`,
+    duration: "3",
+  },
+
+  {
+    title: "進階情境 Part 1",
+    subtitle: "專案建置與 namespace 檢查",
+    section: "進階情境實作",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 font-semibold mb-2">練習 1</p>
+            <p className="text-slate-300">你是 DevOps 工程師，請依序完成：</p>
+            <ol className="text-slate-300 list-decimal list-inside mt-2 space-y-1">
+              <li>建立 <code className="text-green-300">~/k8s-deploy/</code> 完整目錄結構</li>
+              <li>在 <code className="text-green-300">manifests/dev/deployments/</code> 用 nano 建 <code className="text-green-300">nginx-deploy.yaml</code></li>
+              <li>複製到 staging 與 prod</li>
+              <li>用 grep 驗證三份檔案都還含有 <code className="text-green-300">namespace: dev</code></li>
+              <li>備份整個專案為 <code className="text-green-300">~/k8s-deploy-backup/</code></li>
+              <li>最後用 <code className="text-green-300">ls -R</code> 確認</li>
+            </ol>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-blue-400 font-semibold mb-2">練習 2</p>
+            <p className="text-slate-300">你發現三個環境都寫成 <code className="text-green-300">namespace: dev</code>：</p>
+            <ol className="text-slate-300 list-decimal list-inside mt-2 space-y-1">
+              <li>找出所有包含 <code className="text-green-300">namespace: dev</code> 的檔案與行號</li>
+              <li>用 nano 修改 staging / prod 的 namespace</li>
+              <li>用一行指令驗證三個環境的 namespace 都正確</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `進階 Part 1 參考答案
+
+練習 1：
+mkdir -p ~/k8s-deploy/manifests/{dev,staging,prod}/{deployments,services}
+mkdir -p ~/k8s-deploy/{scripts,docs,configs/{nginx,redis}}
+nano ~/k8s-deploy/manifests/dev/deployments/nginx-deploy.yaml
+cp ~/k8s-deploy/manifests/dev/deployments/nginx-deploy.yaml ~/k8s-deploy/manifests/staging/deployments/
+cp ~/k8s-deploy/manifests/dev/deployments/nginx-deploy.yaml ~/k8s-deploy/manifests/prod/deployments/
+grep -rn "namespace: dev" ~/k8s-deploy/
+cp -r ~/k8s-deploy/ ~/k8s-deploy-backup/
+ls -R ~/k8s-deploy/
+
+練習 2：
+grep -rn "namespace: dev" ~/k8s-deploy/
+nano ~/k8s-deploy/manifests/staging/deployments/nginx-deploy.yaml
+# Ctrl + W 搜尋 namespace: dev，改成 staging；prod 同理改成 prod
+grep -rn "namespace:" ~/k8s-deploy/manifests/`,
+    duration: "15",
+  },
+
+  {
+    title: "進階情境 Part 2",
+    subtitle: "日誌分析實戰",
+    section: "進階情境實作",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-purple-400 font-semibold mb-2">練習 3</p>
+            <p className="text-slate-300">以 <code className="text-green-300">/var/log/syslog</code> 為例，分別寫出：</p>
+            <ul className="text-slate-300 mt-2 space-y-1">
+              <li>• 總行數</li>
+              <li>• 最新 50 行</li>
+              <li>• 即時監控</li>
+              <li>• 不分大小寫搜尋 <code className="text-green-300">error</code> 並顯示行號</li>
+              <li>• 統計 <code className="text-green-300">error</code> 行數</li>
+              <li>• 過濾掉 <code className="text-green-300">DEBUG</code></li>
+              <li>• 搜尋 <code className="text-green-300">error</code> 後只看最後 5 筆</li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 4</p>
+              <p className="text-slate-300">在 <code className="text-green-300">less /var/log/syslog</code> 中：</p>
+              <ul className="text-slate-300 mt-2 space-y-1">
+                <li>• 搜尋 <code className="text-green-300">kernel</code> 後跳下一個</li>
+                <li>• 反向搜尋 <code className="text-green-300">warning</code></li>
+                <li>• 跳到檔案末尾再回開頭</li>
+                <li>• 說明為什麼大檔案應該用 less，不該用 cat</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">練習 5</p>
+              <p className="text-slate-300">用一行組合指令完成：<span className="text-slate-200">列出 <code className="text-green-300">/etc</code> 目錄下有多少個檔案和目錄</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `進階 Part 2 參考答案
+
+練習 3：
+wc -l /var/log/syslog
+tail -n 50 /var/log/syslog
+tail -f /var/log/syslog
+grep -in "error" /var/log/syslog
+grep -ic "error" /var/log/syslog
+grep -v "DEBUG" /var/log/syslog
+grep -i "error" /var/log/syslog | tail -n 5
+
+練習 4：
+/kernel -> Enter
+n
+?warning -> Enter
+G -> g
+less 可分頁、搜尋、上下移動；cat 會一次全部噴出來，不適合大檔案
+
+練習 5：
+ls /etc | wc -l`,
+    duration: "12",
+  },
+
+  {
+    title: "進階情境 Part 3",
+    subtitle: "搜尋與過濾進階",
+    section: "進階情境實作",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-yellow-400 font-semibold mb-2">練習 6</p>
+            <p className="text-slate-300">使用 <code className="text-green-300">find</code> 完成：</p>
+            <ul className="text-slate-300 mt-2 space-y-1">
+              <li>• 找出 <code className="text-green-300">~/k8s-deploy/</code> 下所有 <code className="text-green-300">.yaml</code></li>
+              <li>• 找出所有空目錄</li>
+              <li>• 找最近 30 分鐘內修改過的檔案</li>
+              <li>• 找 <code className="text-green-300">/var/log/</code> 下大於 10MB 的檔案</li>
+              <li>• 找 <code className="text-green-300">~/k8s-deploy/</code> 下所有目錄</li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl space-y-3">
+            <div>
+              <p className="text-yellow-400 font-semibold mb-1">練習 7</p>
+              <p className="text-slate-300">使用 <code className="text-green-300">grep</code> 完成：</p>
+              <ul className="text-slate-300 mt-2 space-y-1">
+                <li>• 遞迴搜尋所有包含 <code className="text-green-300">nginx</code> 的行並顯示檔名 / 行號</li>
+                <li>• 在 <code className="text-green-300">/etc/passwd</code> 找出不包含 <code className="text-green-300">nologin</code> 的行</li>
+                <li>• 統計所有 YAML 內 <code className="text-green-300">image:</code> 出現次數</li>
+                <li>• 搜尋 <code className="text-green-300">replicas</code> 並顯示前後各 1 行</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-yellow-400 font-semibold mb-1">練習 8</p>
+              <p className="text-slate-300">解釋這條指令鏈每一段的作用：</p>
+              <code className="block mt-2 text-green-300 text-xs bg-slate-900/60 p-2 rounded">find ~/k8s-deploy -name "*.yaml" -type f | grep "prod" | wc -l</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `進階 Part 3 參考答案
+
+練習 6：
+find ~/k8s-deploy/ -name "*.yaml"
+find ~/k8s-deploy/ -type d -empty
+find ~ -mmin -30
+find /var/log/ -size +10M
+find ~/k8s-deploy/ -type d
+
+練習 7：
+grep -rn "nginx" ~/k8s-deploy/
+grep -v "nologin" /etc/passwd
+grep -r "image:" ~/k8s-deploy/ --include="*.yaml" | wc -l
+grep -rn -A 1 -B 1 "replicas" ~/k8s-deploy/
+
+練習 8：
+- find 先找出所有 yaml 一般檔案
+- grep 再過濾只保留路徑中含 prod 的結果
+- wc -l 統計符合數量
+- 最終輸出是 prod 環境下有多少個 yaml 檔案`,
+    duration: "12",
+  },
+
+  {
+    title: "進階情境 Part 4",
+    subtitle: "綜合排查與清理安全",
+    section: "進階情境實作",
+    content: (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-red-400 font-semibold mb-2">練習 9</p>
+            <p className="text-slate-300">收到應用異常告警，請依序寫出：</p>
+            <ol className="text-slate-300 list-decimal list-inside mt-2 space-y-1">
+              <li><code className="text-green-300">pwd</code> 確認位置</li>
+              <li>切到 <code className="text-green-300">/var/log</code></li>
+              <li>依時間排序列出日誌</li>
+              <li>用 <code className="text-green-300">tail -f</code> 監控 syslog</li>
+              <li>停止監控</li>
+              <li>找最近的 error 並只看最後 20 筆</li>
+              <li>把結果導到 <code className="text-green-300">~/error-report.txt</code></li>
+              <li>用 <code className="text-green-300">cat</code> 確認內容</li>
+              <li>統計錯誤數</li>
+              <li>用 nano 在檔案最上方加入標題</li>
+            </ol>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
+            <p className="text-red-400 font-semibold mb-2">練習 10</p>
+            <p className="text-slate-300">你要清理舊檔案，請回答：</p>
+            <ul className="text-slate-300 mt-2 space-y-1">
+              <li>• 找出 <code className="text-green-300">/tmp</code> 超過 7 天沒修改的檔案</li>
+              <li>• 找出家目錄下所有大於 100MB 的檔案</li>
+              <li>• 刪除 <code className="text-green-300">~/old-project/</code> 前應先做什麼檢查？</li>
+              <li>• 安全刪除整個目錄的指令是什麼？</li>
+              <li>• 為什麼腳本中要避免直接寫 <code className="text-red-300">rm -rf $DIR/</code>？</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `進階 Part 4 參考答案
+
+練習 9：
+pwd
+cd /var/log
+ls -lt
+tail -f syslog
+# Ctrl + C 停止
+grep -i "error" syslog | tail -n 20
+grep -i "error" syslog | tail -n 20 > ~/error-report.txt
+cat ~/error-report.txt
+wc -l ~/error-report.txt
+nano ~/error-report.txt
+
+練習 10：
+find /tmp -mtime +7
+find ~ -size +100M
+ls -la ~/old-project/
+rm -r ~/old-project/
+
+腳本風險說明：
+- 如果 $DIR 為空，rm -rf $DIR/ 可能退化成 rm -rf /
+- 生產環境中一定要先檢查變數是否為空，再執行刪除
+- 安全寫法示意：[[ -n "$DIR" ]] && rm -rf "$DIR/"`,
+    duration: "18",
+  },
+
+  // ===== 32. 總結 =====
   {
     title: "今日下午總結",
     subtitle: "完整指令清單 + 明日預告",

@@ -1915,8 +1915,16 @@ find ~ -name "*.txt"
         <div className="grid md:grid-cols-3 gap-4 text-sm">
           <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
             <p className="text-blue-400 font-semibold mb-2">練習 1</p>
-            <p className="text-slate-300">用一條指令建立：</p>
-            <code className="block mt-2 text-green-300 text-xs bg-slate-900/60 p-2 rounded">~/k8s-lab/{"{"}deployments/{"{"}dev,staging,prod{"}"},services,configs{"}"}</code>
+            <p className="text-slate-300">用 <code className="text-green-300">mkdir -p</code> 一次建立以下結構：</p>
+            <div className="mt-2 text-green-300 text-xs bg-slate-900/60 p-2 rounded font-mono space-y-0.5">
+              <p>~/k8s-lab/</p>
+              <p className="pl-4">deployments/dev/</p>
+              <p className="pl-4">deployments/staging/</p>
+              <p className="pl-4">deployments/prod/</p>
+              <p className="pl-4">services/</p>
+              <p className="pl-4">configs/</p>
+            </div>
+            <p className="text-slate-500 text-xs mt-2">提示：用 brace expansion {"{ }"}</p>
           </div>
           <div className="bg-slate-800/60 border border-slate-600 p-4 rounded-xl">
             <p className="text-blue-400 font-semibold mb-2">練習 2</p>

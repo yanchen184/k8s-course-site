@@ -214,7 +214,14 @@ function buildAudienceUrl(sessionId: string, lessonId: string): string {
   return url.toString()
 }
 
+function isAdminPath(): boolean {
+  const path = window.location.pathname
+  const redirectedPath = new URLSearchParams(window.location.search).get('p') || ''
+  return path.includes('/admin') || redirectedPath.includes('/admin')
+}
+
 function App() {
+  const [isAdmin] = useState(isAdminPath)
   const [viewMode, setViewMode] = useState<ViewMode>(() => parseViewMode(window.location.search))
   const [sessionId, setSessionId] = useState<string | null>(() => parseSessionId(window.location.search))
   const [currentLesson, setCurrentLesson] = useState(getLessonIndexFromHash)
@@ -387,13 +394,13 @@ function App() {
         e.preventDefault(); nextSlide()
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault(); prevSlide()
-      } else if (e.key === 'n' || e.key === 'N') {
+      } else if ((e.key === 'n' || e.key === 'N') && isAdmin) {
         setShowNotes(prev => !prev)
       } else if (e.key === 'm' || e.key === 'M') {
         setShowMenu(prev => !prev)
       } else if (e.key === 'b' || e.key === 'B') {
         setSidebarOpen(prev => !prev)
-      } else if (e.key === 'p' || e.key === 'P') {
+      } else if ((e.key === 'p' || e.key === 'P') && isAdmin) {
         e.preventDefault()
         if (isPresenterModeEnabled) {
           stopPresenterMode()
@@ -817,8 +824,8 @@ function App() {
                           <span className="text-slate-600 text-sm">·</span>
                           <span className="text-slate-500 text-sm">{section.slideCount} 張</span>
                         </div>
-                        {/* 演講稿字數統計 */}
-                        <div className="mt-2 space-y-1 bg-slate-800/50 rounded-lg p-2">
+                        {/* 演講稿字數統計 (admin only) */}
+                        {isAdmin && <div className="mt-2 space-y-1 bg-slate-800/50 rounded-lg p-2">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400 text-sm font-medium">預計</span>
                             <span className="text-slate-300 text-sm font-bold">{section.totalExpectedChars.toLocaleString()} 字</span>
@@ -859,7 +866,7 @@ function App() {
                                 : '—'}
                             </span>
                           </div>
-                        </div>
+                        </div>}
                       </button>
                     )
                   })}
@@ -869,8 +876,8 @@ function App() {
           )}
         </div>
 
-        {/* 演講稿總字數統計 */}
-        {(() => {
+        {/* 演講稿總字數統計 (admin only) */}
+        {isAdmin && (() => {
           const totalExpected = slides.reduce((sum, s) => sum + parseInt(s.duration || '2') * 150, 0)
           const totalActual = slides.reduce((sum, s) => sum + (s.notes || '').length, 0)
           const pct = totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0
@@ -900,8 +907,8 @@ function App() {
           )
         })()}
 
-        {/* ❓ Q&A 學員預期問題 */}
-        {qaItems.length > 0 && (
+        {/* ❓ Q&A 學員預期問題 (admin only) */}
+        {isAdmin && qaItems.length > 0 && (
           <div className="border-t border-slate-700/50">
             <button
               onClick={() => setShowQA(prev => !prev)}
@@ -1043,7 +1050,7 @@ function App() {
               <div className="text-6xl mb-4 animate-pulse">⏳</div>
               <p className="text-2xl text-slate-300">載入課程中...</p>
             </div>
-          ) : isPresenterModeEnabled ? (
+          ) : isAdmin && isPresenterModeEnabled ? (
             <div className="w-full max-w-[1800px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(500px,1.2fr)] gap-6" key={`${currentLesson}-${currentSlide}`}>
               <div className="bg-slate-900/60 border border-slate-700 rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-4 text-xs text-slate-500">
@@ -1199,8 +1206,8 @@ function App() {
           )}
         </div>
 
-        {/* Speaker notes */}
-        {!isPresenterModeEnabled && showNotes && slide.notes && (
+        {/* Speaker notes (admin only) */}
+        {isAdmin && !isPresenterModeEnabled && showNotes && slide.notes && (
           <div className="fixed bottom-16 right-4 left-4 md:left-auto md:w-[800px] bg-black/95 backdrop-blur-sm rounded-xl p-8 text-white border border-slate-700 max-h-[70vh] overflow-y-auto z-20 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-blue-400 font-semibold text-xl">📝 演講稿</h3>
@@ -1246,7 +1253,7 @@ function App() {
               <span className="text-slate-400 text-sm hidden md:block">{lesson.label}</span>
               <span className="text-slate-600 hidden md:block">·</span>
               <span className="text-slate-400 text-sm">{currentSlide + 1} / {slides.length}</span>
-              {!isPresenterModeEnabled && (
+              {isAdmin && !isPresenterModeEnabled && (
                 <button
                   onClick={() => setShowNotes(!showNotes)}
                   className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
@@ -1256,24 +1263,26 @@ function App() {
                   {showNotes ? '收起' : '演講稿'} (N)
                 </button>
               )}
-              <button
-                onClick={() => {
-                  if (isPresenterModeEnabled) {
-                    stopPresenterMode()
-                  } else {
-                    startPresenterMode()
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  isPresenterModeEnabled
-                    ? 'bg-red-600/80 hover:bg-red-500 text-white'
-                    : 'bg-emerald-600/80 hover:bg-emerald-500 text-white'
-                }`}
-                title="Toggle presenter mode (P)"
-              >
-                {isPresenterModeEnabled ? 'End Presenter (P)' : 'Start Presenter (P)'}
-              </button>
-              {isPresenterModeEnabled && (
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    if (isPresenterModeEnabled) {
+                      stopPresenterMode()
+                    } else {
+                      startPresenterMode()
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    isPresenterModeEnabled
+                      ? 'bg-red-600/80 hover:bg-red-500 text-white'
+                      : 'bg-emerald-600/80 hover:bg-emerald-500 text-white'
+                  }`}
+                  title="Toggle presenter mode (P)"
+                >
+                  {isPresenterModeEnabled ? 'End Presenter (P)' : 'Start Presenter (P)'}
+                </button>
+              )}
+              {isAdmin && isPresenterModeEnabled && (
                 <span className={`text-xs px-2 py-1 rounded border ${
                   presenterSyncStatus === 'connected'
                     ? 'text-emerald-300 border-emerald-700/70 bg-emerald-900/40'
@@ -1315,7 +1324,9 @@ function App() {
 
       {/* Keyboard hint */}
       <div className="fixed left-4 bottom-16 text-slate-600 text-xs hidden md:block">
-        ← → 換頁 | N 演講稿 | B 側邊欄 | M 課程選單 | P 演講者模式
+        {isAdmin
+          ? '← → 換頁 | N 演講稿 | B 側邊欄 | M 課程選單 | P 演講者模式'
+          : '← → 換頁 | B 側邊欄 | M 課程選單'}
       </div>
     </div>
   )

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>K8s Course</title>
+  <script>
+    // GitHub Pages SPA redirect
+    var path = window.location.pathname;
+    var repo = '/k8s-course-site';
+    var query = window.location.search;
+    var hash = window.location.hash;
+    window.location.replace(repo + '/?p=' + encodeURIComponent(path.replace(repo, '')) + query + hash);
+  </script>
+</head>
+<body></body>
+</html>

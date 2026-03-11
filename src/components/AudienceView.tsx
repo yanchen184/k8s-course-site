@@ -75,32 +75,32 @@ export default function AudienceView({
   const statusBadge = getAudienceStatusBadge(connectionState, controlsEnabled)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      <div className="fixed top-4 left-4 right-4 flex items-start justify-between z-20 pointer-events-none gap-4">
-        <div className="bg-slate-900/80 border border-slate-700/60 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+    <div className="min-h-screen overflow-x-clip bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <div className="fixed left-3 right-3 top-3 z-20 flex flex-col gap-2 pointer-events-none sm:left-4 sm:right-4 sm:top-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="rounded-xl border border-slate-700/60 bg-slate-900/80 px-3 py-2 text-xs text-slate-300 shadow-lg shadow-slate-950/20">
           {lessonLabel} · {lessonTitle}
         </div>
         {statusBadge && (
           <div
-            className={`rounded-lg px-3 py-1.5 text-xs border ${statusBadge.className}`}
+            className={`self-start rounded-xl px-3 py-2 text-xs border shadow-lg shadow-slate-950/20 ${statusBadge.className}`}
           >
             {statusBadge.label}
           </div>
         )}
       </div>
 
-      <div className="min-h-screen flex items-center justify-center p-6 md:p-10">
+      <div className="flex min-h-screen items-start justify-center px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-[calc(5.75rem+env(safe-area-inset-top))] sm:px-6 sm:pt-[calc(6.5rem+env(safe-area-inset-top))] md:items-center md:px-10">
         {showWaitingState && (
-          <div className="text-center max-w-xl">
-            <div className="text-5xl mb-3 animate-pulse">⏳</div>
+          <div className="max-w-xl text-center">
+            <div className="mb-3 text-5xl animate-pulse">⏳</div>
             <h1 className="text-2xl md:text-3xl font-semibold">Waiting for presenter sync</h1>
             <p className="text-slate-300 mt-2">This view will update automatically once the presenter starts.</p>
           </div>
         )}
 
         {!showWaitingState && showError && (
-          <div className="text-center max-w-xl">
-            <div className="text-5xl mb-3">⚠️</div>
+          <div className="max-w-xl text-center">
+            <div className="mb-3 text-5xl">⚠️</div>
             <h1 className="text-2xl md:text-3xl font-semibold">Audience view is unavailable</h1>
             <p className="text-slate-300 mt-2">
               {connectionState === 'missing-session'
@@ -111,40 +111,37 @@ export default function AudienceView({
         )}
 
         {!showWaitingState && !showError && !slide && (
-          <div className="text-center max-w-xl">
-            <div className="text-5xl mb-3">🗂️</div>
+          <div className="max-w-xl text-center">
+            <div className="mb-3 text-5xl">🗂️</div>
             <h1 className="text-2xl md:text-3xl font-semibold">No slide content</h1>
             <p className="text-slate-300 mt-2">The presenter has not selected a valid slide yet.</p>
           </div>
         )}
 
         {!showWaitingState && !showError && slide && (
-          <div className="max-w-6xl w-full">
+          <div className="slide-shell-wide">
             {slide.section && (
-              <div className="text-blue-400 text-lg md:text-xl font-semibold mb-3 tracking-wider uppercase">
+              <div className="slide-section-label">
                 {slide.section}
               </div>
             )}
 
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight text-white">
+            <h1 className="slide-title">
               {slide.title}
             </h1>
 
             {slide.subtitle && (
-              <h2 className="text-2xl md:text-4xl text-slate-300 mb-10">
+              <h2 className="slide-subtitle">
                 {slide.subtitle}
               </h2>
             )}
 
-            <div className="text-2xl md:text-3xl text-slate-200 space-y-5
-              [&_p]:text-2xl [&_li]:text-2xl [&_span]:text-2xl
-              [&_code]:text-xl [&_pre]:text-xl
-              [&_.text-xs]:!text-lg [&_.text-sm]:!text-xl [&_.text-base]:!text-2xl">
+            <div className="slide-content-responsive space-y-5">
               {slide.content}
             </div>
 
             {slide.code && (
-              <pre className="mt-8 bg-slate-900/80 p-6 rounded-xl overflow-x-auto text-xl border border-slate-700 shadow-inner">
+              <pre className="slide-code-block">
                 <code className="text-green-400 font-mono">{slide.code}</code>
               </pre>
             )}
@@ -154,30 +151,32 @@ export default function AudienceView({
 
       {/* Navigation buttons */}
       {!showWaitingState && !showError && totalSlides > 0 && (
-        <div className="fixed bottom-6 left-0 right-0 flex items-center justify-center gap-4 z-20">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-700/60 bg-slate-950/75 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur md:bottom-6 md:border-t-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
+          <div className="mx-auto flex w-full max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/90 px-3 py-3 shadow-xl shadow-slate-950/30 md:max-w-fit md:px-4">
           <button
             onClick={onPrev}
             disabled={!controlsEnabled || currentSlide <= 0}
-            className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all
+            className="min-w-[6.5rem] rounded-xl px-4 py-2.5 text-sm font-medium transition-all
               bg-slate-800/80 border border-slate-600/60 text-slate-200
               hover:bg-slate-700/80 hover:border-slate-500
               disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-800/80"
           >
             ← Prev
           </button>
-          <span className="text-slate-400 text-sm tabular-nums min-w-[80px] text-center">
+          <span className="min-w-[70px] text-center text-sm tabular-nums text-slate-400">
             {currentSlide + 1} / {totalSlides}
           </span>
           <button
             onClick={onNext}
             disabled={!controlsEnabled || currentSlide >= totalSlides - 1}
-            className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all
+            className="min-w-[6.5rem] rounded-xl px-4 py-2.5 text-sm font-medium transition-all
               bg-slate-800/80 border border-slate-600/60 text-slate-200
               hover:bg-slate-700/80 hover:border-slate-500
               disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-800/80"
           >
             Next →
           </button>
+          </div>
         </div>
       )}
     </div>

@@ -258,6 +258,7 @@ const FALLBACK_ERROR_SLIDE: Slide = {
   duration: '1',
 }
 
+const MOBILE_BREAKPOINT = 768
 const SLIDE_RAIL_VISIBLE_COUNT = 11
 
 function App() {
@@ -283,7 +284,8 @@ function App() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showNotes, setShowNotes] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768)
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= MOBILE_BREAKPOINT)
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < MOBILE_BREAKPOINT)
   const [showQA, setShowQA] = useState(false)
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => new Set([LESSONS[initialLessonIndex].id]))
@@ -318,6 +320,8 @@ function App() {
   const presenterNotesScrollRef = useRef<HTMLDivElement | null>(null)
   const isAudienceView = viewMode === 'audience'
   const isPresenterModeEnabled = viewMode === 'presenter' && Boolean(sessionId)
+  const isMobileSidebar = isMobileViewport && !isPresenterModeEnabled
+  const isSidebarDrawerVisible = isMobileSidebar && sidebarOpen
   const audienceControlsEnabled = canAudienceControlPresenter(viewMode, sessionId, controlToken)
   const channelSenderRole = viewMode === 'presenter' ? 'presenter' : 'audience'
   const { latestMessage, transportStatus, syncCapability, sendMessage } = usePresentationChannel(sessionId, {
@@ -341,8 +345,12 @@ function App() {
     const nextLesson = LESSONS[idx]
     setCurrentLesson(idx)
     ensureOutlineLessonVisible(idx)
+    if (isMobileViewport) {
+      setSidebarOpen(false)
+      setShowMenu(false)
+    }
     window.location.hash = nextLesson.id
-  }, [ensureOutlineLessonVisible])
+  }, [ensureOutlineLessonVisible, isMobileViewport])
 
   const updatePresenterNotesScrollHint = useCallback(() => {
     const notesElement = presenterNotesScrollRef.current
@@ -423,6 +431,22 @@ function App() {
   }, [isAudienceView, sessionId, viewMode])
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const syncViewportState = (matches: boolean) => {
+      setIsMobileViewport(matches)
+      setSidebarOpen(!matches)
+    }
+
+    syncViewportState(mediaQuery.matches)
+    const handleChange = (event: MediaQueryListEvent) => {
+      syncViewportState(event.matches)
+    }
+
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
     const timer = window.setInterval(() => setClockTick(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
@@ -443,7 +467,6 @@ function App() {
     const lesson = LESSONS[currentLesson]
     const requestId = lessonLoadRequestRef.current + 1
     lessonLoadRequestRef.current = requestId
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     const pendingSidebarSection = pendingSidebarSectionRef.current
     if ((!isAudienceView || pendingAudienceSlideRef.current === null)
@@ -655,11 +678,14 @@ function App() {
       } else if (e.key === 'Escape') {
         setIsShareModalOpen(false)
         setShowMenu(false)
+        if (isMobileViewport) {
+          setSidebarOpen(false)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [audienceNav, isAdmin, isAudienceView, isPresenterModeEnabled, nextSlide, prevSlide, startPresenterMode, stopPresenterMode])
+  }, [audienceNav, isAdmin, isAudienceView, isMobileViewport, isPresenterModeEnabled, nextSlide, prevSlide, startPresenterMode, stopPresenterMode])
 
   const slide: Slide = slides[currentSlide] || slides[0]
   const lesson = LESSONS[currentLesson]
@@ -709,7 +735,6 @@ function App() {
 
   useEffect(() => {
     if (isAudienceView && !sessionId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAudienceConnectionState('missing-session')
       return
     }
@@ -727,7 +752,6 @@ function App() {
   useEffect(() => {
     if (!isTransportReady) {
       if (isPresenterModeEnabled && transportStatus === 'connecting') {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPresenterSyncStatus('connecting')
         setPresenterError(null)
       }
@@ -901,7 +925,6 @@ function App() {
 
   useEffect(() => {
     if (isPresenterModeEnabled && !sessionStartedAt) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionStartedAt(Date.now())
     }
 
@@ -924,7 +947,6 @@ function App() {
     hasReceivedInitialSyncRef.current = false
     lastAudienceSignalAtRef.current = null
     if (sessionId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAudienceConnectionState('loading')
     }
   }, [isAudienceView, sessionId])
@@ -949,6 +971,29 @@ function App() {
     setIsShareModalOpen(false)
     setSharePermissionMode('read-only')
   }, [isPresenterModeEnabled, syncCapability])
+
+  useEffect(() => {
+    const shouldLockPageScroll = isMobileViewport && (
+      isSidebarDrawerVisible
+      || showMenu
+      || isShareModalOpen
+      || (isAdmin && !isPresenterModeEnabled && showNotes)
+    )
+
+    if (!shouldLockPageScroll) {
+      return
+    }
+
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [isAdmin, isMobileViewport, isPresenterModeEnabled, isShareModalOpen, isSidebarDrawerVisible, showMenu, showNotes])
 
   useEffect(() => {
     if (!isAdmin || !isPresenterModeEnabled) {
@@ -1102,12 +1147,15 @@ function App() {
 
     if (lessonIndex === currentLesson) {
       goToSlide(section.firstIndex)
+      if (isMobileViewport) {
+        setSidebarOpen(false)
+      }
       return
     }
 
     pendingSidebarSectionRef.current = { lessonId: targetLesson.id, slideIndex: section.firstIndex }
     switchLesson(lessonIndex)
-  }, [currentLesson, goToSlide, setExpandedSectionsForLesson, switchLesson])
+  }, [currentLesson, goToSlide, isMobileViewport, setExpandedSectionsForLesson, switchLesson])
 
   const toggleSectionExpansion = useCallback((lessonId: string, sectionKey: string) => {
     setExpandedSectionsByLesson((prev) => {
@@ -1141,12 +1189,15 @@ function App() {
 
     if (lessonIndex === currentLesson) {
       goToSlide(slideIndex)
+      if (isMobileViewport) {
+        setSidebarOpen(false)
+      }
       return
     }
 
     pendingSidebarSectionRef.current = { lessonId: targetLesson.id, slideIndex }
     switchLesson(lessonIndex)
-  }, [currentLesson, goToSlide, setExpandedSectionsForLesson, switchLesson])
+  }, [currentLesson, goToSlide, isMobileViewport, setExpandedSectionsForLesson, switchLesson])
 
   const presenterStatusLabel = presenterSyncStatus === 'connected'
     ? 'Audience connected'
@@ -1201,23 +1252,44 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
+    <div className="flex min-h-screen overflow-x-clip bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
 
       {/* ===== LEFT SIDEBAR ===== */}
       {!isPresenterModeEnabled && (
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+          className={`fixed inset-0 z-20 bg-slate-950/70 backdrop-blur-sm transition-opacity md:hidden ${
+            isSidebarDrawerVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        />
+      )}
+      {!isPresenterModeEnabled && (
       <aside
-        className={`fixed top-0 left-0 h-[100dvh] z-30 flex flex-col overflow-hidden touch-pan-y transition-all duration-300 ${
-          sidebarOpen ? 'w-full md:w-[420px]' : 'w-0'
+        className={`fixed top-0 left-0 z-30 flex h-[100dvh] max-w-full flex-col overflow-hidden touch-pan-y transition-all duration-300 ${
+          isMobileViewport
+            ? `w-[min(22rem,calc(100vw-2rem))] ${sidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-[110%] pointer-events-none'}`
+            : `w-[420px] ${sidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'}`
         }`}
         style={{ background: 'rgba(15,23,42,0.97)', borderRight: '1px solid rgba(51,65,85,0.7)' }}
       >
         {/* Sidebar header */}
-        <div className="p-5 border-b border-slate-700/50 flex-shrink-0">
-          <div className="flex items-center gap-3 mb-1">
-            <span className="text-3xl">☸️</span>
-            <span className="text-white font-bold text-xl">K8s 課程大綱</span>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-700/50 p-4 md:p-5">
+          <div>
+            <div className="mb-1 flex items-center gap-3">
+              <span className="text-3xl">☸️</span>
+              <span className="text-white font-bold text-xl">K8s 課程大綱</span>
+            </div>
+            <p className="text-sm text-slate-400 md:text-base">{lesson.label} · {lesson.title}</p>
           </div>
-          <p className="text-slate-400 text-base mt-1">{lesson.label} · {lesson.title}</p>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="rounded-xl border border-slate-700/70 bg-slate-800/80 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white md:hidden"
+          >
+            Close
+          </button>
         </div>
 
         <div
@@ -1231,7 +1303,7 @@ function App() {
             <div className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               大綱檢視
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={focusCurrentLessonOutline}
@@ -1531,7 +1603,7 @@ function App() {
 
       {/* ===== MAIN CONTENT ===== */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 ${
+        className={`min-w-0 flex-1 flex flex-col transition-all duration-300 ${
           sidebarOpen && !isPresenterModeEnabled ? 'md:ml-[420px]' : ''
         }`}
       >
@@ -1568,9 +1640,18 @@ function App() {
 
         {/* 課程選擇浮層 */}
         {showMenu && (
-          <div className="fixed inset-0 bg-black/80 z-40 flex items-center justify-center" onClick={() => setShowMenu(false)}>
-            <div className="bg-slate-800 rounded-2xl p-8 max-w-2xl w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <h2 className="text-2xl font-bold text-white mb-6">📚 選擇課程</h2>
+          <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-4" onClick={() => setShowMenu(false)}>
+            <div className="mobile-panel max-h-[85vh] overflow-y-auto rounded-b-none p-5 sm:max-w-2xl sm:rounded-3xl sm:p-8" onClick={e => e.stopPropagation()}>
+              <div className="mb-6 flex items-center justify-between gap-3">
+                <h2 className="text-2xl font-bold text-white">📚 選擇課程</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowMenu(false)}
+                  className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
               <div className="grid gap-3">
                 {LESSONS.map((l, i) => (
                   <button
@@ -1590,7 +1671,7 @@ function App() {
                   </button>
                 ))}
               </div>
-              <button onClick={() => setShowMenu(false)} className="mt-6 w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+              <button onClick={() => setShowMenu(false)} className="mt-6 w-full rounded-xl bg-slate-700 py-3 text-white transition-colors hover:bg-slate-600">
                 關閉（ESC）
               </button>
             </div>
@@ -1598,12 +1679,12 @@ function App() {
         )}
 
         {isShareModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby="share-audience-link-title"
-              className="w-full max-w-xl rounded-3xl border border-slate-700/80 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/50"
+              className="mobile-panel max-h-[85vh] overflow-y-auto rounded-b-none p-5 sm:max-w-xl sm:rounded-3xl sm:p-6"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -1720,7 +1801,7 @@ function App() {
         )}
 
         {presenterError && (
-          <div className="fixed top-4 right-4 z-40 max-w-md bg-red-950/90 border border-red-700/70 text-red-100 rounded-lg p-4 shadow-xl">
+          <div className="fixed left-3 right-3 top-3 z-40 rounded-2xl border border-red-700/70 bg-red-950/90 p-4 text-red-100 shadow-xl sm:left-auto sm:right-4 sm:top-4 sm:max-w-md">
             <p className="text-sm font-semibold">Presenter mode warning</p>
             <p className="text-sm mt-1">{presenterError}</p>
             {manualAudienceUrl && (
@@ -1738,10 +1819,10 @@ function App() {
         )}
 
         {/* Slide area */}
-        <div className={`text-white ${
+        <div className={`min-w-0 text-white ${
           isAdmin && isPresenterModeEnabled
-            ? 'w-full px-4 pt-6 pb-24 xl:h-[calc(100dvh-4.5rem)] xl:overflow-hidden xl:px-8'
-            : 'min-h-screen flex flex-col items-center justify-center p-8 pb-24'
+            ? 'w-full px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))] sm:px-6 xl:h-[calc(100dvh-4.5rem)] xl:overflow-hidden xl:px-8 xl:pb-24 xl:pt-6'
+            : 'min-h-screen w-full px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))] sm:px-6 md:flex md:flex-col md:items-center md:justify-center md:px-8 md:pb-24 md:pt-8'
         }`}>
           {loading ? (
             <div className="text-center">
@@ -1749,9 +1830,9 @@ function App() {
               <p className="text-2xl text-slate-300">載入課程中...</p>
             </div>
           ) : isAdmin && isPresenterModeEnabled ? (
-            <div className="mx-auto w-full max-w-[1800px] grid grid-cols-1 gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(500px,1.2fr)]" key={`${currentLesson}-${currentSlide}`}>
-              <div className="bg-slate-900/60 border border-slate-700 rounded-2xl p-6 xl:min-h-0 xl:flex xl:flex-col xl:overflow-hidden">
-                <div className="flex items-center gap-2 mb-4 text-xs text-slate-500">
+            <div className="mx-auto grid w-full max-w-[1800px] grid-cols-1 gap-4 sm:gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(500px,1.2fr)]" key={`${currentLesson}-${currentSlide}`}>
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 sm:p-6 xl:min-h-0 xl:flex xl:flex-col xl:overflow-hidden">
+                <div className="slide-breadcrumb">
                   <span>{lesson.day}</span>
                   <span>›</span>
                   <span>{lesson.label}</span>
@@ -1765,30 +1846,27 @@ function App() {
 
                 <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2">
                   {slide.section && (
-                    <div className="text-blue-400 text-xl font-semibold mb-3 tracking-wider uppercase">
+                    <div className="slide-section-label">
                       {slide.section}
                     </div>
                   )}
 
-                  <h1 className="text-5xl 2xl:text-6xl font-bold mb-6 leading-tight text-white">
+                  <h1 className="slide-title-compact">
                     {slide.title}
                   </h1>
 
                   {slide.subtitle && (
-                    <h2 className="text-2xl 2xl:text-3xl text-slate-300 mb-8">
+                    <h2 className="slide-subtitle-compact">
                       {slide.subtitle}
                     </h2>
                   )}
 
-                  <div className="text-xl 2xl:text-2xl text-slate-200 space-y-5
-                    [&_p]:text-xl [&_li]:text-xl [&_span]:text-xl
-                    [&_code]:text-lg [&_pre]:text-lg
-                    [&_.text-xs]:!text-base [&_.text-sm]:!text-lg [&_.text-base]:!text-xl">
+                  <div className="slide-content-compact space-y-5">
                     {slide.content}
                   </div>
 
                   {slide.code && (
-                    <pre className="mt-8 bg-slate-900/80 p-6 rounded-xl overflow-x-auto text-lg border border-slate-700 shadow-inner">
+                    <pre className="slide-code-block-compact">
                       <code className="text-green-400 font-mono">{slide.code}</code>
                     </pre>
                   )}
@@ -1818,8 +1896,8 @@ function App() {
                   )}
                 </div>
 
-                <div className="relative bg-black/70 border border-slate-700 rounded-xl p-6 flex-1 min-h-[500px] flex flex-col xl:min-h-0 xl:overflow-hidden">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="relative flex min-h-[320px] flex-1 flex-col rounded-xl border border-slate-700 bg-black/70 p-4 sm:min-h-[420px] sm:p-6 xl:min-h-0 xl:overflow-hidden">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-lg uppercase tracking-wide text-blue-400 font-semibold">📝 演講稿</h3>
                     <span className="text-sm text-slate-400">
                       ⏱ {slide.duration || '2-3'} min · {(slide.notes || '').length} 字
@@ -1828,7 +1906,7 @@ function App() {
                   <div
                     ref={presenterNotesScrollRef}
                     onScroll={updatePresenterNotesScrollHint}
-                    className="text-xl text-slate-100 whitespace-pre-line leading-relaxed overflow-y-auto pr-2 flex-1 min-h-0 overscroll-contain"
+                    className="min-h-0 flex-1 overflow-y-auto pr-2 text-base leading-relaxed text-slate-100 whitespace-pre-line overscroll-contain sm:text-lg xl:text-xl"
                   >
                     {slide.notes?.trim() ? slide.notes : 'No notes for this slide yet.'}
                   </div>
@@ -1845,9 +1923,9 @@ function App() {
               </div>
             </div>
           ) : (
-            <div className="max-w-5xl w-full" key={`${currentLesson}-${currentSlide}`}>
+            <div className="slide-shell" key={`${currentLesson}-${currentSlide}`}>
               {/* breadcrumb */}
-              <div className="flex items-center gap-2 mb-4 text-xs text-slate-500">
+              <div className="slide-breadcrumb">
                 <span>{lesson.day}</span>
                 <span>›</span>
                 <span>{lesson.label}</span>
@@ -1860,30 +1938,27 @@ function App() {
               </div>
 
               {slide.section && (
-                <div className="text-blue-400 text-xl font-semibold mb-3 tracking-wider uppercase">
+                <div className="slide-section-label">
                   {slide.section}
                 </div>
               )}
 
-              <h1 className="text-6xl md:text-7xl font-bold mb-6 leading-tight text-white">
+              <h1 className="slide-title">
                 {slide.title}
               </h1>
 
               {slide.subtitle && (
-                <h2 className="text-3xl md:text-4xl text-slate-300 mb-10">
+                <h2 className="slide-subtitle">
                   {slide.subtitle}
                 </h2>
               )}
 
-              <div className="text-2xl md:text-3xl text-slate-200 space-y-5
-                [&_p]:text-2xl [&_li]:text-2xl [&_span]:text-2xl
-                [&_code]:text-xl [&_pre]:text-xl
-                [&_.text-xs]:!text-lg [&_.text-sm]:!text-xl [&_.text-base]:!text-2xl">
+              <div className="slide-content-responsive space-y-5">
                 {slide.content}
               </div>
 
               {slide.code && (
-                <pre className="mt-8 bg-slate-900/80 p-6 rounded-xl overflow-x-auto text-xl border border-slate-700 shadow-inner">
+                <pre className="slide-code-block">
                   <code className="text-green-400 font-mono">{slide.code}</code>
                 </pre>
               )}
@@ -1893,10 +1968,10 @@ function App() {
 
         {/* Speaker notes (admin only) */}
         {isAdmin && !isPresenterModeEnabled && showNotes && slide.notes && (
-          <div className="fixed bottom-16 right-4 left-4 md:left-auto md:w-[800px] bg-black/95 backdrop-blur-sm rounded-xl p-8 text-white border border-slate-700 max-h-[70vh] overflow-y-auto z-20 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
+          <div className="fixed bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-30 max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-700 bg-black/95 p-4 text-white shadow-2xl backdrop-blur-sm sm:p-6 md:left-auto md:right-4 md:w-[800px] md:p-8">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-blue-400 font-semibold text-xl">📝 演講稿</h3>
-              <div className="flex gap-4 text-slate-400 text-sm">
+              <div className="flex flex-wrap gap-3 text-sm text-slate-400">
                 <span>⏱ {slide.duration || '2-3'} 分鐘</span>
                 <span className={slide.notes.length >= parseInt(slide.duration || '2') * 150 ? 'text-green-400' : 'text-yellow-400'}>
                   {slide.notes.length} / {parseInt(slide.duration || '2') * 150} 字
@@ -1914,8 +1989,8 @@ function App() {
         <div className={`fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm border-t border-slate-700/50 z-20 ${
           sidebarOpen && !isPresenterModeEnabled ? 'md:pl-[420px]' : ''
         }`}>
-          <div className="max-w-5xl mx-auto flex items-center justify-between px-4 py-3">
-            <div className="flex gap-2 items-center">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-4">
+            <div className="flex flex-1 items-center gap-2 sm:flex-none">
               {!isPresenterModeEnabled && (
                 <button
                   onClick={() => setSidebarOpen(prev => !prev)}
@@ -1934,15 +2009,15 @@ function App() {
               </button>
             </div>
 
-            <div className="flex flex-col items-center gap-2 text-center md:items-end">
-              <div className="flex flex-wrap items-center justify-center gap-3 md:justify-end">
-                <span className="text-slate-400 text-sm hidden md:block">{lesson.label}</span>
-                <span className="text-slate-600 hidden md:block">·</span>
+            <div className="order-3 flex w-full flex-col gap-2 text-center md:order-none md:w-auto md:items-end">
+              <div className="flex flex-wrap items-center justify-center gap-2 md:justify-end">
+                <span className="hidden text-sm text-slate-400 md:block">{lesson.label}</span>
+                <span className="hidden text-slate-600 md:block">·</span>
                 <span className="text-slate-400 text-sm">{currentSlide + 1} / {slides.length}</span>
                 {isAdmin && isPresenterModeEnabled && (
                   <>
-                    <span className="text-slate-600 hidden md:block">·</span>
-                    <span className="text-slate-400 text-sm hidden md:block">Timer</span>
+                    <span className="hidden text-slate-600 md:block">·</span>
+                    <span className="hidden text-slate-400 text-sm md:block">Timer</span>
                     <span className={`font-semibold tabular-nums text-sm ${timerPaused ? 'text-amber-400' : 'text-slate-200'}`}>
                       {elapsedMinutes}:{elapsedRemainderSeconds.toString().padStart(2, '0')}
                     </span>
@@ -1984,7 +2059,7 @@ function App() {
                             startPresenterMode()
                           }
                         }}
-                        className={`min-w-[11rem] rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        className={`min-w-[9.5rem] rounded-xl px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[11rem] ${
                           isPresenterModeEnabled
                             ? 'bg-red-600/90 text-white hover:bg-red-500'
                             : 'bg-emerald-600/90 text-white hover:bg-emerald-500'
@@ -2003,7 +2078,7 @@ function App() {
                         disabled={!canShareAudienceUrl}
                         aria-disabled={!canShareAudienceUrl}
                         title={shareAudienceButtonTitle}
-                        className={`min-w-[10rem] rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
+                        className={`min-w-[8.5rem] rounded-xl border px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[10rem] ${
                           !canShareAudienceUrl
                             ? 'cursor-not-allowed border-slate-700/80 bg-slate-800/80 text-slate-500'
                             : 'border-sky-600/70 bg-sky-900/35 text-sky-100 hover:bg-sky-800/50'
@@ -2051,7 +2126,7 @@ function App() {
             <button
               onClick={nextSlide}
               disabled={currentSlide === slides.length - 1}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium"
+              className="order-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-30 sm:order-none"
             >
               下一頁 →
             </button>
@@ -2060,7 +2135,7 @@ function App() {
       </div>
 
       {/* Slide rail（靠右） */}
-      <div className="fixed right-3 top-1/2 z-10 -translate-y-1/2">
+      <div className="fixed right-3 top-1/2 z-10 hidden -translate-y-1/2 md:block">
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-slate-800/70 bg-slate-950/55 px-2 py-3 shadow-xl shadow-slate-950/30 backdrop-blur">
           <div className="rounded-full border border-slate-800/80 bg-slate-900/80 px-2 py-1 text-[10px] font-semibold tracking-[0.2em] text-slate-300">
             {currentSlide + 1}
@@ -2126,7 +2201,7 @@ function App() {
       </div>
 
       {/* Keyboard hint */}
-      <div className="fixed left-4 bottom-16 text-slate-600 text-xs hidden md:block">
+      <div className="fixed left-4 bottom-16 hidden text-slate-600 text-xs lg:block">
         {isAdmin
           ? '← → 換頁 | N 演講稿 | B 側邊欄 | M 課程選單 | P 演講者模式'
           : '← → 換頁 | B 側邊欄 | M 課程選單'}

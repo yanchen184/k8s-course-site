@@ -291,6 +291,7 @@ function App() {
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => new Set([LESSONS[initialLessonIndex].id]))
   const [expandedSectionsByLesson, setExpandedSectionsByLesson] = useState<Record<string, Set<string>>>({})
+  const [outlineExpandingAll, setOutlineExpandingAll] = useState(false)
   const [lessonSectionStates, setLessonSectionStates] = useState<Record<string, {
     status: 'idle' | 'loading' | 'ready' | 'error'
     sections: SectionEntry[]
@@ -349,17 +350,18 @@ function App() {
     }))
   }, [])
 
-  const ensureLessonSectionsLoaded = useCallback(async (lessonIndex: number) => {
+  const loadLessonSections = useCallback(async (lessonIndex: number): Promise<SectionEntry[]> => {
     const lessonToLoad = LESSONS[lessonIndex]
     const cachedState = lessonSectionStates[lessonToLoad.id]
 
-    if (cachedState?.status === 'loading' || cachedState?.status === 'ready') {
-      return
+    if (cachedState?.status === 'ready') {
+      return cachedState.sections
     }
 
     if (lessonIndex === currentLesson) {
-      cacheLessonSections(lessonToLoad.id, buildSections(slides))
-      return
+      const nextSections = buildSections(slides)
+      cacheLessonSections(lessonToLoad.id, nextSections)
+      return nextSections
     }
 
     setLessonSectionStates((prev) => ({
@@ -369,15 +371,22 @@ function App() {
 
     try {
       const loadedSlides = await lessonToLoad.getSlides()
-      cacheLessonSections(lessonToLoad.id, buildSections(loadedSlides as Slide[]))
+      const nextSections = buildSections(loadedSlides as Slide[])
+      cacheLessonSections(lessonToLoad.id, nextSections)
+      return nextSections
     } catch (error) {
       console.error('Failed to load lesson sections', { lessonId: lessonToLoad.id, error })
       setLessonSectionStates((prev) => ({
         ...prev,
         [lessonToLoad.id]: { status: 'error', sections: [] },
       }))
+      return []
     }
   }, [cacheLessonSections, currentLesson, lessonSectionStates, slides])
+
+  const ensureLessonSectionsLoaded = useCallback(async (lessonIndex: number) => {
+    await loadLessonSections(lessonIndex)
+  }, [loadLessonSections])
 
   useEffect(() => {
     if (isAudienceView) {
@@ -940,6 +949,7 @@ function App() {
 
   // 按天分組課程
   const days = Array.from(new Set(LESSONS.map(l => l.day)))
+  const allLessonIds = useMemo(() => LESSONS.map(({ id }) => id), [])
   const currentLessonSections = lessonSectionStates[lesson.id]?.sections ?? (loading ? [] : sections)
   const currentDay = lesson.day
   const isOnlyCurrentLessonView = days.every((day) => day === currentDay || collapsedDays.has(day))
@@ -963,6 +973,31 @@ function App() {
       activeCurrentSection ? [buildSectionKey(activeCurrentSection)] : [],
     )
   }, [activeCurrentSection, currentDay, lesson.id, lessonOutlineEntries, setExpandedSectionsForLesson])
+
+  const expandAllOutline = useCallback(async () => {
+    setOutlineExpandingAll(true)
+    setCollapsedDays(new Set())
+    setExpandedLessons(new Set(allLessonIds))
+
+    try {
+      const sectionEntries = await Promise.all(
+        LESSONS.map(async (lessonItem, lessonIndex) => {
+          const loadedSections = await loadLessonSections(lessonIndex)
+          return [lessonItem.id, new Set(loadedSections.map(buildSectionKey))] as const
+        }),
+      )
+
+      setExpandedSectionsByLesson(Object.fromEntries(sectionEntries))
+    } finally {
+      setOutlineExpandingAll(false)
+    }
+  }, [allLessonIds, loadLessonSections])
+
+  const collapseAllOutline = useCallback(() => {
+    setCollapsedDays(new Set(days))
+    setExpandedLessons(new Set())
+    setExpandedSectionsByLesson({})
+  }, [days])
 
   const toggleLessonExpansion = useCallback((lessonIndex: number) => {
     const lessonToToggle = LESSONS[lessonIndex]
@@ -1099,19 +1134,41 @@ function App() {
 
         {/* 課程切換（依天分組，含每堂課子目錄） */}
         <div className="p-4 border-b border-slate-700/50 flex-shrink-0">
-          <button
-            onClick={() => {
-              if (isOnlyCurrentLessonView) {
-                setCollapsedDays(new Set())
-                setExpandedLessons(new Set([lesson.id]))
-              } else {
-                focusCurrentLessonOutline()
-              }
-            }}
-            className="w-full mb-3 px-4 py-2.5 rounded-xl bg-slate-700/60 hover:bg-slate-600/70 border border-slate-600/50 text-slate-300 text-base font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <span>{isOnlyCurrentLessonView ? '📂 展開所有課程' : '📁 只顯示本堂課'}</span>
-          </button>
+          <div className="mb-3 rounded-2xl border border-slate-700/60 bg-slate-800/35 p-2">
+            <div className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              大綱檢視
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={focusCurrentLessonOutline}
+                className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+                  isOnlyCurrentLessonView
+                    ? 'border border-blue-500/50 bg-blue-600/20 text-blue-200 shadow-sm shadow-blue-950/30'
+                    : 'border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:border-slate-500/70 hover:bg-slate-700/70 hover:text-white'
+                }`}
+              >
+                本堂課
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void expandAllOutline()
+                }}
+                disabled={outlineExpandingAll}
+                className="rounded-xl border border-slate-700/70 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-300 transition-all hover:border-slate-500/70 hover:bg-slate-700/70 hover:text-white disabled:cursor-wait disabled:opacity-60"
+              >
+                {outlineExpandingAll ? '展開中' : '全部展開'}
+              </button>
+              <button
+                type="button"
+                onClick={collapseAllOutline}
+                className="rounded-xl border border-slate-700/70 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-300 transition-all hover:border-slate-500/70 hover:bg-slate-700/70 hover:text-white"
+              >
+                全部收合
+              </button>
+            </div>
+          </div>
           {days.map((day) => {
             const isCollapsed = collapsedDays.has(day)
             const lessonsInDay = LESSONS.filter((item) => item.day === day)

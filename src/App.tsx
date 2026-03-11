@@ -261,6 +261,8 @@ const FALLBACK_ERROR_SLIDE: Slide = {
   duration: '1',
 }
 
+const SLIDE_RAIL_VISIBLE_COUNT = 11
+
 function App() {
   const initialLessonIndex = getLessonIndexFromHash()
   const [isAdmin] = useState(isAdminPath)
@@ -631,6 +633,24 @@ function App() {
     [],
   )
   const nextSlidePreview: Slide | null = slides[currentSlide + 1] || null
+  const visibleSlideRail = useMemo(() => {
+    if (slides.length <= SLIDE_RAIL_VISIBLE_COUNT) {
+      return { start: 0, end: slides.length }
+    }
+
+    const halfWindow = Math.floor(SLIDE_RAIL_VISIBLE_COUNT / 2)
+    let start = Math.max(currentSlide - halfWindow, 0)
+    let end = start + SLIDE_RAIL_VISIBLE_COUNT
+
+    if (end > slides.length) {
+      end = slides.length
+      start = Math.max(end - SLIDE_RAIL_VISIBLE_COUNT, 0)
+    }
+
+    return { start, end }
+  }, [currentSlide, slides.length])
+  const hiddenSlidesBefore = visibleSlideRail.start
+  const hiddenSlidesAfter = slides.length - visibleSlideRail.end
   const elapsedSeconds = timerPaused
     ? pausedElapsed
     : sessionStartedAt
@@ -1741,20 +1761,70 @@ function App() {
         </div>
       </div>
 
-      {/* Slide dots（靠右） */}
-      <div className="fixed right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-10">
-        {slides.map((s, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`rounded-full transition-all ${
-              index === currentSlide
-                ? 'bg-blue-500 w-3 h-3 shadow-lg shadow-blue-500/50'
-                : 'bg-slate-600 hover:bg-slate-400 w-2 h-2'
-            }`}
-            title={s.title}
-          />
-        ))}
+      {/* Slide rail（靠右） */}
+      <div className="fixed right-3 top-1/2 z-10 -translate-y-1/2">
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-slate-800/70 bg-slate-950/55 px-2 py-3 shadow-xl shadow-slate-950/30 backdrop-blur">
+          <div className="rounded-full border border-slate-800/80 bg-slate-900/80 px-2 py-1 text-[10px] font-semibold tracking-[0.2em] text-slate-300">
+            {currentSlide + 1}
+            <span className="ml-1 text-slate-500">/ {slides.length}</span>
+          </div>
+
+          {hiddenSlidesBefore > 0 && (
+            <button
+              type="button"
+              onClick={() => goToSlide(Math.max(visibleSlideRail.start - SLIDE_RAIL_VISIBLE_COUNT, 0))}
+              className="min-h-7 rounded-full px-2 text-[10px] font-medium text-slate-400 transition-colors hover:bg-slate-800/70 hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400/70"
+              aria-label={`Jump back to earlier slides, ${hiddenSlidesBefore} hidden above`}
+              title={`${hiddenSlidesBefore} earlier slides`}
+            >
+              ↑ {hiddenSlidesBefore}
+            </button>
+          )}
+
+          <div className="flex flex-col items-center gap-2">
+            {slides.slice(visibleSlideRail.start, visibleSlideRail.end).map((s, offset) => {
+              const index = visibleSlideRail.start + offset
+              const isActive = index === currentSlide
+
+              return (
+                <div key={index} className="group relative flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => goToSlide(index)}
+                    aria-label={`Go to slide ${index + 1}: ${s.title}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-blue-400/70 ${
+                      isActive
+                        ? 'h-8 w-3 border-blue-300/80 bg-blue-400 shadow-lg shadow-blue-500/35'
+                        : 'h-2.5 w-2.5 border-slate-500/80 bg-slate-600/80 hover:h-4 hover:w-2.5 hover:border-slate-300/80 hover:bg-slate-300'
+                    }`}
+                    title={s.title}
+                  >
+                    <span className="sr-only">{`${index + 1}. ${s.title}`}</span>
+                  </button>
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute right-full top-1/2 mr-3 -translate-y-1/2 whitespace-nowrap rounded-lg border border-slate-700/80 bg-slate-950/95 px-2.5 py-1 text-xs text-slate-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                  >
+                    {index + 1}. {s.title}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {hiddenSlidesAfter > 0 && (
+            <button
+              type="button"
+              onClick={() => goToSlide(Math.min(visibleSlideRail.end, slides.length - 1))}
+              className="min-h-7 rounded-full px-2 text-[10px] font-medium text-slate-400 transition-colors hover:bg-slate-800/70 hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400/70"
+              aria-label={`Jump forward to later slides, ${hiddenSlidesAfter} hidden below`}
+              title={`${hiddenSlidesAfter} later slides`}
+            >
+              ↓ {hiddenSlidesAfter}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Keyboard hint */}

@@ -184,11 +184,15 @@ docker run hello-world
 - 核心差異：Docker 走 `Client -> dockerd`；Podman 是 daemonless，且更常搭配 rootless 使用
 - Docker 生態和教材更完整；Podman 在 RHEL / Fedora 與 systemd 管理場景更自然
 
+這一段先建立概念認知，不展開安裝或指令示範；後續課程主線仍以 Docker 為主。
+
 ### 架構與安全
 
 - Docker 依賴背景中的 `dockerd` 服務來管理容器
 - Podman 沒有常駐 daemon，命令會直接呼叫底層 runtime
 - Podman 較容易以一般使用者執行，安全邊界更單純
+
+先抓到 daemon 與 rootless 的差異即可，這裡不往底層設定展開。
 
 ### 生態與相容性
 
@@ -196,11 +200,15 @@ docker run hello-world
 - Docker 在 Compose、教學資源、社群範例上更成熟
 - Podman 同樣遵守 OCI 標準，和現代 Linux 容器工具鏈整合良好
 
+重點不是多背一套指令，而是知道兩者仍在同一條 OCI 容器工具鏈上。
+
 ### 適用場景
 
 - 教學、跨平台開發、社群文件查找：Docker 通常更方便
 - RHEL / Fedora、systemd 服務管理、偏好 rootless：Podman 更自然
 - 本課程仍以 Docker 為主，但實務上遇到 Podman 不會陌生
+
+後續所有 lab 與課堂操作仍以 Docker 為準。
 
 ---
 

@@ -14,7 +14,7 @@ Day 2 學完：
 
 ---
 
-## 二、綜合練習（30 分鐘）
+## 二、綜合練習題（30 分鐘）
 
 ### 練習一：基礎操作
 
@@ -160,7 +160,35 @@ Docker Client → Docker Daemon → containerd → runc → Container
 
 ---
 
-## 五、預告 Day 3（3 分鐘）
+## 五、Docker 網路先導（5 分鐘）
+
+- `--link` 是舊做法，現在不建議在新專案使用
+- 自定義網路可以提供容器名稱解析，讓服務彼此更容易互通
+- 需要跨網路互連時，可以用 `docker network connect` 把容器接進第二個網路
+
+### 容器互聯：--link（已不建議）
+
+- 早期可用 `--link` 讓容器透過名稱找到另一個容器
+- 本質是在 `/etc/hosts` 寫入對應 IP，維護成本高且不夠彈性
+
+```bash
+docker run -d -P --name tomcat03 --link tomcat02 tomcat
+docker exec -it tomcat03 ping tomcat02
+```
+
+### 自定義網路（推薦）
+
+- 建立自定義 bridge 網路後，容器之間可直接用名稱互相存取
+- 這是多容器應用與服務分群的基礎做法
+
+### 跨網路連通：docker network connect
+
+- 容器可以同時連到多個網路，負責不同服務群組之間的連線
+- 實務上常用來處理跨網段或分層部署場景
+
+---
+
+## 六、預告 Day 3（3 分鐘）
 
 - 映像檔分層結構
 - 容器網路
@@ -169,7 +197,15 @@ Docker Client → Docker Daemon → containerd → runc → Container
 
 ---
 
-## 六、課後作業
+## 七、本堂課小結（3 分鐘）
+
+- 今天已經完成 Docker 安裝、基本指令與 Nginx 容器實作
+- 綜合練習與錯誤排除，已把常見操作流程串成完整心智模型
+- 下一步會把重點接到映像分層、容器網路與 Dockerfile
+
+---
+
+## 八、課後作業（自選）
 
 ```bash
 # MySQL 容器練習

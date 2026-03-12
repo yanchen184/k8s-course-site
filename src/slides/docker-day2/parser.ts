@@ -559,12 +559,44 @@ function allocateChunkDurations(targetTotal: number, count: number): number[] {
   return Array.from({ length: count }, (_unused, index) => base + (index < remainder ? 1 : 0))
 }
 
-function normalizeChunkMatchTitle(value: string): string {
+function normalizeLooseMatchTitle(value: string): string {
   return normalizeSectionTitle(value)
     .replace(/[（(].*?[)）]/gu, '')
     .replace(/[：:]/g, '')
     .replace(/\s+/g, '')
     .trim()
+}
+
+function findMatchingFullSection(
+  outlineSection: MarkdownSection,
+  fullSections: MarkdownSection[],
+  fullByTitle: Map<string, MarkdownSection>,
+): MarkdownSection | undefined {
+  const exactMatch = fullByTitle.get(outlineSection.title)
+  if (exactMatch) {
+    return exactMatch
+  }
+
+  const outlineTitle = normalizeLooseMatchTitle(outlineSection.title)
+  if (!outlineTitle) {
+    return undefined
+  }
+
+  const exactNormalizedMatches = fullSections.filter((section) => (
+    normalizeLooseMatchTitle(section.title) === outlineTitle
+  ))
+  if (exactNormalizedMatches.length === 1) {
+    return exactNormalizedMatches[0]
+  }
+
+  const partialMatches = fullSections.filter((section) => {
+    const fullTitle = normalizeLooseMatchTitle(section.title)
+    return Boolean(fullTitle) && (
+      fullTitle.includes(outlineTitle) || outlineTitle.includes(fullTitle)
+    )
+  })
+
+  return partialMatches.length === 1 ? partialMatches[0] : undefined
 }
 
 function extractChunkCommandSignatures(markdown: string): Set<string> {
@@ -589,10 +621,10 @@ function alignChunkNotes(outlineChunks: MarkdownChunk[], fullChunks: MarkdownChu
 
   const groupedBodies = outlineChunks.map(() => [] as string[])
   const outlineSignatures = outlineChunks.map((chunk) => extractChunkCommandSignatures(chunk.body))
-  const outlineTitles = outlineChunks.map((chunk) => normalizeChunkMatchTitle(chunk.title))
+  const outlineTitles = outlineChunks.map((chunk) => normalizeLooseMatchTitle(chunk.title))
 
   fullChunks.forEach((fullChunk, fullIndex) => {
-    const fullTitle = normalizeChunkMatchTitle(fullChunk.title)
+    const fullTitle = normalizeLooseMatchTitle(fullChunk.title)
     const fullSignatures = extractChunkCommandSignatures(fullChunk.body)
     let bestIndex = 0
     let bestScore = Number.NEGATIVE_INFINITY
@@ -738,7 +770,7 @@ export function buildDockerDay2SlideSpecs(
     )
 
     outlineSections.forEach((section, index) => {
-      const matchingFullSection = fullByTitle.get(section.title)
+      const matchingFullSection = findMatchingFullSection(section, fullSections, fullByTitle)
       const subSections = extractLevelThreeSections(section.body)
       const cards = subSections
         .map((subSection) => ({

@@ -204,6 +204,67 @@ describe('docker day 2 parser', () => {
     expect(hour3Intro?.summary.flatMap((entry) => entry.items)).not.toContain('---')
   })
 
+  it('uses full-script notes for synced hour 3 sections after outline cleanup', () => {
+    const slides = buildDockerDay2SlideSpecs(documents)
+    const prepSlide = slides.find((slide) => slide.hour === 3 && slide.title === '安裝前準備')
+    const hubSlide = slides.find((slide) => slide.hour === 3 && slide.title === 'Docker Hub 註冊與登入')
+
+    expect(prepSlide).toBeDefined()
+    expect(prepSlide?.notes).toContain('支援的發行版：Ubuntu 20.04+、CentOS 7+、Debian 10+、Fedora')
+    expect(prepSlide?.notes).toContain('檢查系統資訊')
+
+    expect(hubSlide).toBeDefined()
+    expect(hubSlide?.notes).toContain('Access Token（建議）')
+    expect(hubSlide?.notes).toContain('docker logout')
+  })
+
+  it('keeps hour 7 network intro and closing sections in the generated slides', () => {
+    const slides = buildDockerDay2SlideSpecs(documents)
+    const networkSlide = slides.find((slide) => slide.hour === 7 && slide.title === 'Docker 網路先導')
+    const closingSlide = slides.find((slide) => slide.hour === 7 && slide.title === '本堂課小結')
+    const homeworkSlide = slides.find((slide) => slide.hour === 7 && slide.title === '課後作業（自選）')
+
+    expect(networkSlide).toBeDefined()
+    expect(networkSlide?.summary).toEqual([group([
+      '--link 是舊做法，現在不建議在新專案使用',
+      '自定義網路可以提供容器名稱解析，讓服務彼此更容易互通',
+      '需要跨網路互連時，可以用 docker network connect 把容器接進第二個網路',
+    ])])
+    expect(networkSlide?.notes).toContain('docker network create -d bridge')
+    expect(networkSlide?.notes).toContain('docker network connect mynet tomcat01')
+
+    expect(closingSlide).toBeDefined()
+    expect(closingSlide?.notes).toContain('Docker 網路先導')
+
+    expect(homeworkSlide).toBeDefined()
+    expect(homeworkSlide?.notes).toContain('MySQL 啟動範例')
+  })
+
+  it('falls back to conservative partial title matching when outline headings are shorter', () => {
+    const fallbackDocuments = {
+      ...documents,
+      'day2-hour3.md': day2Hour3Raw
+        .replace('## 七、設定映像加速（5 分鐘）', '## 七、映像加速（5 分鐘）')
+        .replace('## 八、本堂課小結（2 分鐘）', '## 八、小結（2 分鐘）'),
+      'day2-hour7.md': day2Hour7Raw
+        .replace('## 二、綜合練習題（30 分鐘）', '## 二、綜合練習（30 分鐘）')
+        .replace('## 八、課後作業（自選）', '## 八、課後作業'),
+    }
+    const slides = buildDockerDay2SlideSpecs(fallbackDocuments)
+    const mirrorSlide = slides.find((slide) => slide.hour === 3 && slide.title === '映像加速')
+    const practiceSlide = slides.find((slide) => slide.hour === 7 && slide.title === '練習一：基礎操作')
+    const homeworkSlide = slides.find((slide) => slide.hour === 7 && slide.title === '課後作業')
+
+    expect(mirrorSlide).toBeDefined()
+    expect(mirrorSlide?.notes).toContain('常用映像站')
+
+    expect(practiceSlide).toBeDefined()
+    expect(practiceSlide?.notes).toContain('查看本機所有映像檔')
+
+    expect(homeworkSlide).toBeDefined()
+    expect(homeworkSlide?.notes).toContain('MySQL 啟動範例')
+  })
+
   it('keeps every lead-summary section free of dangling labels and within summary limits', () => {
     const slides = buildDockerDay2SlideSpecs(documents)
 

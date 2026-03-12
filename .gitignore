@@ -2,6 +2,7 @@
 node_modules
 dist
 dist-ssr
+.codex-artifacts/
 *.local
 .wrangler/
 .dev.vars*

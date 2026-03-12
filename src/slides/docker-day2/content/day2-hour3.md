@@ -8,7 +8,7 @@
 
 ---
 
-## 二、系統需求（8 分鐘）
+## 二、安裝前準備（8 分鐘）
 
 ### 各平台需求
 
@@ -38,9 +38,17 @@ Docker on Windows/Mac：
 └───────────────────────┘
 ```
 
+### 檢查系統資訊
+
+```bash
+uname -r
+cat /etc/os-release
+uname -m
+```
+
 ---
 
-## 三、Linux 安裝（20 分鐘）
+## 三、Linux 安裝 Docker（20 分鐘）
 
 ### CentOS
 
@@ -151,7 +159,7 @@ docker run -it ubuntu bash
 
 ---
 
-## 六、Docker Hub（8 分鐘）
+## 六、Docker Hub 註冊與登入（8 分鐘）
 
 ### 為什麼需要帳號
 
@@ -172,7 +180,7 @@ docker logout  # 登出
 
 ---
 
-## 七、映像加速（5 分鐘）
+## 七、設定映像加速（5 分鐘）
 
 Docker Hub 在國外，下載可能慢。設定映像站加速：
 
@@ -192,7 +200,7 @@ docker info | grep -A 5 "Registry Mirrors"
 
 ---
 
-## 八、小結（2 分鐘）
+## 八、本堂課小結（2 分鐘）
 
 | 平台 | 安裝方式 |
 |------|----------|

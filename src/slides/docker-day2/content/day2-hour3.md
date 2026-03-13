@@ -106,6 +106,10 @@ docker run hello-world  # 不用 sudo 了
 
 ## 四、Windows/Mac 安裝 Docker Desktop（10 分鐘）
 
+- Docker Desktop 是 Windows/Mac 上最常見的安裝方式，本質上是把 Docker Engine 放進 Linux VM
+- Linux 可能直接裝 Docker Engine，企業環境也可能碰到 Podman，但後面課程一律用相同的 `docker` CLI 操作
+- 看到教學只寫 `docker run` 很正常，因為你其實是在和 Linux 後端溝通，不需要每一步分平台改寫
+
 ### Windows
 
 1. 啟用 WSL 2：`wsl --install`（PowerShell 系統管理員）
@@ -131,6 +135,10 @@ Docker Desktop → Settings → Resources
 
 ## 五、驗證安裝（8 分鐘）
 
+- 驗證時最好同時看到 `docker version` 的 Client 和 Server，才能確認 CLI 與 daemon 都正常
+- Windows 先確認 WSL 2 / Docker Desktop backend 已啟動，再跑 `hello-world`
+- 後面 lab 最常見的卡點是權限、port 衝突與 image pull 太慢，先排這三類
+
 ### 基本命令
 
 ```bash
@@ -153,9 +161,11 @@ docker run -it ubuntu bash
 
 | 錯誤 | 解法 |
 |------|------|
-| `Cannot connect to Docker daemon` | `sudo systemctl start docker` |
+| `Cannot connect to Docker daemon` | Linux 用 `sudo systemctl start docker`；Desktop 平台先確認 app 已啟動 |
 | `Permission denied` | `sudo usermod -aG docker $USER` + 重新登入 |
 | WSL 2 相關錯誤 | `wsl --status` 和 `wsl --update` |
+| `port is already allocated` | 找出占用的容器或改用其他 host port |
+| `docker pull` 很慢 | 先確認網路，再考慮設定 registry mirror |
 
 ---
 

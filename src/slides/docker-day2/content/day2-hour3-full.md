@@ -303,6 +303,16 @@ docker run hello-world
 
 ## 四、Windows/Mac 安裝 Docker Desktop（10 分鐘）
 
+這一段先抓住一個原則：**Linux 上通常是直接安裝 Docker Engine；Windows 和 Mac 上最常見的是安裝 Docker Desktop。**
+
+對 Windows/Mac 使用者來說，Docker Desktop 的角色不只是「一個有圖示的安裝包」，而是幫你準備好 Linux 後端、管理虛擬化、整合檔案分享和網路設定的整套環境。
+
+雖然安裝形式不同，但後面課堂上的操作主線不會分裂。你看到的仍然會是同一套 `docker run`、`docker ps`、`docker logs` 指令，差別只是這些命令最後是送到 Linux 主機上的 Docker Engine，或是送到 Docker Desktop 內建的 Linux 虛擬機。
+
+所以如果你在網路上看到教學只寫 `docker run nginx`，不要被平台差異嚇到。對 Linux 使用者來說，那是在和本機的 Docker Engine 溝通；對 Windows/Mac 使用者來說，那是在和 Docker Desktop 裡面的 Linux backend 溝通。
+
+補充一句和課程安排直接相關的：在企業 Linux 環境裡，你之後確實可能碰到 Podman，而不是 Docker。但為了讓課堂上的每位學員都能用同一套介面跟上節奏，這門課的 lab 仍然統一使用 `docker` CLI。這是教學策略，不是忽略 Podman 的存在。
+
 ### 4.1 為什麼需要 Docker Desktop
 
 Docker 依賴 Linux 核心功能（Namespace、Cgroups）。Windows 和 Mac 沒有 Linux 核心，所以需要 Docker Desktop。
@@ -372,6 +382,10 @@ Docker Desktop → Settings → Resources
 ---
 
 ## 五、驗證安裝（8 分鐘）
+
+驗證安裝時，不要只看 `docker --version`。這個命令只能證明 CLI 有裝好，不代表背景的 Docker Engine 或 Docker Desktop backend 一定正常。
+
+比較穩的做法是先看 `docker version` 和 `docker info`，確認 Client 和 Server 都能正常回應；再跑 `hello-world` 實際建立一次容器。這樣比較能排除「命令列有裝，但後端沒起來」的情況。
 
 ### 5.1 基本驗證命令
 
@@ -458,6 +472,47 @@ sudo usermod -aG docker $USER
 wsl --status
 wsl --update
 ```
+
+有些人 Docker Desktop 裝好了，但 WSL 2 版本太舊、沒更新，或 backend 還沒啟動，結果 `docker version` 一直卡住或 Server 連不上。這其實不是 Docker 指令錯，而是底層 Linux 環境沒準備好。
+
+**問題：Port 已經被占用**
+
+你在後面的 lab 很容易看到這種錯誤：
+
+```text
+Bind for 0.0.0.0:8080 failed: port is already allocated
+```
+
+這通常代表主機的 8080 port 已經被別的程式或容器使用了。最常見的是你前一次跑的 Nginx 容器還沒刪掉，或者本機已經有別的服務在監聽同一個 port。
+
+解法：
+```bash
+# 先看有哪些容器還在跑
+docker ps
+
+# 如果是前一個 lab 的容器沒清掉
+docker stop web
+docker rm web
+```
+
+或者直接換一個 host port，例如把 `8080:80` 改成 `8081:80`。這個問題不影響 Docker 本身是否安裝成功，但很常在第一個 Web lab 就卡住。
+
+**問題：拉 Image 很慢或逾時**
+
+如果 `docker pull` 或 `docker run hello-world` 卡很久，甚至 timeout，很多時候不是你指令打錯，而是 Docker Hub 下載速度太慢。
+
+解法：
+- 先確認網路本身正常
+- 再考慮設定 registry mirror
+- 不要把「下載慢」誤判成「Docker 安裝失敗」
+
+後面第七節會示範如何設定加速器，所以這裡先記一個原則：**安裝成功不代表下載一定順暢，下載慢通常是網路路徑問題，不是 Docker 壞掉。**
+
+**補充：為什麼後面課程都只寫 docker 指令？**
+
+因為不論你是在 Linux 直接裝 Docker Engine，還是在 Windows/Mac 用 Docker Desktop，對學員來說最穩定的共同介面都是 `docker` CLI。本課的目標是先學容器基本功，不是把平台差異放大成多條操作路線。
+
+只要你把 Docker 的後端啟動好，後面的 lab 就能直接跟著做，不需要每一頁都拆成 Linux 版、Windows 版、Mac 版三套說明。
 
 ---
 
@@ -595,4 +650,3 @@ docker info | grep -A 5 "Registry Mirrors"
 2. Linux 安裝流程圖
 3. docker run hello-world 流程圖
 4. 常見錯誤與解法表
-

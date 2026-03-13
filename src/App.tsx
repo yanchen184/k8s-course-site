@@ -2,6 +2,7 @@
 import { slides as lesson1MorningSlides } from './slides/lesson1-morning/index'
 import type { Slide } from './slides/lesson1-morning/index'
 import AudienceView from './components/AudienceView'
+import PresenterNotesPanel from './components/PresenterNotesPanel'
 import { usePresentationChannel } from './hooks/usePresentationChannel'
 import {
   buildAudienceViewUrl,
@@ -312,6 +313,8 @@ function App() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [sharePermissionMode, setSharePermissionMode] = useState<AudienceLinkAccessMode>('read-only')
   const [showPresenterNotesScrollHint, setShowPresenterNotesScrollHint] = useState(false)
+  const [presenterNotesTab, setPresenterNotesTab] = useState<'key-points' | 'full-script'>('key-points')
+  const [isPresenterNotesExpanded, setIsPresenterNotesExpanded] = useState(false)
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
   const [clockTick, setClockTick] = useState(() => Date.now())
   const [timerPaused, setTimerPaused] = useState(false)
@@ -687,6 +690,7 @@ function App() {
           startPresenterMode()
         }
       } else if (e.key === 'Escape') {
+        setIsPresenterNotesExpanded(false)
         setIsShareModalOpen(false)
         setShowMenu(false)
         if (isMobileViewport) {
@@ -1003,14 +1007,23 @@ function App() {
   }, [isPresenterModeEnabled, syncCapability])
 
   useEffect(() => {
+    if (isPresenterModeEnabled) {
+      return
+    }
+
+    setIsPresenterNotesExpanded(false)
+  }, [isPresenterModeEnabled])
+
+  useEffect(() => {
     const shouldLockPageScroll = isMobileViewport && (
       isSidebarDrawerVisible
       || showMenu
       || isShareModalOpen
       || (isAdmin && !isPresenterModeEnabled && showNotes)
     )
+    const shouldLockForOverlay = isPresenterNotesExpanded
 
-    if (!shouldLockPageScroll) {
+    if (!shouldLockPageScroll && !shouldLockForOverlay) {
       return
     }
 
@@ -1023,7 +1036,7 @@ function App() {
       document.body.style.overflow = previousBodyOverflow
       document.documentElement.style.overflow = previousHtmlOverflow
     }
-  }, [isAdmin, isMobileViewport, isPresenterModeEnabled, isShareModalOpen, isSidebarDrawerVisible, showMenu, showNotes])
+  }, [isAdmin, isMobileViewport, isPresenterModeEnabled, isPresenterNotesExpanded, isShareModalOpen, isSidebarDrawerVisible, showMenu, showNotes])
 
   useEffect(() => {
     if (!isAdmin || !isPresenterModeEnabled) {
@@ -1946,29 +1959,30 @@ function App() {
                   )}
                 </div>
 
-                <div className="relative flex min-h-[320px] flex-1 flex-col rounded-xl border border-slate-700 bg-black/70 p-4 sm:min-h-[420px] sm:p-6 xl:min-h-0 xl:overflow-hidden">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-lg uppercase tracking-wide text-blue-400 font-semibold">📝 演講稿</h3>
-                    <span className="text-sm text-slate-400">
-                      ⏱ {slide.duration || '2-3'} min · {(slide.notes || '').length} 字
-                    </span>
-                  </div>
-                  <div
-                    ref={presenterNotesScrollRef}
-                    onScroll={updatePresenterNotesScrollHint}
-                    className="min-h-0 flex-1 overflow-y-auto pr-2 text-base leading-relaxed text-slate-100 whitespace-pre-line overscroll-contain sm:text-lg xl:text-xl"
-                  >
-                    {slide.notes?.trim() ? slide.notes : 'No notes for this slide yet.'}
-                  </div>
-                  {showPresenterNotesScrollHint && (
-                    <div className="pointer-events-none absolute inset-x-6 bottom-6 rounded-b-xl bg-gradient-to-t from-black/95 via-black/70 to-transparent px-4 pb-2 pt-10 text-center">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-slate-600/70 bg-slate-950/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200 shadow-lg shadow-slate-950/30">
-                        <span aria-hidden="true" className="text-sm leading-none">↓</span>
-                        <span>Scroll for more</span>
-                      </div>
-                    </div>
+                <PresenterNotesPanel
+                  notes={slide.notes || ''}
+                  duration={slide.duration}
+                  variant="presenter"
+                  fullNotesRef={presenterNotesScrollRef}
+                  onFullNotesScroll={updatePresenterNotesScrollHint}
+                  showScrollHint={showPresenterNotesScrollHint}
+                  activeTab={presenterNotesTab}
+                  onActiveTabChange={setPresenterNotesTab}
+                  actions={(
+                    <button
+                      type="button"
+                      onClick={() => setIsPresenterNotesExpanded(true)}
+                      aria-label="Expand speaker notes"
+                      title="Expand speaker notes"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900/80 text-slate-200 transition-colors hover:border-slate-500/80 hover:bg-slate-800 hover:text-white"
+                    >
+                      <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M8 4H4v4M12 4h4v4M16 12v4h-4M8 16H4v-4" strokeLinecap="round" strokeLinejoin="round" opacity="0.45" />
+                      </svg>
+                    </button>
                   )}
-                </div>
+                />
 
               </div>
             </div>
@@ -2017,20 +2031,70 @@ function App() {
         </div>
 
         {/* Speaker notes (admin only) */}
-        {isAdmin && !isPresenterModeEnabled && showNotes && slide.notes && (
-          <div className="fixed bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-30 max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-700 bg-black/95 p-4 text-white shadow-2xl backdrop-blur-sm sm:p-6 md:left-auto md:right-4 md:w-[800px] md:p-8">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-blue-400 font-semibold text-xl">📝 演講稿</h3>
-              <div className="flex flex-wrap gap-3 text-sm text-slate-400">
-                <span>⏱ {slide.duration || '2-3'} 分鐘</span>
-                <span className={slide.notes.length >= parseInt(slide.duration || '2') * 150 ? 'text-green-400' : 'text-yellow-400'}>
-                  {slide.notes.length} / {parseInt(slide.duration || '2') * 150} 字
-                  {slide.notes.length >= parseInt(slide.duration || '2') * 150 ? ' ✅' : ' ⚠️'}
-                </span>
+        {isAdmin && !isPresenterModeEnabled && showNotes && (
+          <div className="fixed bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-30 max-h-[72vh] rounded-2xl border border-slate-700/80 bg-black/95 p-3 text-white shadow-2xl backdrop-blur-sm sm:p-4 md:left-auto md:right-4 md:w-[min(980px,calc(100vw-2rem))]">
+            <PresenterNotesPanel
+              notes={slide.notes || ''}
+              duration={slide.duration}
+              variant="modal"
+              activeTab={presenterNotesTab}
+              onActiveTabChange={setPresenterNotesTab}
+            />
+          </div>
+        )}
+
+        {isAdmin && isPresenterModeEnabled && isPresenterNotesExpanded && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="expanded-speaker-notes-title"
+              className="flex h-full w-full max-w-[1400px] flex-col overflow-hidden rounded-[1.9rem] border border-slate-700/80 bg-slate-950/95 p-3 shadow-[0_30px_80px_rgba(2,6,23,0.5)] sm:p-5"
+            >
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h2 id="expanded-speaker-notes-title" className="text-xl font-semibold text-white">
+                    Expanded Speaker Notes
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Enlarged reading view for the active slide.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPresenterNotesExpanded(false)}
+                  aria-label="Close expanded speaker notes"
+                  title="Close expanded speaker notes"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/80 bg-slate-800/80 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+                  </svg>
+                </button>
               </div>
-            </div>
-            <div className="text-slate-100 whitespace-pre-line leading-loose text-xl">
-              {slide.notes}
+
+              <div className="min-h-0 flex-1">
+                <PresenterNotesPanel
+                  notes={slide.notes || ''}
+                  duration={slide.duration}
+                  variant="overlay"
+                  activeTab={presenterNotesTab}
+                  onActiveTabChange={setPresenterNotesTab}
+                  actions={(
+                    <button
+                      type="button"
+                      onClick={() => setIsPresenterNotesExpanded(false)}
+                      aria-label="Close expanded speaker notes"
+                      title="Close expanded speaker notes"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900/80 text-slate-200 transition-colors hover:border-slate-500/80 hover:bg-slate-800 hover:text-white"
+                    >
+                      <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
+                />
+              </div>
             </div>
           </div>
         )}

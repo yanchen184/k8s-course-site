@@ -140,9 +140,9 @@ describe('docker day 2 parser', () => {
 
     expect(podmanSlide).toBeDefined()
     expect(podmanSlide?.summary).toEqual([group([
-      'Docker 和 Podman 都能跑 OCI 容器，日常指令非常接近',
-      '核心差異：Docker 走 Client -> dockerd；Podman 是 daemonless，且更常搭配 rootless 使用',
-      'Docker 生態和教材更完整；Podman 在 RHEL / Fedora 與 systemd 管理場景更自然',
+      '課程主線選 Docker，不是因為 Podman 不重要，而是 Docker 的教材、範例、Compose 文件與跨平台體驗最一致',
+      'Podman 在 RHEL / Fedora、rootless、安全邊界與 systemd 管理情境很常是合理選擇',
+      '先學 Docker 建立容器核心概念，再轉看 Podman 成本低；若一開始兩條工具線一起講，初學者更容易混淆',
     ])])
     expect(countItems(podmanSlide?.summary ?? [])).toBe(3)
     expect(podmanSlide?.cards).toEqual([
@@ -158,19 +158,51 @@ describe('docker day 2 parser', () => {
         title: '生態與相容性',
         bullets: [group([
           '多數 docker 指令都能直接對應成 podman',
-          'Docker 在 Compose、教學資源、社群範例上更成熟',
+          'Docker 在 Compose、教學資源、社群範例與跨平台學習體驗上更成熟',
           'Podman 同樣遵守 OCI 標準，和現代 Linux 容器工具鏈整合良好',
         ])],
       },
       {
         title: '適用場景',
         bullets: [group([
-          '教學、跨平台開發、社群文件查找：Docker 通常更方便',
+          '需要和教學、社群範例、Compose 文件保持一致：Docker 通常更方便',
           'RHEL / Fedora、systemd 服務管理、偏好 rootless：Podman 更自然',
-          '本課程仍以 Docker 為主，但實務上遇到 Podman 不會陌生',
+          '先把 Docker 主線學穩，再轉看 Podman，學習成本最低',
         ])],
       },
     ])
+  })
+
+  it('adds desktop-vs-engine context to the installation slide without changing the docker CLI path', () => {
+    const slides = buildDockerDay2SlideSpecs(documents)
+    const desktopInstallSlide = slides.find((slide) => (
+      slide.hour === 3
+      && slide.title === 'Windows/Mac 安裝 Docker Desktop'
+    ))
+
+    expect(desktopInstallSlide).toBeDefined()
+    expect(desktopInstallSlide?.summary).toEqual([group([
+      'Docker Desktop 是 Windows/Mac 上最常見的安裝方式，本質上是把 Docker Engine 放進 Linux VM',
+      'Linux 可能直接裝 Docker Engine，企業環境也可能碰到 Podman，但後面課程一律用相同的 docker CLI 操作',
+      '看到教學只寫 docker run 很正常，因為你其實是在和 Linux 後端溝通，不需要每一步分平台改寫',
+    ])])
+  })
+
+  it('keeps installation verification focused on backend health and common day-2 blockers', () => {
+    const slides = buildDockerDay2SlideSpecs(documents)
+    const verifyInstallSlide = slides.find((slide) => (
+      slide.hour === 3
+      && slide.title === '驗證安裝'
+    ))
+
+    expect(verifyInstallSlide).toBeDefined()
+    expect(verifyInstallSlide?.summary).toEqual([group([
+      '驗證時最好同時看到 docker version 的 Client 和 Server，才能確認 CLI 與 daemon 都正常',
+      'Windows 先確認 WSL 2 / Docker Desktop backend 已啟動，再跑 hello-world',
+      '後面 lab 最常見的卡點是權限、port 衝突與 image pull 太慢，先排這三類',
+    ])])
+    expect(verifyInstallSlide?.notes).toContain('port is already allocated')
+    expect(verifyInstallSlide?.notes).toContain('registry mirror')
   })
 
   it('keeps hour 6 nginx config workflow as detail cards with no duplicated summary', () => {

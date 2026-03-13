@@ -180,11 +180,11 @@ docker run hello-world
 
 ## 五、Podman 簡介（5 分鐘）
 
-- Docker 和 Podman 都能跑 OCI 容器，日常指令非常接近
-- 核心差異：Docker 走 `Client -> dockerd`；Podman 是 daemonless，且更常搭配 rootless 使用
-- Docker 生態和教材更完整；Podman 在 RHEL / Fedora 與 systemd 管理場景更自然
+- 課程主線選 Docker，不是因為 Podman 不重要，而是 Docker 的教材、範例、Compose 文件與跨平台體驗最一致
+- Podman 在 RHEL / Fedora、rootless、安全邊界與 systemd 管理情境很常是合理選擇
+- 先學 Docker 建立容器核心概念，再轉看 Podman 成本低；若一開始兩條工具線一起講，初學者更容易混淆
 
-這一段先建立概念認知，不展開安裝或指令示範；後續課程主線仍以 Docker 為主。
+這一段先直接回答課程安排的原因，再補 Podman 的合理使用場景；不展開安裝或指令示範，後續課程主線仍以 Docker 為主。
 
 ### 架構與安全
 
@@ -197,16 +197,16 @@ docker run hello-world
 ### 生態與相容性
 
 - 多數 `docker` 指令都能直接對應成 `podman`
-- Docker 在 Compose、教學資源、社群範例上更成熟
+- Docker 在 Compose、教學資源、社群範例與跨平台學習體驗上更成熟
 - Podman 同樣遵守 OCI 標準，和現代 Linux 容器工具鏈整合良好
 
-重點不是多背一套指令，而是知道兩者仍在同一條 OCI 容器工具鏈上。
+重點不是多背一套指令，而是理解本課為什麼先選 Docker，以及兩者仍在同一條 OCI 容器工具鏈上。
 
 ### 適用場景
 
-- 教學、跨平台開發、社群文件查找：Docker 通常更方便
+- 需要和教學、社群範例、Compose 文件保持一致：Docker 通常更方便
 - RHEL / Fedora、systemd 服務管理、偏好 rootless：Podman 更自然
-- 本課程仍以 Docker 為主，但實務上遇到 Podman 不會陌生
+- 先把 Docker 主線學穩，再轉看 Podman，學習成本最低
 
 後續所有 lab 與課堂操作仍以 Docker 為準。
 

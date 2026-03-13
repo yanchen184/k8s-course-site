@@ -14,10 +14,13 @@ import {
 } from './presentation'
 import {
   buildCloudflareWebSocketUrl,
+  classifyCloudflareTransportIssue,
   getPresentationSyncCapability,
   getPresentationSyncCapabilityLabel,
   isPresentationTransportActive,
   parsePresentationSyncConfig,
+  PRESENTATION_CONTROL_LINK_EXPIRED_CLOSE_CODE,
+  PRESENTATION_CONTROL_LINK_INVALID_CLOSE_CODE,
   resolvePresentationTransport,
 } from './presentationTransport'
 
@@ -163,5 +166,16 @@ describe('presentation helpers', () => {
 
     expect(getPresentationSyncCapabilityLabel('cross-browser')).toBe('Cross-browser sync')
     expect(getPresentationSyncCapabilityLabel('same-browser')).toBe('Same-browser only')
+  })
+
+  it('classifies explicit websocket close reasons for invalid and expired control links', () => {
+    expect(classifyCloudflareTransportIssue(PRESENTATION_CONTROL_LINK_INVALID_CLOSE_CODE, ''))
+      .toBe('control-link-invalid')
+    expect(classifyCloudflareTransportIssue(PRESENTATION_CONTROL_LINK_EXPIRED_CLOSE_CODE, ''))
+      .toBe('control-link-expired')
+    expect(classifyCloudflareTransportIssue(1000, 'control-link-invalid'))
+      .toBe('control-link-invalid')
+    expect(classifyCloudflareTransportIssue(1006, ''))
+      .toBeNull()
   })
 })

@@ -4,13 +4,18 @@ import { PresentationRoom } from './presentationRoom'
 
 function createPeer() {
   const sent: string[] = []
+  const closed: Array<{ code?: number, reason?: string }> = []
   return {
     peer: {
       send(message: string) {
         sent.push(message)
       },
+      close(code?: number, reason?: string) {
+        closed.push({ code, reason })
+      },
     },
     sent,
+    closed,
   }
 }
 
@@ -165,6 +170,7 @@ describe('PresentationRoom', () => {
     const secondToken = room.registerActiveControlToken('new-hash', Date.now() + 60_000)
     room.addPeer(newControlAudience.peer, audienceMeta('new-hash', secondToken.version))
 
+    expect(oldControlAudience.closed).toEqual([{ code: 4403, reason: 'control-link-invalid' }])
     expect(room.handleMessage(oldControlAudience.peer, controlSync)).toBe(false)
     expect(room.handleMessage(newControlAudience.peer, controlSync)).toBe(true)
   })

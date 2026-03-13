@@ -4,6 +4,10 @@ export type PresentationSyncMode = 'auto' | 'broadcast' | 'cloudflare'
 export type PresentationTransportKind = 'broadcast' | 'cloudflare'
 export type PresentationTransportStatus = 'idle' | 'connecting' | 'ready' | 'fallback' | 'unsupported' | 'error'
 export type PresentationSyncCapability = 'cross-browser' | 'same-browser' | 'unavailable'
+export type PresentationTransportIssue = 'control-link-invalid' | 'control-link-expired'
+
+export const PRESENTATION_CONTROL_LINK_INVALID_CLOSE_CODE = 4403
+export const PRESENTATION_CONTROL_LINK_EXPIRED_CLOSE_CODE = 4408
 
 export interface PresentationSyncConfig {
   mode: PresentationSyncMode
@@ -102,4 +106,16 @@ export function getPresentationSyncCapabilityLabel(capability: PresentationSyncC
   }
 
   return 'Sync unavailable'
+}
+
+export function classifyCloudflareTransportIssue(code: number, reason: string): PresentationTransportIssue | null {
+  if (code === PRESENTATION_CONTROL_LINK_INVALID_CLOSE_CODE || reason === 'control-link-invalid') {
+    return 'control-link-invalid'
+  }
+
+  if (code === PRESENTATION_CONTROL_LINK_EXPIRED_CLOSE_CODE || reason === 'control-link-expired') {
+    return 'control-link-expired'
+  }
+
+  return null
 }

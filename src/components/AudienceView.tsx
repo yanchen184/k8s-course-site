@@ -1,6 +1,13 @@
 import type { Slide } from '../slides/lesson1-morning/index'
 
-type AudienceConnectionState = 'loading' | 'connected' | 'disconnected' | 'missing-session' | 'unsupported'
+type AudienceConnectionState =
+  | 'loading'
+  | 'connected'
+  | 'disconnected'
+  | 'missing-session'
+  | 'unsupported'
+  | 'invalid-control-link'
+  | 'expired-control-link'
 
 interface AudienceViewProps {
   lessonLabel: string
@@ -28,6 +35,12 @@ function getConnectionLabel(state: AudienceConnectionState): string {
   if (state === 'unsupported') {
     return 'Unsupported browser'
   }
+  if (state === 'invalid-control-link') {
+    return 'Control link invalid'
+  }
+  if (state === 'expired-control-link') {
+    return 'Control link expired'
+  }
   return 'Session missing'
 }
 
@@ -52,6 +65,13 @@ function getAudienceStatusBadge(
     }
   }
 
+  if (connectionState === 'invalid-control-link' || connectionState === 'expired-control-link') {
+    return {
+      label: getConnectionLabel(connectionState),
+      className: 'bg-red-900/70 text-red-200 border-red-700/80',
+    }
+  }
+
   return {
     label: getConnectionLabel(connectionState),
     className: 'bg-amber-900/70 text-amber-200 border-amber-700/80',
@@ -71,7 +91,11 @@ export default function AudienceView({
   onNext,
 }: AudienceViewProps) {
   const showWaitingState = loading || connectionState === 'loading'
-  const showError = connectionState === 'missing-session' || connectionState === 'unsupported'
+  const showError =
+    connectionState === 'missing-session' ||
+    connectionState === 'unsupported' ||
+    connectionState === 'invalid-control-link' ||
+    connectionState === 'expired-control-link'
   const statusBadge = getAudienceStatusBadge(connectionState, controlsEnabled)
 
   return (
@@ -101,11 +125,19 @@ export default function AudienceView({
         {!showWaitingState && showError && (
           <div className="max-w-xl text-center">
             <div className="mb-3 text-5xl">⚠️</div>
-            <h1 className="text-2xl md:text-3xl font-semibold">Audience view is unavailable</h1>
+            <h1 className="text-2xl md:text-3xl font-semibold">
+              {connectionState === 'invalid-control-link' || connectionState === 'expired-control-link'
+                ? 'This control link is no longer valid'
+                : 'Audience view is unavailable'}
+            </h1>
             <p className="text-slate-300 mt-2">
               {connectionState === 'missing-session'
                 ? 'No active session was provided.'
-                : 'Presenter sync is unavailable for the current mode.'}
+                : connectionState === 'unsupported'
+                ? 'Presenter sync is unavailable for the current mode.'
+                : connectionState === 'expired-control-link'
+                ? 'This control link has expired. Ask the presenter for a new control link.'
+                : 'This control link has been rotated or is no longer authorized. Ask the presenter for a new control link.'}
             </p>
           </div>
         )}

@@ -8,12 +8,14 @@ import {
 } from '../types/presentation'
 import {
   buildCloudflareWebSocketUrl,
+  classifyCloudflareTransportIssue,
   getPresentationSyncCapability,
   parsePresentationSyncConfig,
   resolvePresentationTransport,
   shouldUseBroadcastFallback,
   type PresentationSyncCapability,
   type PresentationTransportKind,
+  type PresentationTransportIssue,
   type PresentationTransportStatus,
 } from '../types/presentationTransport'
 
@@ -23,6 +25,7 @@ interface UsePresentationChannelResult {
   latestMessage: PresentationSyncMessage | null
   transportStatus: PresentationTransportStatus
   transportKind: PresentationTransportKind | null
+  transportIssue: PresentationTransportIssue | null
   syncCapability: PresentationSyncCapability
   sendMessage: (message: PresentationSyncMessage) => boolean
 }
@@ -40,6 +43,7 @@ export function usePresentationChannel(
   const [latestMessage, setLatestMessage] = useState<PresentationSyncMessage | null>(null)
   const [transportStatus, setTransportStatus] = useState<PresentationTransportStatus>('idle')
   const [transportKind, setTransportKind] = useState<PresentationTransportKind | null>(null)
+  const [transportIssue, setTransportIssue] = useState<PresentationTransportIssue | null>(null)
   const channelRef = useRef<BroadcastChannel | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const senderRef = useRef<TransportSender | null>(null)
@@ -65,6 +69,8 @@ export function usePresentationChannel(
     cleanupTransport()
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLatestMessage(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTransportIssue(null)
 
     if (!sessionId) {
       setTransportStatus('idle')
@@ -87,6 +93,7 @@ export function usePresentationChannel(
       }
       setTransportKind('broadcast')
       setTransportStatus(status)
+      setTransportIssue(null)
 
       channel.onmessage = (event: MessageEvent<unknown>) => {
           if (!isPresentationSyncMessage(event.data) || event.data.sessionId !== sessionId || !isFreshPresentationMessage(event.data)) {
@@ -150,9 +157,21 @@ export function usePresentationChannel(
       }
       setTransportKind('cloudflare')
       setTransportStatus('connecting')
+      setTransportIssue(null)
 
-      const failCloudflareTransport = () => {
+      const failCloudflareTransport = (event?: CloseEvent) => {
         if (disposed) {
+          return
+        }
+
+        const transportIssue = event
+          ? classifyCloudflareTransportIssue(event.code, event.reason)
+          : null
+        if (transportIssue) {
+          cleanupTransport()
+          setTransportKind(null)
+          setTransportIssue(transportIssue)
+          setTransportStatus('error')
           return
         }
 
@@ -195,8 +214,8 @@ export function usePresentationChannel(
         // Wait for onclose to finalize fallback/error state.
       }
 
-      socket.onclose = () => {
-        failCloudflareTransport()
+      socket.onclose = (event) => {
+        failCloudflareTransport(event)
       }
     }
 
@@ -223,6 +242,7 @@ export function usePresentationChannel(
     latestMessage,
     transportStatus,
     transportKind,
+    transportIssue,
     syncCapability: getPresentationSyncCapability(transportKind, transportStatus),
     sendMessage,
   }

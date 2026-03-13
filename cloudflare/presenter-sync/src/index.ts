@@ -16,6 +16,10 @@ interface ConnectionAttachment {
 
 const ACTIVE_CONTROL_TOKEN_STORAGE_KEY = 'active-control-token'
 const DEFAULT_CONTROL_TOKEN_TTL_SECONDS = 8 * 60 * 60
+const CONTROL_LINK_INVALID_CLOSE_CODE = 4403
+const CONTROL_LINK_INVALID_CLOSE_REASON = 'control-link-invalid'
+const CONTROL_LINK_EXPIRED_CLOSE_CODE = 4408
+const CONTROL_LINK_EXPIRED_CLOSE_REASON = 'control-link-expired'
 
 function isWebSocketUpgradeRequest(request: Request): boolean {
   return request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
@@ -101,6 +105,18 @@ function isAllowedOrigin(request: Request, allowedOrigins: Set<string>): boolean
   }
 
   return allowedOrigins.has(origin)
+}
+
+function createRejectedWebSocketResponse(code: number, reason: string): Response {
+  const webSocketPair = new WebSocketPair()
+  const [client, server] = Object.values(webSocketPair)
+  server.accept()
+  server.close(code, reason)
+
+  return new Response(null, {
+    status: 101,
+    webSocket: client,
+  })
 }
 
 export default {
@@ -199,11 +215,13 @@ export class PresentationRoomDurableObject extends DurableObject<Env> {
     } else if (senderRole === 'audience' && controlTokenHash) {
       const authorizationResult = this.room.authorizeControlConnection(controlTokenHash)
       if (authorizationResult.status === 'rejected') {
-        return new Response(
+        return createRejectedWebSocketResponse(
           authorizationResult.reason === 'expired'
-            ? 'Control link has expired.'
-            : 'Control link is invalid.',
-          { status: authorizationResult.reason === 'expired' ? 410 : 403 },
+            ? CONTROL_LINK_EXPIRED_CLOSE_CODE
+            : CONTROL_LINK_INVALID_CLOSE_CODE,
+          authorizationResult.reason === 'expired'
+            ? CONTROL_LINK_EXPIRED_CLOSE_REASON
+            : CONTROL_LINK_INVALID_CLOSE_REASON,
         )
       }
 

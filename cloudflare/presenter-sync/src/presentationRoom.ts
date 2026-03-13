@@ -7,6 +7,7 @@ import {
 
 export interface PresentationRoomPeer {
   send: (message: string) => void
+  close: (code?: number, reason?: string) => void
 }
 
 export interface PresentationRoomPeerMetadata {
@@ -25,6 +26,9 @@ export type PresentationControlAuthorizationResult =
   | { status: 'authorized', version: number }
   | { status: 'pending' }
   | { status: 'rejected', reason: 'invalid' | 'expired' }
+
+const CONTROL_LINK_INVALID_CLOSE_CODE = 4403
+const CONTROL_LINK_INVALID_CLOSE_REASON = 'control-link-invalid'
 
 export class PresentationRoom {
   static readonly MAX_MESSAGE_BYTES = 8_192
@@ -84,6 +88,7 @@ export class PresentationRoom {
       expiresAt,
       version: (this.activeControlToken?.version ?? 0) + 1,
     }
+    this.revokeStaleControlPeers(tokenHash)
     this.reauthorizeMatchingPeers()
     return this.activeControlToken
   }
@@ -162,6 +167,21 @@ export class PresentationRoom {
   private reauthorizeMatchingPeers(): void {
     for (const peer of this.peers.keys()) {
       this.reauthorizePeer(peer)
+    }
+  }
+
+  private revokeStaleControlPeers(activeTokenHash: string): void {
+    for (const [peer, metadata] of this.peers.entries()) {
+      if (metadata.senderRole !== 'audience' || !metadata.controlTokenHash) {
+        continue
+      }
+
+      if (metadata.controlTokenHash === activeTokenHash) {
+        continue
+      }
+
+      metadata.controlAuthorizationVersion = null
+      peer.close(CONTROL_LINK_INVALID_CLOSE_CODE, CONTROL_LINK_INVALID_CLOSE_REASON)
     }
   }
 

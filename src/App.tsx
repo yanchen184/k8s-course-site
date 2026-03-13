@@ -301,7 +301,9 @@ function App() {
   const [slides, setSlides] = useState<Slide[]>(lesson1MorningSlides)
   const [loading, setLoading] = useState(false)
   const [presenterSyncStatus, setPresenterSyncStatus] = useState<'idle' | 'connecting' | 'connected' | 'disconnected' | 'unsupported'>('idle')
-  const [audienceConnectionState, setAudienceConnectionState] = useState<'loading' | 'connected' | 'disconnected' | 'missing-session' | 'unsupported'>(
+  const [audienceConnectionState, setAudienceConnectionState] = useState<
+    'loading' | 'connected' | 'disconnected' | 'missing-session' | 'unsupported' | 'invalid-control-link' | 'expired-control-link'
+  >(
     viewMode === 'audience' && !sessionId ? 'missing-session' : 'loading',
   )
   const [presenterError, setPresenterError] = useState<string | null>(null)
@@ -328,7 +330,7 @@ function App() {
   const isSidebarDrawerVisible = isMobileSidebar && sidebarOpen
   const audienceControlsEnabled = canAudienceControlPresenter(viewMode, sessionId, controlToken)
   const channelSenderRole = viewMode === 'presenter' ? 'presenter' : 'audience'
-  const { latestMessage, transportKind, transportStatus, syncCapability, sendMessage } = usePresentationChannel(sessionId, {
+  const { latestMessage, transportKind, transportStatus, transportIssue, syncCapability, sendMessage } = usePresentationChannel(sessionId, {
     senderRole: channelSenderRole,
     controlToken,
   })
@@ -748,6 +750,16 @@ function App() {
       return
     }
 
+    if (isAudienceView && transportIssue === 'control-link-invalid') {
+      setAudienceConnectionState('invalid-control-link')
+      return
+    }
+
+    if (isAudienceView && transportIssue === 'control-link-expired') {
+      setAudienceConnectionState('expired-control-link')
+      return
+    }
+
     if (isAudienceView && (transportStatus === 'unsupported' || transportStatus === 'error')) {
       setAudienceConnectionState('unsupported')
       return
@@ -756,7 +768,7 @@ function App() {
     if (isAudienceView && (!isTransportReady || !hasReceivedInitialSyncRef.current)) {
       setAudienceConnectionState('loading')
     }
-  }, [isAudienceView, isTransportReady, sessionId, transportStatus])
+  }, [isAudienceView, isTransportReady, sessionId, transportIssue, transportStatus])
 
   useEffect(() => {
     if (!isTransportReady) {

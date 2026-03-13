@@ -24,6 +24,8 @@ If you want cross-browser presenter sync, deploy the optional Cloudflare Workers
 - `VITE_PRESENTATION_SYNC_MODE=auto`
 - `VITE_PRESENTATION_SYNC_URL=https://<your-worker-domain>/websocket`
 
+Use the production rollout checklist in [docs/presenter-sync-runbook.md](docs/presenter-sync-runbook.md) for deployment order, smoke testing, and troubleshooting.
+
 When those variables are missing or the realtime endpoint is unavailable, the app automatically falls back to same-browser sync.
 
 ### What this enables

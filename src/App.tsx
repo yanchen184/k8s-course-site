@@ -328,11 +328,12 @@ function App() {
   const isSidebarDrawerVisible = isMobileSidebar && sidebarOpen
   const audienceControlsEnabled = canAudienceControlPresenter(viewMode, sessionId, controlToken)
   const channelSenderRole = viewMode === 'presenter' ? 'presenter' : 'audience'
-  const { latestMessage, transportStatus, syncCapability, sendMessage } = usePresentationChannel(sessionId, {
+  const { latestMessage, transportKind, transportStatus, syncCapability, sendMessage } = usePresentationChannel(sessionId, {
     senderRole: channelSenderRole,
-    controlToken: viewMode === 'audience' ? controlToken : null,
+    controlToken,
   })
   const isTransportReady = isPresentationTransportActive(transportStatus)
+  const shouldEmbedControlTokenInMessages = transportKind !== 'cloudflare'
 
   // 切換課程（同步 URL hash）
   const ensureOutlineLessonVisible = useCallback((idx: number) => {
@@ -529,10 +530,10 @@ function App() {
     goToSlide(nextIndex)
     sendMessage(
       createPresentationMessage('SYNC_STATE', sessionId, LESSONS[currentLesson].id, nextIndex, 'audience', {
-        controlToken,
+        controlToken: shouldEmbedControlTokenInMessages ? controlToken : null,
       }),
     )
-  }, [audienceControlsEnabled, controlToken, currentLesson, currentSlide, goToSlide, sendMessage, sessionId, slides.length])
+  }, [audienceControlsEnabled, controlToken, currentLesson, currentSlide, goToSlide, sendMessage, sessionId, shouldEmbedControlTokenInMessages, slides.length])
 
   const postPresentationMessage = useCallback(
     (
@@ -550,36 +551,40 @@ function App() {
     [sendMessage, sessionId],
   )
 
-  const startPresenterMode = useCallback(() => {
-    const activeSessionId = sessionId ?? createSessionId()
-    const activeControlToken = createSessionId()
-    const activeLessonId = LESSONS[currentLesson].id
-    const audienceUrl = buildAudienceUrl(activeSessionId, activeLessonId, {
+  const openAudienceWindow = useCallback((
+    activeSessionId: string,
+    activeControlToken: string,
+  ): Window | null => {
+    const lessonId = LESSONS[currentLesson].id
+    const audienceUrl = buildAudienceUrl(activeSessionId, lessonId, {
       accessMode: 'control',
       controlToken: activeControlToken,
     })
-    persistPresenterControlToken(activeSessionId, activeControlToken)
-
     const openedWindow = window.open(audienceUrl, `k8s-audience-${activeSessionId}`, 'popup=yes,width=1366,height=768')
+
     if (!openedWindow) {
       setPresenterError('Popup blocked. Allow popups for this site and try again.')
       setManualAudienceUrl(audienceUrl)
-      setViewMode('presenter')
-      setSessionId(activeSessionId)
-      setControlToken(activeControlToken)
-      setPresenterSyncStatus('disconnected')
-      return
+      return null
     }
 
     audienceWindowRef.current = openedWindow
     setPresenterError(null)
     setManualAudienceUrl(null)
+    return openedWindow
+  }, [currentLesson])
+
+  const startPresenterMode = useCallback(() => {
+    const activeSessionId = sessionId ?? createSessionId()
+    const activeControlToken = createSessionId()
+    persistPresenterControlToken(activeSessionId, activeControlToken)
+    const openedWindow = openAudienceWindow(activeSessionId, activeControlToken)
     setViewMode('presenter')
     setSessionId(activeSessionId)
     setControlToken(activeControlToken)
     setSessionStartedAt(Date.now())
-    setPresenterSyncStatus('connecting')
-  }, [currentLesson, sessionId])
+    setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
+  }, [openAudienceWindow, sessionId])
 
   const reopenAudienceWindow = useCallback(() => {
     if (!sessionId || !controlToken) {
@@ -587,26 +592,30 @@ function App() {
       return
     }
 
-    const lessonId = LESSONS[currentLesson].id
-    const audienceUrl = buildAudienceUrl(sessionId, lessonId, {
-      accessMode: 'control',
-      controlToken,
-    })
-    const openedWindow = window.open(audienceUrl, `k8s-audience-${sessionId}`, 'popup=yes,width=1366,height=768')
-
+    const openedWindow = openAudienceWindow(sessionId, controlToken)
     if (!openedWindow) {
-      setPresenterError('Popup blocked. Allow popups for this site and try again.')
-      setManualAudienceUrl(audienceUrl)
       setPresenterSyncStatus('disconnected')
       return
     }
 
-    audienceWindowRef.current = openedWindow
-    setPresenterError(null)
-    setManualAudienceUrl(null)
     setPresenterSyncStatus('connecting')
-    postPresentationMessage('SYNC_STATE', lessonId, currentSlide, 'presenter')
-  }, [controlToken, currentLesson, currentSlide, postPresentationMessage, sessionId, startPresenterMode])
+    postPresentationMessage('SYNC_STATE', LESSONS[currentLesson].id, currentSlide, 'presenter')
+  }, [controlToken, currentLesson, currentSlide, openAudienceWindow, postPresentationMessage, sessionId, startPresenterMode])
+
+  const rotateControlLink = useCallback(() => {
+    if (!sessionId) {
+      return
+    }
+
+    const nextControlToken = createSessionId()
+    persistPresenterControlToken(sessionId, nextControlToken)
+    setControlToken(nextControlToken)
+    setCopyAudienceUrlState('idle')
+    setSharePermissionMode('control')
+
+    const openedWindow = openAudienceWindow(sessionId, nextControlToken)
+    setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
+  }, [openAudienceWindow, sessionId])
 
   const stopPresenterMode = useCallback(() => {
     const lessonId = LESSONS[currentLesson].id
@@ -778,7 +787,15 @@ function App() {
       return
     }
 
-    if (isPresenterModeEnabled && shouldAcceptAudienceControlMessage(latestMessage, controlToken)) {
+    if (
+      isPresenterModeEnabled &&
+      latestMessage.type === 'SYNC_STATE' &&
+      latestMessage.senderRole === 'audience' &&
+      (
+        transportKind === 'cloudflare' ||
+        shouldAcceptAudienceControlMessage(latestMessage, controlToken)
+      )
+    ) {
       const syncedLessonIndex = LESSONS.findIndex((item) => item.id === latestMessage.lessonId)
       if (syncedLessonIndex === -1) {
         return
@@ -855,6 +872,7 @@ function App() {
     postPresentationMessage,
     slides.length,
     isTransportReady,
+    transportKind,
     transportStatus,
   ])
 
@@ -1234,6 +1252,7 @@ function App() {
   const sharePermissionDescription = sharePermissionMode === 'control'
     ? 'Anyone with this link can control presenter navigation.'
     : 'Audience members can view slides but cannot control navigation.'
+  const canRotateControlLink = isPresenterModeEnabled && Boolean(sessionId)
   if (isAudienceView) {
     return (
       <AudienceView
@@ -1764,6 +1783,25 @@ function App() {
                 <p className="mt-3 text-sm text-slate-400">
                   {sharePermissionDescription}
                 </p>
+                {sharePermissionMode === 'control' && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-800/40 bg-amber-950/20 px-3 py-3">
+                    <p className="text-sm text-amber-100">
+                      Rotate the control link to invalidate the previous control token and issue a new one.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={rotateControlLink}
+                      disabled={!canRotateControlLink}
+                      className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                        canRotateControlLink
+                          ? 'bg-amber-600 text-white hover:bg-amber-500'
+                          : 'cursor-not-allowed bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      Rotate Control Link
+                    </button>
+                  </div>
+                )}
                 <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-3 font-mono text-xs leading-relaxed text-slate-200 break-all">
                   {selectedShareAudienceUrl ?? 'Audience link unavailable'}
                 </div>

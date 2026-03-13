@@ -69,6 +69,10 @@ describe('presentation helpers', () => {
     expect(isPresentationSyncMessage(presenterMessage)).toBe(true)
     expect(isPresentationSyncMessage(audienceMessage)).toBe(true)
     expect(audienceMessage.controlToken).toBe('demo-control')
+
+    const cloudflareAudienceMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'audience')
+    expect(isPresentationSyncMessage(cloudflareAudienceMessage)).toBe(true)
+    expect(cloudflareAudienceMessage.controlToken).toBeUndefined()
   })
 
   it('only accepts audience control messages with the active control token', () => {

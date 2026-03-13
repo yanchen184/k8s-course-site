@@ -1,16 +1,21 @@
 import { DurableObject } from 'cloudflare:workers'
-import { PresentationRoom } from './presentationRoom'
+import { PresentationRoom, type PresentationRoomControlTokenState } from './presentationRoom'
 import type { PresentationSenderRole } from '../../../src/types/presentation'
 
 export interface Env {
   PRESENTATION_ROOM: DurableObjectNamespace<PresentationRoomDurableObject>
   ALLOWED_ORIGINS?: string
+  PRESENTER_CONTROL_TOKEN_TTL_SECONDS?: string
 }
 
 interface ConnectionAttachment {
   senderRole: PresentationSenderRole
-  controlToken: string | null
+  controlTokenHash: string | null
+  controlAuthorizationVersion: number | null
 }
+
+const ACTIVE_CONTROL_TOKEN_STORAGE_KEY = 'active-control-token'
+const DEFAULT_CONTROL_TOKEN_TTL_SECONDS = 8 * 60 * 60
 
 function isWebSocketUpgradeRequest(request: Request): boolean {
   return request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
@@ -66,6 +71,25 @@ function parseAllowedOrigins(env: Env): Set<string> {
   )
 }
 
+function parseControlTokenTtlMs(env: Env): number {
+  const rawTtlSeconds = env.PRESENTER_CONTROL_TOKEN_TTL_SECONDS?.trim()
+  if (!rawTtlSeconds) {
+    return DEFAULT_CONTROL_TOKEN_TTL_SECONDS * 1000
+  }
+
+  const ttlSeconds = Number.parseInt(rawTtlSeconds, 10)
+  if (!Number.isFinite(ttlSeconds) || ttlSeconds < 60) {
+    return DEFAULT_CONTROL_TOKEN_TTL_SECONDS * 1000
+  }
+
+  return ttlSeconds * 1000
+}
+
+async function hashControlToken(controlToken: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(controlToken))
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
+}
+
 function isAllowedOrigin(request: Request, allowedOrigins: Set<string>): boolean {
   if (allowedOrigins.size === 0) {
     return true
@@ -117,6 +141,7 @@ export default {
 
 export class PresentationRoomDurableObject extends DurableObject<Env> {
   private readonly room = new PresentationRoom()
+  private readonly ready: Promise<void>
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -130,9 +155,16 @@ export class PresentationRoomDurableObject extends DurableObject<Env> {
 
       this.room.restorePeer(socket, attachment)
     }
+
+    this.ready = this.ctx.blockConcurrencyWhile(async () => {
+      const activeControlToken = await this.ctx.storage.get<PresentationRoomControlTokenState>(ACTIVE_CONTROL_TOKEN_STORAGE_KEY)
+      this.room.hydrateActiveControlToken(activeControlToken ?? null)
+    })
   }
 
   async fetch(request: Request): Promise<Response> {
+    await this.ready
+
     if (!isWebSocketUpgradeRequest(request)) {
       return new Response('Expected Upgrade: websocket', { status: 426 })
     }
@@ -151,15 +183,45 @@ export class PresentationRoomDurableObject extends DurableObject<Env> {
       return new Response('Invalid control token.', { status: 400 })
     }
 
+    let controlTokenHash: string | null = null
+    let controlAuthorizationVersion: number | null = null
+    if (controlToken) {
+      controlTokenHash = await hashControlToken(controlToken)
+    }
+
+    if (senderRole === 'presenter' && controlTokenHash) {
+      const activeControlToken = this.room.registerActiveControlToken(
+        controlTokenHash,
+        Date.now() + parseControlTokenTtlMs(this.env),
+      )
+      controlAuthorizationVersion = activeControlToken.version
+      await this.ctx.storage.put(ACTIVE_CONTROL_TOKEN_STORAGE_KEY, activeControlToken)
+    } else if (senderRole === 'audience' && controlTokenHash) {
+      const authorizationResult = this.room.authorizeControlConnection(controlTokenHash)
+      if (authorizationResult.status === 'rejected') {
+        return new Response(
+          authorizationResult.reason === 'expired'
+            ? 'Control link has expired.'
+            : 'Control link is invalid.',
+          { status: authorizationResult.reason === 'expired' ? 410 : 403 },
+        )
+      }
+
+      if (authorizationResult.status === 'authorized') {
+        controlAuthorizationVersion = authorizationResult.version
+      }
+    }
+
     const webSocketPair = new WebSocketPair()
     const [client, server] = Object.values(webSocketPair)
 
     this.ctx.acceptWebSocket(server)
     server.serializeAttachment({
       senderRole,
-      controlToken,
+      controlTokenHash,
+      controlAuthorizationVersion,
     } satisfies ConnectionAttachment)
-    this.room.addPeer(server, { senderRole, controlToken })
+    this.room.addPeer(server, { senderRole, controlTokenHash, controlAuthorizationVersion })
 
     return new Response(null, {
       status: 101,
@@ -168,6 +230,8 @@ export class PresentationRoomDurableObject extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    await this.ready
+
     if (typeof message !== 'string') {
       console.warn('Ignoring non-text presentation sync payload.')
       return
@@ -176,15 +240,28 @@ export class PresentationRoomDurableObject extends DurableObject<Env> {
     const accepted = this.room.handleMessage(ws, message)
     if (!accepted) {
       console.warn('Ignoring invalid presentation sync payload.')
+      return
+    }
+
+    try {
+      const payload = JSON.parse(message) as { type?: string, senderRole?: string }
+      if (payload.type === 'END_SESSION' && payload.senderRole === 'presenter') {
+        this.room.clearActiveControlToken()
+        await this.ctx.storage.delete(ACTIVE_CONTROL_TOKEN_STORAGE_KEY)
+      }
+    } catch {
+      // Ignore follow-up cleanup for invalid payloads. Validation already happened above.
     }
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    await this.ready
     this.room.removePeer(ws)
     ws.close(code, reason)
   }
 
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+    await this.ready
     console.error('Presentation room websocket error.', error)
     this.room.removePeer(ws)
     ws.close(1011, 'WebSocket error')

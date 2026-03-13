@@ -17,14 +17,16 @@ function createPeer() {
 function presenterMeta() {
   return {
     senderRole: 'presenter' as const,
-    controlToken: null,
+    controlTokenHash: null,
+    controlAuthorizationVersion: null,
   }
 }
 
-function audienceMeta(controlToken: string | null = null) {
+function audienceMeta(controlTokenHash: string | null = null, controlAuthorizationVersion: number | null = null) {
   return {
     senderRole: 'audience' as const,
-    controlToken,
+    controlTokenHash,
+    controlAuthorizationVersion,
   }
 }
 
@@ -101,12 +103,69 @@ describe('PresentationRoom', () => {
     room.addPeer(receiver.peer, presenterMeta())
 
     const spoofedControlMessage = JSON.stringify(
-      createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'audience', {
-        controlToken: 'stolen-control-token',
-      }),
+      createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'audience'),
     )
 
     expect(room.handleMessage(readOnlyAudience.peer, spoofedControlMessage)).toBe(false)
     expect(receiver.sent).toEqual([])
+  })
+
+  it('authorizes control audiences only after the presenter registers a matching control token', () => {
+    const room = new PresentationRoom()
+    const controlAudience = createPeer()
+    const presenter = createPeer()
+
+    room.addPeer(controlAudience.peer, audienceMeta('control-hash'))
+    room.addPeer(presenter.peer, presenterMeta())
+
+    const controlSync = JSON.stringify(
+      createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'audience'),
+    )
+
+    expect(room.handleMessage(controlAudience.peer, controlSync)).toBe(false)
+
+    const activeControlToken = room.registerActiveControlToken('control-hash', Date.now() + 60_000)
+    expect(activeControlToken.version).toBe(1)
+    expect(room.handleMessage(controlAudience.peer, controlSync)).toBe(true)
+  })
+
+  it('rejects new control connections after token expiry but keeps already authorized peers active', () => {
+    const room = new PresentationRoom()
+    const authorizedControlAudience = createPeer()
+
+    const expiresAt = Date.now() + 1_000
+    const activeControlToken = room.registerActiveControlToken('control-hash', expiresAt)
+    room.addPeer(authorizedControlAudience.peer, audienceMeta('control-hash', activeControlToken.version))
+
+    const controlSync = JSON.stringify(
+      createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 3, 'audience'),
+    )
+
+    expect(room.authorizeControlConnection('control-hash', expiresAt + 1)).toEqual({
+      status: 'rejected',
+      reason: 'expired',
+    })
+    expect(room.handleMessage(authorizedControlAudience.peer, controlSync)).toBe(true)
+  })
+
+  it('revokes previous control peers after the token rotates', () => {
+    const room = new PresentationRoom()
+    const oldControlAudience = createPeer()
+    const newControlAudience = createPeer()
+
+    const firstToken = room.registerActiveControlToken('old-hash', Date.now() + 60_000)
+    room.addPeer(oldControlAudience.peer, audienceMeta('old-hash', firstToken.version))
+
+    const controlSync = JSON.stringify(
+      createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 4, 'audience'),
+    )
+
+    expect(room.handleMessage(oldControlAudience.peer, controlSync)).toBe(true)
+
+    const secondToken = room.registerActiveControlToken('new-hash', Date.now() + 60_000)
+    room.addPeer(newControlAudience.peer, audienceMeta('new-hash', secondToken.version))
+
+    expect(room.handleMessage(oldControlAudience.peer, controlSync)).toBe(false)
+    expect(room.handleMessage(newControlAudience.peer, controlSync)).toBe(true)
   })
 })

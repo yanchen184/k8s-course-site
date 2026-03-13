@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { Slide } from '../slides/lesson1-morning/index'
 
 type AudienceConnectionState =
@@ -78,7 +79,39 @@ function getAudienceStatusBadge(
   }
 }
 
-export default function AudienceView({
+function AudienceSlideBody({ slide }: { slide: Slide }) {
+  return (
+    <>
+      {slide.section && (
+        <div className="slide-section-label">
+          {slide.section}
+        </div>
+      )}
+
+      <h1 className="slide-title">
+        {slide.title}
+      </h1>
+
+      {slide.subtitle && (
+        <h2 className="slide-subtitle">
+          {slide.subtitle}
+        </h2>
+      )}
+
+      <div className="slide-content-responsive space-y-5">
+        {slide.content}
+      </div>
+
+      {slide.code && (
+        <pre className="slide-code-block">
+          <code className="text-green-400 font-mono">{slide.code}</code>
+        </pre>
+      )}
+    </>
+  )
+}
+
+function AudienceView({
   lessonLabel,
   lessonTitle,
   slide,
@@ -99,7 +132,7 @@ export default function AudienceView({
   const statusBadge = getAudienceStatusBadge(connectionState, controlsEnabled)
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="isolate min-h-screen overflow-x-clip bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       <div className="fixed left-3 right-3 top-3 z-20 flex flex-col gap-2 pointer-events-none sm:left-4 sm:right-4 sm:top-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="rounded-xl border border-slate-700/60 bg-slate-900/80 px-3 py-2 text-xs text-slate-300 shadow-lg shadow-slate-950/20">
           {lessonLabel} · {lessonTitle}
@@ -113,7 +146,7 @@ export default function AudienceView({
         )}
       </div>
 
-      <div className="flex min-h-screen items-start justify-center px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-[calc(5.75rem+env(safe-area-inset-top))] sm:px-6 sm:pt-[calc(6.5rem+env(safe-area-inset-top))] md:items-center md:px-10">
+      <div className="relative z-0 flex min-h-screen items-start justify-center px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-[calc(5.75rem+env(safe-area-inset-top))] sm:px-6 sm:pt-[calc(6.5rem+env(safe-area-inset-top))] md:px-10">
         {showWaitingState && (
           <div className="max-w-xl text-center">
             <div className="mb-3 text-5xl animate-pulse">⏳</div>
@@ -151,40 +184,16 @@ export default function AudienceView({
         )}
 
         {!showWaitingState && !showError && slide && (
-          <div className="slide-shell-wide">
-            {slide.section && (
-              <div className="slide-section-label">
-                {slide.section}
-              </div>
-            )}
-
-            <h1 className="slide-title">
-              {slide.title}
-            </h1>
-
-            {slide.subtitle && (
-              <h2 className="slide-subtitle">
-                {slide.subtitle}
-              </h2>
-            )}
-
-            <div className="slide-content-responsive space-y-5">
-              {slide.content}
-            </div>
-
-            {slide.code && (
-              <pre className="slide-code-block">
-                <code className="text-green-400 font-mono">{slide.code}</code>
-              </pre>
-            )}
+          <div className="audience-slide-stage slide-shell-wide relative [contain:layout_paint]">
+            <AudienceSlideBody slide={slide} />
           </div>
         )}
       </div>
 
       {/* Navigation buttons */}
       {!showWaitingState && !showError && totalSlides > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-700/60 bg-slate-950/75 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur md:bottom-6 md:border-t-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
-          <div className="mx-auto flex w-full max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/90 px-3 py-3 shadow-xl shadow-slate-950/30 md:max-w-fit md:px-4">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-800/80 bg-slate-950/94 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:bottom-6 md:border-t-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
+          <div className="mx-auto flex w-full max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-700/80 bg-slate-950/95 px-3 py-3 shadow-xl shadow-slate-950/30 md:max-w-fit md:px-4">
           <button
             onClick={onPrev}
             disabled={!controlsEnabled || currentSlide <= 0}
@@ -214,3 +223,5 @@ export default function AudienceView({
     </div>
   )
 }
+
+export default memo(AudienceView)

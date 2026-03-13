@@ -31,6 +31,15 @@ import {
   type SectionEntry,
 } from './sidebarOutline'
 
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (updateCallback: () => void | Promise<void>) => {
+    finished: Promise<void>
+    ready: Promise<void>
+    updateCallbackDone: Promise<void>
+    skipTransition: () => void
+  }
+}
+
 // 課程列表
 const LESSONS = [
   {
@@ -327,6 +336,7 @@ function App() {
   const lastAudienceSignalAtRef = useRef<number | null>(null)
   const hasReceivedInitialSyncRef = useRef(false)
   const presenterNotesScrollRef = useRef<HTMLDivElement | null>(null)
+  const presenterSlideScrollRef = useRef<HTMLDivElement | null>(null)
   const isAudienceView = viewMode === 'audience'
   const shouldRenderSidebar = shouldShowSidebar(viewMode)
   const isPresenterModeEnabled = viewMode === 'presenter' && Boolean(sessionId)
@@ -454,9 +464,13 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!isPresenterModeEnabled || timerPaused) {
+      return
+    }
+
     const timer = window.setInterval(() => setClockTick(Date.now()), 1000)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [isPresenterModeEnabled, timerPaused])
 
   // 監聽瀏覽器上一頁/下一頁
   useEffect(() => {
@@ -515,10 +529,23 @@ function App() {
   }, [cacheLessonSections, currentLesson, isAudienceView])
 
   const goToSlide = useCallback((index: number) => {
-    if (index >= 0 && index < slides.length) {
-      setCurrentSlide(index)
+    if (index < 0 || index >= slides.length || index === currentSlide) {
+      return
     }
-  }, [slides.length])
+
+    if (isAudienceView) {
+      const transitionDocument = document as ViewTransitionDocument
+
+      if (typeof transitionDocument.startViewTransition === 'function') {
+        transitionDocument.startViewTransition(() => {
+          setCurrentSlide(index)
+        })
+        return
+      }
+    }
+
+    setCurrentSlide(index)
+  }, [currentSlide, isAudienceView, slides.length])
 
   const nextSlide = useCallback(() => goToSlide(currentSlide + 1), [currentSlide, goToSlide])
   const prevSlide = useCallback(() => goToSlide(currentSlide - 1), [currentSlide, goToSlide])
@@ -540,6 +567,14 @@ function App() {
       }),
     )
   }, [audienceControlsEnabled, controlToken, currentLesson, currentSlide, goToSlide, sendMessage, sessionId, shouldEmbedControlTokenInMessages, slides.length])
+
+  const handleAudiencePrev = useCallback(() => {
+    audienceNav('prev')
+  }, [audienceNav])
+
+  const handleAudienceNext = useCallback(() => {
+    audienceNav('next')
+  }, [audienceNav])
 
   const postPresentationMessage = useCallback(
     (
@@ -1102,6 +1137,19 @@ function App() {
     }
   }, [currentSlide, isAdmin, isPresenterModeEnabled, slide.notes, updatePresenterNotesScrollHint])
 
+  useEffect(() => {
+    if (!isAdmin || !isPresenterModeEnabled) {
+      return
+    }
+
+    const slideElement = presenterSlideScrollRef.current
+    if (!slideElement) {
+      return
+    }
+
+    slideElement.scrollTo({ top: 0, behavior: 'auto' })
+  }, [currentLesson, currentSlide, isAdmin, isPresenterModeEnabled])
+
   // 解析所有投影片 notes 中的 Q&A
   const qaItems = useMemo(() => {
     const marker = '\u3010\u9810\u671f\u96e3\u641e\u5b78\u54e1\u554f\u984c'
@@ -1319,8 +1367,8 @@ function App() {
         controlsEnabled={audienceControlsEnabled}
         currentSlide={currentSlide}
         totalSlides={slides.length}
-        onPrev={() => audienceNav('prev')}
-        onNext={() => audienceNav('next')}
+        onPrev={handleAudiencePrev}
+        onNext={handleAudienceNext}
       />
     )
   }
@@ -1977,7 +2025,7 @@ function App() {
               <p className="text-2xl text-slate-300">載入課程中...</p>
             </div>
           ) : isAdmin && isPresenterModeEnabled ? (
-            <div className="mx-auto grid w-full max-w-[1800px] grid-cols-1 gap-4 sm:gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(500px,1.2fr)]" key={`${currentLesson}-${currentSlide}`}>
+            <div className="mx-auto grid w-full max-w-[1800px] grid-cols-1 gap-4 sm:gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(500px,1.2fr)]">
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 sm:p-6 xl:min-h-0 xl:flex xl:flex-col xl:overflow-hidden">
                 <div className="slide-breadcrumb">
                   <span>{lesson.day}</span>
@@ -1991,7 +2039,10 @@ function App() {
                   )}
                 </div>
 
-                <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2">
+                <div
+                  ref={presenterSlideScrollRef}
+                  className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2"
+                >
                   {slide.section && (
                     <div className="slide-section-label">
                       {slide.section}

@@ -2100,150 +2100,182 @@ function App() {
         )}
 
         {/* Bottom nav */}
-        <div className={`fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm border-t border-slate-700/50 z-20 ${
+        <div className={`fixed bottom-0 left-0 right-0 z-20 border-t border-slate-700/50 bg-black/60 backdrop-blur-sm ${
           shouldRenderSidebar && sidebarOpen ? 'md:pl-[420px]' : ''
         }`}>
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-4">
-            <div className="flex flex-1 items-center gap-2 sm:flex-none">
-              {shouldRenderSidebar && (
-                <button
-                  onClick={() => setSidebarOpen(prev => !prev)}
-                  className="p-2 bg-slate-700/80 hover:bg-slate-600 rounded-lg transition-colors text-slate-300"
-                  title="切換側邊欄 (B)"
-                >
-                  {sidebarOpen ? '◀' : '▶'}
-                </button>
-              )}
-              <button
-                onClick={prevSlide}
-                disabled={currentSlide === 0}
-                className="px-4 py-2 bg-slate-700/80 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors text-sm"
-              >
-                ← 上一頁
-              </button>
-            </div>
-
-            <div className="order-3 flex w-full flex-col gap-2 text-center md:order-none md:w-auto md:items-end">
-              <div className="flex flex-wrap items-center justify-center gap-2 md:justify-end">
-                <span className="hidden text-sm text-slate-400 md:block">{lesson.label}</span>
-                <span className="hidden text-slate-600 md:block">·</span>
-                <span className="text-slate-400 text-sm">{currentSlide + 1} / {slides.length}</span>
-                {isAdmin && isPresenterModeEnabled && (
-                  <>
-                    <span className="hidden text-slate-600 md:block">·</span>
-                    <span className="hidden text-slate-400 text-sm md:block">Timer</span>
-                    <span className={`font-semibold tabular-nums text-sm ${timerPaused ? 'text-amber-400' : 'text-slate-200'}`}>
-                      {elapsedMinutes}:{elapsedRemainderSeconds.toString().padStart(2, '0')}
-                    </span>
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-1 flex-wrap items-center gap-2 sm:flex-none">
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/70 p-1.5 shadow-lg shadow-slate-950/20">
+                  {shouldRenderSidebar && (
                     <button
-                      onClick={toggleTimerPause}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        timerPaused
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                          : 'bg-amber-600 hover:bg-amber-500 text-white'
-                      }`}
-                      title={timerPaused ? '繼續計時' : '暫停計時'}
+                      onClick={() => setSidebarOpen(prev => !prev)}
+                      aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                      title="切換側邊欄 (B)"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 text-slate-200 transition-colors hover:border-slate-500/80 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      {timerPaused ? '▶ 繼續' : '⏸ 暫停'}
+                      <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d={sidebarOpen ? 'M12.5 4.5L7 10l5.5 5.5' : 'M7.5 4.5L13 10l-5.5 5.5'} strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </button>
-                  </>
-                )}
+                  )}
+
+                  <button
+                    onClick={prevSlide}
+                    disabled={currentSlide === 0}
+                    aria-label="Previous slide"
+                    title="上一頁"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/80 px-3 text-sm font-medium text-slate-100 transition-colors hover:border-slate-500/80 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M11.5 4.5L6 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="hidden sm:inline">上一頁</span>
+                  </button>
+
+                  <button
+                    onClick={nextSlide}
+                    disabled={currentSlide === slides.length - 1}
+                    aria-label="Next slide"
+                    title="下一頁"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <span className="hidden sm:inline">下一頁</span>
+                    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M8.5 4.5L14 10l-5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {isAdmin && (
-                <div className="flex flex-col items-center gap-2 md:items-end">
-                  <div className="flex flex-wrap items-center justify-center gap-2 md:justify-end">
-                    {!isPresenterModeEnabled && (
-                      <button
-                        onClick={() => setShowNotes(!showNotes)}
-                        className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-colors ${
-                          showNotes ? 'bg-blue-600 text-white' : 'bg-slate-700/80 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        {showNotes ? 'Hide Notes' : 'Show Notes'} (N)
-                      </button>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-700/70 bg-slate-900/65 p-1.5 shadow-lg shadow-slate-950/20">
-                      <button
-                        onClick={() => {
-                          if (isPresenterModeEnabled) {
-                            stopPresenterMode()
-                          } else {
-                            startPresenterMode()
-                          }
-                        }}
-                        className={`min-w-[9.5rem] rounded-xl px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[11rem] ${
-                          isPresenterModeEnabled
-                            ? 'bg-red-600/90 text-white hover:bg-red-500'
-                            : 'bg-emerald-600/90 text-white hover:bg-emerald-500'
-                        }`}
-                        title="Toggle presenter mode (P)"
-                      >
-                        {isPresenterModeEnabled ? 'End Presenter (P)' : 'Start Presenter (P)'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCopyAudienceUrlState('idle')
-                          setSharePermissionMode('read-only')
-                          setIsShareModalOpen(true)
-                        }}
-                        disabled={!canShareAudienceUrl}
-                        aria-disabled={!canShareAudienceUrl}
-                        title={shareAudienceButtonTitle}
-                        className={`min-w-[8.5rem] rounded-xl border px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[10rem] ${
-                          !canShareAudienceUrl
-                            ? 'cursor-not-allowed border-slate-700/80 bg-slate-800/80 text-slate-500'
-                            : 'border-sky-600/70 bg-sky-900/35 text-sky-100 hover:bg-sky-800/50'
-                        }`}
-                      >
-                        Share Link
-                      </button>
-                    </div>
-                  </div>
-
-                  {isPresenterModeEnabled && (
-                    <div className="flex flex-wrap items-center justify-center gap-2 md:justify-end">
-                      <span className={`text-xs px-2.5 py-1 rounded-full border ${
-                        presenterSyncStatus === 'connected'
-                          ? 'text-emerald-300 border-emerald-700/70 bg-emerald-900/40'
-                          : presenterSyncStatus === 'unsupported'
-                          ? 'text-red-300 border-red-700/70 bg-red-900/40'
-                          : 'text-amber-300 border-amber-700/70 bg-amber-900/40'
-                      }`}>
-                        {presenterStatusLabel}
-                      </span>
-                      <span className={`text-xs px-2.5 py-1 rounded-full border ${
-                        syncCapability === 'cross-browser'
-                          ? 'text-sky-300 border-sky-700/70 bg-sky-900/40'
-                          : syncCapability === 'same-browser'
-                          ? 'text-slate-300 border-slate-700/70 bg-slate-900/40'
-                          : 'text-red-300 border-red-700/70 bg-red-900/40'
-                      }`}>
-                        {presenterTransportLabel}
-                      </span>
-                      {presenterSyncStatus === 'disconnected' && (
-                        <button
-                          onClick={reopenAudienceWindow}
-                          className="px-3 py-1.5 rounded-full text-xs font-medium border border-amber-700/70 bg-amber-900/40 text-amber-200 hover:bg-amber-800/50 transition-colors"
-                        >
-                          Reopen Audience
-                        </button>
-                      )}
-                    </div>
+                <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                  {!isPresenterModeEnabled && (
+                    <button
+                      onClick={() => setShowNotes(!showNotes)}
+                      className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
+                        showNotes ? 'bg-blue-600 text-white' : 'bg-slate-700/80 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {showNotes ? 'Hide Notes' : 'Show Notes'} (N)
+                    </button>
                   )}
+
+                  <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/70 p-1.5 shadow-lg shadow-slate-950/20">
+                    <button
+                      onClick={() => {
+                        if (isPresenterModeEnabled) {
+                          stopPresenterMode()
+                        } else {
+                          startPresenterMode()
+                        }
+                      }}
+                      className={`min-w-[9.5rem] rounded-xl px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[11rem] ${
+                        isPresenterModeEnabled
+                          ? 'bg-red-600/90 text-white hover:bg-red-500'
+                          : 'bg-emerald-600/90 text-white hover:bg-emerald-500'
+                      }`}
+                      title="Toggle presenter mode (P)"
+                    >
+                      {isPresenterModeEnabled ? 'End Presenter (P)' : 'Start Presenter (P)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCopyAudienceUrlState('idle')
+                        setSharePermissionMode('read-only')
+                        setIsShareModalOpen(true)
+                      }}
+                      disabled={!canShareAudienceUrl}
+                      aria-disabled={!canShareAudienceUrl}
+                      title={shareAudienceButtonTitle}
+                      className={`min-w-[8.5rem] rounded-xl border px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[10rem] ${
+                        !canShareAudienceUrl
+                          ? 'cursor-not-allowed border-slate-700/80 bg-slate-800/80 text-slate-500'
+                          : 'border-sky-600/70 bg-slate-950/70 text-sky-100 hover:bg-sky-900/35'
+                      }`}
+                    >
+                      Share Link
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
-            <button
-              onClick={nextSlide}
-              disabled={currentSlide === slides.length - 1}
-              className="order-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-30 sm:order-none"
-            >
-              下一頁 →
-            </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-slate-800/80 bg-slate-950/75 px-3 py-1 text-xs font-medium tracking-[0.08em] text-slate-300">
+                  {lesson.label}
+                </span>
+                <span className="rounded-full border border-slate-800/80 bg-slate-950/75 px-3 py-1 text-xs font-semibold tracking-[0.18em] text-slate-200">
+                  {currentSlide + 1} / {slides.length}
+                </span>
+                {isAdmin && isPresenterModeEnabled && (
+                  <div className="flex items-center gap-2 rounded-full border border-slate-800/80 bg-slate-950/75 px-3 py-1 text-xs">
+                    <div className="inline-flex items-center gap-2">
+                      <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <circle cx="10" cy="10" r="6.5" />
+                        <path d="M10 6.5v4l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className={`font-semibold tabular-nums ${timerPaused ? 'text-amber-400' : 'text-slate-100'}`}>
+                        {elapsedMinutes}:{elapsedRemainderSeconds.toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                    <button
+                      onClick={toggleTimerPause}
+                      aria-label={timerPaused ? 'Resume timer' : 'Pause timer'}
+                      title={timerPaused ? '繼續計時' : '暫停計時'}
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                        timerPaused
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                          : 'bg-amber-600 text-white hover:bg-amber-500'
+                      }`}
+                    >
+                      {timerPaused ? (
+                        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 fill-current" focusable="false">
+                          <path d="M7 5.75v8.5L14 10 7 5.75Z" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 fill-current" focusable="false">
+                          <path d="M6.5 5.5h2.25v9H6.5zM11.25 5.5h2.25v9h-2.25z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isAdmin && isPresenterModeEnabled && (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className={`rounded-full border px-2.5 py-1 text-xs ${
+                    presenterSyncStatus === 'connected'
+                      ? 'border-emerald-700/70 bg-emerald-900/40 text-emerald-300'
+                      : presenterSyncStatus === 'unsupported'
+                      ? 'border-red-700/70 bg-red-900/40 text-red-300'
+                      : 'border-amber-700/70 bg-amber-900/40 text-amber-300'
+                  }`}>
+                    {presenterStatusLabel}
+                  </span>
+                  <span className={`rounded-full border px-2.5 py-1 text-xs ${
+                    syncCapability === 'cross-browser'
+                      ? 'border-sky-700/70 bg-sky-900/40 text-sky-300'
+                      : syncCapability === 'same-browser'
+                      ? 'border-slate-700/70 bg-slate-900/40 text-slate-300'
+                      : 'border-red-700/70 bg-red-900/40 text-red-300'
+                  }`}>
+                    {presenterTransportLabel}
+                  </span>
+                  {presenterSyncStatus === 'disconnected' && (
+                    <button
+                      onClick={reopenAudienceWindow}
+                      className="rounded-full border border-amber-700/70 bg-amber-900/40 px-3 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-800/50"
+                    >
+                      Reopen Audience
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

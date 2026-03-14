@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react'
+﻿import type { ReactNode, UIEventHandler } from 'react'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { slides as lesson1MorningSlides } from './slides/lesson1-morning/index'
 import type { Slide } from './slides/lesson1-morning/index'
@@ -453,6 +453,7 @@ function buildPresentationMessageKey(message: PresentationSyncMessage): string {
     message.sessionId,
     message.lessonId,
     message.slideIndex,
+    message.slideScrollProgress ?? '',
     message.sentAt,
     message.controlToken ?? '',
   ].join(':')
@@ -473,6 +474,47 @@ const FALLBACK_ERROR_SLIDE: Slide = {
 
 const MOBILE_BREAKPOINT = 768
 const SLIDE_RAIL_VISIBLE_COUNT = 11
+
+function getElementScrollProgress(element: { scrollTop: number; scrollHeight: number; clientHeight: number } | null): number {
+  if (!element) {
+    return 0
+  }
+
+  const maxScrollTop = Math.max(element.scrollHeight - element.clientHeight, 0)
+  if (maxScrollTop === 0) {
+    return 0
+  }
+
+  return Math.min(Math.max(element.scrollTop / maxScrollTop, 0), 1)
+}
+
+function getMaxScrollTop(scrollHeight: number, clientHeight: number): number {
+  return Math.max(scrollHeight - clientHeight, 0)
+}
+
+function getScrollTopFromProgress(progress: number, scrollHeight: number, clientHeight: number): number {
+  return getMaxScrollTop(scrollHeight, clientHeight) * Math.min(Math.max(progress, 0), 1)
+}
+
+function getWindowScrollProgress(): number {
+  return getElementScrollProgress({
+    scrollTop: window.scrollY,
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: window.innerHeight,
+  })
+}
+
+function armScrollSyncSuppression(flagRef: { current: boolean }, frameRef: { current: number | null }) {
+  flagRef.current = true
+  if (frameRef.current !== null) {
+    window.cancelAnimationFrame(frameRef.current)
+  }
+
+  frameRef.current = window.requestAnimationFrame(() => {
+    flagRef.current = false
+    frameRef.current = null
+  })
+}
 
 function App() {
   const initialLessonIndex = getLessonIndexFromHash()
@@ -532,11 +574,21 @@ function App() {
   const [pausedElapsed, setPausedElapsed] = useState(0)
   const audienceWindowRef = useRef<Window | null>(null)
   const pendingAudienceSlideRef = useRef<number | null>(null)
+  const pendingAudienceScrollProgressRef = useRef<number | null>(null)
+  const pendingPresenterScrollProgressRef = useRef<number | null>(null)
   const pendingSidebarSectionRef = useRef<{ lessonId: string; slideIndex: number } | null>(null)
   const lessonLoadRequestRef = useRef(0)
   const lastAudienceSignalAtRef = useRef<number | null>(null)
   const hasReceivedInitialSyncRef = useRef(false)
   const lastHandledMessageKeyRef = useRef<string | null>(null)
+  const presenterScrollSyncFrameRef = useRef<number | null>(null)
+  const queuedPresenterScrollProgressRef = useRef<number | null>(null)
+  const audienceScrollSyncFrameRef = useRef<number | null>(null)
+  const queuedAudienceScrollProgressRef = useRef<number | null>(null)
+  const suppressPresenterScrollSyncRef = useRef(false)
+  const suppressAudienceScrollSyncRef = useRef(false)
+  const suppressPresenterScrollResetFrameRef = useRef<number | null>(null)
+  const suppressAudienceScrollResetFrameRef = useRef<number | null>(null)
   const presenterNotesScrollRef = useRef<HTMLDivElement | null>(null)
   const presenterSlideScrollRef = useRef<HTMLDivElement | null>(null)
   const isAudienceView = viewMode === 'audience'
@@ -596,6 +648,31 @@ function App() {
 
     setShowPresenterNotesScrollHint(hasOverflow && remainingScroll > 16)
   }, [isAdmin, isPresenterModeEnabled])
+
+  const applyAudienceScrollProgress = useCallback((scrollProgress: number) => {
+    const normalizedScrollProgress = Math.min(Math.max(scrollProgress, 0), 1)
+    window.requestAnimationFrame(() => {
+      armScrollSyncSuppression(suppressAudienceScrollSyncRef, suppressAudienceScrollResetFrameRef)
+      window.scrollTo({
+        top: getScrollTopFromProgress(normalizedScrollProgress, document.documentElement.scrollHeight, window.innerHeight),
+        behavior: 'auto',
+      })
+    })
+  }, [])
+
+  const applyPresenterSlideScrollProgress = useCallback((scrollProgress: number) => {
+    const slideElement = presenterSlideScrollRef.current
+    if (!slideElement) {
+      pendingPresenterScrollProgressRef.current = Math.min(Math.max(scrollProgress, 0), 1)
+      return
+    }
+
+    const top = getScrollTopFromProgress(scrollProgress, slideElement.scrollHeight, slideElement.clientHeight)
+    armScrollSyncSuppression(suppressPresenterScrollSyncRef, suppressPresenterScrollResetFrameRef)
+    slideElement.scrollTop = top
+    slideElement.scrollTo({ top, behavior: 'auto' })
+    pendingPresenterScrollProgressRef.current = null
+  }, [])
 
   const cacheLessonSections = useCallback((lessonId: string, nextSections: SectionEntry[]) => {
     setLessonSectionStates((prev) => ({
@@ -674,6 +751,21 @@ function App() {
 
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => () => {
+    if (presenterScrollSyncFrameRef.current !== null) {
+      window.cancelAnimationFrame(presenterScrollSyncFrameRef.current)
+    }
+    if (audienceScrollSyncFrameRef.current !== null) {
+      window.cancelAnimationFrame(audienceScrollSyncFrameRef.current)
+    }
+    if (suppressPresenterScrollResetFrameRef.current !== null) {
+      window.cancelAnimationFrame(suppressPresenterScrollResetFrameRef.current)
+    }
+    if (suppressAudienceScrollResetFrameRef.current !== null) {
+      window.cancelAnimationFrame(suppressAudienceScrollResetFrameRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -784,7 +876,7 @@ function App() {
       lessonId: string,
       slideIndex: number,
       senderRole: 'presenter' | 'audience',
-      options?: { controlToken?: string | null },
+      options?: { controlToken?: string | null, slideScrollProgress?: number | null },
     ): boolean => {
       if (!sessionId) {
         return false
@@ -793,6 +885,69 @@ function App() {
     },
     [sendMessage, sessionId],
   )
+
+  const postPresenterSyncState = useCallback((lessonId: string, slideIndex: number, slideScrollProgress: number) => (
+    postPresentationMessage('SYNC_STATE', lessonId, slideIndex, 'presenter', { slideScrollProgress })
+  ), [postPresentationMessage])
+
+  const postAudienceSyncState = useCallback((lessonId: string, slideIndex: number, slideScrollProgress: number) => (
+    postPresentationMessage('SYNC_STATE', lessonId, slideIndex, 'audience', {
+      controlToken: shouldEmbedControlTokenInMessages ? controlToken : null,
+      slideScrollProgress,
+    })
+  ), [controlToken, postPresentationMessage, shouldEmbedControlTokenInMessages])
+
+  const queuePresenterScrollSync = useCallback((scrollProgress: number) => {
+    if (!isPresenterModeEnabled || !isTransportReady) {
+      return
+    }
+
+    queuedPresenterScrollProgressRef.current = Math.min(Math.max(scrollProgress, 0), 1)
+    if (presenterScrollSyncFrameRef.current !== null) {
+      return
+    }
+
+    presenterScrollSyncFrameRef.current = window.requestAnimationFrame(() => {
+      presenterScrollSyncFrameRef.current = null
+      const nextScrollProgress = queuedPresenterScrollProgressRef.current
+      queuedPresenterScrollProgressRef.current = null
+      if (nextScrollProgress === null) {
+        return
+      }
+
+      postPresenterSyncState(LESSONS[currentLesson].id, currentSlide, nextScrollProgress)
+    })
+  }, [currentLesson, currentSlide, isPresenterModeEnabled, isTransportReady, postPresenterSyncState])
+
+  const queueAudienceScrollSync = useCallback((scrollProgress: number) => {
+    if (!isAudienceView || !audienceControlsEnabled || !isTransportReady || audienceConnectionState !== 'connected') {
+      return
+    }
+
+    queuedAudienceScrollProgressRef.current = Math.min(Math.max(scrollProgress, 0), 1)
+    if (audienceScrollSyncFrameRef.current !== null) {
+      return
+    }
+
+    audienceScrollSyncFrameRef.current = window.requestAnimationFrame(() => {
+      audienceScrollSyncFrameRef.current = null
+      const nextScrollProgress = queuedAudienceScrollProgressRef.current
+      queuedAudienceScrollProgressRef.current = null
+      if (nextScrollProgress === null) {
+        return
+      }
+
+      postAudienceSyncState(LESSONS[currentLesson].id, currentSlide, nextScrollProgress)
+    })
+  }, [audienceConnectionState, audienceControlsEnabled, currentLesson, currentSlide, isAudienceView, isTransportReady, postAudienceSyncState])
+
+  const handlePresenterSlideScroll = useCallback<UIEventHandler<HTMLDivElement>>((event) => {
+    if (suppressPresenterScrollSyncRef.current) {
+      return
+    }
+
+    queuePresenterScrollSync(getElementScrollProgress(event.currentTarget))
+  }, [queuePresenterScrollSync])
 
   const openAudienceWindow = useCallback((
     activeSessionId: string,
@@ -844,8 +999,8 @@ function App() {
     }
 
     setPresenterSyncStatus('connecting')
-    postPresentationMessage('SYNC_STATE', LESSONS[currentLesson].id, currentSlide, 'presenter')
-  }, [controlToken, currentLesson, currentSlide, openAudienceWindow, postPresentationMessage, presenterAudienceAccessMode, sessionId, startPresenterMode])
+    postPresenterSyncState(LESSONS[currentLesson].id, currentSlide, getElementScrollProgress(presenterSlideScrollRef.current))
+  }, [controlToken, currentLesson, currentSlide, openAudienceWindow, postPresenterSyncState, presenterAudienceAccessMode, sessionId, startPresenterMode])
 
   const rotateControlLink = useCallback(() => {
     if (!sessionId) {
@@ -877,9 +1032,9 @@ function App() {
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
 
     if (openedWindow) {
-      postPresentationMessage('SYNC_STATE', LESSONS[currentLesson].id, currentSlide, 'presenter')
+      postPresenterSyncState(LESSONS[currentLesson].id, currentSlide, getElementScrollProgress(presenterSlideScrollRef.current))
     }
-  }, [controlToken, currentLesson, currentSlide, isPresenterModeEnabled, openAudienceWindow, postPresentationMessage, presenterAudienceAccessMode, sessionId])
+  }, [controlToken, currentLesson, currentSlide, isPresenterModeEnabled, openAudienceWindow, postPresenterSyncState, presenterAudienceAccessMode, sessionId])
 
   const stopPresenterMode = useCallback(async () => {
     if (recordingStatus === 'recording' || recordingStatus === 'paused' || recordingStatus === 'requesting') {
@@ -1125,7 +1280,7 @@ function App() {
       lastHandledMessageKeyRef.current = latestMessageKey
       setPresenterSyncStatus('connected')
       setPresenterError(null)
-      postPresentationMessage('SYNC_STATE', lesson.id, currentSlide, 'presenter')
+      postPresenterSyncState(lesson.id, currentSlide, getElementScrollProgress(presenterSlideScrollRef.current))
       return
     }
 
@@ -1156,6 +1311,13 @@ function App() {
       setPresenterError(null)
 
       if (syncedLessonIndex !== currentLesson) {
+        pendingSidebarSectionRef.current = {
+          lessonId: latestMessage.lessonId,
+          slideIndex: latestMessage.slideIndex,
+        }
+        if (typeof latestMessage.slideScrollProgress === 'number') {
+          pendingPresenterScrollProgressRef.current = latestMessage.slideScrollProgress
+        }
         ensureOutlineLessonVisible(syncedLessonIndex)
         setCurrentLesson(syncedLessonIndex)
         window.location.hash = latestMessage.lessonId
@@ -1163,6 +1325,13 @@ function App() {
       }
 
       goToSlide(Math.min(Math.max(latestMessage.slideIndex, 0), Math.max(slides.length - 1, 0)))
+      if (typeof latestMessage.slideScrollProgress === 'number') {
+        if (latestMessage.slideIndex === currentSlide) {
+          applyPresenterSlideScrollProgress(latestMessage.slideScrollProgress)
+        } else {
+          pendingPresenterScrollProgressRef.current = latestMessage.slideScrollProgress
+        }
+      }
       return
     }
 
@@ -1200,6 +1369,9 @@ function App() {
     hasReceivedInitialSyncRef.current = true
     lastAudienceSignalAtRef.current = latestMessage.sentAt
     setAudienceConnectionState('connected')
+    if (typeof latestMessage.slideScrollProgress === 'number') {
+      pendingAudienceScrollProgressRef.current = latestMessage.slideScrollProgress
+    }
 
     const syncedLessonIndex = LESSONS.findIndex((item) => item.id === latestMessage.lessonId)
     if (syncedLessonIndex === -1) {
@@ -1215,7 +1387,13 @@ function App() {
     }
 
     goToSlide(Math.min(Math.max(latestMessage.slideIndex, 0), Math.max(slides.length - 1, 0)))
+    if (latestMessage.slideIndex === currentSlide && typeof latestMessage.slideScrollProgress === 'number') {
+      applyAudienceScrollProgress(latestMessage.slideScrollProgress)
+      pendingAudienceScrollProgressRef.current = null
+    }
   }, [
+    applyPresenterSlideScrollProgress,
+    applyAudienceScrollProgress,
     controlToken,
     currentLesson,
     currentSlide,
@@ -1231,6 +1409,23 @@ function App() {
     transportKind,
     transportStatus,
   ])
+
+  useEffect(() => {
+    if (!isAudienceView || loading || pendingAudienceScrollProgressRef.current === null) {
+      return
+    }
+
+    applyAudienceScrollProgress(pendingAudienceScrollProgressRef.current)
+    pendingAudienceScrollProgressRef.current = null
+  }, [applyAudienceScrollProgress, currentLesson, currentSlide, isAudienceView, loading])
+
+  useEffect(() => {
+    if (isAudienceView || loading || pendingPresenterScrollProgressRef.current === null) {
+      return
+    }
+
+    applyPresenterSlideScrollProgress(pendingPresenterScrollProgressRef.current)
+  }, [applyPresenterSlideScrollProgress, currentLesson, currentSlide, isAudienceView, loading])
 
   useEffect(() => {
     if (!isAudienceView || !sessionId || !isTransportReady) {
@@ -1261,11 +1456,28 @@ function App() {
   }, [audienceConnectionState, currentSlide, isAudienceView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
 
   useEffect(() => {
+    if (!isAudienceView || !audienceControlsEnabled || !isTransportReady || audienceConnectionState !== 'connected') {
+      return
+    }
+
+    const handleAudienceScroll = () => {
+      if (suppressAudienceScrollSyncRef.current) {
+        return
+      }
+
+      queueAudienceScrollSync(getWindowScrollProgress())
+    }
+
+    window.addEventListener('scroll', handleAudienceScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleAudienceScroll)
+  }, [audienceConnectionState, audienceControlsEnabled, isAudienceView, isTransportReady, queueAudienceScrollSync])
+
+  useEffect(() => {
     if (!isPresenterModeEnabled || !isTransportReady) {
       return
     }
-    postPresentationMessage('SYNC_STATE', lesson.id, currentSlide, 'presenter')
-  }, [currentSlide, isPresenterModeEnabled, isTransportReady, lesson.id, postPresentationMessage])
+    postPresenterSyncState(lesson.id, currentSlide, 0)
+  }, [currentSlide, isPresenterModeEnabled, isTransportReady, lesson.id, postPresenterSyncState])
 
   useEffect(() => {
     if (!isPresenterModeEnabled || !isTransportReady) {
@@ -1425,7 +1637,7 @@ function App() {
       window.removeEventListener('resize', updateHint)
       resizeObserver?.disconnect()
     }
-  }, [currentSlide, isAdmin, isPresenterModeEnabled, slide.notes, updatePresenterNotesScrollHint])
+  }, [currentSlide, isAdmin, isPresenterModeEnabled, presenterNotesTab, slide.notes, updatePresenterNotesScrollHint])
 
   useEffect(() => {
     if (!isAdmin || !isPresenterModeEnabled) {
@@ -2348,6 +2560,8 @@ function App() {
 
                 <div
                   ref={presenterSlideScrollRef}
+                  data-testid="presenter-slide-scroll"
+                  onScroll={handlePresenterSlideScroll}
                   className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2"
                 >
                   {slide.section && (

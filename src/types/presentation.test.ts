@@ -64,18 +64,35 @@ describe('presentation helpers', () => {
   })
 
   it('creates valid presenter and audience sync messages', () => {
-    const presenterMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'presenter')
+    const presenterMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'presenter', {
+      slideScrollProgress: 0.4,
+    })
     const audienceMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'audience', {
       controlToken: 'demo-control',
     })
 
     expect(isPresentationSyncMessage(presenterMessage)).toBe(true)
     expect(isPresentationSyncMessage(audienceMessage)).toBe(true)
+    expect(presenterMessage.slideScrollProgress).toBe(0.4)
     expect(audienceMessage.controlToken).toBe('demo-control')
 
     const cloudflareAudienceMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 2, 'audience')
     expect(isPresentationSyncMessage(cloudflareAudienceMessage)).toBe(true)
     expect(cloudflareAudienceMessage.controlToken).toBeUndefined()
+  })
+
+  it('clamps slide scroll progress into the supported range', () => {
+    const highProgressMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 1, 'presenter', {
+      slideScrollProgress: 2,
+    })
+    const lowProgressMessage = createPresentationMessage('SYNC_STATE', 'demo-session', 'lesson1-morning', 1, 'presenter', {
+      slideScrollProgress: -1,
+    })
+
+    expect(highProgressMessage.slideScrollProgress).toBe(1)
+    expect(lowProgressMessage.slideScrollProgress).toBe(0)
+    expect(isPresentationSyncMessage(highProgressMessage)).toBe(true)
+    expect(isPresentationSyncMessage(lowProgressMessage)).toBe(true)
   })
 
   it('only accepts audience control messages with the active control token', () => {

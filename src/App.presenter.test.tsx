@@ -35,12 +35,13 @@ function getEndSessionMessages() {
   return sendMessageMock.mock.calls.filter(([message]) => message.type === 'END_SESSION')
 }
 
-function createAudienceSyncMessage(slideIndex: number) {
+function createAudienceSyncMessage(slideIndex: number, options?: { slideScrollProgress?: number }) {
   return {
     type: 'SYNC_STATE' as const,
     sessionId: 'session-1',
     lessonId: 'lesson1-morning',
     slideIndex,
+    ...(options?.slideScrollProgress !== undefined ? { slideScrollProgress: options.slideScrollProgress } : {}),
     senderRole: 'audience' as const,
     controlToken: 'control-1',
     sentAt: Date.now(),
@@ -56,6 +57,28 @@ function createAudienceHeartbeatMessage() {
     senderRole: 'audience' as const,
     sentAt: Date.now(),
   }
+}
+
+function installScrollableMetrics(element: HTMLElement, options?: { scrollTop?: number; scrollHeight?: number; clientHeight?: number }) {
+  let scrollTop = options?.scrollTop ?? 0
+
+  Object.defineProperty(element, 'scrollTop', {
+    configurable: true,
+    get: () => scrollTop,
+    set: (value: number) => {
+      scrollTop = value
+    },
+  })
+
+  Object.defineProperty(element, 'scrollHeight', {
+    configurable: true,
+    value: options?.scrollHeight ?? 1200,
+  })
+
+  Object.defineProperty(element, 'clientHeight', {
+    configurable: true,
+    value: options?.clientHeight ?? 300,
+  })
 }
 
 const PRESENTER_TEST_TIMEOUT = 10000
@@ -266,6 +289,29 @@ describe('App presenter control modes', () => {
       expect(latestWindowUrl).toContain('control=')
     })
   })
+
+  it('broadcasts the presenter slide scroll progress to the audience channel', async () => {
+    render(<App />)
+
+    await startPresenter()
+    sendMessageMock.mockClear()
+
+    const slideScrollArea = await screen.findByTestId('presenter-slide-scroll')
+    installScrollableMetrics(slideScrollArea, { scrollTop: 450, scrollHeight: 1050, clientHeight: 150 })
+
+    fireEvent.scroll(slideScrollArea)
+
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SYNC_STATE',
+          senderRole: 'presenter',
+          slideIndex: 0,
+          slideScrollProgress: 0.5,
+        }),
+      )
+    })
+  })
 })
 
 describe('App presenter sync conflict handling', () => {
@@ -321,6 +367,31 @@ describe('App presenter sync conflict handling', () => {
       expect(
         screen.getByRole('button', { name: /go to slide 2: 47 小時完整課程大綱/i }).getAttribute('aria-current'),
       ).toBe('page')
+    })
+  })
+
+  it('applies audience scroll progress back onto the presenter slide column', async () => {
+    let latestMessage: ReturnType<typeof createAudienceSyncMessage> | null = null
+
+    vi.mocked(usePresentationChannel).mockImplementation(() => ({
+      latestMessage,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage: sendMessageMock,
+    }))
+
+    const { rerender } = render(<App />)
+
+    const slideScrollArea = await screen.findByTestId('presenter-slide-scroll')
+    installScrollableMetrics(slideScrollArea, { scrollTop: 0, scrollHeight: 1200, clientHeight: 200 })
+
+    latestMessage = createAudienceSyncMessage(0, { slideScrollProgress: 0.5 })
+    rerender(<App />)
+
+    await waitFor(() => {
+      expect(slideScrollArea.scrollTop).toBe(500)
     })
   })
 })

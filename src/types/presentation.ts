@@ -11,6 +11,7 @@ export interface PresentationSyncMessage {
   sessionId: string
   lessonId: string
   slideIndex: number
+  slideScrollProgress?: number
   senderRole: PresentationSenderRole
   controlToken?: string
   sentAt: number
@@ -87,7 +88,7 @@ export function createPresentationMessage(
   lessonId: string,
   slideIndex: number,
   senderRole: PresentationSenderRole,
-  options?: { controlToken?: string | null },
+  options?: { controlToken?: string | null, slideScrollProgress?: number | null },
 ): PresentationSyncMessage {
   const message: PresentationSyncMessage = {
     type,
@@ -100,6 +101,10 @@ export function createPresentationMessage(
 
   if (options?.controlToken) {
     message.controlToken = options.controlToken
+  }
+
+  if (typeof options?.slideScrollProgress === 'number' && Number.isFinite(options.slideScrollProgress)) {
+    message.slideScrollProgress = Math.min(Math.max(options.slideScrollProgress, 0), 1)
   }
 
   return message
@@ -157,6 +162,11 @@ export function isPresentationSyncMessage(value: unknown): value is Presentation
     typeof record.slideIndex === 'number' &&
     Number.isInteger(record.slideIndex) &&
     record.slideIndex >= 0 &&
+    (record.slideScrollProgress === undefined
+      || (typeof record.slideScrollProgress === 'number'
+        && Number.isFinite(record.slideScrollProgress)
+        && record.slideScrollProgress >= 0
+        && record.slideScrollProgress <= 1)) &&
     isPresentationSenderRole(record.senderRole) &&
     (record.controlToken === undefined || (typeof record.controlToken === 'string' && record.controlToken.length > 0)) &&
     typeof record.sentAt === 'number' &&

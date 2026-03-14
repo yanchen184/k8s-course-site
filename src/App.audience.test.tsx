@@ -10,12 +10,13 @@ vi.mock('./hooks/usePresentationChannel', () => ({
   usePresentationChannel: vi.fn(),
 }))
 
-function createSyncMessage(slideIndex: number) {
+function createSyncMessage(slideIndex: number, options?: { slideScrollProgress?: number }) {
   return {
     type: 'SYNC_STATE' as const,
     sessionId: 'session-1',
     lessonId: 'lesson1-morning',
     slideIndex,
+    ...(options?.slideScrollProgress !== undefined ? { slideScrollProgress: options.slideScrollProgress } : {}),
     senderRole: 'presenter' as const,
     sentAt: Date.now(),
   }
@@ -43,6 +44,11 @@ describe('App audience sync', () => {
     })
 
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+    })
+
+    Object.defineProperty(window, 'scrollTo', {
       configurable: true,
       value: vi.fn(),
     })
@@ -185,4 +191,90 @@ describe('App audience sync', () => {
       vi.useRealTimers()
     }
   }, AUDIENCE_TEST_TIMEOUT)
+
+  it('applies presenter scroll progress to the audience window', async () => {
+    let latestMessage: ReturnType<typeof createSyncMessage> | null = null
+
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 600,
+      writable: true,
+    })
+
+    Object.defineProperty(document.documentElement, 'scrollHeight', {
+      configurable: true,
+      value: 1600,
+    })
+
+    vi.mocked(usePresentationChannel).mockImplementation(() => ({
+      latestMessage,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage: vi.fn(() => true),
+    }))
+
+    const { rerender } = render(<App />)
+    latestMessage = createSyncMessage(0, { slideScrollProgress: 0.5 })
+    rerender(<App />)
+
+    await waitFor(() => {
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 500, behavior: 'auto' })
+    })
+  })
+
+  it('broadcasts audience scroll progress back when control is enabled', async () => {
+    let latestMessage: ReturnType<typeof createSyncMessage> | null = null
+    const sendMessage = vi.fn(() => true)
+
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 500,
+      writable: true,
+    })
+
+    Object.defineProperty(document.documentElement, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    })
+
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      value: 250,
+      writable: true,
+    })
+
+    vi.mocked(usePresentationChannel).mockImplementation(() => ({
+      latestMessage,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage,
+    }))
+
+    const { rerender } = render(<App />)
+    latestMessage = createSyncMessage(0)
+    rerender(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: lesson1MorningSlides[0].title })).toBeTruthy()
+    })
+
+    sendMessage.mockClear()
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SYNC_STATE',
+          senderRole: 'audience',
+          slideIndex: 0,
+          slideScrollProgress: 0.5,
+          controlToken: 'control-1',
+        }),
+      )
+    })
+  })
 })

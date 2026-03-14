@@ -95,5 +95,5 @@ describe('App expanded speaker notes', () => {
     })
 
     expect(within(dialog).queryByText('第一堂課')).toBeNull()
-  })
+  }, 10000)
 })

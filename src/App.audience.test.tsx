@@ -21,6 +21,8 @@ function createSyncMessage(slideIndex: number) {
   }
 }
 
+const AUDIENCE_TEST_TIMEOUT = 10000
+
 describe('App audience sync', () => {
   beforeEach(() => {
     cleanup()
@@ -138,4 +140,49 @@ describe('App audience sync', () => {
       }),
     )
   })
+
+  it('sends audience heartbeats after the presenter sync is established', async () => {
+    vi.useFakeTimers()
+
+    try {
+      let latestMessage: ReturnType<typeof createSyncMessage> | null = null
+      const sendMessage = vi.fn(() => true)
+
+      vi.mocked(usePresentationChannel).mockImplementation(() => ({
+        latestMessage,
+        transportStatus: 'ready',
+        transportKind: 'broadcast',
+        transportIssue: null,
+        syncCapability: 'same-browser',
+        sendMessage,
+      }))
+
+      const { rerender } = render(<App />)
+      latestMessage = createSyncMessage(0)
+      rerender(<App />)
+
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          senderRole: 'audience',
+          type: 'REQUEST_SYNC',
+        }),
+      )
+
+      sendMessage.mockClear()
+
+      await vi.advanceTimersByTimeAsync(2000)
+
+      expect(sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          senderRole: 'audience',
+          type: 'HEARTBEAT',
+        }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  }, AUDIENCE_TEST_TIMEOUT)
 })

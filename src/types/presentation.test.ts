@@ -94,18 +94,18 @@ describe('presentation helpers', () => {
   })
 
   it('rejects message types that do not match the sender role', () => {
-    const invalidAudienceHeartbeat = createPresentationMessage('HEARTBEAT', 'demo-session', 'lesson1-morning', 0, 'audience')
+    const validAudienceHeartbeat = createPresentationMessage('HEARTBEAT', 'demo-session', 'lesson1-morning', 0, 'audience')
     const invalidAudienceEndSession = createPresentationMessage('END_SESSION', 'demo-session', 'lesson1-morning', 0, 'audience')
     const invalidPresenterRequestSync = createPresentationMessage('REQUEST_SYNC', 'demo-session', 'lesson1-morning', 0, 'presenter')
     const validPresenterHeartbeat = createPresentationMessage('HEARTBEAT', 'demo-session', 'lesson1-morning', 0, 'presenter')
 
     expect(isAllowedPresentationMessageForSender(validPresenterHeartbeat)).toBe(true)
-    expect(isAllowedPresentationMessageForSender(invalidAudienceHeartbeat)).toBe(false)
+    expect(isAllowedPresentationMessageForSender(validAudienceHeartbeat)).toBe(true)
     expect(isAllowedPresentationMessageForSender(invalidAudienceEndSession)).toBe(false)
     expect(isAllowedPresentationMessageForSender(invalidPresenterRequestSync)).toBe(false)
-    expect(isPresentationSyncMessage(invalidAudienceHeartbeat)).toBe(false)
+    expect(isPresentationSyncMessage(validAudienceHeartbeat)).toBe(true)
     expect(isPresenterBroadcastMessage(validPresenterHeartbeat)).toBe(true)
-    expect(isPresenterBroadcastMessage(invalidAudienceHeartbeat)).toBe(false)
+    expect(isPresenterBroadcastMessage(validAudienceHeartbeat)).toBe(false)
   })
 
   it('accepts only fresh messages within the allowed replay window', () => {

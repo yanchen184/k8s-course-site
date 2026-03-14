@@ -47,6 +47,17 @@ function createAudienceSyncMessage(slideIndex: number) {
   }
 }
 
+function createAudienceHeartbeatMessage() {
+  return {
+    type: 'HEARTBEAT' as const,
+    sessionId: 'session-1',
+    lessonId: 'lesson1-morning',
+    slideIndex: 0,
+    senderRole: 'audience' as const,
+    sentAt: Date.now(),
+  }
+}
+
 const PRESENTER_TEST_TIMEOUT = 10000
 
 describe('App presenter end confirmation', () => {
@@ -312,4 +323,63 @@ describe('App presenter sync conflict handling', () => {
       ).toBe('page')
     })
   })
+})
+
+describe('App presenter reconnect status', () => {
+  beforeEach(() => {
+    cleanup()
+    window.history.replaceState({}, '', '/admin?view=presenter&session=session-1&control=control-1#lesson1-morning')
+
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+    })
+
+    sendMessageMock = vi.fn(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('marks the audience as connected after a presenter reload receives an audience heartbeat', async () => {
+    let latestMessage: ReturnType<typeof createAudienceHeartbeatMessage> | null = null
+
+    vi.mocked(usePresentationChannel).mockImplementation(() => ({
+      latestMessage,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage: sendMessageMock,
+    }))
+
+    const { rerender } = render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Connecting audience' })).toBeTruthy()
+    })
+
+    latestMessage = createAudienceHeartbeatMessage()
+    rerender(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Audience connected' })).toBeTruthy()
+    })
+  }, PRESENTER_TEST_TIMEOUT)
 })

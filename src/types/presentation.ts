@@ -19,7 +19,7 @@ export interface PresentationSyncMessage {
 const messageTypes: PresentationMessageType[] = ['SYNC_STATE', 'REQUEST_SYNC', 'HEARTBEAT', 'END_SESSION']
 const senderRoles: PresentationSenderRole[] = ['presenter', 'audience']
 const presenterMessageTypes: PresentationMessageType[] = ['SYNC_STATE', 'HEARTBEAT', 'END_SESSION']
-const audienceMessageTypes: PresentationMessageType[] = ['SYNC_STATE', 'REQUEST_SYNC']
+const audienceMessageTypes: PresentationMessageType[] = ['SYNC_STATE', 'REQUEST_SYNC', 'HEARTBEAT']
 
 function isPresentationMessageType(value: unknown): value is PresentationMessageType {
   return typeof value === 'string' && messageTypes.includes(value as PresentationMessageType)

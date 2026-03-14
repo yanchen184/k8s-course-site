@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+﻿import type { ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { slides as lesson1MorningSlides } from './slides/lesson1-morning/index'
 import type { Slide } from './slides/lesson1-morning/index'
 import AudienceView from './components/AudienceView'
@@ -187,6 +188,200 @@ const LESSONS = [
     },
   },
 ]
+
+type ToolbarStatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+
+function getToolbarToneClasses(tone: ToolbarStatusTone): string {
+  if (tone === 'success') return 'border-emerald-700/70 bg-emerald-900/40 text-emerald-200'
+  if (tone === 'warning') return 'border-amber-700/70 bg-amber-900/40 text-amber-200'
+  if (tone === 'danger') return 'border-red-700/70 bg-red-900/40 text-red-200'
+  if (tone === 'info') return 'border-sky-700/70 bg-sky-900/40 text-sky-200'
+  return 'border-slate-700/70 bg-slate-900/40 text-slate-300'
+}
+
+function renderToolbarIcon(icon: string): ReactNode {
+  switch (icon) {
+    case 'audience-connected':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M6.25 13.25a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5ZM13.75 12.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2.75 16.25c.8-1.74 2.2-2.75 3.5-2.75s2.7 1.01 3.5 2.75M10.75 16.25c.63-1.33 1.76-2.1 3-2.1 1.24 0 2.37.77 3 2.1" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m14.75 3.75 1.25 1.25 2.25-2.25" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'audience-connecting':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M10 3.25a6.75 6.75 0 1 0 6.75 6.75" strokeLinecap="round" />
+          <path d="M10 1.75v3M18.25 10h-3" strokeLinecap="round" />
+        </svg>
+      )
+    case 'audience-disconnected':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M6.5 12.75a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM13.75 11.75a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M3 16c.76-1.58 1.95-2.5 3.5-2.5 1.55 0 2.74.92 3.5 2.5M11.25 16c.57-1.18 1.54-1.85 2.75-1.85 1.2 0 2.18.67 2.75 1.85" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m13.5 4.25 3 3M16.5 4.25l-3 3" strokeLinecap="round" />
+        </svg>
+      )
+    case 'alert':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M10 3.25 17 15.5H3L10 3.25Z" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M10 7.25v3.75M10 13.75h.01" strokeLinecap="round" />
+        </svg>
+      )
+    case 'same-browser':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3.25" y="4" width="13.5" height="9.5" rx="1.75" />
+          <path d="M7 16h6M8.25 13.5l-.5 2.5M12.25 13.5l.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'same-browser-fallback':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3.25" y="4" width="13.5" height="9.5" rx="1.75" />
+          <path d="M7 16h6M8.25 13.5l-.5 2.5M12.25 13.5l.5 2.5M10 6.75v2.75M10 11.75h.01" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'cross-browser':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="2.5" y="4" width="7.25" height="5.5" rx="1.25" />
+          <rect x="10.25" y="10.5" width="7.25" height="5.5" rx="1.25" />
+          <path d="m8.75 11 2.5-2.5M11.25 8.5H9M11.25 8.5v2.25" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'presenter-only':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="4.25" y="8.25" width="11.5" height="7" rx="1.75" />
+          <path d="M7.5 8.25V6.75a2.5 2.5 0 0 1 5 0v1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'both-can-switch':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M4 7.25h9.5M10.75 4.5 13.5 7.25 10.75 10M16 12.75H6.5M9.25 10l-2.75 2.75L9.25 15.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'record-ready':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M10 12.75a2.75 2.75 0 0 0 2.75-2.75v-3a2.75 2.75 0 1 0-5.5 0v3A2.75 2.75 0 0 0 10 12.75Z" />
+          <path d="M5.75 9.75a4.25 4.25 0 0 0 8.5 0M10 14.5v2.25M7.75 16.75h4.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'record-preparing':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M10 3.25a6.75 6.75 0 1 0 6.75 6.75" strokeLinecap="round" />
+          <circle cx="10" cy="10" r="2.5" />
+        </svg>
+      )
+    case 'recording':
+      return <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 fill-current" focusable="false"><circle cx="10" cy="10" r="4.25" /></svg>
+    case 'record-paused':
+      return <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 fill-current" focusable="false"><path d="M6.5 5.5h2.25v9H6.5zM11.25 5.5h2.25v9h-2.25z" /></svg>
+    case 'record-done':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="10" cy="10" r="6.75" />
+          <path d="m7.25 10.25 1.75 1.75 3.75-4.25" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'play':
+      return <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 fill-current" focusable="false"><path d="M7 5.75v8.5L14 10 7 5.75Z" /></svg>
+    case 'stop':
+      return <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5 fill-current" focusable="false"><rect x="6" y="6" width="8" height="8" rx="1.25" /></svg>
+    case 'download':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M10 4.5v7.25M7.25 9.5 10 12.25l2.75-2.75M4.5 14.75h11" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'refresh':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M15.25 8.25A5.5 5.5 0 0 0 5.84 6.2M4.75 4.75v2.9h2.9M4.75 11.75A5.5 5.5 0 0 0 14.16 13.8M15.25 15.25v-2.9h-2.9" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'reopen-audience':
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3.25" y="5" width="10.5" height="8" rx="1.5" />
+          <path d="M10.75 6.5h3.75v3.75M14.5 6.5l-5 5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    default:
+      return <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="6.5" /></svg>
+  }
+}
+
+function ToolbarDesktopTooltip({ label }: { label: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-slate-700/80 bg-slate-950/95 px-2.5 py-1 text-xs text-slate-100 opacity-0 shadow-lg transition-opacity duration-150 md:block group-hover:opacity-100 group-focus-within:opacity-100"
+    >
+      {label}
+    </div>
+  )
+}
+
+function ToolbarStatusItem({ label, tone, icon }: { label: string, tone: ToolbarStatusTone, icon: string }) {
+  return (
+    <div className="group relative flex items-center justify-center">
+      <span
+        role="img"
+        aria-label={label}
+        title={label}
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border ${getToolbarToneClasses(tone)}`}
+      >
+        {renderToolbarIcon(icon)}
+      </span>
+      <ToolbarDesktopTooltip label={label} />
+    </div>
+  )
+}
+
+function ToolbarStatusButton({
+  label,
+  tone,
+  icon,
+  onClick,
+  disabled = false,
+  href,
+  download,
+}: {
+  label: string
+  tone: ToolbarStatusTone
+  icon: string
+  onClick?: () => void
+  disabled?: boolean
+  href?: string
+  download?: string
+}) {
+  const className = `inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors ${
+    disabled ? 'cursor-not-allowed border-slate-700/80 bg-slate-800/80 text-slate-500' : `${getToolbarToneClasses(tone)} hover:brightness-110`
+  }`
+
+  return (
+    <div className="group relative flex items-center justify-center">
+      {href ? (
+        <a aria-label={label} title={label} href={href} download={download} className={className}>
+          {renderToolbarIcon(icon)}
+        </a>
+      ) : (
+        <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={label} className={className}>
+          {renderToolbarIcon(icon)}
+        </button>
+      )}
+      <ToolbarDesktopTooltip label={label} />
+    </div>
+  )
+}
 
 // 從 URL hash 取得初始課程 index
 function getLessonIndexFromHash(): number {
@@ -851,15 +1046,6 @@ function App() {
     : recordingStatus === 'error'
     ? 'Recording failed'
     : 'Recording idle'
-  const recordingStatusClassName = recordingStatus === 'recording'
-    ? 'border-rose-700/70 bg-rose-900/40 text-rose-200'
-    : recordingStatus === 'paused'
-    ? 'border-amber-700/70 bg-amber-900/40 text-amber-200'
-    : recordingStatus === 'stopped'
-    ? 'border-emerald-700/70 bg-emerald-900/40 text-emerald-200'
-    : recordingStatus === 'unsupported' || recordingStatus === 'error'
-    ? 'border-red-700/70 bg-red-900/40 text-red-200'
-    : 'border-slate-700/70 bg-slate-900/40 text-slate-300'
   const canRetryRecording = isPresenterModeEnabled && (recordingStatus === 'error' || recordingStatus === 'unsupported')
   const canStartRecording = isPresenterModeEnabled && recordingStatus === 'idle'
   const canPauseRecording = recordingStatus === 'recording'
@@ -940,6 +1126,13 @@ function App() {
       setPresenterSyncStatus('connected')
       setPresenterError(null)
       postPresentationMessage('SYNC_STATE', lesson.id, currentSlide, 'presenter')
+      return
+    }
+
+    if (isPresenterModeEnabled && latestMessage.type === 'HEARTBEAT' && latestMessage.senderRole === 'audience') {
+      lastHandledMessageKeyRef.current = latestMessageKey
+      setPresenterSyncStatus('connected')
+      setPresenterError(null)
       return
     }
 
@@ -1053,6 +1246,19 @@ function App() {
 
     return () => window.clearInterval(retryTimer)
   }, [isAudienceView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
+
+  useEffect(() => {
+    if (!isAudienceView || !sessionId || !isTransportReady || audienceConnectionState !== 'connected') {
+      return
+    }
+
+    postPresentationMessage('HEARTBEAT', lesson.id, currentSlide, 'audience')
+    const heartbeatTimer = window.setInterval(() => {
+      postPresentationMessage('HEARTBEAT', lesson.id, currentSlide, 'audience')
+    }, 2000)
+
+    return () => window.clearInterval(heartbeatTimer)
+  }, [audienceConnectionState, currentSlide, isAudienceView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
 
   useEffect(() => {
     if (!isPresenterModeEnabled || !isTransportReady) {
@@ -2509,108 +2715,120 @@ function App() {
 
               {isAdmin && isPresenterModeEnabled && (
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className={`rounded-full border px-2.5 py-1 text-xs ${
-                    presenterSyncStatus === 'connected'
-                      ? 'border-emerald-700/70 bg-emerald-900/40 text-emerald-300'
-                      : presenterSyncStatus === 'unsupported'
-                      ? 'border-red-700/70 bg-red-900/40 text-red-300'
-                      : 'border-amber-700/70 bg-amber-900/40 text-amber-300'
-                  }`}>
-                    {presenterStatusLabel}
-                  </span>
-                  <span className={`rounded-full border px-2.5 py-1 text-xs ${
-                    syncCapability === 'cross-browser'
-                      ? 'border-sky-700/70 bg-sky-900/40 text-sky-300'
-                      : syncCapability === 'same-browser'
-                      ? 'border-slate-700/70 bg-slate-900/40 text-slate-300'
-                      : 'border-red-700/70 bg-red-900/40 text-red-300'
-                  }`}>
-                    {presenterTransportLabel}
-                  </span>
-                  <span className={`rounded-full border px-2.5 py-1 text-xs ${
-                    presenterAudienceAccessMode === 'control'
-                      ? 'border-amber-700/70 bg-amber-900/40 text-amber-200'
-                      : 'border-slate-700/70 bg-slate-900/40 text-slate-300'
-                  }`}>
-                    {presenterAudienceAccessLabel}
-                  </span>
+                  <ToolbarStatusItem
+                    label={presenterStatusLabel}
+                    tone={
+                      presenterSyncStatus === 'connected'
+                        ? 'success'
+                        : presenterSyncStatus === 'unsupported'
+                        ? 'danger'
+                        : 'warning'
+                    }
+                    icon={
+                      presenterSyncStatus === 'connected'
+                        ? 'audience-connected'
+                        : presenterSyncStatus === 'connecting'
+                        ? 'audience-connecting'
+                        : presenterSyncStatus === 'disconnected'
+                        ? 'audience-disconnected'
+                        : 'alert'
+                    }
+                  />
+                  <ToolbarStatusItem
+                    label={presenterTransportLabel}
+                    tone={
+                      syncCapability === 'cross-browser'
+                        ? 'info'
+                        : syncCapability === 'same-browser'
+                        ? 'neutral'
+                        : 'danger'
+                    }
+                    icon={
+                      syncCapability === 'cross-browser'
+                        ? 'cross-browser'
+                        : syncCapability === 'same-browser' && transportStatus === 'fallback'
+                        ? 'same-browser-fallback'
+                        : syncCapability === 'same-browser'
+                        ? 'same-browser'
+                        : 'alert'
+                    }
+                  />
+                  <ToolbarStatusItem
+                    label={presenterAudienceAccessLabel}
+                    tone={presenterAudienceAccessMode === 'control' ? 'warning' : 'neutral'}
+                    icon={presenterAudienceAccessMode === 'control' ? 'both-can-switch' : 'presenter-only'}
+                  />
                   {presenterSyncStatus === 'disconnected' && (
-                    <button
+                    <ToolbarStatusButton
+                      label="Reopen Audience"
+                      tone="warning"
+                      icon="reopen-audience"
                       onClick={reopenAudienceWindow}
-                      className="rounded-full border border-amber-700/70 bg-amber-900/40 px-3 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-800/50"
-                    >
-                      Reopen Audience
-                    </button>
+                    />
                   )}
                 </div>
               )}
 
               {isRecordingVisible && (
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className={`rounded-full border px-2.5 py-1 text-xs ${recordingStatusClassName}`}>
-                    {recordingStatusLabel}
-                  </span>
+                  <ToolbarStatusItem
+                    label={recordingStatusLabel}
+                    tone={
+                      recordingStatus === 'recording'
+                        ? 'danger'
+                        : recordingStatus === 'paused'
+                        ? 'warning'
+                        : recordingStatus === 'stopped'
+                        ? 'success'
+                        : recordingStatus === 'unsupported' || recordingStatus === 'error'
+                        ? 'danger'
+                        : 'neutral'
+                    }
+                    icon={
+                      recordingStatus === 'recording'
+                        ? 'recording'
+                        : recordingStatus === 'paused'
+                        ? 'record-paused'
+                        : recordingStatus === 'requesting'
+                        ? 'record-preparing'
+                        : recordingStatus === 'stopped'
+                        ? 'record-done'
+                        : recordingStatus === 'idle'
+                        ? 'record-ready'
+                        : 'alert'
+                    }
+                  />
 
                   {canStartRecording && (
-                    <button
-                      type="button"
-                      onClick={handleStartRecording}
-                      className="rounded-full border border-sky-700/70 bg-sky-900/40 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-800/50"
-                    >
-                      Start Recording
-                    </button>
+                    <ToolbarStatusButton label="Start Recording" tone="info" icon="recording" onClick={handleStartRecording} />
                   )}
 
                   {canPauseRecording && (
-                    <button
-                      type="button"
-                      onClick={pauseRecording}
-                      className="rounded-full border border-amber-700/70 bg-amber-900/40 px-3 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-800/50"
-                    >
-                      Pause Recording
-                    </button>
+                    <ToolbarStatusButton label="Pause Recording" tone="warning" icon="record-paused" onClick={pauseRecording} />
                   )}
 
                   {canResumeRecording && (
-                    <button
-                      type="button"
-                      onClick={resumeRecording}
-                      className="rounded-full border border-emerald-700/70 bg-emerald-900/40 px-3 py-1.5 text-xs font-medium text-emerald-100 transition-colors hover:bg-emerald-800/50"
-                    >
-                      Resume Recording
-                    </button>
+                    <ToolbarStatusButton label="Resume Recording" tone="success" icon="play" onClick={resumeRecording} />
                   )}
 
                   {canStopRecording && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void stopRecording()
-                      }}
-                      className="rounded-full border border-rose-700/70 bg-rose-900/40 px-3 py-1.5 text-xs font-medium text-rose-100 transition-colors hover:bg-rose-800/50"
-                    >
-                      Stop Recording
-                    </button>
+                    <ToolbarStatusButton label="Stop Recording" tone="danger" icon="stop" onClick={() => {
+                      void stopRecording()
+                    }} />
                   )}
 
                   {recordingStatus === 'stopped' && recordingDownloadUrl && recordingDownloadFilename && (
-                    <a
+                    <ToolbarStatusButton
+                      label="Download Recording"
+                      tone="info"
+                      icon="download"
                       href={recordingDownloadUrl}
                       download={recordingDownloadFilename}
-                      className="rounded-full border border-sky-700/70 bg-sky-900/40 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-800/50"
-                    >
-                      Download Recording
-                    </a>
+                    />
                   )}
 
                   {canRetryRecording && (
-                    <button
-                      type="button"
-                      onClick={handleRetryRecording}
-                      className="rounded-full border border-sky-700/70 bg-sky-900/40 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-800/50"
-                    >
-                      Retry Recording
-                    </button>
+                    <ToolbarStatusButton label="Retry Recording" tone="info" icon="refresh" onClick={handleRetryRecording} />
                   )}
                 </div>
               )}

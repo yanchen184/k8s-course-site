@@ -2314,6 +2314,8 @@ function App() {
                   notes={slide.notes || ''}
                   duration={slide.duration}
                   variant="overlay"
+                  contextSection={slide.section}
+                  contextTitle={slide.title}
                   activeTab={presenterNotesTab}
                   onActiveTabChange={setPresenterNotesTab}
                   actions={(

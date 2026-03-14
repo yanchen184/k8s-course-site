@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { createElement } from 'react'
 import {
   buildPresenterNoteBlocks,
   getPresenterNotesMetrics,
 } from './PresenterNotesPanel'
+import PresenterNotesPanel from './PresenterNotesPanel'
+
+afterEach(() => {
+  cleanup()
+})
 
 describe('PresenterNotesPanel helpers', () => {
   it('builds intro, point, and outro cards from multi-paragraph notes', () => {
@@ -70,5 +79,46 @@ describe('PresenterNotesPanel helpers', () => {
       paragraphCount: 2,
       blockCount: 2,
     })
+  })
+
+  it('shows section and slide title context in overlay mode when both are provided', () => {
+    render(
+      createElement(PresenterNotesPanel, {
+        notes: '這是講稿。',
+        variant: 'overlay',
+        contextSection: '容器生命週期',
+        contextTitle: '生命週期指令操作',
+      }),
+    )
+
+    expect(screen.getByText('容器生命週期')).toBeTruthy()
+    expect(screen.getByText('生命週期指令操作')).toBeTruthy()
+  })
+
+  it('shows only the slide title context when overlay mode has no section', () => {
+    render(
+      createElement(PresenterNotesPanel, {
+        notes: '這是講稿。',
+        variant: 'overlay',
+        contextTitle: '環境確認',
+      }),
+    )
+
+    expect(screen.getByText('環境確認')).toBeTruthy()
+    expect(screen.queryByText('容器生命週期')).toBeNull()
+  })
+
+  it('does not render context metadata outside overlay mode', () => {
+    render(
+      createElement(PresenterNotesPanel, {
+        notes: '這是講稿。',
+        variant: 'modal',
+        contextSection: '容器生命週期',
+        contextTitle: '生命週期指令操作',
+      }),
+    )
+
+    expect(screen.queryByText('容器生命週期')).toBeNull()
+    expect(screen.queryByText('生命週期指令操作')).toBeNull()
   })
 })

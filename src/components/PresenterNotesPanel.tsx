@@ -18,6 +18,8 @@ interface PresenterNotesPanelProps {
   notes: string
   duration?: string
   variant?: 'presenter' | 'modal' | 'overlay'
+  contextSection?: string
+  contextTitle?: string
   fullNotesRef?: RefObject<HTMLDivElement | null>
   onFullNotesScroll?: UIEventHandler<HTMLDivElement>
   showScrollHint?: boolean
@@ -185,6 +187,8 @@ export default function PresenterNotesPanel({
   notes,
   duration,
   variant = 'presenter',
+  contextSection,
+  contextTitle,
   fullNotesRef,
   onFullNotesScroll,
   showScrollHint = false,
@@ -199,6 +203,9 @@ export default function PresenterNotesPanel({
   const isPresenter = variant === 'presenter'
   const isOverlay = variant === 'overlay'
   const resolvedActiveTab = activeTab ?? internalActiveTab
+  const normalizedContextSection = contextSection?.trim() || ''
+  const normalizedContextTitle = contextTitle?.trim() || ''
+  const shouldShowContextHeader = isOverlay && normalizedContextTitle.length > 0
 
   const handleTabChange = (tab: PresenterNotesTab) => {
     onActiveTabChange?.(tab)
@@ -231,6 +238,18 @@ export default function PresenterNotesPanel({
         <div>
           <h3 className="text-lg font-semibold tracking-[0.08em] text-slate-50">Speaker Notes</h3>
           <p className="mt-1 text-sm text-slate-400">Scan the key beats first, then drop into the full script.</p>
+          {shouldShowContextHeader && (
+            <div className="mt-3 rounded-[1.2rem] border border-slate-800/80 bg-slate-900/75 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              {normalizedContextSection && (
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
+                  {normalizedContextSection}
+                </p>
+              )}
+              <p className={`font-semibold leading-tight text-slate-50 ${normalizedContextSection ? 'mt-2 text-xl sm:text-[1.65rem]' : 'text-xl sm:text-[1.65rem]'}`}>
+                {normalizedContextTitle}
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {actions}

@@ -4,6 +4,7 @@ import type { Slide } from './slides/lesson1-morning/index'
 import AudienceView from './components/AudienceView'
 import PresenterNotesPanel from './components/PresenterNotesPanel'
 import { usePresentationChannel } from './hooks/usePresentationChannel'
+import { usePresenterRecording } from './hooks/usePresenterRecording'
 import {
   buildAudienceViewUrl,
   canAudienceControlPresenter,
@@ -348,6 +349,17 @@ function App() {
     senderRole: channelSenderRole,
     controlToken,
   })
+  const {
+    status: recordingStatus,
+    error: recordingError,
+    downloadUrl: recordingDownloadUrl,
+    downloadFilename: recordingDownloadFilename,
+    start: startRecording,
+    pause: pauseRecording,
+    resume: resumeRecording,
+    stop: stopRecording,
+    resetCompleted: resetCompletedRecording,
+  } = usePresenterRecording()
   const isTransportReady = isPresentationTransportActive(transportStatus)
   const shouldEmbedControlTokenInMessages = transportKind !== 'cloudflare'
 
@@ -625,7 +637,8 @@ function App() {
     setControlToken(activeControlToken)
     setSessionStartedAt(Date.now())
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
-  }, [openAudienceWindow, sessionId])
+    resetCompletedRecording()
+  }, [openAudienceWindow, resetCompletedRecording, sessionId])
 
   const reopenAudienceWindow = useCallback(() => {
     if (!sessionId || !controlToken) {
@@ -658,7 +671,11 @@ function App() {
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
   }, [openAudienceWindow, sessionId])
 
-  const stopPresenterMode = useCallback(() => {
+  const stopPresenterMode = useCallback(async () => {
+    if (recordingStatus === 'recording' || recordingStatus === 'paused' || recordingStatus === 'requesting') {
+      await stopRecording()
+    }
+
     const lessonId = LESSONS[currentLesson].id
     postPresentationMessage('END_SESSION', lessonId, currentSlide, 'presenter')
     if (audienceWindowRef.current && !audienceWindowRef.current.closed) {
@@ -676,7 +693,7 @@ function App() {
     setManualAudienceUrl(null)
     setCopyAudienceUrlState('idle')
     setPresenterSyncStatus('idle')
-  }, [currentLesson, currentSlide, postPresentationMessage, sessionId])
+  }, [currentLesson, currentSlide, postPresentationMessage, recordingStatus, sessionId, stopRecording])
 
   const closeEndPresenterConfirm = useCallback(() => {
     setIsEndPresenterConfirmOpen(false)
@@ -686,9 +703,9 @@ function App() {
     setIsEndPresenterConfirmOpen(true)
   }, [])
 
-  const confirmStopPresenterMode = useCallback(() => {
+  const confirmStopPresenterMode = useCallback(async () => {
     setIsEndPresenterConfirmOpen(false)
-    stopPresenterMode()
+    await stopPresenterMode()
   }, [stopPresenterMode])
 
   const togglePresenterMode = useCallback(() => {
@@ -697,7 +714,7 @@ function App() {
       return
     }
 
-    startPresenterMode()
+    void startPresenterMode()
   }, [isPresenterModeEnabled, requestStopPresenterMode, startPresenterMode])
 
   const copyAudienceUrl = useCallback(async (audienceUrl: string | null) => {
@@ -798,6 +815,41 @@ function App() {
     : 0
   const elapsedMinutes = Math.floor(elapsedSeconds / 60)
   const elapsedRemainderSeconds = elapsedSeconds % 60
+  const isRecordingVisible = isAdmin && (
+    isPresenterModeEnabled
+    || recordingStatus === 'stopped'
+    || recordingStatus === 'error'
+    || recordingStatus === 'unsupported'
+  )
+  const recordingStatusLabel = recordingStatus === 'recording'
+    ? 'Recording'
+    : recordingStatus === 'paused'
+    ? 'Recording paused'
+    : recordingStatus === 'requesting'
+    ? 'Preparing recording'
+    : recordingStatus === 'stopped'
+    ? 'Recording ready'
+    : recordingStatus === 'idle'
+    ? 'Ready to record'
+    : recordingStatus === 'unsupported'
+    ? 'Recording unavailable'
+    : recordingStatus === 'error'
+    ? 'Recording failed'
+    : 'Recording idle'
+  const recordingStatusClassName = recordingStatus === 'recording'
+    ? 'border-rose-700/70 bg-rose-900/40 text-rose-200'
+    : recordingStatus === 'paused'
+    ? 'border-amber-700/70 bg-amber-900/40 text-amber-200'
+    : recordingStatus === 'stopped'
+    ? 'border-emerald-700/70 bg-emerald-900/40 text-emerald-200'
+    : recordingStatus === 'unsupported' || recordingStatus === 'error'
+    ? 'border-red-700/70 bg-red-900/40 text-red-200'
+    : 'border-slate-700/70 bg-slate-900/40 text-slate-300'
+  const canRetryRecording = isPresenterModeEnabled && (recordingStatus === 'error' || recordingStatus === 'unsupported')
+  const canStartRecording = isPresenterModeEnabled && recordingStatus === 'idle'
+  const canPauseRecording = recordingStatus === 'recording'
+  const canResumeRecording = recordingStatus === 'paused'
+  const canStopRecording = recordingStatus === 'recording' || recordingStatus === 'paused'
 
   const toggleTimerPause = useCallback(() => {
     if (timerPaused) {
@@ -1356,6 +1408,20 @@ function App() {
     ? 'Anyone with this link can control presenter navigation.'
     : 'Audience members can view slides but cannot control navigation.'
   const canRotateControlLink = isPresenterModeEnabled && Boolean(sessionId)
+  const handleStartRecording = useCallback(() => {
+    if (!isPresenterModeEnabled) {
+      return
+    }
+
+    void startRecording()
+  }, [isPresenterModeEnabled, startRecording])
+  const handleRetryRecording = useCallback(() => {
+    if (!isPresenterModeEnabled) {
+      return
+    }
+
+    void startRecording()
+  }, [isPresenterModeEnabled, startRecording])
   if (isAudienceView) {
     return (
       <AudienceView
@@ -2404,7 +2470,83 @@ function App() {
                   )}
                 </div>
               )}
+
+              {isRecordingVisible && (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className={`rounded-full border px-2.5 py-1 text-xs ${recordingStatusClassName}`}>
+                    {recordingStatusLabel}
+                  </span>
+
+                  {canStartRecording && (
+                    <button
+                      type="button"
+                      onClick={handleStartRecording}
+                      className="rounded-full border border-sky-700/70 bg-sky-900/40 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-800/50"
+                    >
+                      Start Recording
+                    </button>
+                  )}
+
+                  {canPauseRecording && (
+                    <button
+                      type="button"
+                      onClick={pauseRecording}
+                      className="rounded-full border border-amber-700/70 bg-amber-900/40 px-3 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-800/50"
+                    >
+                      Pause Recording
+                    </button>
+                  )}
+
+                  {canResumeRecording && (
+                    <button
+                      type="button"
+                      onClick={resumeRecording}
+                      className="rounded-full border border-emerald-700/70 bg-emerald-900/40 px-3 py-1.5 text-xs font-medium text-emerald-100 transition-colors hover:bg-emerald-800/50"
+                    >
+                      Resume Recording
+                    </button>
+                  )}
+
+                  {canStopRecording && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void stopRecording()
+                      }}
+                      className="rounded-full border border-rose-700/70 bg-rose-900/40 px-3 py-1.5 text-xs font-medium text-rose-100 transition-colors hover:bg-rose-800/50"
+                    >
+                      Stop Recording
+                    </button>
+                  )}
+
+                  {recordingStatus === 'stopped' && recordingDownloadUrl && recordingDownloadFilename && (
+                    <a
+                      href={recordingDownloadUrl}
+                      download={recordingDownloadFilename}
+                      className="rounded-full border border-sky-700/70 bg-sky-900/40 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-800/50"
+                    >
+                      Download Recording
+                    </a>
+                  )}
+
+                  {canRetryRecording && (
+                    <button
+                      type="button"
+                      onClick={handleRetryRecording}
+                      className="rounded-full border border-sky-700/70 bg-sky-900/40 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-800/50"
+                    >
+                      Retry Recording
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
+
+            {isRecordingVisible && recordingError && (
+              <p className="mt-2 text-sm text-rose-300">
+                {recordingError}
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -21,6 +21,7 @@ let sendMessageMock: ReturnType<typeof vi.fn>
 let popupWindow: Window & {
   close: ReturnType<typeof vi.fn>
 }
+let popupWindowState: { closed: boolean }
 
 async function startPresenter(): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: /start presenter \(p\)/i }))
@@ -39,12 +40,16 @@ describe('App presenter end confirmation', () => {
     cleanup()
     window.history.replaceState({}, '', '/admin')
 
+    popupWindowState = { closed: false }
     popupWindow = {
-      closed: false,
       close: vi.fn(function close() {
-        popupWindow.closed = true
+        popupWindowState.closed = true
       }),
     } as unknown as Window & { close: ReturnType<typeof vi.fn> }
+    Object.defineProperty(popupWindow, 'closed', {
+      configurable: true,
+      get: () => popupWindowState.closed,
+    })
 
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
@@ -80,7 +85,7 @@ describe('App presenter end confirmation', () => {
     let nextId = 0
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
       nextId += 1
-      return `test-session-${nextId}`
+      return `00000000-0000-4000-8000-${String(nextId).padStart(12, '0')}`
     })
   })
 

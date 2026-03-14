@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 import { usePresentationChannel } from './hooks/usePresentationChannel'
 import { slides as lesson1MorningSlides } from './slides/lesson1-morning/index'
@@ -52,6 +52,7 @@ describe('App audience sync', () => {
   })
 
   it('applies presenter sync without invoking document view transitions', async () => {
+    let latestMessage: ReturnType<typeof createSyncMessage> | null = null
     const startViewTransition = vi.fn((updateCallback: () => void) => {
       updateCallback()
       return {
@@ -67,16 +68,18 @@ describe('App audience sync', () => {
       value: startViewTransition,
     })
 
-    vi.mocked(usePresentationChannel).mockReturnValue({
-      latestMessage: createSyncMessage(1),
+    vi.mocked(usePresentationChannel).mockImplementation(() => ({
+      latestMessage,
       transportStatus: 'ready',
       transportKind: 'broadcast',
       transportIssue: null,
       syncCapability: 'same-browser',
       sendMessage: vi.fn(() => true),
-    })
+    }))
 
-    render(<App />)
+    const { rerender } = render(<App />)
+    latestMessage = createSyncMessage(1)
+    rerender(<App />)
 
     await waitFor(() => {
       expect(
@@ -88,5 +91,51 @@ describe('App audience sync', () => {
     })
 
     expect(startViewTransition).not.toHaveBeenCalled()
+  })
+
+  it('does not re-apply a stale presenter sync after the audience navigates locally', async () => {
+    let latestMessage: ReturnType<typeof createSyncMessage> | null = null
+    const sendMessage = vi.fn(() => true)
+
+    vi.mocked(usePresentationChannel).mockImplementation(() => ({
+      latestMessage,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage,
+    }))
+
+    const { rerender } = render(<App />)
+    latestMessage = createSyncMessage(0)
+    rerender(<App />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: lesson1MorningSlides[0].title,
+        }),
+      ).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: lesson1MorningSlides[1].title,
+        }),
+      ).toBeTruthy()
+    })
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        senderRole: 'audience',
+        slideIndex: 1,
+        type: 'SYNC_STATE',
+      }),
+    )
   })
 })

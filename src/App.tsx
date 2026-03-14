@@ -15,6 +15,7 @@ import {
   parseViewMode,
   shouldAcceptAudienceControlMessage,
   type AudienceLinkAccessMode,
+  type PresentationSyncMessage,
   type ViewMode,
 } from './types/presentation'
 import {
@@ -250,6 +251,18 @@ function clearPresenterControlToken(sessionId: string | null): void {
   }
 }
 
+function buildPresentationMessageKey(message: PresentationSyncMessage): string {
+  return [
+    message.senderRole,
+    message.type,
+    message.sessionId,
+    message.lessonId,
+    message.slideIndex,
+    message.sentAt,
+    message.controlToken ?? '',
+  ].join(':')
+}
+
 function isAdminPath(): boolean {
   const path = window.location.pathname
   const redirectedPath = new URLSearchParams(window.location.search).get('p') || ''
@@ -314,6 +327,7 @@ function App() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [isEndPresenterConfirmOpen, setIsEndPresenterConfirmOpen] = useState(false)
   const [sharePermissionMode, setSharePermissionMode] = useState<AudienceLinkAccessMode>('read-only')
+  const [presenterAudienceAccessMode, setPresenterAudienceAccessMode] = useState<AudienceLinkAccessMode>('control')
   const [showPresenterNotesScrollHint, setShowPresenterNotesScrollHint] = useState(false)
   const [presenterNotesTab, setPresenterNotesTab] = useState<'key-points' | 'full-script'>('key-points')
   const [isPresenterNotesExpanded, setIsPresenterNotesExpanded] = useState(false)
@@ -327,6 +341,7 @@ function App() {
   const lessonLoadRequestRef = useRef(0)
   const lastAudienceSignalAtRef = useRef<number | null>(null)
   const hasReceivedInitialSyncRef = useRef(false)
+  const lastHandledMessageKeyRef = useRef<string | null>(null)
   const presenterNotesScrollRef = useRef<HTMLDivElement | null>(null)
   const presenterSlideScrollRef = useRef<HTMLDivElement | null>(null)
   const isAudienceView = viewMode === 'audience'
@@ -586,12 +601,13 @@ function App() {
 
   const openAudienceWindow = useCallback((
     activeSessionId: string,
+    accessMode: AudienceLinkAccessMode,
     activeControlToken: string,
   ): Window | null => {
     const lessonId = LESSONS[currentLesson].id
     const audienceUrl = buildAudienceUrl(activeSessionId, lessonId, {
-      accessMode: 'control',
-      controlToken: activeControlToken,
+      accessMode,
+      controlToken: accessMode === 'control' ? activeControlToken : null,
     })
     const openedWindow = window.open(audienceUrl, `k8s-audience-${activeSessionId}`, 'popup=yes,width=1366,height=768')
 
@@ -611,14 +627,14 @@ function App() {
     const activeSessionId = sessionId ?? createSessionId()
     const activeControlToken = createSessionId()
     persistPresenterControlToken(activeSessionId, activeControlToken)
-    const openedWindow = openAudienceWindow(activeSessionId, activeControlToken)
+    const openedWindow = openAudienceWindow(activeSessionId, presenterAudienceAccessMode, activeControlToken)
     setViewMode('presenter')
     setSessionId(activeSessionId)
     setControlToken(activeControlToken)
     setSessionStartedAt(Date.now())
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
     resetCompletedRecording()
-  }, [openAudienceWindow, resetCompletedRecording, sessionId])
+  }, [openAudienceWindow, presenterAudienceAccessMode, resetCompletedRecording, sessionId])
 
   const reopenAudienceWindow = useCallback(() => {
     if (!sessionId || !controlToken) {
@@ -626,7 +642,7 @@ function App() {
       return
     }
 
-    const openedWindow = openAudienceWindow(sessionId, controlToken)
+    const openedWindow = openAudienceWindow(sessionId, presenterAudienceAccessMode, controlToken)
     if (!openedWindow) {
       setPresenterSyncStatus('disconnected')
       return
@@ -634,7 +650,7 @@ function App() {
 
     setPresenterSyncStatus('connecting')
     postPresentationMessage('SYNC_STATE', LESSONS[currentLesson].id, currentSlide, 'presenter')
-  }, [controlToken, currentLesson, currentSlide, openAudienceWindow, postPresentationMessage, sessionId, startPresenterMode])
+  }, [controlToken, currentLesson, currentSlide, openAudienceWindow, postPresentationMessage, presenterAudienceAccessMode, sessionId, startPresenterMode])
 
   const rotateControlLink = useCallback(() => {
     if (!sessionId) {
@@ -647,9 +663,28 @@ function App() {
     setCopyAudienceUrlState('idle')
     setSharePermissionMode('control')
 
-    const openedWindow = openAudienceWindow(sessionId, nextControlToken)
+    const openedWindow = openAudienceWindow(sessionId, presenterAudienceAccessMode, nextControlToken)
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
-  }, [openAudienceWindow, sessionId])
+  }, [openAudienceWindow, presenterAudienceAccessMode, sessionId])
+
+  const handlePresenterAudienceAccessModeChange = useCallback((nextMode: AudienceLinkAccessMode) => {
+    if (presenterAudienceAccessMode === nextMode) {
+      return
+    }
+
+    setPresenterAudienceAccessMode(nextMode)
+
+    if (!isPresenterModeEnabled || !sessionId || !controlToken) {
+      return
+    }
+
+    const openedWindow = openAudienceWindow(sessionId, nextMode, controlToken)
+    setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
+
+    if (openedWindow) {
+      postPresentationMessage('SYNC_STATE', LESSONS[currentLesson].id, currentSlide, 'presenter')
+    }
+  }, [controlToken, currentLesson, currentSlide, isPresenterModeEnabled, openAudienceWindow, postPresentationMessage, presenterAudienceAccessMode, sessionId])
 
   const stopPresenterMode = useCallback(async () => {
     if (recordingStatus === 'recording' || recordingStatus === 'paused' || recordingStatus === 'requesting') {
@@ -870,6 +905,10 @@ function App() {
   }, [isAudienceView, isTransportReady, sessionId, transportIssue, transportStatus])
 
   useEffect(() => {
+    lastHandledMessageKeyRef.current = null
+  }, [sessionId, viewMode])
+
+  useEffect(() => {
     if (!isTransportReady) {
       if (isPresenterModeEnabled && transportStatus === 'connecting') {
         setPresenterSyncStatus('connecting')
@@ -891,7 +930,13 @@ function App() {
       return
     }
 
+    const latestMessageKey = buildPresentationMessageKey(latestMessage)
+    if (lastHandledMessageKeyRef.current === latestMessageKey) {
+      return
+    }
+
     if (isPresenterModeEnabled && latestMessage.type === 'REQUEST_SYNC' && latestMessage.senderRole === 'audience') {
+      lastHandledMessageKeyRef.current = latestMessageKey
       setPresenterSyncStatus('connected')
       setPresenterError(null)
       postPresentationMessage('SYNC_STATE', lesson.id, currentSlide, 'presenter')
@@ -909,9 +954,11 @@ function App() {
     ) {
       const syncedLessonIndex = LESSONS.findIndex((item) => item.id === latestMessage.lessonId)
       if (syncedLessonIndex === -1) {
+        lastHandledMessageKeyRef.current = latestMessageKey
         return
       }
 
+      lastHandledMessageKeyRef.current = latestMessageKey
       setPresenterSyncStatus('connected')
       setPresenterError(null)
 
@@ -931,16 +978,19 @@ function App() {
     }
 
     if (!isPresenterBroadcastMessage(latestMessage)) {
+      lastHandledMessageKeyRef.current = latestMessageKey
       return
     }
 
     if (latestMessage.type === 'END_SESSION') {
+      lastHandledMessageKeyRef.current = latestMessageKey
       window.close()
       setAudienceConnectionState('disconnected')
       return
     }
 
     if (latestMessage.type === 'HEARTBEAT') {
+      lastHandledMessageKeyRef.current = latestMessageKey
       lastAudienceSignalAtRef.current = latestMessage.sentAt
       if (hasReceivedInitialSyncRef.current) {
         setAudienceConnectionState('connected')
@@ -949,9 +999,11 @@ function App() {
     }
 
     if (latestMessage.type !== 'SYNC_STATE' || latestMessage.senderRole !== 'presenter') {
+      lastHandledMessageKeyRef.current = latestMessageKey
       return
     }
 
+    lastHandledMessageKeyRef.current = latestMessageKey
     hasReceivedInitialSyncRef.current = true
     lastAudienceSignalAtRef.current = latestMessage.sentAt
     setAudienceConnectionState('connected')
@@ -1364,6 +1416,9 @@ function App() {
   const presenterTransportLabel = syncCapability === 'same-browser' && transportStatus === 'fallback'
     ? 'Same-browser fallback'
     : getPresentationSyncCapabilityLabel(syncCapability)
+  const presenterAudienceAccessLabel = presenterAudienceAccessMode === 'control'
+    ? 'Both can switch'
+    : 'Presenter only'
   const canShareAudienceUrl = isPresenterModeEnabled && syncCapability === 'cross-browser'
   const selectedShareAudienceUrl = sessionId
     ? buildAudienceUrl(sessionId, lesson.id, {
@@ -2343,6 +2398,36 @@ function App() {
                   )}
 
                   <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/70 p-1.5 shadow-lg shadow-slate-950/20">
+                    <div
+                      role="group"
+                      aria-label="Presenter audience control mode"
+                      className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-700/70 bg-slate-900/70 p-1"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handlePresenterAudienceAccessModeChange('read-only')}
+                        aria-pressed={presenterAudienceAccessMode === 'read-only'}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                          presenterAudienceAccessMode === 'read-only'
+                            ? 'bg-slate-100 text-slate-950'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        Presenter only
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePresenterAudienceAccessModeChange('control')}
+                        aria-pressed={presenterAudienceAccessMode === 'control'}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                          presenterAudienceAccessMode === 'control'
+                            ? 'bg-sky-500 text-slate-950'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        Both can switch
+                      </button>
+                    </div>
                     <button
                       onClick={togglePresenterMode}
                       className={`min-w-[9.5rem] rounded-xl px-4 py-2 text-sm font-semibold transition-colors sm:min-w-[11rem] ${
@@ -2439,6 +2524,13 @@ function App() {
                       : 'border-red-700/70 bg-red-900/40 text-red-300'
                   }`}>
                     {presenterTransportLabel}
+                  </span>
+                  <span className={`rounded-full border px-2.5 py-1 text-xs ${
+                    presenterAudienceAccessMode === 'control'
+                      ? 'border-amber-700/70 bg-amber-900/40 text-amber-200'
+                      : 'border-slate-700/70 bg-slate-900/40 text-slate-300'
+                  }`}>
+                    {presenterAudienceAccessLabel}
                   </span>
                   {presenterSyncStatus === 'disconnected' && (
                     <button

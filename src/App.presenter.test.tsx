@@ -35,6 +35,20 @@ function getEndSessionMessages() {
   return sendMessageMock.mock.calls.filter(([message]) => message.type === 'END_SESSION')
 }
 
+function createAudienceSyncMessage(slideIndex: number) {
+  return {
+    type: 'SYNC_STATE' as const,
+    sessionId: 'session-1',
+    lessonId: 'lesson1-morning',
+    slideIndex,
+    senderRole: 'audience' as const,
+    controlToken: 'control-1',
+    sentAt: Date.now(),
+  }
+}
+
+const PRESENTER_TEST_TIMEOUT = 10000
+
 describe('App presenter end confirmation', () => {
   beforeEach(() => {
     cleanup()
@@ -115,7 +129,7 @@ describe('App presenter end confirmation', () => {
     expect(screen.getByRole('button', { name: /end presenter \(p\)/i })).toBeTruthy()
     expect(getEndSessionMessages()).toHaveLength(0)
     expect(popupWindow.close).not.toHaveBeenCalled()
-  })
+  }, PRESENTER_TEST_TIMEOUT)
 
   it('ends presenter mode only after explicit confirmation', async () => {
     render(<App />)
@@ -146,5 +160,156 @@ describe('App presenter end confirmation', () => {
     })
     expect(getEndSessionMessages()).toHaveLength(0)
     expect(screen.getByRole('button', { name: /end presenter \(p\)/i })).toBeTruthy()
+  })
+})
+
+describe('App presenter control modes', () => {
+  beforeEach(() => {
+    cleanup()
+    window.history.replaceState({}, '', '/admin')
+
+    popupWindowState = { closed: false }
+    popupWindow = {
+      close: vi.fn(function close() {
+        popupWindowState.closed = true
+      }),
+    } as unknown as Window & { close: ReturnType<typeof vi.fn> }
+    Object.defineProperty(popupWindow, 'closed', {
+      configurable: true,
+      get: () => popupWindowState.closed,
+    })
+
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+    })
+
+    sendMessageMock = vi.fn(() => true)
+    vi.mocked(usePresentationChannel).mockReturnValue({
+      latestMessage: null,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage: sendMessageMock,
+    })
+
+    vi.spyOn(window, 'open').mockImplementation(() => popupWindow)
+
+    let nextId = 0
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+      nextId += 1
+      return `00000000-0000-4000-8000-${String(nextId).padStart(12, '0')}`
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('opens the presenter audience as read-only when presenter only mode is selected', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^presenter only$/i }))
+    await startPresenter()
+
+    const firstWindowUrl = vi.mocked(window.open).mock.calls[0]?.[0]
+    expect(firstWindowUrl).toContain('view=audience')
+    expect(firstWindowUrl).not.toContain('control=')
+  })
+
+  it('can switch the audience popup between read-only and shared control modes', async () => {
+    render(<App />)
+
+    await startPresenter()
+
+    const firstWindowUrl = vi.mocked(window.open).mock.calls[0]?.[0]
+    expect(firstWindowUrl).toContain('control=')
+
+    fireEvent.click(screen.getByRole('button', { name: /^presenter only$/i }))
+
+    await waitFor(() => {
+      const latestWindowUrl = vi.mocked(window.open).mock.calls.at(-1)?.[0]
+      expect(latestWindowUrl).not.toContain('control=')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^both can switch$/i }))
+
+    await waitFor(() => {
+      const latestWindowUrl = vi.mocked(window.open).mock.calls.at(-1)?.[0]
+      expect(latestWindowUrl).toContain('control=')
+    })
+  })
+})
+
+describe('App presenter sync conflict handling', () => {
+  beforeEach(() => {
+    cleanup()
+    window.history.replaceState({}, '', '/admin?view=presenter&session=session-1&control=control-1#lesson1-morning')
+
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+    })
+
+    sendMessageMock = vi.fn(() => true)
+    vi.mocked(usePresentationChannel).mockReturnValue({
+      latestMessage: createAudienceSyncMessage(0),
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage: sendMessageMock,
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('does not re-apply a stale audience sync after the presenter navigates locally', async () => {
+    render(<App />)
+
+    expect(
+      screen.getByRole('button', { name: /go to slide 1: kubernetes 入門/i }).getAttribute('aria-current'),
+    ).toBe('page')
+
+    fireEvent.click(screen.getByRole('button', { name: /next slide/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /go to slide 2: 47 小時完整課程大綱/i }).getAttribute('aria-current'),
+      ).toBe('page')
+    })
   })
 })

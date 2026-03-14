@@ -32,15 +32,6 @@ import {
   type SectionEntry,
 } from './sidebarOutline'
 
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (updateCallback: () => void | Promise<void>) => {
-    finished: Promise<void>
-    ready: Promise<void>
-    updateCallbackDone: Promise<void>
-    skipTransition: () => void
-  }
-}
-
 // 課程列表
 const LESSONS = [
   {
@@ -545,19 +536,8 @@ function App() {
       return
     }
 
-    if (isAudienceView) {
-      const transitionDocument = document as ViewTransitionDocument
-
-      if (typeof transitionDocument.startViewTransition === 'function') {
-        transitionDocument.startViewTransition(() => {
-          setCurrentSlide(index)
-        })
-        return
-      }
-    }
-
     setCurrentSlide(index)
-  }, [currentSlide, isAudienceView, slides.length])
+  }, [currentSlide, slides.length])
 
   const nextSlide = useCallback(() => goToSlide(currentSlide + 1), [currentSlide, goToSlide])
   const prevSlide = useCallback(() => goToSlide(currentSlide - 1), [currentSlide, goToSlide])

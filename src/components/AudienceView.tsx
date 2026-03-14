@@ -184,7 +184,7 @@ function AudienceView({
         )}
 
         {!showWaitingState && !showError && slide && (
-          <div className="audience-slide-stage slide-shell-wide relative [contain:layout_paint]">
+          <div className="slide-shell-wide relative [contain:layout_paint]">
             <AudienceSlideBody slide={slide} />
           </div>
         )}

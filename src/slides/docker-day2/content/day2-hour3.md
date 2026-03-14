@@ -15,12 +15,12 @@
 | 平台 | 需求 |
 |------|------|
 | **Linux** | 64 位元、核心 3.10+（建議 4.0+） |
-| **Windows** | Win 10/11 專業版/企業版、Hyper-V 或 WSL 2、4GB+ RAM |
+| **Windows** | Win 10/11 64 位元、4GB+ RAM；Linux containers 用 WSL 2，Windows containers 才需要專業版/企業版 + Hyper-V |
 | **Mac** | macOS 12+（Intel 或 Apple Silicon）、4GB+ RAM |
 
 ### 為什麼這些需求？
 
-**Windows/Mac 需要虛擬機**：Docker 依賴 Linux 核心功能，非 Linux 系統需要跑 Linux VM。
+**Windows/Mac 需要 Linux VM**：Docker 依賴 Linux 核心功能，非 Linux 系統需要透過 WSL 2、Hyper-V 或 Desktop 內建 VM 跑 Linux 後端。
 
 ```
 Docker on Windows/Mac：
@@ -50,45 +50,32 @@ uname -m
 
 ## 三、Linux 安裝 Docker（20 分鐘）
 
-### CentOS
+### Ubuntu（課堂主線）
 
 ```bash
-# 1. 安裝工具
-sudo yum install -y yum-utils
+# 1. 移除舊版套件（若曾安裝）
+sudo apt-get remove -y docker docker-engine docker.io containerd runc
 
-# 2. 加入 Repository
-sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-
-# 3. 安裝 Docker
-sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# 4. 啟動
-sudo systemctl start docker
-sudo systemctl enable docker
-
-# 5. 驗證
-sudo docker run hello-world
-```
-
-### Ubuntu
-
-```bash
-# 1. 更新並安裝工具
+# 2. 更新並安裝工具
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 
-# 2. 加入 GPG 金鑰
+# 3. 加入 GPG 金鑰
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-# 3. 加入 Repository
+# 4. 加入 Repository
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list
 
-# 4. 安裝 Docker
+# 5. 更新套件索引並安裝 Docker
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# 5. 驗證
+# 6. 啟動
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# 7. 驗證
 sudo docker run hello-world
 ```
 

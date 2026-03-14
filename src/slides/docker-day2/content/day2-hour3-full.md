@@ -9,7 +9,7 @@
 現在開始動手——安裝 Docker。
 
 這堂課會涵蓋：
-- Linux（CentOS/Ubuntu）安裝 Docker
+- Linux（以 Ubuntu 為主）安裝 Docker
 - Windows/Mac 的 Docker Desktop
 - 驗證安裝
 - Docker Hub 註冊與登入
@@ -26,8 +26,8 @@
 - 支援的發行版：Ubuntu 20.04+、CentOS 7+、Debian 10+、Fedora
 
 **Windows**
-- Windows 10/11 64 位元專業版或企業版
-- 啟用 Hyper-V 或 WSL 2
+- Windows 10/11 64 位元
+- Linux containers 用 WSL 2；若要切換 Windows containers，才需要專業版/企業版與 Hyper-V
 - 至少 4GB RAM
 
 **Mac**
@@ -52,9 +52,9 @@ Docker 依賴 Linux 核心的兩個關鍵功能：
 
 核心 3.10 是最低要求，但 4.0+ 的 OverlayFS 效能更好，穩定性更高。
 
-**為什麼 Windows 需要專業版/企業版？**
+**為什麼 Windows 要分 WSL 2 和 Hyper-V？**
 
-Windows 家用版沒有 Hyper-V 功能。Docker Desktop 需要 Hyper-V 或 WSL 2 來運行 Linux 虛擬機。
+Docker Desktop 在 Windows 上最常見的是跑 Linux containers，這條路線主要依賴 WSL 2，所以 Windows Home 也能使用。只有在你要切換成 Windows containers 時，才會需要專業版/企業版與 Hyper-V。
 
 ```
 Docker on Windows 的架構：
@@ -75,7 +75,7 @@ Docker on Windows 的架構：
 └─────────────────────────────┘
 ```
 
-Docker 實際上跑在 Linux 虛擬機裡，所以需要虛擬化技術。
+Docker 實際上跑在 Linux 虛擬機裡，所以需要 WSL 2 或 Hyper-V 這類虛擬化能力。
 
 **為什麼至少 4GB RAM？**
 
@@ -128,28 +128,16 @@ uname -m
 
 如果之前裝過舊版 Docker，先移除：
 
-**CentOS/RHEL**
-```bash
-sudo yum remove docker \
-                docker-client \
-                docker-client-latest \
-                docker-common \
-                docker-latest \
-                docker-latest-logrotate \
-                docker-logrotate \
-                docker-engine
-```
-
 **Ubuntu/Debian**
 ```bash
-sudo apt-get remove docker docker-engine docker.io containerd runc
+sudo apt-get remove -y docker docker-engine docker.io containerd runc
 ```
 
 ### 3.2 安裝方式選擇
 
 有三種安裝方式：
 1. **官方 Repository**（推薦）：最新版本，自動更新
-2. **下載 DEB/RPM 套件**：離線環境使用
+2. **下載 DEB 套件**：離線環境使用
 3. **官方安裝腳本**：最快，但不適合生產環境
 
 我們用官方 Repository 方式。
@@ -162,45 +150,44 @@ Docker 有兩個版本：
 
 我們使用的是 CE 版本。
 
-### 3.4 CentOS 安裝步驟
+### 3.4 Ubuntu 安裝步驟
 
 **Step 1：安裝必要工具**
 ```bash
-sudo yum install -y yum-utils
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
 ```
 
-**Step 2：新增 Docker Repository**
-
-官方預設的 Repository 在國外，下載速度可能很慢。建議使用阿里雲的鏡像源：
+**Step 2：新增 Docker 官方 GPG 金鑰**
 
 ```bash
-# 官方源（國外，可能較慢）
-sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-
-# 阿里雲源（國內，推薦）
-sudo yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
 ```
 
-**Step 3：更新 yum 套件索引**
-
-安裝前建議先更新索引，確保取得最新的套件資訊：
+**Step 3：新增 Repository**
 
 ```bash
-sudo yum makecache fast
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 ```
 
-**Step 4：安裝 Docker Engine**
+**Step 4：更新套件索引並安裝 Docker Engine**
 ```bash
-sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
 如果需要安裝指定版本，可以用以下方式：
 ```bash
 # 列出可用版本
-yum list docker-ce --showduplicates | sort -r
+apt-cache madison docker-ce
 
 # 安裝指定版本
-sudo yum install -y docker-ce-<版本號> docker-ce-cli-<版本號> containerd.io
+sudo apt-get install -y docker-ce=<版本號> docker-ce-cli=<版本號> containerd.io
 ```
 
 **Step 5：啟動 Docker**
@@ -229,47 +216,13 @@ sudo docker run hello-world
 docker images
 ```
 
-### 3.5 Ubuntu 安裝步驟
-
-**Step 1：更新套件索引，安裝必要工具**
-```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg
-```
-
-**Step 2：新增 Docker 官方 GPG 金鑰**
-```bash
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-```
-
-**Step 3：新增 Repository**
-```bash
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-```
-
-**Step 4：安裝 Docker Engine**
-```bash
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
-
-**Step 5：驗證安裝**
-```bash
-sudo docker run hello-world
-```
-
-### 3.6 卸載 Docker
+### 3.5 卸載 Docker
 
 如果需要卸載 Docker，只需兩步：
 
 ```bash
 # Step 1：卸載 Docker 套件
-sudo yum remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-get remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Step 2：刪除 Docker 資源目錄
 sudo rm -rf /var/lib/docker
@@ -278,7 +231,7 @@ sudo rm -rf /var/lib/containerd
 
 Docker 的所有資源（映像檔、容器、Volume 等）都存放在 `/var/lib/docker`，這是 Docker 的預設工作路徑。刪除這個目錄就能徹底清除所有 Docker 資料。
 
-### 3.7 讓非 root 使用者執行 Docker
+### 3.6 讓非 root 使用者執行 Docker
 
 預設只有 root 可以執行 docker 命令。要讓一般使用者也能用：
 
@@ -623,7 +576,7 @@ docker info | grep -A 5 "Registry Mirrors"
 
 **Linux 安裝**
 - 使用官方 Repository
-- CentOS 用 yum，Ubuntu 用 apt
+- 以 Ubuntu 的 apt 流程為主
 - 啟動 Docker 服務
 - 設定非 root 使用者權限
 

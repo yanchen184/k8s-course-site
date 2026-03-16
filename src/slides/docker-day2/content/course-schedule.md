@@ -34,20 +34,20 @@
 
 | 時段 | 內容 | 講課時間 | 實作/測驗 | 備註 |
 |------|------|----------|-----------|------|
-| Hour 8 | 映像檔深入理解 | 55 分鐘 | +10 分鐘操作 | |
-| Hour 9 | 容器生命週期管理 | 55 分鐘 | +10 分鐘操作 | |
+| Hour 8 | Volume 資料持久化 | 50 分鐘 | +10 分鐘操作 | Named Volume / Bind Mount / tmpfs |
+| Hour 9 | 容器網路與 Port Mapping 進階 | 50 分鐘 | +10 分鐘操作 | bridge/host/none、自訂網路、DNS |
 | **休息** | | | 10 分鐘 | |
-| Hour 10 | 容器網路基礎 | 45 分鐘 | +15 分鐘操作 | 網路概念需多練習 |
-| Hour 11 | Port Mapping 進階 | 55 分鐘 | +10 分鐘操作 | |
+| Hour 10 | Dockerfile 基礎 | 50 分鐘 | +10 分鐘操作 | 全部指令、CMD vs ENTRYPOINT |
+| Hour 11 | Dockerfile 進階與最佳化 | 50 分鐘 | +10 分鐘操作 | Multi-stage、Best Practices、docker push |
 | **午休** | | | 60 分鐘 | |
-| Hour 12 | Volume 資料持久化 | 50 分鐘 | +15 分鐘操作 | |
-| Hour 13 | Dockerfile 入門 | 45 分鐘 | +15 分鐘操作 | 第一個 Dockerfile |
+| Hour 12 | Dockerfile 實戰與映像檔發佈 | 50 分鐘 | +15 分鐘操作 | Node.js+TS、Spring Boot、troubleshooting |
+| Hour 13 | Docker Compose 基礎與進階 | 50 分鐘 | +10 分鐘操作 | compose.yaml、networks、depends_on |
 | **休息** | | | 10 分鐘 | |
-| Hour 14 | Dockerfile 實戰與總結 | 40 分鐘 | +20 分鐘操作 | Multi-stage 實作 |
+| Hour 14 | Docker Compose 實戰與課程總結 | 45 分鐘 | +15 分鐘操作 | WordPress 部落格系統、K8s 銜接 |
 
 **Day 3 總計**：
 - 講課：約 5.8 小時
-- 實作/測驗：約 1.5 小時
+- 實作/測驗：約 1.3 小時
 - 休息：30 分鐘
 
 ---
@@ -132,52 +132,55 @@ docker cp 自己的檔案 container:/path
 
 ### Day 3
 
-**Hour 8：操作（10 分鐘）**
+**Hour 8：Volume 操作（10 分鐘）**
 ```bash
-docker history nginx:alpine
-docker images  # 比較大小
-docker save / docker tag
+docker volume create my-data
+docker run -d -v my-data:/var/lib/mysql mysql:8
+# 刪容器 → 新容器掛同 volume → 驗證資料還在
 ```
 
-**Hour 9：操作（10 分鐘）**
+**Hour 9：網路操作（10 分鐘）**
 ```bash
-# 生命週期：create → start → pause → stop
-docker run --memory 64m ...
-docker stats
+docker network create my-net
+docker run -d --name web --network my-net nginx
+docker run -d --name db --network my-net mysql:8
+# 用容器名稱互 ping
 ```
 
-**Hour 10：操作（15 分鐘）**
+**Hour 10：Dockerfile 操作（10 分鐘）**
 ```bash
-docker network create test-net
-# 兩容器在同網路
-# 用名稱互相 ping
+# 寫第一個 Dockerfile（Python Flask）
+docker build -t my-app .
+docker run -p 5000:5000 my-app
 ```
 
-**Hour 11：操作（10 分鐘）**
+**Hour 11：Dockerfile 進階操作（10 分鐘）**
 ```bash
-# 三種 port mapping
--p 8081:80
--p 127.0.0.1:8082:80
--P
+# Multi-stage Build
+# 比較單階段 vs 多階段映像檔大小
+docker push username/my-app:v1
 ```
 
-**Hour 12：操作（15 分鐘）**
+**Hour 12：Dockerfile 實戰（15 分鐘）**
 ```bash
-docker volume create my-vol
-# 寫資料 → 刪容器 → 新容器 → 驗證資料還在
+# Node.js + TypeScript 生產級 Dockerfile
+# Spring Boot Dockerfile
+# troubleshooting 練習
 ```
 
-**Hour 13：操作（15 分鐘）**
+**Hour 13：Docker Compose 操作（10 分鐘）**
 ```bash
-# 寫第一個 Dockerfile
-# docker build
-# docker run
+# 三層架構：Nginx + Node.js + MySQL
+docker compose up -d
+docker compose logs -f
+docker compose down
 ```
 
-**Hour 14：操作（20 分鐘）**
+**Hour 14：Compose 實戰（15 分鐘）**
 ```bash
-# Multi-stage Dockerfile
-# 比較單階段 vs 多階段大小
+# WordPress + Nginx + MySQL + Redis 部落格系統
+docker compose up -d
+# 驗證四個服務正常運作
 ```
 
 ---

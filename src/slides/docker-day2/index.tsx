@@ -260,4 +260,6 @@ function buildSlidesForHours(minHour: number, maxHour: number): Slide[] {
 
 export const dockerDay2Slides: Slide[] = slideSpecs.map(buildSlide)
 export const dockerDay2MorningSlides = buildSlidesForHours(1, 3)
-export const dockerDay2AfternoonSlides = buildSlidesForHours(4, 14)
+export const dockerDay2AfternoonSlides = buildSlidesForHours(4, 7)
+export const dockerDay3MorningSlides = buildSlidesForHours(8, 10)
+export const dockerDay3AfternoonSlides = buildSlidesForHours(11, 14)

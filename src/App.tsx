@@ -80,7 +80,7 @@ const LESSONS = [
   {
     id: 'lesson3-morning',
     label: '第三堂 早上',
-    title: '容器進階操作',
+    title: 'Volume、容器網路、Dockerfile 基礎',
     time: '09:00–12:00',
     day: '第三天',
     getSlides: async () => {
@@ -91,7 +91,7 @@ const LESSONS = [
   {
     id: 'lesson3-afternoon',
     label: '第三堂 下午',
-    title: '容器資料管理',
+    title: 'Dockerfile 進階實戰、Docker Compose',
     time: '13:00–17:00',
     day: '第三天',
     getSlides: async () => {

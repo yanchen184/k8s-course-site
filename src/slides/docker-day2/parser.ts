@@ -782,10 +782,12 @@ export function buildDockerDay2SlideSpecs(
         collectKeyLines(extractLeadBody(section.body), 3),
         cards,
       )
-      const phase = hour <= 3 ? 'morning' : 'afternoon'
+      const phase = sourceDay === 2
+        ? (hour <= 3 ? 'morning' : 'afternoon')
+        : (hour <= 10 ? 'morning' : 'afternoon')
       const subtitlePrefix = sourceDay === 2
         ? `Day 2 ${phase === 'morning' ? '上午' : '下午'}`
-        : 'Day 3 擴充'
+        : `Day 3 ${phase === 'morning' ? '上午' : '下午'}`
       const sectionDuration = normalizedDurations[index] ?? 1
 
       if (isCodeHeavySection(summary, cards, section.body)) {

@@ -790,45 +790,37 @@ export function buildDockerDay2SlideSpecs(
         : `Day 3 ${phase === 'morning' ? '上午' : '下午'}`
       const sectionDuration = normalizedDurations[index] ?? 1
 
-      if (isCodeHeavySection(summary, cards, section.body)) {
-        const outlineChunks = extractStepChunks(section.body, section.title)
-        const fullChunks = matchingFullSection
-          ? extractStepChunks(matchingFullSection.body, matchingFullSection.title)
-          : []
-        const alignedNotes = alignChunkNotes(outlineChunks, fullChunks)
-        const chunkDurations = allocateChunkDurations(sectionDuration, outlineChunks.length)
+      // Always split into chunks (one slide per ### sub-section)
+      const outlineChunks = extractStepChunks(section.body, section.title)
+      const fullChunks = matchingFullSection
+        ? extractStepChunks(matchingFullSection.body, matchingFullSection.title)
+        : []
+      const alignedNotes = alignChunkNotes(outlineChunks, fullChunks)
+      const chunkDurations = allocateChunkDurations(sectionDuration, outlineChunks.length)
 
-        outlineChunks.forEach((chunk, chunkIndex) => {
-          specs.push({
-            hour,
-            hourTitle: hourMeta.title,
-            phase,
-            title: chunk.isIntro ? section.title : chunk.title,
-            subtitle: `${subtitlePrefix} · Hour ${hour} · ${section.title}`,
-            section: `Hour ${hour}｜${hourMeta.title}`,
-            duration: String(chunkDurations[chunkIndex] ?? 0),
-            summary: deriveChunkSummary(chunk.body, 3),
-            cards: [],
-            code: extractFirstCodeBlock(chunk.body),
-            notes: cleanNotes(alignedNotes[chunkIndex] ?? chunk.body),
-          })
+      outlineChunks.forEach((chunk, chunkIndex) => {
+        const chunkSummary = deriveChunkSummary(chunk.body, 3)
+        const chunkSubSections = extractLevelThreeSections(chunk.body)
+        const chunkCards = chunkSubSections
+          .map((sub) => ({
+            title: sub.title,
+            bullets: collectKeyLines(sub.body, 3),
+          }))
+          .filter((card) => card.bullets.length > 0)
+
+        specs.push({
+          hour,
+          hourTitle: hourMeta.title,
+          phase,
+          title: chunk.isIntro ? section.title : chunk.title,
+          subtitle: `${subtitlePrefix} · Hour ${hour} · ${section.title}`,
+          section: `Hour ${hour}｜${hourMeta.title}`,
+          duration: String(chunkDurations[chunkIndex] ?? 0),
+          summary: chunkSummary,
+          cards: chunkCards,
+          code: extractFirstCodeBlock(chunk.body),
+          notes: cleanNotes(alignedNotes[chunkIndex] ?? chunk.body),
         })
-
-        return
-      }
-
-      specs.push({
-        hour,
-        hourTitle: hourMeta.title,
-        phase,
-        title: section.title,
-        subtitle: `${subtitlePrefix} · Hour ${hour}`,
-        section: `Hour ${hour}｜${hourMeta.title}`,
-        duration: String(sectionDuration),
-        summary,
-        cards,
-        code: extractFirstCodeBlock(section.body),
-        notes: cleanNotes(matchingFullSection?.body ?? section.body),
       })
     })
   }

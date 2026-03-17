@@ -585,6 +585,7 @@ function App() {
   const audienceWindowRef = useRef<Window | null>(null)
   const recorderWindowRef = useRef<Window | null>(null)
   const recorderWindowReadyRef = useRef(false)
+  const recorderWindowLoadRequestRef = useRef(0)
   const pendingAudienceSlideRef = useRef<number | null>(null)
   const pendingAudienceScrollProgressRef = useRef<number | null>(null)
   const pendingPresenterScrollProgressRef = useRef<number | null>(null)
@@ -800,6 +801,8 @@ function App() {
       }
 
       recorderWindowReadyRef.current = true
+      recorderWindowLoadRequestRef.current += 1
+      setIsRecorderWindowPreparing(false)
       setIsRecorderWindowReady(true)
       setRecordingUiError(null)
     }
@@ -1064,6 +1067,60 @@ function App() {
     })
   }, [])
 
+  const resetRecorderWindowState = useCallback(() => {
+    recorderWindowLoadRequestRef.current += 1
+    recorderWindowReadyRef.current = false
+    setIsRecorderWindowPreparing(false)
+    setIsRecorderWindowReady(false)
+  }, [])
+
+  const watchRecorderWindowReady = useCallback(() => {
+    const nextLoadRequestId = recorderWindowLoadRequestRef.current + 1
+    recorderWindowLoadRequestRef.current = nextLoadRequestId
+    setIsRecorderWindowPreparing(true)
+
+    void (async () => {
+      const isReady = await waitForRecorderWindowReady()
+      if (recorderWindowLoadRequestRef.current !== nextLoadRequestId) {
+        return
+      }
+
+      setIsRecorderWindowPreparing(false)
+
+      if (!isReady && recorderWindowRef.current && !recorderWindowRef.current.closed && !recorderWindowReadyRef.current) {
+        setRecordingUiError('Recorder window did not finish loading. Reopen it and try again.')
+      }
+    })()
+  }, [waitForRecorderWindowReady])
+
+  const prepareRecorderWindow = useCallback(() => {
+    if (!sessionId) {
+      return false
+    }
+
+    if (recorderWindowRef.current && !recorderWindowRef.current.closed) {
+      if (!recorderWindowReadyRef.current) {
+        setRecordingUiError(null)
+        watchRecorderWindowReady()
+      }
+
+      return true
+    }
+
+    setRecordingUiError(null)
+    recorderWindowReadyRef.current = false
+    setIsRecorderWindowReady(false)
+
+    const recorderWindow = openRecorderWindow(sessionId)
+    if (!recorderWindow) {
+      resetRecorderWindowState()
+      return false
+    }
+
+    watchRecorderWindowReady()
+    return true
+  }, [openRecorderWindow, resetRecorderWindowState, sessionId, watchRecorderWindowReady])
+
   const startPresenterMode = useCallback(() => {
     const activeSessionId = sessionId ?? createSessionId()
     const activeControlToken = createSessionId()
@@ -1075,11 +1132,9 @@ function App() {
     setSessionStartedAt(Date.now())
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
     setRecordingUiError(null)
-    setIsRecorderWindowPreparing(false)
-    setIsRecorderWindowReady(false)
-    recorderWindowReadyRef.current = false
+    resetRecorderWindowState()
     resetCompletedRecording()
-  }, [openAudienceWindow, presenterAudienceAccessMode, resetCompletedRecording, sessionId])
+  }, [openAudienceWindow, presenterAudienceAccessMode, resetCompletedRecording, resetRecorderWindowState, sessionId])
 
   const reopenAudienceWindow = useCallback(() => {
     if (!sessionId || !controlToken) {
@@ -1153,7 +1208,7 @@ function App() {
       recorderWindowRef.current.close()
     }
     recorderWindowRef.current = null
-    recorderWindowReadyRef.current = false
+    resetRecorderWindowState()
     clearPresenterControlToken(sessionId)
     setViewMode('single')
     setSessionId(null)
@@ -1165,10 +1220,8 @@ function App() {
     setManualAudienceUrl(null)
     setCopyAudienceUrlState('idle')
     setRecordingUiError(null)
-    setIsRecorderWindowPreparing(false)
-    setIsRecorderWindowReady(false)
     setPresenterSyncStatus('idle')
-  }, [currentLesson, currentSlide, postPresentationMessage, recordingStatus, sessionId, stopRecording])
+  }, [currentLesson, currentSlide, postPresentationMessage, recordingStatus, resetRecorderWindowState, sessionId, stopRecording])
 
   const closeEndPresenterConfirm = useCallback(() => {
     setIsEndPresenterConfirmOpen(false)
@@ -1614,9 +1667,7 @@ function App() {
       }
 
       recorderWindowRef.current = null
-      recorderWindowReadyRef.current = false
-      setIsRecorderWindowReady(false)
-      setIsRecorderWindowPreparing(false)
+      resetRecorderWindowState()
 
       if (recordingStatus === 'recording' || recordingStatus === 'paused' || recordingStatus === 'finishing') {
         void abortRecording('Recorder window closed. Reopen it and try again.')
@@ -1626,7 +1677,7 @@ function App() {
     }, 1000)
 
     return () => window.clearInterval(recorderMonitorTimer)
-  }, [abortRecording, isPresenterModeEnabled, isRecorderWindowPreparing, isRecorderWindowReady, recordingStatus])
+  }, [abortRecording, isPresenterModeEnabled, isRecorderWindowPreparing, isRecorderWindowReady, recordingStatus, resetRecorderWindowState])
 
   useEffect(() => {
     if (!isRemoteConsumerView) {
@@ -2032,37 +2083,6 @@ function App() {
     : null
   const recordingFeedbackMessage = recordingError ?? recordingUiError ?? recordingCapabilityMessage
 
-  const ensureRecorderWindowReady = useCallback(async () => {
-    if (!sessionId) {
-      return false
-    }
-
-    if (recorderWindowRef.current && !recorderWindowRef.current.closed && recorderWindowReadyRef.current) {
-      return true
-    }
-
-    setIsRecorderWindowPreparing(true)
-    setRecordingUiError(null)
-    recorderWindowReadyRef.current = false
-    setIsRecorderWindowReady(false)
-
-    const recorderWindow = openRecorderWindow(sessionId)
-    if (!recorderWindow) {
-      setIsRecorderWindowPreparing(false)
-      return false
-    }
-
-    const isReady = await waitForRecorderWindowReady()
-    setIsRecorderWindowPreparing(false)
-
-    if (!isReady) {
-      setRecordingUiError('Recorder window did not finish loading. Reopen it and try again.')
-      return false
-    }
-
-    return true
-  }, [openRecorderWindow, sessionId, waitForRecorderWindowReady])
-
   const handleStartRecording = useCallback(() => {
     if (!isPresenterModeEnabled || !sessionId) {
       return
@@ -2073,15 +2093,15 @@ function App() {
         resetCompletedRecording()
       }
 
-      const recorderReady = await ensureRecorderWindowReady()
-      if (!recorderReady) {
+      const recorderWindowPrepared = prepareRecorderWindow()
+      if (!recorderWindowPrepared) {
         return
       }
 
       setRecordingUiError(null)
       await startRecording()
     })()
-  }, [ensureRecorderWindowReady, isPresenterModeEnabled, recordingStatus, resetCompletedRecording, sessionId, startRecording])
+  }, [isPresenterModeEnabled, prepareRecorderWindow, recordingStatus, resetCompletedRecording, sessionId, startRecording])
 
   const handleRetryRecording = useCallback(() => {
     if (!isPresenterModeEnabled) {

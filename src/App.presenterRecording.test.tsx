@@ -390,6 +390,27 @@ describe('App presenter recording', () => {
     })
   }, PRESENTER_RECORDING_TEST_TIMEOUT)
 
+  it('starts the first recording attempt before the recorder window finishes loading', async () => {
+    render(<App />)
+
+    await startPresenter()
+
+    const startButton = await screen.findByRole('button', { name: /start recording/i })
+    fireEvent.click(startButton)
+
+    await waitFor(() => {
+      expect(showDirectoryPickerMock).toHaveBeenCalledTimes(1)
+    })
+
+    emitRecorderReady()
+
+    await waitFor(() => {
+      expect(getDisplayMediaMock).toHaveBeenCalledTimes(1)
+      expect(getUserMediaMock).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: /pause recording/i })).toBeTruthy()
+    })
+  }, PRESENTER_RECORDING_TEST_TIMEOUT)
+
   it('shows a capability warning when long recording support is unavailable', async () => {
     Object.defineProperty(window, 'showDirectoryPicker', {
       configurable: true,

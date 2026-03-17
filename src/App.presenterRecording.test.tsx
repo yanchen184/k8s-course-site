@@ -110,14 +110,21 @@ class MockMediaRecorder {
 }
 
 let sendMessageMock: ReturnType<typeof vi.fn>
-let popupWindow: Window & {
+let audienceWindow: Window & {
   close: ReturnType<typeof vi.fn>
 }
-let popupWindowState: { closed: boolean }
+let audienceWindowState: { closed: boolean }
+let recorderWindow: Window & {
+  close: ReturnType<typeof vi.fn>
+}
+let recorderWindowState: { closed: boolean }
 let getDisplayMediaMock: ReturnType<typeof vi.fn>
 let getUserMediaMock: ReturnType<typeof vi.fn>
-let createObjectUrlMock: ReturnType<typeof vi.fn>
-let revokeObjectUrlMock: ReturnType<typeof vi.fn>
+let showDirectoryPickerMock: ReturnType<typeof vi.fn>
+let getFileHandleMock: ReturnType<typeof vi.fn>
+let createWritableMock: ReturnType<typeof vi.fn>
+let writeMock: ReturnType<typeof vi.fn>
+let closeWritableMock: ReturnType<typeof vi.fn>
 
 const PRESENTER_RECORDING_TEST_TIMEOUT = 15000
 
@@ -146,18 +153,28 @@ function installMediaMocks() {
     },
   })
 
-  createObjectUrlMock = vi.fn(() => 'blob:recording-download')
-  revokeObjectUrlMock = vi.fn()
-  Object.defineProperty(URL, 'createObjectURL', {
-    configurable: true,
-    value: createObjectUrlMock,
-  })
-  Object.defineProperty(URL, 'revokeObjectURL', {
-    configurable: true,
-    value: revokeObjectUrlMock,
-  })
-
   return { displayTrack, audioTrack }
+}
+
+function installDirectoryPickerMocks() {
+  writeMock = vi.fn(async () => {})
+  closeWritableMock = vi.fn(async () => {})
+  createWritableMock = vi.fn(async () => ({
+    write: writeMock,
+    close: closeWritableMock,
+  }))
+  getFileHandleMock = vi.fn(async () => ({
+    createWritable: createWritableMock,
+  }))
+  showDirectoryPickerMock = vi.fn(async () => ({
+    name: 'Recorder Output',
+    getFileHandle: getFileHandleMock,
+  }))
+
+  Object.defineProperty(window, 'showDirectoryPicker', {
+    configurable: true,
+    value: showDirectoryPickerMock,
+  })
 }
 
 async function startPresenter(): Promise<void> {
@@ -168,10 +185,28 @@ async function startPresenter(): Promise<void> {
   })
 }
 
+function emitRecorderReady(sessionId = '00000000-0000-4000-8000-000000000001') {
+  window.dispatchEvent(new MessageEvent('message', {
+    origin: window.location.origin,
+    data: {
+      type: 'k8s-course-recorder-ready',
+      sessionId,
+    },
+    source: recorderWindow as MessageEventSource,
+  }))
+}
+
 async function startRecording(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: /start recording/i }))
 
   await waitFor(() => {
+    expect(screen.getByText(/preparing recorder/i)).toBeTruthy()
+  })
+
+  emitRecorderReady()
+
+  await waitFor(() => {
+    expect(showDirectoryPickerMock).toHaveBeenCalledTimes(1)
     expect(getDisplayMediaMock).toHaveBeenCalledTimes(1)
     expect(getUserMediaMock).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: /pause recording/i })).toBeTruthy()
@@ -184,16 +219,28 @@ describe('App presenter recording', () => {
     window.history.replaceState({}, '', '/admin')
     MockMediaRecorder.reset()
     installMediaMocks()
+    installDirectoryPickerMocks()
 
-    popupWindowState = { closed: false }
-    popupWindow = {
+    audienceWindowState = { closed: false }
+    audienceWindow = {
       close: vi.fn(function close() {
-        popupWindowState.closed = true
+        audienceWindowState.closed = true
       }),
     } as unknown as Window & { close: ReturnType<typeof vi.fn> }
-    Object.defineProperty(popupWindow, 'closed', {
+    Object.defineProperty(audienceWindow, 'closed', {
       configurable: true,
-      get: () => popupWindowState.closed,
+      get: () => audienceWindowState.closed,
+    })
+
+    recorderWindowState = { closed: false }
+    recorderWindow = {
+      close: vi.fn(function close() {
+        recorderWindowState.closed = true
+      }),
+    } as unknown as Window & { close: ReturnType<typeof vi.fn> }
+    Object.defineProperty(recorderWindow, 'closed', {
+      configurable: true,
+      get: () => recorderWindowState.closed,
     })
 
     Object.defineProperty(window, 'matchMedia', {
@@ -225,7 +272,13 @@ describe('App presenter recording', () => {
       sendMessage: sendMessageMock,
     })
 
-    vi.spyOn(window, 'open').mockImplementation(() => popupWindow)
+    vi.spyOn(window, 'open').mockImplementation((_url, target) => {
+      if (typeof target === 'string' && target.startsWith('k8s-recorder-')) {
+        return recorderWindow
+      }
+
+      return audienceWindow
+    })
 
     let nextId = 0
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
@@ -273,7 +326,7 @@ describe('App presenter recording', () => {
     })
   }, PRESENTER_RECORDING_TEST_TIMEOUT)
 
-  it('finalizes the recording and shows a download link after stop', async () => {
+  it('stops the recording and reports the output folder after saving segmented files', async () => {
     render(<App />)
 
     await startPresenter()
@@ -281,13 +334,13 @@ describe('App presenter recording', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /stop recording/i }))
 
-    const downloadLink = await screen.findByRole('link', { name: /download recording/i })
-    expect(createObjectUrlMock).toHaveBeenCalledTimes(1)
-    expect(downloadLink.getAttribute('href')).toBe('blob:recording-download')
-    expect(downloadLink.getAttribute('download')).toMatch(/^k8s-course-presenter-/)
+    await waitFor(() => {
+      expect(screen.getByText(/saved segmented recording files to recorder output/i)).toBeTruthy()
+    })
+    expect(getFileHandleMock).toHaveBeenCalledWith(expect.stringMatching(/part-001\.webm$/), { create: true })
   }, PRESENTER_RECORDING_TEST_TIMEOUT)
 
-  it('stops the recording before ending presenter mode and keeps the download available', async () => {
+  it('stops the recording before ending presenter mode and closes the recorder window', async () => {
     render(<App />)
 
     await startPresenter()
@@ -295,14 +348,16 @@ describe('App presenter recording', () => {
 
     const recorder = MockMediaRecorder.instances[0]
     fireEvent.click(screen.getByRole('button', { name: /end presenter \(p\)/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^end presenter$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^end presenter$/i }))
+
+    await waitFor(() => {
+      expect(recorder?.stop).toHaveBeenCalledTimes(1)
+      expect(recorderWindow.close).toHaveBeenCalledTimes(1)
+    })
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start presenter \(p\)/i })).toBeTruthy()
     })
-
-    expect(recorder?.stop).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('link', { name: /download recording/i })).toBeTruthy()
   }, PRESENTER_RECORDING_TEST_TIMEOUT)
 
   it('shows a retry action when microphone access is denied', async () => {
@@ -324,13 +379,19 @@ describe('App presenter recording', () => {
     fireEvent.click(await screen.findByRole('button', { name: /start recording/i }))
 
     await waitFor(() => {
+      expect(screen.getByText(/preparing recorder/i)).toBeTruthy()
+    })
+
+    emitRecorderReady()
+
+    await waitFor(() => {
       expect(screen.getByText(/recording needs screen sharing and microphone access/i)).toBeTruthy()
       expect(screen.getByRole('button', { name: /retry recording/i })).toBeTruthy()
     })
   }, PRESENTER_RECORDING_TEST_TIMEOUT)
 
-  it('shows unsupported recording state without blocking presenter mode', async () => {
-    Object.defineProperty(globalThis, 'MediaRecorder', {
+  it('shows a capability warning when long recording support is unavailable', async () => {
+    Object.defineProperty(window, 'showDirectoryPicker', {
       configurable: true,
       value: undefined,
     })
@@ -338,12 +399,24 @@ describe('App presenter recording', () => {
     render(<App />)
 
     await startPresenter()
-    fireEvent.click(await screen.findByRole('button', { name: /start recording/i }))
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /end presenter \(p\)/i })).toBeTruthy()
-      expect(screen.getByText(/recording is unavailable in this browser/i)).toBeTruthy()
-      expect(screen.getByRole('button', { name: /retry recording/i })).toBeTruthy()
+      expect(screen.getByText(/long recording requires chromium and local folder write access/i)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /start recording/i })).toBeNull()
     })
   }, PRESENTER_RECORDING_TEST_TIMEOUT)
+
+  it('renders a dedicated slide-only recording view', async () => {
+    window.history.replaceState({}, '', '/admin?view=recording&session=demo-session#lesson1-morning')
+
+    render(<App />)
+
+    expect(screen.getByText(/recorder window/i)).toBeTruthy()
+    expect(screen.getByText(/slide-only recording surface/i)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /kubernetes 入門/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /start presenter/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /share link/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /next slide/i })).toBeNull()
+  })
 })

@@ -8,6 +8,7 @@ import { usePresentationChannel } from './hooks/usePresentationChannel'
 import { usePresenterRecording } from './hooks/usePresenterRecording'
 import {
   buildAudienceViewUrl,
+  buildRecordingViewUrl,
   canAudienceControlPresenter,
   createPresentationMessage,
   isPresenterBroadcastMessage,
@@ -405,6 +406,10 @@ function buildAudienceUrl(
   return buildAudienceViewUrl(window.location.href, sessionId, lessonId, options)
 }
 
+function buildRecordingUrl(sessionId: string, lessonId: string): string {
+  return buildRecordingViewUrl(window.location.href, sessionId, lessonId)
+}
+
 function buildPresenterControlStorageKey(sessionId: string): string {
   return `k8s-course-presenter-control:${sessionId}`
 }
@@ -474,6 +479,8 @@ const FALLBACK_ERROR_SLIDE: Slide = {
 
 const MOBILE_BREAKPOINT = 768
 const SLIDE_RAIL_VISIBLE_COUNT = 11
+const RECORDER_WINDOW_READY_MESSAGE = 'k8s-course-recorder-ready'
+const RECORDER_WINDOW_FEATURES = 'popup=yes,width=1180,height=900'
 
 function getElementScrollProgress(element: { scrollTop: number; scrollHeight: number; clientHeight: number } | null): number {
   if (!element) {
@@ -556,7 +563,7 @@ function App() {
   const [audienceConnectionState, setAudienceConnectionState] = useState<
     'loading' | 'connected' | 'disconnected' | 'missing-session' | 'unsupported' | 'invalid-control-link' | 'expired-control-link'
   >(
-    viewMode === 'audience' && !sessionId ? 'missing-session' : 'loading',
+    (viewMode === 'audience' || viewMode === 'recording') && !sessionId ? 'missing-session' : 'loading',
   )
   const [presenterError, setPresenterError] = useState<string | null>(null)
   const [manualAudienceUrl, setManualAudienceUrl] = useState<string | null>(null)
@@ -572,7 +579,12 @@ function App() {
   const [clockTick, setClockTick] = useState(() => Date.now())
   const [timerPaused, setTimerPaused] = useState(false)
   const [pausedElapsed, setPausedElapsed] = useState(0)
+  const [isRecorderWindowPreparing, setIsRecorderWindowPreparing] = useState(false)
+  const [isRecorderWindowReady, setIsRecorderWindowReady] = useState(false)
+  const [recordingUiError, setRecordingUiError] = useState<string | null>(null)
   const audienceWindowRef = useRef<Window | null>(null)
+  const recorderWindowRef = useRef<Window | null>(null)
+  const recorderWindowReadyRef = useRef(false)
   const pendingAudienceSlideRef = useRef<number | null>(null)
   const pendingAudienceScrollProgressRef = useRef<number | null>(null)
   const pendingPresenterScrollProgressRef = useRef<number | null>(null)
@@ -592,6 +604,8 @@ function App() {
   const presenterNotesScrollRef = useRef<HTMLDivElement | null>(null)
   const presenterSlideScrollRef = useRef<HTMLDivElement | null>(null)
   const isAudienceView = viewMode === 'audience'
+  const isRecordingView = viewMode === 'recording'
+  const isRemoteConsumerView = isAudienceView || isRecordingView
   const shouldRenderSidebar = shouldShowSidebar(viewMode)
   const isPresenterModeEnabled = viewMode === 'presenter' && Boolean(sessionId)
   const isMobileSidebar = isMobileViewport && shouldRenderSidebar
@@ -605,12 +619,14 @@ function App() {
   const {
     status: recordingStatus,
     error: recordingError,
-    downloadUrl: recordingDownloadUrl,
-    downloadFilename: recordingDownloadFilename,
-    start: startRecording,
+    currentSegmentIndex,
+    outputDirectoryName,
+    isLongRecordingSupported,
+    startLongRecording: startRecording,
     pause: pauseRecording,
     resume: resumeRecording,
     stop: stopRecording,
+    abort: abortRecording,
     resetCompleted: resetCompletedRecording,
   } = usePresenterRecording()
   const isTransportReady = isPresentationTransportActive(transportStatus)
@@ -720,7 +736,7 @@ function App() {
   }, [loadLessonSections])
 
   useEffect(() => {
-    if (isAudienceView) {
+    if (isRemoteConsumerView) {
       return
     }
 
@@ -735,7 +751,7 @@ function App() {
       url.searchParams.delete('control')
     }
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-  }, [isAudienceView, sessionId, viewMode])
+  }, [isRemoteConsumerView, sessionId, viewMode])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
@@ -769,6 +785,41 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return
+      }
+
+      const data = event.data as { type?: string, sessionId?: string } | null
+      if (!data || data.type !== RECORDER_WINDOW_READY_MESSAGE || data.sessionId !== sessionId) {
+        return
+      }
+
+      if (event.source !== recorderWindowRef.current) {
+        return
+      }
+
+      recorderWindowReadyRef.current = true
+      setIsRecorderWindowReady(true)
+      setRecordingUiError(null)
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!isRecordingView || !window.opener) {
+      return
+    }
+
+    window.opener.postMessage({
+      type: RECORDER_WINDOW_READY_MESSAGE,
+      sessionId,
+    }, window.location.origin)
+  }, [isRecordingView, sessionId])
+
+  useEffect(() => {
     if (!isPresenterModeEnabled || timerPaused) {
       return
     }
@@ -795,7 +846,7 @@ function App() {
     lessonLoadRequestRef.current = requestId
     setLoading(true)
     const pendingSidebarSection = pendingSidebarSectionRef.current
-    if ((!isAudienceView || pendingAudienceSlideRef.current === null)
+    if ((!isRemoteConsumerView || pendingAudienceSlideRef.current === null)
       && pendingSidebarSection?.lessonId !== lesson.id) {
       setCurrentSlide(0)
     }
@@ -808,7 +859,7 @@ function App() {
         const loadedSlides = s as Slide[]
         cacheLessonSections(lesson.id, buildSections(loadedSlides))
         setSlides(loadedSlides)
-        if (isAudienceView && pendingAudienceSlideRef.current !== null) {
+        if (isRemoteConsumerView && pendingAudienceSlideRef.current !== null) {
           const nextIndex = Math.min(Math.max(pendingAudienceSlideRef.current, 0), Math.max(loadedSlides.length - 1, 0))
           setCurrentSlide(nextIndex)
           pendingAudienceSlideRef.current = null
@@ -831,7 +882,7 @@ function App() {
         setSlides([FALLBACK_ERROR_SLIDE])
         setLoading(false)
       })
-  }, [cacheLessonSections, currentLesson, isAudienceView])
+  }, [cacheLessonSections, currentLesson, isRemoteConsumerView])
 
   const goToSlide = useCallback((index: number) => {
     if (index < 0 || index >= slides.length || index === currentSlide) {
@@ -973,6 +1024,46 @@ function App() {
     return openedWindow
   }, [currentLesson])
 
+  const openRecorderWindow = useCallback((activeSessionId: string): Window | null => {
+    const lessonId = LESSONS[currentLesson].id
+    const recorderUrl = buildRecordingUrl(activeSessionId, lessonId)
+    const openedWindow = window.open(recorderUrl, `k8s-recorder-${activeSessionId}`, RECORDER_WINDOW_FEATURES)
+
+    if (!openedWindow) {
+      setRecordingUiError('Recorder window blocked. Allow popups for this site and try again.')
+      setIsRecorderWindowReady(false)
+      recorderWindowReadyRef.current = false
+      return null
+    }
+
+    recorderWindowRef.current = openedWindow
+    setRecordingUiError(null)
+    return openedWindow
+  }, [currentLesson])
+
+  const waitForRecorderWindowReady = useCallback(async () => {
+    if (recorderWindowRef.current && !recorderWindowRef.current.closed && recorderWindowReadyRef.current) {
+      return true
+    }
+
+    return await new Promise<boolean>((resolve) => {
+      const startedAt = Date.now()
+      const timer = window.setInterval(() => {
+        const recorderWindow = recorderWindowRef.current
+        if (recorderWindow && !recorderWindow.closed && recorderWindowReadyRef.current) {
+          window.clearInterval(timer)
+          resolve(true)
+          return
+        }
+
+        if (!recorderWindow || recorderWindow.closed || Date.now() - startedAt > 5000) {
+          window.clearInterval(timer)
+          resolve(false)
+        }
+      }, 100)
+    })
+  }, [])
+
   const startPresenterMode = useCallback(() => {
     const activeSessionId = sessionId ?? createSessionId()
     const activeControlToken = createSessionId()
@@ -983,6 +1074,10 @@ function App() {
     setControlToken(activeControlToken)
     setSessionStartedAt(Date.now())
     setPresenterSyncStatus(openedWindow ? 'connecting' : 'disconnected')
+    setRecordingUiError(null)
+    setIsRecorderWindowPreparing(false)
+    setIsRecorderWindowReady(false)
+    recorderWindowReadyRef.current = false
     resetCompletedRecording()
   }, [openAudienceWindow, presenterAudienceAccessMode, resetCompletedRecording, sessionId])
 
@@ -1037,7 +1132,14 @@ function App() {
   }, [controlToken, currentLesson, currentSlide, isPresenterModeEnabled, openAudienceWindow, postPresenterSyncState, presenterAudienceAccessMode, sessionId])
 
   const stopPresenterMode = useCallback(async () => {
-    if (recordingStatus === 'recording' || recordingStatus === 'paused' || recordingStatus === 'requesting') {
+    if (
+      recordingStatus === 'preparing'
+      || recordingStatus === 'selecting-folder'
+      || recordingStatus === 'requesting-permission'
+      || recordingStatus === 'recording'
+      || recordingStatus === 'paused'
+      || recordingStatus === 'finishing'
+    ) {
       await stopRecording()
     }
 
@@ -1047,6 +1149,11 @@ function App() {
       audienceWindowRef.current.close()
     }
     audienceWindowRef.current = null
+    if (recorderWindowRef.current && !recorderWindowRef.current.closed) {
+      recorderWindowRef.current.close()
+    }
+    recorderWindowRef.current = null
+    recorderWindowReadyRef.current = false
     clearPresenterControlToken(sessionId)
     setViewMode('single')
     setSessionId(null)
@@ -1057,6 +1164,9 @@ function App() {
     setPresenterError(null)
     setManualAudienceUrl(null)
     setCopyAudienceUrlState('idle')
+    setRecordingUiError(null)
+    setIsRecorderWindowPreparing(false)
+    setIsRecorderWindowReady(false)
     setPresenterSyncStatus('idle')
   }, [currentLesson, currentSlide, postPresentationMessage, recordingStatus, sessionId, stopRecording])
 
@@ -1112,6 +1222,10 @@ function App() {
         return
       }
 
+      if (isRecordingView) {
+        return
+      }
+
       if (isEndPresenterConfirmOpen) {
         if (e.key === 'Escape') {
           e.preventDefault()
@@ -1145,7 +1259,7 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [audienceNav, closeEndPresenterConfirm, isAdmin, isAudienceView, isEndPresenterConfirmOpen, isMobileViewport, nextSlide, prevSlide, togglePresenterMode])
+  }, [audienceNav, closeEndPresenterConfirm, isAdmin, isAudienceView, isEndPresenterConfirmOpen, isMobileViewport, isRecordingView, nextSlide, prevSlide, togglePresenterMode])
 
   const slide: Slide = slides[currentSlide] || slides[0]
   const lesson = LESSONS[currentLesson]
@@ -1180,32 +1294,6 @@ function App() {
     : 0
   const elapsedMinutes = Math.floor(elapsedSeconds / 60)
   const elapsedRemainderSeconds = elapsedSeconds % 60
-  const isRecordingVisible = isAdmin && (
-    isPresenterModeEnabled
-    || recordingStatus === 'stopped'
-    || recordingStatus === 'error'
-    || recordingStatus === 'unsupported'
-  )
-  const recordingStatusLabel = recordingStatus === 'recording'
-    ? 'Recording'
-    : recordingStatus === 'paused'
-    ? 'Recording paused'
-    : recordingStatus === 'requesting'
-    ? 'Preparing recording'
-    : recordingStatus === 'stopped'
-    ? 'Recording ready'
-    : recordingStatus === 'idle'
-    ? 'Ready to record'
-    : recordingStatus === 'unsupported'
-    ? 'Recording unavailable'
-    : recordingStatus === 'error'
-    ? 'Recording failed'
-    : 'Recording idle'
-  const canRetryRecording = isPresenterModeEnabled && (recordingStatus === 'error' || recordingStatus === 'unsupported')
-  const canStartRecording = isPresenterModeEnabled && recordingStatus === 'idle'
-  const canPauseRecording = recordingStatus === 'recording'
-  const canResumeRecording = recordingStatus === 'paused'
-  const canStopRecording = recordingStatus === 'recording' || recordingStatus === 'paused'
 
   const toggleTimerPause = useCallback(() => {
     if (timerPaused) {
@@ -1220,7 +1308,7 @@ function App() {
   }, [timerPaused, pausedElapsed, elapsedSeconds])
 
   useEffect(() => {
-    if (isAudienceView && !sessionId) {
+    if (isRemoteConsumerView && !sessionId) {
       setAudienceConnectionState('missing-session')
       return
     }
@@ -1235,15 +1323,15 @@ function App() {
       return
     }
 
-    if (isAudienceView && (transportStatus === 'unsupported' || transportStatus === 'error')) {
+    if (isRemoteConsumerView && (transportStatus === 'unsupported' || transportStatus === 'error')) {
       setAudienceConnectionState('unsupported')
       return
     }
 
-    if (isAudienceView && (!isTransportReady || !hasReceivedInitialSyncRef.current)) {
+    if (isRemoteConsumerView && (!isTransportReady || !hasReceivedInitialSyncRef.current)) {
       setAudienceConnectionState('loading')
     }
-  }, [isAudienceView, isTransportReady, sessionId, transportIssue, transportStatus])
+  }, [isAudienceView, isRemoteConsumerView, isTransportReady, sessionId, transportIssue, transportStatus])
 
   useEffect(() => {
     lastHandledMessageKeyRef.current = null
@@ -1335,7 +1423,7 @@ function App() {
       return
     }
 
-    if (!isAudienceView) {
+    if (!isRemoteConsumerView) {
       return
     }
 
@@ -1369,9 +1457,9 @@ function App() {
     hasReceivedInitialSyncRef.current = true
     lastAudienceSignalAtRef.current = latestMessage.sentAt
     setAudienceConnectionState('connected')
-    if (typeof latestMessage.slideScrollProgress === 'number') {
-      pendingAudienceScrollProgressRef.current = latestMessage.slideScrollProgress
-    }
+      if (isAudienceView && typeof latestMessage.slideScrollProgress === 'number') {
+        pendingAudienceScrollProgressRef.current = latestMessage.slideScrollProgress
+      }
 
     const syncedLessonIndex = LESSONS.findIndex((item) => item.id === latestMessage.lessonId)
     if (syncedLessonIndex === -1) {
@@ -1380,14 +1468,16 @@ function App() {
 
     if (syncedLessonIndex !== currentLesson) {
       pendingAudienceSlideRef.current = latestMessage.slideIndex
-      ensureOutlineLessonVisible(syncedLessonIndex)
+      if (!isRecordingView) {
+        ensureOutlineLessonVisible(syncedLessonIndex)
+      }
       setCurrentLesson(syncedLessonIndex)
       window.location.hash = latestMessage.lessonId
       return
     }
 
     goToSlide(Math.min(Math.max(latestMessage.slideIndex, 0), Math.max(slides.length - 1, 0)))
-    if (latestMessage.slideIndex === currentSlide && typeof latestMessage.slideScrollProgress === 'number') {
+    if (isAudienceView && latestMessage.slideIndex === currentSlide && typeof latestMessage.slideScrollProgress === 'number') {
       applyAudienceScrollProgress(latestMessage.slideScrollProgress)
       pendingAudienceScrollProgressRef.current = null
     }
@@ -1399,11 +1489,14 @@ function App() {
     currentSlide,
     goToSlide,
     isAudienceView,
+    isRecordingView,
+    isRemoteConsumerView,
     isPresenterModeEnabled,
     latestMessage,
     lesson.id,
     ensureOutlineLessonVisible,
     postPresentationMessage,
+    postPresenterSyncState,
     slides.length,
     isTransportReady,
     transportKind,
@@ -1420,15 +1513,15 @@ function App() {
   }, [applyAudienceScrollProgress, currentLesson, currentSlide, isAudienceView, loading])
 
   useEffect(() => {
-    if (isAudienceView || loading || pendingPresenterScrollProgressRef.current === null) {
+    if (isRemoteConsumerView || loading || pendingPresenterScrollProgressRef.current === null) {
       return
     }
 
     applyPresenterSlideScrollProgress(pendingPresenterScrollProgressRef.current)
-  }, [applyPresenterSlideScrollProgress, currentLesson, currentSlide, isAudienceView, loading])
+  }, [applyPresenterSlideScrollProgress, currentLesson, currentSlide, isRemoteConsumerView, loading])
 
   useEffect(() => {
-    if (!isAudienceView || !sessionId || !isTransportReady) {
+    if (!isRemoteConsumerView || !sessionId || !isTransportReady) {
       return
     }
 
@@ -1440,10 +1533,10 @@ function App() {
     }, 2000)
 
     return () => window.clearInterval(retryTimer)
-  }, [isAudienceView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
+  }, [isRemoteConsumerView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
 
   useEffect(() => {
-    if (!isAudienceView || !sessionId || !isTransportReady || audienceConnectionState !== 'connected') {
+    if (!isRemoteConsumerView || !sessionId || !isTransportReady || audienceConnectionState !== 'connected') {
       return
     }
 
@@ -1453,7 +1546,7 @@ function App() {
     }, 2000)
 
     return () => window.clearInterval(heartbeatTimer)
-  }, [audienceConnectionState, currentSlide, isAudienceView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
+  }, [audienceConnectionState, currentSlide, isRemoteConsumerView, isTransportReady, lesson.id, postPresentationMessage, sessionId])
 
   useEffect(() => {
     if (!isAudienceView || !audienceControlsEnabled || !isTransportReady || audienceConnectionState !== 'connected') {
@@ -1506,7 +1599,37 @@ function App() {
   }, [isPresenterModeEnabled])
 
   useEffect(() => {
-    if (!isAudienceView) {
+    if (!isPresenterModeEnabled && !isRecorderWindowPreparing && !isRecorderWindowReady) {
+      return
+    }
+
+    const recorderMonitorTimer = window.setInterval(() => {
+      const recorderWindow = recorderWindowRef.current
+      if (!recorderWindow) {
+        return
+      }
+
+      if (!recorderWindow.closed) {
+        return
+      }
+
+      recorderWindowRef.current = null
+      recorderWindowReadyRef.current = false
+      setIsRecorderWindowReady(false)
+      setIsRecorderWindowPreparing(false)
+
+      if (recordingStatus === 'recording' || recordingStatus === 'paused' || recordingStatus === 'finishing') {
+        void abortRecording('Recorder window closed. Reopen it and try again.')
+      } else if (recordingStatus === 'preparing' || recordingStatus === 'selecting-folder' || recordingStatus === 'requesting-permission') {
+        setRecordingUiError('Recorder window closed before recording could start.')
+      }
+    }, 1000)
+
+    return () => window.clearInterval(recorderMonitorTimer)
+  }, [abortRecording, isPresenterModeEnabled, isRecorderWindowPreparing, isRecorderWindowReady, recordingStatus])
+
+  useEffect(() => {
+    if (!isRemoteConsumerView) {
       return
     }
 
@@ -1520,7 +1643,7 @@ function App() {
     }, 1000)
 
     return () => window.clearInterval(disconnectMonitorTimer)
-  }, [isAudienceView])
+  }, [isRemoteConsumerView])
 
   useEffect(() => {
     if (isPresenterModeEnabled && !sessionStartedAt) {
@@ -1537,7 +1660,7 @@ function App() {
   }, [isPresenterModeEnabled, presenterSyncStatus, sessionStartedAt])
 
   useEffect(() => {
-    if (!isAudienceView) {
+    if (!isRemoteConsumerView) {
       hasReceivedInitialSyncRef.current = false
       lastAudienceSignalAtRef.current = null
       return
@@ -1548,7 +1671,7 @@ function App() {
     if (sessionId) {
       setAudienceConnectionState('loading')
     }
-  }, [isAudienceView, sessionId])
+  }, [isRemoteConsumerView, sessionId])
 
   useEffect(() => {
     if (copyAudienceUrlState === 'idle') {
@@ -1861,20 +1984,113 @@ function App() {
     ? 'Anyone with this link can control presenter navigation.'
     : 'Audience members can view slides but cannot control navigation.'
   const canRotateControlLink = isPresenterModeEnabled && Boolean(sessionId)
+  const recordingStatusLabel = isRecorderWindowPreparing
+    ? 'Preparing recorder'
+    : recordingStatus === 'recording'
+    ? `Recording part ${String(Math.max(currentSegmentIndex, 1)).padStart(2, '0')}`
+    : recordingStatus === 'paused'
+    ? 'Paused'
+    : recordingStatus === 'preparing'
+    ? 'Preparing recording'
+    : recordingStatus === 'selecting-folder'
+    ? 'Selecting folder'
+    : recordingStatus === 'requesting-permission'
+    ? 'Preparing capture'
+    : recordingStatus === 'finishing'
+    ? 'Finishing current part'
+    : recordingStatus === 'stopped'
+    ? 'Recording saved'
+    : recordingStatus === 'storage-unavailable'
+    ? 'Storage unavailable'
+    : recordingStatus === 'unsupported'
+    ? 'Recording unavailable'
+    : recordingStatus === 'error'
+    ? 'Recording failed'
+    : 'Ready to record'
+  const isRecordingVisible = isAdmin && (
+    isPresenterModeEnabled
+    || isRecorderWindowPreparing
+    || recordingStatus === 'stopped'
+    || recordingStatus === 'error'
+    || recordingStatus === 'unsupported'
+    || recordingStatus === 'storage-unavailable'
+  )
+  const canRetryRecording = isPresenterModeEnabled && (
+    recordingStatus === 'error'
+    || recordingStatus === 'unsupported'
+    || recordingStatus === 'storage-unavailable'
+  )
+  const canStartRecording = isPresenterModeEnabled
+    && isLongRecordingSupported
+    && !isRecorderWindowPreparing
+    && (recordingStatus === 'idle' || recordingStatus === 'stopped')
+  const canPauseRecording = recordingStatus === 'recording'
+  const canResumeRecording = recordingStatus === 'paused'
+  const canStopRecording = recordingStatus === 'recording' || recordingStatus === 'paused'
+  const recordingCapabilityMessage = isPresenterModeEnabled && !isLongRecordingSupported
+    ? 'Long recording requires Chromium and local folder write access.'
+    : null
+  const recordingFeedbackMessage = recordingError ?? recordingUiError ?? recordingCapabilityMessage
+
+  const ensureRecorderWindowReady = useCallback(async () => {
+    if (!sessionId) {
+      return false
+    }
+
+    if (recorderWindowRef.current && !recorderWindowRef.current.closed && recorderWindowReadyRef.current) {
+      return true
+    }
+
+    setIsRecorderWindowPreparing(true)
+    setRecordingUiError(null)
+    recorderWindowReadyRef.current = false
+    setIsRecorderWindowReady(false)
+
+    const recorderWindow = openRecorderWindow(sessionId)
+    if (!recorderWindow) {
+      setIsRecorderWindowPreparing(false)
+      return false
+    }
+
+    const isReady = await waitForRecorderWindowReady()
+    setIsRecorderWindowPreparing(false)
+
+    if (!isReady) {
+      setRecordingUiError('Recorder window did not finish loading. Reopen it and try again.')
+      return false
+    }
+
+    return true
+  }, [openRecorderWindow, sessionId, waitForRecorderWindowReady])
+
   const handleStartRecording = useCallback(() => {
-    if (!isPresenterModeEnabled) {
+    if (!isPresenterModeEnabled || !sessionId) {
       return
     }
 
-    void startRecording()
-  }, [isPresenterModeEnabled, startRecording])
+    void (async () => {
+      if (recordingStatus === 'stopped') {
+        resetCompletedRecording()
+      }
+
+      const recorderReady = await ensureRecorderWindowReady()
+      if (!recorderReady) {
+        return
+      }
+
+      setRecordingUiError(null)
+      await startRecording()
+    })()
+  }, [ensureRecorderWindowReady, isPresenterModeEnabled, recordingStatus, resetCompletedRecording, sessionId, startRecording])
+
   const handleRetryRecording = useCallback(() => {
     if (!isPresenterModeEnabled) {
       return
     }
 
-    void startRecording()
-  }, [isPresenterModeEnabled, startRecording])
+    resetCompletedRecording()
+    void handleStartRecording()
+  }, [handleStartRecording, isPresenterModeEnabled, resetCompletedRecording])
   if (isAudienceView) {
     return (
       <AudienceView
@@ -1889,6 +2105,74 @@ function App() {
         onPrev={handleAudiencePrev}
         onNext={handleAudienceNext}
       />
+    )
+  }
+
+  if (isRecordingView) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_35%),linear-gradient(180deg,_#020617_0%,_#020617_40%,_#0f172a_100%)] px-4 py-5 text-white sm:px-6 sm:py-7">
+        <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-[1120px] flex-col gap-6">
+          <div className="rounded-[1.9rem] border border-slate-800/80 bg-slate-950/75 px-5 py-4 shadow-[0_18px_45px_rgba(2,6,23,0.22)] sm:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-3xl">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">Recorder Window</p>
+                <h1 className="mt-3 text-[1.95rem] font-semibold leading-tight text-slate-50 sm:text-[2.5rem]">{lesson.label}</h1>
+                <p className="mt-3 text-[0.98rem] leading-7 text-slate-300">
+                  Slide-only recording surface for the active presenter session.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:pt-1">
+                <span className="rounded-full border border-slate-700/70 bg-slate-900/65 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-100">
+                  {slide.section || 'Active slide'}
+                </span>
+                <span className="rounded-full border border-slate-700/70 bg-slate-900/65 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-100">
+                  {currentSlide + 1} / {slides.length}
+                </span>
+                <span className="rounded-full border border-slate-700/70 bg-slate-900/65 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-100">
+                  {elapsedMinutes}:{elapsedRemainderSeconds.toString().padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 rounded-[2rem] border border-slate-800/80 bg-slate-950/72 px-5 py-6 shadow-[0_24px_60px_rgba(2,6,23,0.2)] sm:px-8 sm:py-8">
+            <div className="mx-auto flex h-full max-w-[960px] flex-col">
+              <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-slate-800/80 pb-4">
+                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+                  {slide.section || 'Current slide'}
+                </span>
+                <span className="rounded-full border border-slate-700/80 bg-slate-900/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                  {slide.duration || '2'} min
+                </span>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+                <div className="mx-auto w-full max-w-[76ch]">
+                  <h2 className="text-[2.2rem] font-semibold leading-tight text-slate-50 sm:text-[2.8rem]">
+                    {slide.title}
+                  </h2>
+
+                  {slide.subtitle && (
+                    <p className="mt-4 text-[1.18rem] leading-8 text-slate-300 sm:text-[1.3rem]">
+                      {slide.subtitle}
+                    </p>
+                  )}
+
+                  <div className="mt-8 space-y-5 text-[1.18rem] leading-[2.05] text-slate-100 sm:text-[1.28rem]">
+                    {slide.content}
+                  </div>
+
+                  {slide.code && (
+                    <pre className="mt-8 overflow-x-auto rounded-[1.5rem] border border-slate-800/80 bg-black/45 p-5 text-[1rem] leading-8 text-green-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <code className="font-mono">{slide.code}</code>
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -2988,23 +3272,25 @@ function App() {
                   <ToolbarStatusItem
                     label={recordingStatusLabel}
                     tone={
-                      recordingStatus === 'recording'
+                      isRecorderWindowPreparing || recordingStatus === 'preparing' || recordingStatus === 'selecting-folder' || recordingStatus === 'requesting-permission'
+                        ? 'info'
+                        : recordingStatus === 'recording'
                         ? 'danger'
                         : recordingStatus === 'paused'
                         ? 'warning'
                         : recordingStatus === 'stopped'
                         ? 'success'
-                        : recordingStatus === 'unsupported' || recordingStatus === 'error'
+                        : recordingStatus === 'unsupported' || recordingStatus === 'storage-unavailable' || recordingStatus === 'error'
                         ? 'danger'
                         : 'neutral'
                     }
                     icon={
-                      recordingStatus === 'recording'
+                      isRecorderWindowPreparing || recordingStatus === 'preparing' || recordingStatus === 'selecting-folder' || recordingStatus === 'requesting-permission'
+                        ? 'record-preparing'
+                        : recordingStatus === 'recording'
                         ? 'recording'
                         : recordingStatus === 'paused'
                         ? 'record-paused'
-                        : recordingStatus === 'requesting'
-                        ? 'record-preparing'
                         : recordingStatus === 'stopped'
                         ? 'record-done'
                         : recordingStatus === 'idle'
@@ -3031,16 +3317,6 @@ function App() {
                     }} />
                   )}
 
-                  {recordingStatus === 'stopped' && recordingDownloadUrl && recordingDownloadFilename && (
-                    <ToolbarStatusButton
-                      label="Download Recording"
-                      tone="info"
-                      icon="download"
-                      href={recordingDownloadUrl}
-                      download={recordingDownloadFilename}
-                    />
-                  )}
-
                   {canRetryRecording && (
                     <ToolbarStatusButton label="Retry Recording" tone="info" icon="refresh" onClick={handleRetryRecording} />
                   )}
@@ -3048,10 +3324,24 @@ function App() {
               )}
             </div>
 
-            {isRecordingVisible && recordingError && (
-              <p className="mt-2 text-sm text-rose-300">
-                {recordingError}
-              </p>
+            {isRecordingVisible && (
+              <div className="mt-2 space-y-1 text-sm">
+                {recordingFeedbackMessage && (
+                  <p className="text-rose-300">
+                    {recordingFeedbackMessage}
+                  </p>
+                )}
+                {recordingStatus === 'stopped' && outputDirectoryName && (
+                  <p className="text-emerald-300">
+                    Saved segmented recording files to {outputDirectoryName}.
+                  </p>
+                )}
+                {recordingStatus === 'recording' && outputDirectoryName && (
+                  <p className="text-slate-400">
+                    Writing 10-minute WebM segments to {outputDirectoryName}.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

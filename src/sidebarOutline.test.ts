@@ -91,6 +91,7 @@ describe('sidebarOutline helpers', () => {
     expect(shouldShowSidebar('single')).toBe(true)
     expect(shouldShowSidebar('presenter')).toBe(true)
     expect(shouldShowSidebar('audience')).toBe(false)
+    expect(shouldShowSidebar('recording')).toBe(false)
   })
 
   it('keeps manual outline state while revealing the synced lesson and day', () => {

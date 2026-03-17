@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAudienceViewUrl,
+  buildRecordingViewUrl,
   canAudienceControlPresenter,
   createPresentationMessage,
   isFreshPresentationMessage,
@@ -28,6 +29,7 @@ describe('presentation helpers', () => {
   it('parses view, session, and control token from the URL query', () => {
     expect(parseViewMode('?view=presenter')).toBe('presenter')
     expect(parseViewMode('?view=audience')).toBe('audience')
+    expect(parseViewMode('?view=recording')).toBe('recording')
     expect(parseViewMode('?view=unknown')).toBe('single')
 
     expect(parseSessionId('?session=demo-session')).toBe('demo-session')
@@ -54,6 +56,16 @@ describe('presentation helpers', () => {
         { accessMode: 'control', controlToken: 'demo-control' },
       ),
     ).toBe('https://example.com/k8s-course-site/admin?view=audience&session=demo-session&control=demo-control#lesson2-afternoon')
+  })
+
+  it('builds recording URLs without control tokens', () => {
+    expect(
+      buildRecordingViewUrl(
+        'https://example.com/k8s-course-site/admin?view=presenter&session=current&control=should-not-leak#lesson1-morning',
+        'demo-session',
+        'lesson2-afternoon',
+      ),
+    ).toBe('https://example.com/k8s-course-site/admin?view=recording&session=demo-session#lesson2-afternoon')
   })
 
   it('only enables audience control when audience mode has both session and control token', () => {

@@ -22,7 +22,7 @@ export interface OutlineLessonRef {
 }
 
 export function shouldShowSidebar(viewMode: ViewMode): boolean {
-  return viewMode !== 'audience'
+  return viewMode !== 'audience' && viewMode !== 'recording'
 }
 
 export function expandLessonInOutline(expandedLessons: ReadonlySet<string>, lessonId: string): Set<string> {

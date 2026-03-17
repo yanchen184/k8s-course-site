@@ -55,6 +55,7 @@ class MockMediaRecorder {
   static isTypeSupported = vi.fn(() => true)
 
   state: 'inactive' | 'recording' | 'paused' = 'inactive'
+  onerror: ((event: Event) => void) | null = null
   ondataavailable: ((event: { data: Blob }) => void) | null = null
   onstop: (() => void) | null = null
   start: ReturnType<typeof vi.fn>
@@ -89,6 +90,9 @@ class MockMediaRecorder {
 
 let getDisplayMediaMock: ReturnType<typeof vi.fn>
 let getUserMediaMock: ReturnType<typeof vi.fn>
+let showDirectoryPickerMock: ReturnType<typeof vi.fn>
+let recorderWindow: Window
+const TOOLBAR_STATUS_TEST_TIMEOUT = 15000
 
 function installMediaMocks() {
   const displayTrack = new MockMediaStreamTrack('video')
@@ -115,14 +119,19 @@ function installMediaMocks() {
     },
   })
 
-  Object.defineProperty(URL, 'createObjectURL', {
-    configurable: true,
-    value: vi.fn(() => 'blob:recording-download'),
-  })
+  showDirectoryPickerMock = vi.fn(async () => ({
+    name: 'Recorder Output',
+    getFileHandle: vi.fn(async () => ({
+      createWritable: vi.fn(async () => ({
+        write: vi.fn(async () => {}),
+        close: vi.fn(async () => {}),
+      })),
+    })),
+  }))
 
-  Object.defineProperty(URL, 'revokeObjectURL', {
+  Object.defineProperty(window, 'showDirectoryPicker', {
     configurable: true,
-    value: vi.fn(),
+    value: showDirectoryPickerMock,
   })
 }
 
@@ -132,6 +141,17 @@ async function startPresenter() {
   await waitFor(() => {
     expect(screen.getByRole('button', { name: /end presenter \(p\)/i })).toBeTruthy()
   })
+}
+
+function emitRecorderReady() {
+  window.dispatchEvent(new MessageEvent('message', {
+    origin: window.location.origin,
+    data: {
+      type: 'k8s-course-recorder-ready',
+      sessionId: '00000000-0000-4000-8000-000000000001',
+    },
+    source: recorderWindow as MessageEventSource,
+  }))
 }
 
 describe('App toolbar status icons', () => {
@@ -169,10 +189,21 @@ describe('App toolbar status icons', () => {
       sendMessage: vi.fn(() => true),
     })
 
-    vi.spyOn(window, 'open').mockImplementation(() => ({
+    recorderWindow = {
       closed: false,
       close: vi.fn(),
-    }) as unknown as Window)
+    } as unknown as Window
+
+    vi.spyOn(window, 'open').mockImplementation((_url, target) => {
+      if (typeof target === 'string' && target.startsWith('k8s-recorder-')) {
+        return recorderWindow
+      }
+
+      return {
+        closed: false,
+        close: vi.fn(),
+      } as unknown as Window
+    })
 
     let nextId = 0
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
@@ -202,7 +233,7 @@ describe('App toolbar status icons', () => {
       expect(screen.getByRole('img', { name: 'Presenter only' })).toBeTruthy()
     })
     expect(screen.queryByRole('img', { name: 'Both can switch' })).toBeNull()
-  }, 10000)
+  }, TOOLBAR_STATUS_TEST_TIMEOUT)
 
   it('renders recording controls as icon-only actions and keeps them clickable', async () => {
     render(<App />)
@@ -214,15 +245,15 @@ describe('App toolbar status icons', () => {
     fireEvent.click(startButton)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /pause recording/i })).toBeTruthy()
+      expect(screen.getByText(/preparing recorder/i)).toBeTruthy()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /pause recording/i }))
+    emitRecorderReady()
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /resume recording/i })).toBeTruthy()
+      expect(showDirectoryPickerMock).toHaveBeenCalledTimes(1)
     })
-  }, 10000)
+  }, TOOLBAR_STATUS_TEST_TIMEOUT)
 
   it('includes desktop tooltip containers for icon-only toolbar items', async () => {
     render(<App />)

@@ -1,4 +1,4 @@
-export type ViewMode = 'presenter' | 'audience' | 'single'
+export type ViewMode = 'presenter' | 'audience' | 'recording' | 'single'
 export type PresentationSenderRole = 'presenter' | 'audience'
 export type AudienceLinkAccessMode = 'read-only' | 'control'
 export const MAX_PRESENTATION_MESSAGE_AGE_MS = 30_000
@@ -32,7 +32,7 @@ function isPresentationSenderRole(value: unknown): value is PresentationSenderRo
 
 export function parseViewMode(search: string): ViewMode {
   const view = new URLSearchParams(search).get('view')
-  if (view === 'presenter' || view === 'audience') {
+  if (view === 'presenter' || view === 'audience' || view === 'recording') {
     return view
   }
   return 'single'
@@ -74,6 +74,19 @@ export function buildAudienceViewUrl(
     url.searchParams.delete('control')
   }
 
+  url.hash = lessonId
+  return url.toString()
+}
+
+export function buildRecordingViewUrl(
+  currentUrl: string,
+  sessionId: string,
+  lessonId: string,
+): string {
+  const url = new URL(currentUrl)
+  url.searchParams.set('view', 'recording')
+  url.searchParams.set('session', sessionId)
+  url.searchParams.delete('control')
   url.hash = lessonId
   return url.toString()
 }

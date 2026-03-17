@@ -6,7 +6,7 @@ import { createElement } from 'react'
 import {
   buildPresenterNoteBlocks,
   getPresenterNotesMetrics,
-} from './PresenterNotesPanel'
+} from './presenterNotesHelpers'
 import PresenterNotesPanel from './PresenterNotesPanel'
 
 afterEach(() => {

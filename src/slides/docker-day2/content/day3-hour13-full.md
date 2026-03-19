@@ -1011,6 +1011,73 @@ services:
 
 多個服務跑在同一台機器的時候，資源限制可以防止某個服務把所有資源吃光。我見過有個 Java 應用吃掉 8GB 記憶體，把同機器的 MySQL 擠到 OOM（Out of Memory）直接掛掉。設了 memory limit 就不會發生這種事。
 
+#### Profiles — 按需啟動
+
+最後講一個很實用的功能——`profiles`。有些服務你不是每次都需要啟動。比如 debug 工具、資料庫管理介面、效能監控——開發時偶爾用，但不想每次 `docker compose up` 都跑起來。
+
+```yaml
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+
+  # 只在需要時啟動
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    profiles:
+      - debug
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "8025:8025"
+    profiles:
+      - debug
+```
+
+平常 `docker compose up` 只會啟動 `web` 和 `api`。要用 debug 工具的時候：
+
+```bash
+docker compose --profile debug up
+```
+
+這樣 adminer 和 mailhog 也會一起啟動。不需要的時候就不跑，乾淨俐落。
+
+這比 `docker compose up web api`（手動指定要啟動的服務）方便多了，因為你不用記住哪些是核心服務、哪些是可選的——compose.yaml 裡已經標好了。
+
+#### Logging — 容器日誌管理
+
+這裡要提一個生產環境的**必備知識**——日誌管理。
+
+Docker 預設用 `json-file` 日誌驅動，容器的所有 stdout/stderr 都會存成 JSON 檔案。問題是：**預設沒有大小限制。** 也就是說，如果你的應用瘋狂寫 log，那個日誌檔案會無限長大，最終撐爆你的磁碟。
+
+我不是在嚇你。我見過有人生產環境的伺服器磁碟爆掉，一查發現是某個容器的日誌佔了 80 GB。
+
+解法很簡單，在 compose.yaml 裡面加上日誌限制：
+
+```yaml
+services:
+  api:
+    image: my-api
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"    # 每個日誌檔案最大 10 MB
+        max-file: "3"      # 最多保留 3 個檔案（輪替）
+```
+
+這樣每個容器的日誌最多佔 30 MB（10 MB × 3 個檔案），寫滿就自動輪替，不會撐爆磁碟。
+
+**建議：** 生產環境的每一個容器都要設定 logging limits。這不是可選的，是必須的。
+
 #### command 覆蓋 CMD
 
 ```yaml

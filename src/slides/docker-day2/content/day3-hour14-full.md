@@ -321,6 +321,8 @@ volumes:
 
 **再看 WordPress 服務。** 環境變數用 `${}` 語法從 .env 檔案讀取，沒有寫死。volumes 用了 named volume `wordpress-data` 來持久化 `/var/www/html` 目錄，這裡面放的是 WordPress 的所有檔案，包括你上傳的圖片、安裝的佈景主題和外掛。它同時加入 frontend 和 backend 兩個網路，因為它是中間的橋樑。depends_on 設定了要等 MySQL healthy、Redis started 才啟動。它自己也有 healthcheck，用 curl 去測 localhost:80 有沒有回應。
 
+> 💡 **注意：** 設定 `WP_REDIS_HOST` 和 `WP_REDIS_PORT` 環境變數只是告訴 WordPress「Redis 在哪裡」，但 WordPress 本身不會自動使用 Redis。你需要在 WordPress 後台安裝 **Redis Object Cache** 外掛，並在外掛設定中啟用，WordPress 才會真正把快取存到 Redis。
+
 **MySQL 服務**在 backend 網路裡面。注意看它的 healthcheck，用的是 `mysqladmin ping` 這個指令，這是 MySQL 官方提供的健康檢查方式。`start_period: 30s` 是說啟動後前 30 秒不算失敗，因為 MySQL 啟動需要時間做初始化。
 
 **Redis 服務**也在 backend 網路。它的 command 額外加了 `--maxmemory 64mb --maxmemory-policy allkeys-lru`，意思是最多用 64MB 記憶體，滿了之後自動淘汰最久沒用的資料。這是 Redis 快取的標準配法。
@@ -553,7 +555,7 @@ docker compose up -d
 
 ## 四、Docker Compose vs 手動 docker run 對比（5 分鐘）
 
-好，到這裡 Docker Compose 的內容全部講完了。我們來做一個對比，讓大家真正感受到 Compose 幫了你多少忙。
+好，到這裡 Docker Compose 的內容全部講完了。這個我們在上一堂課已經對比過了，這裡快速帶過重點就好。
 
 ### 4.1 對比表
 
@@ -569,73 +571,9 @@ docker compose up -d
 | **團隊協作** | 寫一堆腳本或文件 | 共享一個 compose.yaml |
 | **版本控制** | 腳本很難管理 | YAML 是純文字，放 Git |
 
-### 4.2 手動方式有多痛苦？
+### 4.2 快速回顧：手動方式有多痛苦？
 
-如果不用 Compose，剛才那個部落格系統要這樣啟動：
-
-```bash
-# 建立兩個網路
-docker network create blog-frontend
-docker network create blog-backend
-
-# 建立三個 Volume
-docker volume create blog-mysql-data
-docker volume create blog-wordpress-data
-docker volume create blog-redis-data
-
-# 啟動 Redis
-docker run -d --name blog-redis \
-  --network blog-backend \
-  -v blog-redis-data:/data \
-  --restart unless-stopped \
-  redis:7-alpine redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
-
-# 啟動 MySQL
-docker run -d --name blog-mysql \
-  --network blog-backend \
-  -v blog-mysql-data:/var/lib/mysql \
-  -e MYSQL_ROOT_PASSWORD=my-secret-root-pw \
-  -e MYSQL_DATABASE=wordpress \
-  -e MYSQL_USER=wp_user \
-  -e MYSQL_PASSWORD=wp_password_123 \
-  --restart unless-stopped \
-  mysql:8.0
-
-# 等 MySQL 起來...你要自己 sleep 或手動檢查
-
-# 啟動 WordPress（注意，一個容器不能同時加兩個網路！）
-docker run -d --name blog-wordpress \
-  --network blog-backend \
-  -v blog-wordpress-data:/var/www/html \
-  -e WORDPRESS_DB_HOST=blog-mysql:3306 \
-  -e WORDPRESS_DB_USER=wp_user \
-  -e WORDPRESS_DB_PASSWORD=wp_password_123 \
-  -e WORDPRESS_DB_NAME=wordpress \
-  --restart unless-stopped \
-  wordpress:6-php8.2-apache
-
-# 還要額外連接第二個網路
-docker network connect blog-frontend blog-wordpress
-
-# 啟動 Nginx
-docker run -d --name blog-nginx \
-  --network blog-frontend \
-  -p 80:80 \
-  -v $(pwd)/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro \
-  --restart unless-stopped \
-  nginx:alpine
-```
-
-天啊，這得打多少行指令？而且你注意到一個很讓人抓狂的問題沒有——`docker run` 的 `--network` 參數只能指定一個網路！如果一個容器要加入兩個網路，你還得事後用 `docker network connect` 再接一次。
-
-清理的時候更痛苦：
-
-```bash
-docker stop blog-nginx blog-wordpress blog-mysql blog-redis
-docker rm blog-nginx blog-wordpress blog-mysql blog-redis
-docker network rm blog-frontend blog-backend
-# Volume 要不要刪？你確定嗎？要一個一個確認...
-```
+上堂課我們已經示範過了——四個服務用 `docker run` 要打將近 30 行指令：建兩個網路、三個 Volume、四個 `docker run`，而且 `--network` 一次只能指定一個網路，WordPress 要加兩個網路還得額外跑 `docker network connect`。清理時也要一個一個 stop、rm、network rm。
 
 對比一下 Compose：啟動 `docker compose up -d`，清理 `docker compose down`。結案。
 

@@ -147,6 +147,14 @@ CMD ["curl", "--version"]
 
 ### 2.2 docker build 完整流程
 
+> 💡 **關於建構輸出格式：** 如果你跟著做的時候，看到的輸出格式跟我畫面上不太一樣——比如你看到 `[1/3] FROM...` 而不是 `Step 1/3`——那是因為你用的是 **BuildKit**（Docker 的新一代建構引擎）。現在的 Docker Desktop 預設就是 BuildKit。功能更強、速度更快，只是輸出長得不一樣。不用擔心，本質上做的事情完全一樣。
+>
+> 如果你想看到更詳細的建構日誌（例如 RUN 指令的完整輸出），可以加 `--progress=plain`：
+>
+> ```bash
+> docker build --progress=plain -t my-app .
+> ```
+
 Dockerfile 寫好了，接下來用 `docker build` 把它建構成 Image：
 
 ```bash
@@ -603,6 +611,15 @@ docker build --build-arg PYTHON_VERSION=3.10 -t my-app .
 docker build --build-arg APP_ENV=development -t my-app .
 ```
 
+> ⚠️ **注意：** FROM 之前定義的 ARG，在 FROM 之後就失效了。如果你需要在 FROM 之後使用同一個 ARG，必須在 FROM 之後再宣告一次（不需要給預設值，它會繼承）：
+>
+> ```dockerfile
+> ARG PYTHON_VERSION=3.11
+> FROM python:${PYTHON_VERSION}
+> ARG PYTHON_VERSION  # 重新宣告才能在後面使用
+> RUN echo "Building with Python ${PYTHON_VERSION}"
+> ```
+
 但是容器跑起來之後：
 
 ```bash
@@ -704,7 +721,44 @@ docker port <container_id>
 
 所以 EXPOSE 雖然「不做事」，但它是一個好的文件習慣。建議你們在 Dockerfile 裡都加上。
 
-### 3.7 CMD vs ENTRYPOINT（重點中的重點！）
+### 3.7 LABEL — 標籤（Metadata）
+
+好，接下來講一個簡單但很實用的指令——`LABEL`。
+
+`LABEL` 就是幫你的 Image 加上標籤，記錄一些後設資料。比如這個 Image 是誰維護的、版本號是多少、用途是什麼：
+
+```dockerfile
+LABEL maintainer="bob@company.com"
+LABEL version="1.2.3"
+LABEL description="公司內部員工管理系統"
+```
+
+或者寫成一行（減少 Layer 數量）：
+
+```dockerfile
+LABEL maintainer="bob@company.com" \
+      version="1.2.3" \
+      description="公司內部員工管理系統"
+```
+
+你可能會想：「這有什麼用？我不加也能跑啊。」
+
+沒錯，LABEL 不影響容器的運行。但當你的公司有幾十個 Image 的時候，`docker inspect` 看到這些標籤，馬上就知道這個 Image 是誰負責的、什麼版本、幹嘛用的。特別是在 CI/CD 流程裡面，自動打上 Git commit hash 和建構時間，排查問題的時候超方便：
+
+```dockerfile
+LABEL org.opencontainers.image.source="https://github.com/company/my-app"
+LABEL org.opencontainers.image.created="2026-03-19T10:30:00Z"
+```
+
+查看方式：
+
+```bash
+docker inspect --format '{{json .Config.Labels}}' my-image
+```
+
+好，LABEL 就這麼簡單。記住一個原則：**生產環境的 Image 都應該加 LABEL，至少加 maintainer 和 version。** 這是團隊協作的基本功。
+
+### 3.8 CMD vs ENTRYPOINT（重點中的重點！）
 
 好了，接下來是整堂課最重要的部分。CMD 和 ENTRYPOINT 是 Dockerfile 裡面最容易搞混的兩個指令，也是面試最愛問的。我要花多一點時間來講。
 
@@ -958,7 +1012,7 @@ CMD ["https://google.com"]
 >
 > **一句話總結：CMD 會被 `docker run` 後面的參數完全覆蓋，ENTRYPOINT 則是把參數附加上去。**
 
-### 3.8 USER：指定執行身份
+### 3.9 USER：指定執行身份
 
 `USER` 指定後續指令要用哪個使用者身份執行。
 
@@ -989,7 +1043,7 @@ CMD ["python", "app.py"]
 
 注意 USER 的位置：要放在 `apt-get install` 和 `pip install` **之後**，因為安裝套件需要 root 權限。先用 root 把該裝的裝好，最後才切換到普通使用者執行你的應用程式。
 
-### 3.9 VOLUME：在 Dockerfile 中宣告掛載點
+### 3.10 VOLUME：在 Dockerfile 中宣告掛載點
 
 `VOLUME` 宣告這個容器有某些目錄的資料需要被持久化。
 
@@ -1012,7 +1066,7 @@ docker run -v mysql-data:/var/lib/mysql mysql:8.0
 
 因為匿名 Volume 的名字是一串亂碼，很難管理。Dockerfile 裡的 VOLUME 更像是一種「提醒」——告訴使用者「嘿，這個目錄的資料很重要，記得掛載！」
 
-### 3.10 HEALTHCHECK：健康檢查
+### 3.11 HEALTHCHECK：健康檢查
 
 `HEALTHCHECK` 讓 Docker 可以定期檢查容器裡的服務是否正常運作。
 
@@ -1046,7 +1100,7 @@ docker ps
 
 寫在 Dockerfile 裡的好處是：所有用這個 Image 跑的容器都**自動**有健康檢查，不需要每次 `docker run` 時手動加。後面學 Docker Compose 和 Swarm 的時候，健康檢查會變得更加重要。
 
-### 3.11 指令總覽
+### 3.12 指令總覽
 
 把所有指令彙整成一張表：
 
@@ -1060,6 +1114,7 @@ docker ps
 | ENV | 設定環境變數 | ✅ |
 | ARG | 建構時參數 | ❌ |
 | EXPOSE | 宣告埠號 | ❌ |
+| LABEL | 加上後設資料標籤 | ❌ |
 | CMD | 容器預設命令 | ❌ |
 | ENTRYPOINT | 容器主程序 | ❌ |
 | USER | 指定執行身份 | ❌ |
@@ -1368,6 +1423,7 @@ docker rm my-flask
 | ENV | 環境變數（容器內也有） | 刺青 |
 | ARG | 建構參數（建構完就沒了） | 貼紙 |
 | EXPOSE | 宣告埠號（只是文件） | 門牌 |
+| LABEL | 加標籤（後設資料） | 名片 |
 | CMD | 預設命令（可被覆蓋） | 預設鈴聲 |
 | ENTRYPOINT | 主程序（參數附加） | 咖啡機 |
 | USER | 指定執行身份 | 安全帽 |

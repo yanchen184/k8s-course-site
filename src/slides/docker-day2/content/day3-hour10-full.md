@@ -22,7 +22,7 @@
 
 - **第一堂（就是今天）：Dockerfile 基礎** —— 把所有指令學會，能寫出可以用的 Dockerfile
 - **第二堂：Dockerfile 進階與最佳化** —— 學會寫出「好的」Dockerfile，Image 又小又安全
-- **第三堂：實戰應用** —— 打包真實的多語言專案，整合 CI/CD
+- **第三堂：實戰應用** —— 打包真實專案（Node.js + TypeScript、Spring Boot），學會常見問題排查
 
 好，我們先回到那個問題：怎麼把自己的程式碼打包成 Image？
 
@@ -395,7 +395,7 @@ Shell Form 會被包在 `/bin/sh -c` 裡面執行，所以你可以用 `&&`、`|
 所以**不要**這樣寫：
 
 ```dockerfile
-# ❌ 不好：三個 RUN = 三個 Layer
+# ❌ 不好：四個 RUN = 四個 Layer
 RUN apt-get update
 RUN apt-get install -y curl
 RUN apt-get install -y vim

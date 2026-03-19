@@ -8,7 +8,7 @@
 
 我們先回顧一下前兩堂課講了什麼。
 
-**第十小時**，我們把 Dockerfile 的所有指令走了一遍——FROM、RUN、COPY、ADD、WORKDIR、ENV、ARG、EXPOSE、CMD、ENTRYPOINT、USER、VOLUME、HEALTHCHECK、LABEL。然後我們用這些指令動手打包了一個 Python Flask 應用，從無到有把 Dockerfile 寫出來，build、run，整個流程跑了一次。那堂課結束的時候，你們應該已經有能力「寫出一個能用的 Dockerfile」了。
+**第十小時**，我們把 Dockerfile 的所有指令走了一遍——FROM、RUN、COPY、ADD、WORKDIR、ENV、ARG、EXPOSE、CMD、ENTRYPOINT、USER、VOLUME、HEALTHCHECK。然後我們用這些指令動手打包了一個 Python Flask 應用，從無到有把 Dockerfile 寫出來，build、run，整個流程跑了一次。那堂課結束的時候，你們應該已經有能力「寫出一個能用的 Dockerfile」了。
 
 **第十一小時**，我們往上提升了一個層次——學了 .dockerignore 來控制 build context、學了一系列 Best Practices 讓 Dockerfile 更專業，最重要的是學了 Multi-stage Build 這個大殺器，還有怎麼把映像檔推上 Docker Hub。那堂課結束的時候，你們應該有能力「寫出一個優化過的 Dockerfile」了。
 
@@ -1253,7 +1253,7 @@ docker exec my-container id
 
 **第十小時——基礎指令**：
 
-我們認識了 Dockerfile 的每一個指令。FROM、RUN、COPY、ADD、CMD、ENTRYPOINT、ENV、ARG、EXPOSE、VOLUME、WORKDIR、USER、HEALTHCHECK、LABEL。
+我們認識了 Dockerfile 的每一個指令。FROM、RUN、COPY、ADD、CMD、ENTRYPOINT、ENV、ARG、EXPOSE、VOLUME、WORKDIR、USER、HEALTHCHECK。
 
 那堂課結束後，你會的是：**寫出一個能跑的 Dockerfile。**
 

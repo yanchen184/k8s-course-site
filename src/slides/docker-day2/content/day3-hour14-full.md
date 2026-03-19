@@ -657,7 +657,7 @@ docker network rm blog-frontend blog-backend
 
 **Hour 11：Dockerfile 進階與最佳化。** Multi-stage build、Build Cache 優化、安全性最佳實踐、.dockerignore。一句話總結：**能寫出又小又安全的 Dockerfile。**
 
-**Hour 12：Dockerfile 實戰 + 除錯。** 打包多語言專案（Node.js、Python、Java、Go），學會排查常見的 build 和 runtime 問題。一句話總結：**能打包真實專案並解決問題。**
+**Hour 12：Dockerfile 實戰 + 除錯。** 打包了 Node.js + TypeScript 和 Spring Boot Java 兩個真實專案，學會排查常見的 build 和 runtime 問題。一句話總結：**能打包真實專案並解決問題。**
 
 **Hour 13：Docker Compose 基礎與進階。** 學了 Compose 的語法、networks、environment、depends_on、build 整合，還有多網路隔離架構。一句話總結：**能用 YAML 管理多容器應用。**
 
@@ -676,12 +676,12 @@ docker network rm blog-frontend blog-backend
 | Day 2 | Hour 5 | 基本指令（下） | stop、rm、logs、exec |
 | Day 2 | Hour 6 | Nginx 實戰 | Port mapping、Volume 初體驗 |
 | Day 2 | Hour 7 | 實作練習 | 綜合應用 |
-| Day 3 | Hour 8 | 映像檔深入 | 分層結構、快取機制 |
-| Day 3 | Hour 9 | 容器生命週期 | 狀態管理、資源限制 |
-| Day 3 | Hour 10 | 容器網路 | Bridge、Host、自訂網路 |
-| Day 3 | Hour 11 | Port Mapping 進階 | 綁定策略、防火牆 |
-| Day 3 | Hour 12 | Volume 持久化 | 三種掛載、備份還原 |
-| Day 3 | Hour 13 | Dockerfile + Compose | 寫 Dockerfile、管理多容器 |
+| Day 3 | Hour 8 | Volume 資料持久化 | 三種掛載、備份還原 |
+| Day 3 | Hour 9 | 容器網路 + Port Mapping 進階 | Bridge、Host、自訂網路、綁定策略 |
+| Day 3 | Hour 10 | Dockerfile 基礎 | 所有指令、Build Cache |
+| Day 3 | Hour 11 | Dockerfile 進階與最佳化 | Multi-stage、Best Practices |
+| Day 3 | Hour 12 | Dockerfile 實戰 + 除錯 | 打包真實專案、問題排查 |
+| Day 3 | Hour 13 | Docker Compose 基礎與進階 | YAML 語法、Networks、depends_on |
 | Day 3 | Hour 14 | Compose 實戰 + 總結 | 部署完整應用、後續學習 |
 
 ### 5.3 Docker 完整工作流程

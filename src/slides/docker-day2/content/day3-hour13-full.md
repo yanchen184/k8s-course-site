@@ -1222,6 +1222,34 @@ docker compose down -v
 > 2. 瀏覽器訪問 `http://localhost:9090` 確認 Nginx 預設頁面
 > 3. 用 `docker compose exec cache redis-cli ping` 測試 Redis（應該回覆 PONG）
 > 4. 用 `docker compose down` 清理
+>
+> **參考答案：**
+>
+> ```yaml
+> # ~/compose-practice/compose.yaml
+> services:
+>   web:
+>     image: nginx:alpine
+>     ports:
+>       - "9090:80"
+>     restart: unless-stopped
+>
+>   cache:
+>     image: redis:7-alpine
+>     ports:
+>       - "6379:6379"
+>     restart: unless-stopped
+> ```
+>
+> 操作與驗證：
+> ```bash
+> cd ~/compose-practice
+> docker compose up -d
+> docker compose ps                              # 確認兩個服務都 Up
+> curl http://localhost:9090                      # 看到 Nginx 歡迎頁面
+> docker compose exec cache redis-cli ping       # 應回覆 PONG
+> docker compose down                            # 清理
+> ```
 
 ---
 
@@ -1230,6 +1258,45 @@ docker compose down -v
 > 建立三個服務：`frontend`（nginx）、`backend`（httpd）、`database`（postgres）。
 > 設定兩個 network（front-net 和 back-net），讓 frontend 無法直接連到 database。
 > 啟動後用 `docker compose exec frontend ping database` 驗證確實連不到。
+>
+> **參考答案：**
+>
+> ```yaml
+> # compose.yaml
+> services:
+>   frontend:
+>     image: nginx:alpine
+>     ports:
+>       - "8080:80"
+>     networks:
+>       - front-net
+>
+>   backend:
+>     image: httpd:alpine
+>     networks:
+>       - front-net
+>       - back-net
+>
+>   database:
+>     image: postgres:16-alpine
+>     environment:
+>       POSTGRES_PASSWORD: secret
+>     networks:
+>       - back-net
+>
+> networks:
+>   front-net:
+>   back-net:
+> ```
+>
+> 驗證：
+> ```bash
+> docker compose up -d
+> docker compose exec frontend ping -c 2 backend     # 成功（同在 front-net）
+> docker compose exec frontend ping -c 2 database     # 失敗（不同網路，隔離）
+> docker compose exec backend ping -c 2 database      # 成功（同在 back-net）
+> docker compose down
+> ```
 
 ---
 
@@ -1240,6 +1307,50 @@ docker compose down -v
 > - compose.yaml 裡面用 `${VARIABLE}` 引用
 > - 提供 `.env.example` 範本檔
 > - 驗證：進入容器，用 `.env` 裡面的帳號密碼登入資料庫
+>
+> **參考答案：**
+>
+> `.env`：
+> ```bash
+> POSTGRES_USER=myuser
+> POSTGRES_PASSWORD=mypassword123
+> POSTGRES_DB=mydb
+> ```
+>
+> `.env.example`：
+> ```bash
+> POSTGRES_USER=your_username
+> POSTGRES_PASSWORD=your_password
+> POSTGRES_DB=your_database
+> ```
+>
+> `compose.yaml`：
+> ```yaml
+> services:
+>   db:
+>     image: postgres:16-alpine
+>     environment:
+>       POSTGRES_USER: ${POSTGRES_USER}
+>       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+>       POSTGRES_DB: ${POSTGRES_DB}
+>     volumes:
+>       - pg-data:/var/lib/postgresql/data
+>     ports:
+>       - "5432:5432"
+>     restart: unless-stopped
+>
+> volumes:
+>   pg-data:
+> ```
+>
+> 驗證：
+> ```bash
+> docker compose up -d
+> # 用 .env 裡面的帳號密碼登入資料庫
+> docker compose exec db psql -U myuser -d mydb -c "SELECT 1;"
+> # 應成功回傳結果
+> docker compose down
+> ```
 
 ---
 
@@ -1248,6 +1359,50 @@ docker compose down -v
 > 修改練習 3 的 compose.yaml，加入 healthcheck。
 > 新增一個 `adminer` 服務（資料庫管理介面），設定 depends_on 搭配 condition: service_healthy。
 > 觀察 `docker compose ps` 的輸出，確認看到 `(healthy)` 狀態。
+>
+> **參考答案：**
+>
+> ```yaml
+> services:
+>   db:
+>     image: postgres:16-alpine
+>     environment:
+>       POSTGRES_USER: ${POSTGRES_USER}
+>       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+>       POSTGRES_DB: ${POSTGRES_DB}
+>     volumes:
+>       - pg-data:/var/lib/postgresql/data
+>     ports:
+>       - "5432:5432"
+>     healthcheck:
+>       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+>       interval: 5s
+>       timeout: 3s
+>       retries: 5
+>       start_period: 10s
+>     restart: unless-stopped
+>
+>   adminer:
+>     image: adminer
+>     ports:
+>       - "8080:8080"
+>     depends_on:
+>       db:
+>         condition: service_healthy
+>     restart: unless-stopped
+>
+> volumes:
+>   pg-data:
+> ```
+>
+> 驗證：
+> ```bash
+> docker compose up -d
+> docker compose ps
+> # 等 db 顯示 (healthy) 後，adminer 才會啟動
+> # 打開瀏覽器 http://localhost:8080，用 PostgreSQL / db / myuser / mypassword123 登入
+> docker compose down
+> ```
 
 ---
 
@@ -1260,6 +1415,161 @@ docker compose down -v
 >
 > 要求使用：自訂 network、.env、healthcheck、build、named volume。
 > 這題是今天所有內容的綜合應用，能做出來就代表你真的學會了。
+>
+> **參考答案：**
+>
+> 專案結構：
+> ```
+> three-tier-app/
+> ├── compose.yaml
+> ├── .env
+> ├── .env.example
+> ├── backend/
+> │   ├── Dockerfile
+> │   ├── package.json
+> │   └── src/
+> │       └── index.js
+> └── nginx/
+>     └── default.conf
+> ```
+>
+> `.env`：
+> ```bash
+> MYSQL_ROOT_PASSWORD=rootpass123
+> MYSQL_DATABASE=myapp
+> MYSQL_USER=appuser
+> MYSQL_PASSWORD=apppass456
+> ```
+>
+> `.env.example`：
+> ```bash
+> MYSQL_ROOT_PASSWORD=change-me
+> MYSQL_DATABASE=myapp
+> MYSQL_USER=change-me
+> MYSQL_PASSWORD=change-me
+> ```
+>
+> `backend/package.json`：
+> ```json
+> {
+>   "name": "three-tier-api",
+>   "version": "1.0.0",
+>   "dependencies": { "express": "^4.18.2", "mysql2": "^3.6.0" }
+> }
+> ```
+>
+> `backend/src/index.js`：
+> ```javascript
+> const express = require('express');
+> const mysql = require('mysql2/promise');
+> const app = express();
+>
+> app.get('/', async (req, res) => {
+>   try {
+>     const conn = await mysql.createConnection({
+>       host: 'db', user: process.env.MYSQL_USER,
+>       password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE
+>     });
+>     const [rows] = await conn.execute('SELECT 1 AS result');
+>     await conn.end();
+>     res.json({ message: 'Hello from 3-tier app!', db: 'connected', result: rows[0].result });
+>   } catch (err) {
+>     res.status(500).json({ error: err.message });
+>   }
+> });
+>
+> app.get('/health', (req, res) => res.json({ status: 'healthy' }));
+>
+> app.listen(3000, () => console.log('API running on port 3000'));
+> ```
+>
+> `backend/Dockerfile`：
+> ```dockerfile
+> FROM node:20-alpine
+> WORKDIR /app
+> COPY package*.json ./
+> RUN npm ci --omit=dev
+> COPY src/ ./src/
+> USER node
+> EXPOSE 3000
+> CMD ["node", "src/index.js"]
+> ```
+>
+> `nginx/default.conf`：
+> ```nginx
+> server {
+>     listen 80;
+>     location / {
+>         proxy_pass http://api:3000;
+>         proxy_set_header Host $host;
+>         proxy_set_header X-Real-IP $remote_addr;
+>     }
+> }
+> ```
+>
+> `compose.yaml`：
+> ```yaml
+> services:
+>   nginx:
+>     image: nginx:alpine
+>     ports:
+>       - "80:80"
+>     volumes:
+>       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+>     depends_on:
+>       api:
+>         condition: service_started
+>     networks:
+>       - frontend-net
+>     restart: unless-stopped
+>
+>   api:
+>     build: ./backend
+>     env_file: .env
+>     depends_on:
+>       db:
+>         condition: service_healthy
+>     networks:
+>       - frontend-net
+>       - backend-net
+>     restart: unless-stopped
+>
+>   db:
+>     image: mysql:8.0
+>     environment:
+>       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+>       MYSQL_DATABASE: ${MYSQL_DATABASE}
+>       MYSQL_USER: ${MYSQL_USER}
+>       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+>     volumes:
+>       - db-data:/var/lib/mysql
+>     healthcheck:
+>       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+>       interval: 5s
+>       timeout: 3s
+>       retries: 10
+>       start_period: 30s
+>     networks:
+>       - backend-net
+>     restart: unless-stopped
+>
+> networks:
+>   frontend-net:
+>   backend-net:
+>
+> volumes:
+>   db-data:
+> ```
+>
+> 操作：
+> ```bash
+> docker compose up -d --build
+> docker compose ps                              # 等 db 顯示 healthy
+> curl http://localhost                           # 透過 Nginx 存取 API
+> docker compose exec nginx ping -c 1 db         # 失敗（網路隔離）
+> docker compose exec api ping -c 1 db           # 成功
+> docker compose down
+> ```
 
 ---
 

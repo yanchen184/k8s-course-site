@@ -1104,6 +1104,40 @@ docker volume rm mysql-data
 > # docker rm -f web api db redis
 > # docker network rm frontend backend
 > ```
+>
+> **參考答案：**
+>
+> ```bash
+> # 1. 建立兩個網路
+> docker network create frontend
+> docker network create backend
+>
+> # 2. 啟動 Redis，加入 backend
+> docker run -d --name redis --network backend redis:7-alpine
+>
+> # 3. 啟動 MySQL，加入 backend
+> docker run -d --name db --network backend -e MYSQL_ROOT_PASSWORD=secret mysql:8.0
+>
+> # 4. 啟動 API（Alpine 模擬），加入 backend
+> docker run -d --name api --network backend alpine sleep 3600
+>
+> # 5. 把 API 也加入 frontend
+> docker network connect frontend api
+>
+> # 6. 啟動 Nginx，加入 frontend，映射 port 80
+> docker run -d --name web --network frontend -p 80:80 nginx:alpine
+>
+> # 7. 驗證連通性
+> docker exec api ping -c 2 redis    # 成功（同在 backend）
+> docker exec api ping -c 2 db       # 成功（同在 backend）
+> docker exec web ping -c 2 api      # 成功（同在 frontend）
+> docker exec web ping -c 2 redis    # 失敗（web 不在 backend）
+> docker exec web ping -c 2 db       # 失敗（web 不在 backend）
+>
+> # 8. 清理
+> docker rm -f web api db redis
+> docker network rm frontend backend
+> ```
 
 ---
 

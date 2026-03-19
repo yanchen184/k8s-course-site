@@ -801,6 +801,67 @@ docker network rm blog-frontend blog-backend
 > - 網站檔案用 named volume 共享
 >
 > 寫出完整的 compose.yaml。
+>
+> **參考答案：**
+>
+> `compose.yaml`：
+> ```yaml
+> services:
+>   nginx:
+>     image: nginx:alpine
+>     ports:
+>       - "8080:80"
+>     volumes:
+>       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+>       - web-content:/var/www/html:ro
+>     depends_on:
+>       - php
+>     networks:
+>       - app-net
+>     restart: unless-stopped
+>
+>   php:
+>     image: php:8.2-fpm-alpine
+>     volumes:
+>       - web-content:/var/www/html
+>     networks:
+>       - app-net
+>     restart: unless-stopped
+>
+> networks:
+>   app-net:
+>
+> volumes:
+>   web-content:
+> ```
+>
+> `nginx/default.conf`：
+> ```nginx
+> server {
+>     listen 80;
+>     root /var/www/html;
+>     index index.php index.html;
+>
+>     location / {
+>         try_files $uri $uri/ =404;
+>     }
+>
+>     location ~ \.php$ {
+>         fastcgi_pass php:9000;
+>         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+>         include fastcgi_params;
+>     }
+> }
+> ```
+>
+> 建立測試檔案並啟動：
+> ```bash
+> docker compose up -d
+> # 把一個 PHP 測試檔案放進 Volume
+> docker compose exec php sh -c 'echo "<?php phpinfo(); ?>" > /var/www/html/index.php'
+> # 瀏覽器訪問 http://localhost:8080 即可看到 PHP 資訊頁面
+> docker compose down
+> ```
 
 > **練習題 2：Dockerfile + Compose 整合**
 >
@@ -810,6 +871,79 @@ docker network rm blog-frontend blog-backend
 > 3. MongoDB 的資料要持久化
 > 4. 用 .env 管理連線資訊
 > 5. 設定 healthcheck
+>
+> **參考答案：**
+>
+> `backend/Dockerfile`：
+> ```dockerfile
+> # ========== Stage 1: Build ==========
+> FROM node:20-alpine AS builder
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci
+> COPY . .
+>
+> # ========== Stage 2: Production ==========
+> FROM node:20-alpine
+> ENV NODE_ENV=production
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci --omit=dev && npm cache clean --force
+> COPY --from=builder /app/src ./src
+> RUN chown -R node:node /app
+> USER node
+> EXPOSE 3000
+> CMD ["node", "src/index.js"]
+> ```
+>
+> `.env`：
+> ```bash
+> MONGO_INITDB_ROOT_USERNAME=admin
+> MONGO_INITDB_ROOT_PASSWORD=secret123
+> MONGO_DB=myapp
+> MONGO_URI=mongodb://admin:secret123@mongo:27017/myapp?authSource=admin
+> ```
+>
+> `compose.yaml`：
+> ```yaml
+> services:
+>   api:
+>     build: ./backend
+>     ports:
+>       - "3000:3000"
+>     environment:
+>       MONGO_URI: ${MONGO_URI}
+>     depends_on:
+>       mongo:
+>         condition: service_healthy
+>     restart: unless-stopped
+>
+>   mongo:
+>     image: mongo:7
+>     environment:
+>       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+>       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+>     volumes:
+>       - mongo-data:/data/db
+>     healthcheck:
+>       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+>       interval: 5s
+>       timeout: 3s
+>       retries: 5
+>       start_period: 10s
+>     restart: unless-stopped
+>
+> volumes:
+>   mongo-data:
+> ```
+>
+> 操作：
+> ```bash
+> docker compose up -d --build
+> docker compose ps                  # 確認 mongo 顯示 healthy
+> curl http://localhost:3000/
+> docker compose down
+> ```
 
 > **練習題 3：環境分離**
 >
@@ -819,6 +953,91 @@ docker network rm blog-frontend blog-backend
 > - compose.prod.yaml：生產環境（資源限制、日誌設定）
 >
 > 寫出三個檔案，並說明怎麼分別啟動。
+>
+> **參考答案：**
+>
+> `compose.yaml`（基礎設定，所有環境共用）：
+> ```yaml
+> services:
+>   api:
+>     image: myapp:latest
+>     ports:
+>       - "3000:3000"
+>     environment:
+>       NODE_ENV: production
+>     depends_on:
+>       mongo:
+>         condition: service_healthy
+>     restart: unless-stopped
+>
+>   mongo:
+>     image: mongo:7
+>     volumes:
+>       - mongo-data:/data/db
+>     healthcheck:
+>       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+>       interval: 5s
+>       timeout: 3s
+>       retries: 5
+>       start_period: 10s
+>     restart: unless-stopped
+>
+> volumes:
+>   mongo-data:
+> ```
+>
+> `compose.override.yaml`（開發環境，自動載入）：
+> ```yaml
+> services:
+>   api:
+>     build: ./backend
+>     environment:
+>       NODE_ENV: development
+>       DEBUG: "true"
+>     volumes:
+>       - ./backend/src:/app/src
+>     ports:
+>       - "9229:9229"         # Node.js debug port
+>
+>   mongo:
+>     ports:
+>       - "27017:27017"       # 開發時開放 Mongo port，方便用 GUI 工具連
+> ```
+>
+> `compose.prod.yaml`（生產環境）：
+> ```yaml
+> services:
+>   api:
+>     deploy:
+>       resources:
+>         limits:
+>           cpus: "1.0"
+>           memory: 512M
+>     logging:
+>       driver: json-file
+>       options:
+>         max-size: "10m"
+>         max-file: "3"
+>
+>   mongo:
+>     deploy:
+>       resources:
+>         limits:
+>           cpus: "1.0"
+>           memory: 1G
+> ```
+>
+> 使用方式：
+> ```bash
+> # 開發環境（自動載入 compose.yaml + compose.override.yaml）
+> docker compose up -d --build
+>
+> # 生產環境（跳過 override，用 prod）
+> docker compose -f compose.yaml -f compose.prod.yaml up -d
+>
+> # 驗證合併後的設定
+> docker compose -f compose.yaml -f compose.prod.yaml config
+> ```
 
 > **練習題 4：除錯題**
 >
@@ -860,6 +1079,77 @@ docker network rm blog-frontend blog-backend
 > ```
 >
 > 提示：考慮安全性、可靠性、最佳實踐。
+>
+> **參考答案：**
+>
+> **5 個問題：**
+>
+> 1. `DB_HOST: localhost`：應改為 `DB_HOST: db`。在 Compose 中每個 service 是獨立容器，`localhost` 指的是 api 容器自己，不是 db。要用 service name 作為 hostname。
+>
+> 2. `DB_PASSWORD: my-password` 寫死在 compose.yaml：敏感資訊應放在 `.env` 檔案中，用 `${DB_PASSWORD}` 引用。
+>
+> 3. `image: mysql` 沒有指定版本：應改為 `image: mysql:8.0`，避免 latest 陷阱。
+>
+> 4. `./data:/var/lib/mysql` 用了 bind mount：資料庫資料應用 named volume（如 `db-data:/var/lib/mysql`），效能更好且更安全。
+>
+> 5. `db` 沒有設定 `MYSQL_ROOT_PASSWORD` 環境變數：MySQL 啟動時必須設定 root 密碼，否則會直接報錯退出。
+>
+> **其他可改善項目：** 缺少 healthcheck、depends_on 沒有 condition、缺少 restart 策略、nginx:latest 沒指定版本。
+>
+> **修正後的 compose.yaml：**
+> ```yaml
+> services:
+>   web:
+>     image: nginx:alpine
+>     container_name: my-web
+>     ports:
+>       - "80:80"
+>     depends_on:
+>       api:
+>         condition: service_started
+>     networks:
+>       - frontend
+>     restart: unless-stopped
+>
+>   api:
+>     build: .
+>     ports:
+>       - "3000:3000"
+>     environment:
+>       DB_HOST: db
+>       DB_PASSWORD: ${DB_PASSWORD}
+>     depends_on:
+>       db:
+>         condition: service_healthy
+>     networks:
+>       - frontend
+>       - backend
+>     restart: unless-stopped
+>
+>   db:
+>     image: mysql:8.0
+>     environment:
+>       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+>       MYSQL_DATABASE: ${MYSQL_DATABASE}
+>     volumes:
+>       - db-data:/var/lib/mysql
+>     healthcheck:
+>       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+>       interval: 5s
+>       timeout: 3s
+>       retries: 5
+>       start_period: 30s
+>     networks:
+>       - backend
+>     restart: unless-stopped
+>
+> networks:
+>   frontend:
+>   backend:
+>
+> volumes:
+>   db-data:
+> ```
 
 > **練習題 5：架構設計題**
 >
@@ -876,6 +1166,57 @@ docker network rm blog-frontend blog-backend
 > 2. Volume 規劃（哪些需要持久化）
 > 3. 啟動順序
 > 4. 畫出架構圖
+>
+> **參考答案：**
+>
+> **1. 網路拓撲（三個網路）：**
+>
+> | 網路 | 服務 | 理由 |
+> |------|------|------|
+> | `gateway-net` | API Gateway, 使用者服務, 訂單服務 | Gateway 需要轉發到兩個微服務 |
+> | `service-net` | 使用者服務, 訂單服務, Redis, RabbitMQ | 微服務間通訊 + 快取 + 訊息佇列 |
+> | `data-net` | 使用者服務, 訂單服務, PostgreSQL | 只有微服務能連資料庫 |
+>
+> **2. Volume 規劃：**
+> - `postgres-data`：PostgreSQL 資料目錄 `/var/lib/postgresql/data`（必須持久化）
+> - `redis-data`：Redis 持久化資料 `/data`（建議持久化）
+> - `rabbitmq-data`：RabbitMQ 資料 `/var/lib/rabbitmq`（建議持久化，保留佇列訊息）
+>
+> **3. 啟動順序：**
+> PostgreSQL、Redis、RabbitMQ（基礎設施，先啟動） -> 使用者服務、訂單服務（依賴基礎設施） -> API Gateway（依賴微服務）
+>
+> **4. 架構圖：**
+> ```
+>                     Internet
+>                        │
+>                   Port 80/443
+>                        │
+>               ┌────────▼────────┐
+>               │   API Gateway   │
+>               │     (Nginx)     │
+>               └───┬─────────┬───┘
+>                   │         │
+>          gateway-net        gateway-net
+>                   │         │
+>          ┌────────▼──┐  ┌──▼────────┐
+>          │  使用者服務 │  │  訂單服務  │
+>          │ (Node.js)  │  │ (Spring)  │
+>          └──┬──┬──┬───┘  └──┬──┬──┬──┘
+>             │  │  │         │  │  │
+>   data-net──┘  │  └──service-net  │
+>                │         │  │    │
+>         ┌──────▼──┐  ┌──▼──▼──┐  │
+>         │ Postgres │  │ Redis  │  │
+>         └─────────┘  └────────┘  │
+>                            ┌─────▼─────┐
+>                            │ RabbitMQ  │
+>                            └───────────┘
+>
+>    Volumes:
+>    - postgres-data → /var/lib/postgresql/data
+>    - redis-data    → /data
+>    - rabbitmq-data → /var/lib/rabbitmq
+> ```
 
 ---
 

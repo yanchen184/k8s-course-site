@@ -988,6 +988,41 @@ Google 還推出了一種叫 **Distroless** 的 Image，裡面只有應用程式
 > 請寫出這個專案的 .dockerignore 檔案。哪些應該排除？哪些不能排除？為什麼？
 >
 > 提示：package.json 和 package-lock.json 能排除嗎？src/ 能排除嗎？
+>
+> **參考答案：**
+>
+> ```
+> # .dockerignore
+>
+> # 依賴套件——容器內會重新 npm install，不需要帶進去（省 200 MB）
+> node_modules
+>
+> # 版本控制——Image 不需要 Git 歷史（省 50 MB）
+> .git
+> .gitignore
+>
+> # 機密資訊——絕對不能打包進 Image！
+> .env
+>
+> # 測試和文件——生產 Image 不需要
+> tests/
+> docs/
+> coverage/
+> *.md
+>
+> # IDE 設定——跟應用程式無關
+> .vscode/
+>
+> # Docker 相關檔案——Dockerfile 本身不需要被 COPY 進 Image
+> Dockerfile
+> docker-compose.yml
+> .dockerignore
+> ```
+>
+> **不能排除的檔案：**
+> - `package.json` 和 `package-lock.json`：容器內 `npm install` 需要它們
+> - `src/`：這是應用程式的原始碼，當然不能排除
+> - `.env.example`：這個看需求，如果應用程式會讀它當預設值就保留
 
 > **練習題 2：修正 Dockerfile 的快取問題**
 >
@@ -1001,6 +1036,29 @@ Google 還推出了一種叫 **Distroless** 的 Image，裡面只有應用程式
 > CMD ["python", "app.py"]
 > ```
 > 提示：想想「依賴先裝，程式碼後放」的原則。另外，COPY config.yaml 那一行有什麼問題？
+>
+> **參考答案：**
+>
+> 原始 Dockerfile 有兩個問題：
+> 1. `COPY . .` 放在 `pip install` 前面，任何檔案修改都會導致 pip install 重跑（快取失效）
+> 2. `COPY config.yaml` 那行是多餘的，因為前面 `COPY . .` 已經把 config.yaml 複製進去了
+>
+> 修正後的 Dockerfile：
+> ```dockerfile
+> FROM python:3.11-slim
+> WORKDIR /app
+>
+> # 先複製依賴描述檔，安裝依賴（善用快取）
+> COPY requirements.txt .
+> RUN pip install --no-cache-dir -r requirements.txt
+>
+> # 最後才複製所有原始碼（包括 config.yaml）
+> COPY . .
+>
+> CMD ["python", "app.py"]
+> ```
+>
+> 這樣只要 `requirements.txt` 沒變，`pip install` 就會用快取，大幅加速建構。
 
 > **練習題 3：改寫成 Multi-stage Build**
 >
@@ -1015,6 +1073,33 @@ Google 還推出了一種叫 **Distroless** 的 Image，裡面只有應用程式
 > RUN npm install -g serve
 > CMD ["serve", "-s", "dist", "-l", "3000"]
 > ```
+>
+> **參考答案：**
+>
+> ```dockerfile
+> # ========== 階段一：建構 ==========
+> FROM node:20-alpine AS builder
+> WORKDIR /app
+>
+> # 安裝依賴（善用快取）
+> COPY package.json package-lock.json ./
+> RUN npm ci
+>
+> # 複製原始碼並建構
+> COPY . .
+> RUN npm run build
+>
+> # ========== 階段二：運行 ==========
+> FROM nginx:alpine
+>
+> # 從建構階段只複製 dist/ 靜態檔案
+> COPY --from=builder /app/dist /usr/share/nginx/html
+>
+> EXPOSE 80
+> CMD ["nginx", "-g", "daemon off;"]
+> ```
+>
+> 效果：Image 從 ~1.2 GB 縮小到 ~40 MB（縮減 97%）。最終 Image 只有 Nginx + 靜態檔案，沒有 Node.js、node_modules、原始碼。
 
 > **練習題 4：Go 應用的 Multi-stage Build**
 >
@@ -1024,6 +1109,39 @@ Google 還推出了一種叫 **Distroless** 的 Image，裡面只有應用程式
 > - 編譯階段用 `golang:1.22-alpine`
 > - 記得設定 `CGO_ENABLED=0`
 > - 想想什麼時候該用 scratch、什麼時候該用 alpine
+>
+> **參考答案：**
+>
+> ```dockerfile
+> # ========== 階段一：編譯 ==========
+> FROM golang:1.22-alpine AS builder
+> WORKDIR /app
+>
+> # 先複製依賴描述檔，下載依賴（善用快取）
+> COPY go.mod go.sum ./
+> RUN go mod download
+>
+> # 複製原始碼並靜態編譯
+> COPY . .
+> RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+>
+> # ========== 階段二：運行 ==========
+> # 生產環境用 scratch（最小，~8 MB），需要除錯時改用 alpine（~15 MB）
+> FROM scratch
+>
+> # 如果需要發 HTTPS 請求，要帶入 CA 憑證
+> COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+>
+> # 從編譯階段複製執行檔
+> COPY --from=builder /app/main /main
+>
+> EXPOSE 8080
+> ENTRYPOINT ["/main"]
+> ```
+>
+> 效果：Image 從 ~800 MB 縮小到 ~8 MB（縮減 99%）。
+> - 用 `scratch`：最小、最安全，但無法 `docker exec` 進去除錯
+> - 用 `alpine`：多 ~7 MB，但有 shell 可以除錯，適合開發/測試環境
 
 > **練習題 5：docker push 實戰**
 >
@@ -1034,6 +1152,40 @@ Google 還推出了一種叫 **Distroless** 的 Image，裡面只有應用程式
 > 5. 刪掉本地的 Image（docker rmi），然後從 Docker Hub 重新 pull 回來
 > 6. 確認 pull 回來的 Image 可以正常 docker run
 > 7. （加分題）用 docker save 把 Image 匯出成 tar 檔案，再用 docker load 載入回來
+>
+> **參考答案：**
+>
+> ```bash
+> # 1. 登入 Docker Hub
+> docker login
+> # 輸入你的帳號和密碼
+>
+> # 2. 假設你的 Docker Hub 帳號是 myuser，Image 是練習 3 的 React app
+> # 先 tag 成正確的命名格式
+> docker tag my-react-app:latest myuser/my-react-app:1.0
+> docker tag my-react-app:latest myuser/my-react-app:latest
+>
+> # 3. 推送到 Docker Hub
+> docker push myuser/my-react-app:1.0
+> docker push myuser/my-react-app:latest
+>
+> # 4. 去 hub.docker.com/r/myuser/my-react-app 確認
+>
+> # 5. 刪掉本地 Image
+> docker rmi myuser/my-react-app:1.0
+> docker rmi myuser/my-react-app:latest
+>
+> # 6. 重新從 Docker Hub 拉回來
+> docker pull myuser/my-react-app:1.0
+> docker run -d -p 8080:80 myuser/my-react-app:1.0
+> # 打開瀏覽器確認正常
+>
+> # 7. 加分題：離線匯出/匯入
+> docker save -o my-react-app.tar myuser/my-react-app:1.0
+> docker rmi myuser/my-react-app:1.0
+> docker load -i my-react-app.tar
+> docker run -d -p 8080:80 myuser/my-react-app:1.0
+> ```
 
 > **練習題 6：綜合最佳化**
 >
@@ -1050,6 +1202,47 @@ Google 還推出了一種叫 **Distroless** 的 Image，裡面只有應用程式
 > CMD python3 app.py
 > ```
 > 提示：至少能找出 7 個可以改善的地方。（版本號、Layer 數量、快取順序、root 權限、清理暫存、CMD 格式、Base Image 選擇、WORKDIR、.dockerignore……）
+>
+> **參考答案：**
+>
+> **7 個問題：**
+> 1. `FROM ubuntu`：沒有指定版本號，用了隱含的 `latest`，不可重現
+> 2. `FROM ubuntu`：Base Image 太大，應該用 `python:3.11-slim`
+> 3. `RUN apt-get update` 和 `RUN apt-get install` 分開寫：可能用到過期的套件清單，且多了一層 Layer
+> 4. 三個 `RUN pip3 install` 分開寫：應該合併成一個 RUN 或用 `requirements.txt`
+> 5. `COPY . .` 放在 `pip install` 前面：快取策略錯誤，任何程式碼改動都會導致 pip 重裝
+> 6. 沒有 `WORKDIR`：檔案散落在根目錄
+> 7. `CMD python3 app.py`：用了 Shell Form，應該用 Exec Form `CMD ["python3", "app.py"]`
+> 8. 沒有 `USER`：以 root 身份執行，不安全
+> 9. 沒有清理 apt 快取：`rm -rf /var/lib/apt/lists/*`
+>
+> **修正後的 Dockerfile：**
+> ```dockerfile
+> FROM python:3.11-slim
+> WORKDIR /app
+>
+> # 先複製依賴描述檔，安裝依賴（善用快取）
+> COPY requirements.txt .
+> RUN pip install --no-cache-dir -r requirements.txt
+>
+> # 再複製程式碼
+> COPY . .
+>
+> # 建立非 root 使用者並切換
+> RUN groupadd -r appuser && useradd -r -g appuser appuser \
+>     && chown -R appuser:appuser /app
+> USER appuser
+>
+> EXPOSE 5000
+> CMD ["python3", "app.py"]
+> ```
+>
+> 搭配 `requirements.txt`：
+> ```
+> flask
+> requests
+> gunicorn
+> ```
 
 ---
 

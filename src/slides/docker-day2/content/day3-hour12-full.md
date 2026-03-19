@@ -1378,6 +1378,64 @@ Hour 10：能寫 → Hour 11：寫得好 → Hour 12：實際能用
 > - `docker exec <container> whoami` 回傳 `node`
 > - `docker exec <container> ps aux` 確認 PID 1 是 dumb-init
 > - `docker ps` 顯示 `(healthy)`
+>
+> **參考答案：**
+>
+> `.dockerignore`：
+> ```
+> node_modules
+> dist
+> .git
+> .gitignore
+> .env
+> .env.*
+> *.md
+> .vscode
+> .idea
+> coverage
+> .nyc_output
+> ```
+>
+> `Dockerfile`：
+> ```dockerfile
+> # ========== Stage 1: Build ==========
+> FROM node:20-alpine AS builder
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci
+> COPY tsconfig.json ./
+> COPY src/ ./src/
+> RUN npm run build
+>
+> # ========== Stage 2: Production ==========
+> FROM node:20-alpine AS production
+> RUN apk add --no-cache dumb-init
+> ENV NODE_ENV=production
+> ENV PORT=3000
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci --omit=dev && npm cache clean --force
+> COPY --from=builder /app/dist ./dist
+> RUN chown -R node:node /app
+> USER node
+> EXPOSE 3000
+> HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+>   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+> ENTRYPOINT ["dumb-init", "--"]
+> CMD ["node", "dist/index.js"]
+> ```
+>
+> 驗證指令：
+> ```bash
+> docker build -t my-ts-api:1.0.0 .
+> docker run -d --name ts-api -p 3000:3000 my-ts-api:1.0.0
+> curl http://localhost:3000/
+> curl http://localhost:3000/health
+> docker exec ts-api whoami          # 應顯示 node
+> docker exec ts-api ps aux          # PID 1 應為 dumb-init
+> docker ps                          # 等 30 秒後應顯示 (healthy)
+> docker rm -f ts-api
+> ```
 
 ---
 
@@ -1405,6 +1463,41 @@ Hour 10：能寫 → Hour 11：寫得好 → Hour 12：實際能用
 > ```
 >
 > 提示：思考建構效率、映像大小、安全性、cache 策略、指令格式等方面。
+>
+> **參考答案：**
+>
+> **8 個問題：**
+> 1. `FROM node:20`：用完整版 Base Image（~350 MB），應改用 `node:20-alpine`
+> 2. `COPY . /app` 在 `npm install` 前面：快取策略錯誤，任何原始碼變動都會導致 npm 重裝
+> 3. `RUN npm install`：應用 `npm ci`（更可預測），且不需要 devDependencies 就加 `--omit=dev`
+> 4. `RUN npm run build` 和 `RUN npm install` 分開但沒用 Multi-stage：建構工具和 devDependencies 留在最終 Image
+> 5. 沒用 Multi-stage Build：最終 Image 包含 build 工具、原始碼、devDependencies
+> 6. `RUN apt-get update` 和 `RUN apt-get install` 分開寫：應合併。安裝 curl vim wget htop net-tools 在生產 Image 中不必要（增大攻擊面）
+> 7. `CMD npm start`：用了 Shell Form，應改用 Exec Form `CMD ["node", "dist/index.js"]`
+> 8. 沒有 `USER`：以 root 執行，不安全
+>
+> **修正後的 Dockerfile（Multi-stage）：**
+> ```dockerfile
+> # ========== Stage 1: Build ==========
+> FROM node:20-alpine AS builder
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci
+> COPY . .
+> RUN npm run build
+>
+> # ========== Stage 2: Production ==========
+> FROM node:20-alpine
+> ENV NODE_ENV=production
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci --omit=dev && npm cache clean --force
+> COPY --from=builder /app/dist ./dist
+> RUN chown -R node:node /app
+> USER node
+> EXPOSE 3000
+> CMD ["node", "dist/index.js"]
+> ```
 
 ---
 
@@ -1420,6 +1513,50 @@ Hour 10：能寫 → Hour 11：寫得好 → Hour 12：實際能用
 > 5. HEALTHCHECK 的 start-period 至少 30 秒
 >
 > 思考題：如果容器記憶體限制為 1GB，JVM 堆記憶體大約會被設定為多少？為什麼？
+>
+> **參考答案：**
+>
+> ```dockerfile
+> # ========== Stage 1: Build ==========
+> FROM maven:3.9-eclipse-temurin-21 AS builder
+> WORKDIR /app
+>
+> # 先複製 pom.xml，下載依賴（善用快取）
+> COPY pom.xml .
+> RUN mvn dependency:go-offline -B
+>
+> # 複製原始碼，打包
+> COPY src ./src
+> RUN mvn package -DskipTests -B
+>
+> # ========== Stage 2: Production ==========
+> FROM eclipse-temurin:21-jre-alpine
+>
+> # 建立非 root 使用者
+> RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+>
+> WORKDIR /app
+>
+> # 從 build 階段複製 jar 檔
+> COPY --from=builder /app/target/*.jar app.jar
+>
+> # JVM 容器感知參數
+> ENV JAVA_OPTS="-XX:+UseContainerSupport \
+>   -XX:MaxRAMPercentage=75.0 \
+>   -XX:InitialRAMPercentage=50.0 \
+>   -Djava.security.egd=file:/dev/./urandom"
+>
+> USER appuser
+>
+> EXPOSE 8080
+>
+> HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+>   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+>
+> ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
+> ```
+>
+> **思考題答案：** 如果容器記憶體限制為 1GB，JVM 堆記憶體大約會被設定為 **768 MB**（1GB x 75%）。因為 `-XX:MaxRAMPercentage=75.0` 讓 JVM 最多使用容器記憶體的 75%。剩下的 25%（約 256 MB）留給 Metaspace、Code Cache、Thread Stacks、GC Overhead 等 off-heap 記憶體。如果設 100% 給堆記憶體，這些 off-heap 記憶體分配後就會超出容器限制，被 OOM Kill。
 
 ---
 
@@ -1428,6 +1565,50 @@ Hour 10：能寫 → Hour 11：寫得好 → Hour 12：實際能用
 > 你的同事跑來跟你說：「我的 Dockerfile build 成功了，但容器跑起來就馬上退出。」
 >
 > 請列出你的完整除錯步驟（至少 5 步），包含每一步要用的 Docker 指令和要檢查什麼。
+>
+> **參考答案：**
+>
+> **5 步除錯流程：**
+>
+> **步驟一：看容器日誌**
+> ```bash
+> docker logs my-container
+> ```
+> 檢查：有沒有錯誤訊息？程式是不是啟動失敗？缺什麼依賴？
+>
+> **步驟二：看退出碼**
+> ```bash
+> docker inspect my-container --format='{{.State.ExitCode}}'
+> ```
+> 檢查：退出碼 0 = 正常結束；1 = 應用程式錯誤；137 = 被 OOM Kill（記憶體不足）或被 docker kill；143 = 收到 SIGTERM 後正常退出。
+>
+> **步驟三：進入容器互動式除錯**
+> ```bash
+> # 覆蓋 CMD，用 shell 進去看
+> docker run -it --entrypoint sh my-image
+>
+> # 進去之後檢查
+> ls -la /app/           # 檔案有沒有正確 COPY 進來？
+> cat /app/package.json  # 內容正確嗎？
+> node dist/index.js     # 手動執行看錯誤訊息
+> env                    # 環境變數有沒有設定正確？
+> whoami                 # 確認當前使用者
+> ```
+>
+> **步驟四：檢查資源和網路**
+> ```bash
+> docker stats my-container            # 記憶體、CPU 使用量
+> docker inspect my-container          # 完整的容器資訊
+> docker port my-container             # Port mapping 是否正確
+> ```
+> 檢查：是不是記憶體不夠被 OOM Kill？Port 有沒有正確映射？
+>
+> **步驟五：檢查 Dockerfile 本身**
+> ```bash
+> docker history my-image              # 查看每一層 Layer
+> docker build --progress=plain -t test . 2>&1 | grep -E "(CACHED|RUN|COPY)"
+> ```
+> 檢查：CMD/ENTRYPOINT 格式對嗎（Exec Form vs Shell Form）？WORKDIR 設對了嗎？檔案路徑正確嗎？
 
 ---
 
@@ -1451,6 +1632,95 @@ Hour 10：能寫 → Hour 11：寫得好 → Hour 12：實際能用
 >    - 不是 root 在執行
 >    - docker stop 能優雅關閉（不用等 10 秒）
 > 6. （加分）推送到 Docker Hub
+>
+> **參考答案（Node.js 版本）：**
+>
+> `server.js`：
+> ```javascript
+> const express = require('express');
+> const app = express();
+> const PORT = process.env.PORT || 3000;
+>
+> app.get('/', (req, res) => {
+>   res.json({
+>     message: 'Hello from Production Docker!',
+>     hostname: require('os').hostname(),
+>     version: '1.0.0'
+>   });
+> });
+>
+> app.get('/health', (req, res) => {
+>   res.json({ status: 'healthy', uptime: process.uptime() });
+> });
+>
+> // 優雅關閉
+> process.on('SIGTERM', () => {
+>   console.log('SIGTERM received, shutting down gracefully...');
+>   server.close(() => process.exit(0));
+> });
+>
+> const server = app.listen(PORT, () => {
+>   console.log(`Server running on port ${PORT}`);
+> });
+> ```
+>
+> `package.json`：
+> ```json
+> {
+>   "name": "production-api",
+>   "version": "1.0.0",
+>   "scripts": { "start": "node server.js" },
+>   "dependencies": { "express": "^4.18.2" }
+> }
+> ```
+>
+> `.dockerignore`：
+> ```
+> node_modules
+> .git
+> .env
+> *.md
+> Dockerfile
+> .dockerignore
+> ```
+>
+> `Dockerfile`：
+> ```dockerfile
+> # ========== Stage 1: Build ==========
+> FROM node:20-alpine AS builder
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci
+> COPY . .
+>
+> # ========== Stage 2: Production ==========
+> FROM node:20-alpine
+> RUN apk add --no-cache dumb-init
+> ENV NODE_ENV=production
+> WORKDIR /app
+> COPY package.json package-lock.json ./
+> RUN npm ci --omit=dev && npm cache clean --force
+> COPY --from=builder /app/server.js ./
+> RUN chown -R node:node /app
+> USER node
+> EXPOSE 3000
+> HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+>   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+> ENTRYPOINT ["dumb-init", "--"]
+> CMD ["node", "server.js"]
+> ```
+>
+> 驗證：
+> ```bash
+> docker build -t prod-api:1.0 .
+> docker run -d --name prod-api -p 3000:3000 prod-api:1.0
+> curl http://localhost:3000/          # API 正常
+> curl http://localhost:3000/health    # 健康檢查正常
+> docker exec prod-api whoami         # 應顯示 node
+> docker exec prod-api ps aux         # PID 1 應為 dumb-init
+> time docker stop prod-api           # 應在 1-2 秒內停止
+> docker images prod-api              # 確認大小在 ~130 MB 以內
+> ```
 
 ---
 

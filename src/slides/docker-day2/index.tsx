@@ -74,11 +74,11 @@ function renderSummaryChips(summary: BulletGroup[], cards: SlideCardSpec[]) {
   if (chips.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-2.5">
+    <div className="flex flex-wrap gap-3">
       {chips.map((chip, i) => (
         <span
           key={`chip-${i}`}
-          className="rounded-full border border-white/10 bg-white/6 px-3.5 py-1.5 text-sm font-medium leading-relaxed text-slate-200 break-normal whitespace-normal [overflow-wrap:break-word]"
+          className="rounded-full border border-white/10 bg-white/6 px-5 py-2.5 text-base font-medium leading-relaxed text-slate-200 break-normal whitespace-normal [overflow-wrap:break-word]"
         >
           {chip.label ? `${chip.label}：${chip.text}` : chip.text}
         </span>

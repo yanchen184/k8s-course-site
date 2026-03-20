@@ -620,13 +620,44 @@ connection = pymysql.connect(
 
 先回答一個大家一定會有的疑問：**「這些環境變數我怎麼知道要設哪些？」**
 
-答案是：**去 Docker Hub 看。** 每個官方 Image 的頁面都有一個 "Environment Variables" 段落，會列出它支援的所有環境變數。比如你搜尋 `mysql`，官方文件會告訴你：
+這個問題超級重要。很多初學者看到別人的 compose.yaml 寫了一堆 `MYSQL_ROOT_PASSWORD`、`POSTGRES_USER` 之類的，覺得「這些變數名稱是怎麼發明出來的？」
 
-- `MYSQL_ROOT_PASSWORD`（必填）：root 的密碼
-- `MYSQL_DATABASE`（可選）：啟動時自動建立的資料庫
-- `MYSQL_USER` / `MYSQL_PASSWORD`（可選）：自動建立的使用者和密碼
+答案是：**不是發明的，是 Image 的官方文件告訴你的。** 我帶大家實際操作一次，以後你用任何 Image 都會自己查了。
 
-PostgreSQL、Redis、WordPress、Nginx... 每個 Image 都一樣，文件裡都寫好了。**養成習慣：用一個新的 Image 之前，先去 Docker Hub 看它的文件。** 不要用猜的。
+**Step 1：打開瀏覽器，進入 Docker Hub**
+
+網址：`https://hub.docker.com`
+
+**Step 2：搜尋你要用的 Image**
+
+在上面的搜尋欄打 `mysql`，點進第一個結果（有 `Docker Official Image` 標誌的那個）。
+
+**Step 3：往下滑，找到「Environment Variables」段落**
+
+頁面很長，你直接 `Ctrl+F`（Mac 是 `Cmd+F`）搜尋 `Environment`，就會跳到那個段落。它會列出所有支援的環境變數：
+
+- `MYSQL_ROOT_PASSWORD`（**必填**）：root 的密碼，不設這個容器直接啟動失敗
+- `MYSQL_DATABASE`（可選）：容器啟動時自動幫你建立這個資料庫
+- `MYSQL_USER` + `MYSQL_PASSWORD`（可選）：自動建立一個使用者並授權存取上面那個資料庫
+- `MYSQL_ALLOW_EMPTY_PASSWORD`（可選）：允許空密碼（只有開發環境才用，生產環境千萬不要）
+- `MYSQL_RANDOM_ROOT_PASSWORD`（可選）：自動產生隨機 root 密碼，印在 log 裡
+
+你看，文件寫得清清楚楚，哪些必填、哪些可選、每個的作用是什麼，全部都有。
+
+**Step 4：同樣方式查其他 Image**
+
+PostgreSQL？搜 `postgres`，一樣有 `POSTGRES_PASSWORD`、`POSTGRES_USER`、`POSTGRES_DB`。
+
+Redis？搜 `redis`，Redis 比較特別，它的密碼不是用環境變數設定，而是用 `--requirepass` 啟動參數或掛載 `redis.conf`。這也是文件會告訴你的。
+
+WordPress？搜 `wordpress`，它會告訴你 `WORDPRESS_DB_HOST`、`WORDPRESS_DB_USER`、`WORDPRESS_DB_PASSWORD`、`WORDPRESS_DB_NAME`。
+
+**養成這個習慣：用一個新的 Image 之前，先花 5 分鐘看它的 Docker Hub 頁面。** 看三個東西：
+1. **Environment Variables** — 要設哪些環境變數
+2. **Volumes** — 資料存在哪個路徑（要不要掛 Volume）
+3. **Exposed Ports** — 預設用哪個 port
+
+這三個看完，你就知道怎麼用這個 Image 了。不要用猜的，文件都寫好了。
 
 好，知道去哪裡查之後，我們來講怎麼管理這些環境變數。
 

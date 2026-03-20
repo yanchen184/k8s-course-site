@@ -146,11 +146,21 @@ WORDPRESS_DB_NAME=wordpress
 
 **「等等，這些環境變數你怎麼知道的？」**
 
-好問題。這些不是我自己發明的，是每個 Image 的官方文件告訴你的。你去 Docker Hub 搜尋 `mysql`，打開官方頁面，往下滑到 **「Environment Variables」** 這個段落，它會列出所有支援的環境變數：`MYSQL_ROOT_PASSWORD`（必填）、`MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD`。WordPress 也一樣，去 Docker Hub 搜 `wordpress`，文件裡會告訴你要設 `WORDPRESS_DB_HOST`、`WORDPRESS_DB_USER` 等等。
+好問題。上堂課我有教過怎麼查——去 Docker Hub 看官方文件。這裡快速帶一次實際的邏輯：
 
-**這是一個非常重要的習慣：用任何第三方 Image 之前，先去 Docker Hub 看它的文件。** 看它支援哪些環境變數、需要掛載哪些 Volume、預設用哪個 port。不要用猜的，文件都寫好了。
+我先去 Docker Hub 搜 `mysql`，文件告訴我 MySQL Image 支援這些環境變數：
+- `MYSQL_ROOT_PASSWORD`（必填）：root 密碼
+- `MYSQL_DATABASE`（可選）：自動建立的資料庫名稱
+- `MYSQL_USER` / `MYSQL_PASSWORD`（可選）：自動建立的使用者
 
-所以上面這些變數的邏輯是：MySQL 那邊建立了帳號 `wp_user`、密碼 `wp_password_123`、資料庫 `wordpress`。WordPress 這邊就要填一模一樣的值去連線。兩邊要對得起來，不然 WordPress 連不上 MySQL。
+所以我在 .env 裡設了 `wp_user`、`wp_password_123`、`wordpress` 這些值。
+
+然後再去搜 `wordpress`，文件告訴我 WordPress 要設：
+- `WORDPRESS_DB_HOST`：MySQL 在哪裡
+- `WORDPRESS_DB_USER` / `WORDPRESS_DB_PASSWORD`：用什麼帳密連 MySQL
+- `WORDPRESS_DB_NAME`：連哪個資料庫
+
+所以 WordPress 這邊就填跟 MySQL 一模一樣的帳號密碼和資料庫名稱。**兩邊要對得起來，不然 WordPress 連不上 MySQL。**
 
 再看 `WORDPRESS_DB_HOST=mysql:3306` 這行，`mysql` 這個不是 IP 地址，它是我們待會在 compose.yaml 裡面定義的服務名稱。在 Docker Compose 的自訂網路裡，服務名稱會自動變成 DNS 名稱，可以直接拿來當 hostname 用。這個是上堂課教的，大家還有印象吧？
 

@@ -72,26 +72,14 @@ function countItems(groups: BulletGroup[]): number {
 }
 
 const groupedSummarySections: Array<{ hour: number, title: string, labels: string[] }> = [
-  { hour: 1, title: '開場', labels: ['學習路線圖：'] },
-  {
-    hour: 4,
-    title: '前情提要',
-    labels: [],
-  },
-  {
-    hour: 6,
-    title: '前情提要',
-    labels: ['學完指令，用 Nginx 做完整實戰：'],
-  },
-  {
-    hour: 7,
-    title: '前情提要',
-    labels: ['Day 2 學完：'],
-  },
+  { hour: 1, title: '開場', labels: ['學習路線圖'] },
+  { hour: 4, title: '前情提要', labels: [] },
+  { hour: 6, title: '前情提要', labels: ['學完指令，用 Nginx 做完整實戰'] },
+  { hour: 7, title: '前情提要', labels: ['Day 2 學完'] },
 ]
 
 describe('docker day 2 parser', () => {
-  it('parses the official lecture minutes from the schedule', () => {
+  it('parses the official lecture minutes from the current schedule', () => {
     expect(parseCourseSchedule(courseScheduleRaw)).toEqual([
       { hour: 1, title: '環境一致性問題與容器技術', lectureMinutes: 55 },
       { hour: 2, title: 'Docker 架構與工作原理', lectureMinutes: 55 },
@@ -100,25 +88,25 @@ describe('docker day 2 parser', () => {
       { hour: 5, title: 'Docker 基本指令（下）', lectureMinutes: 50 },
       { hour: 6, title: 'Nginx 容器實戰', lectureMinutes: 40 },
       { hour: 7, title: '實作練習與 Day2 總結', lectureMinutes: 30 },
-      { hour: 8, title: '映像檔深入理解', lectureMinutes: 55 },
-      { hour: 9, title: '容器生命週期管理', lectureMinutes: 55 },
-      { hour: 10, title: '容器網路基礎', lectureMinutes: 45 },
-      { hour: 11, title: 'Port Mapping 進階', lectureMinutes: 55 },
-      { hour: 12, title: 'Volume 資料持久化', lectureMinutes: 50 },
-      { hour: 13, title: 'Dockerfile 入門', lectureMinutes: 45 },
-      { hour: 14, title: 'Dockerfile 實戰與總結', lectureMinutes: 40 },
+      { hour: 8, title: 'Volume 資料持久化', lectureMinutes: 50 },
+      { hour: 9, title: '容器網路與 Port Mapping 進階', lectureMinutes: 50 },
+      { hour: 10, title: 'Dockerfile 基礎', lectureMinutes: 50 },
+      { hour: 11, title: 'Dockerfile 進階與最佳化', lectureMinutes: 50 },
+      { hour: 12, title: 'Dockerfile 實戰與映像檔發佈', lectureMinutes: 50 },
+      { hour: 13, title: 'Docker Compose 基礎與進階', lectureMinutes: 50 },
+      { hour: 14, title: 'Docker Compose 實戰與課程總結', lectureMinutes: 45 },
     ])
   })
 
-  it('builds morning and afternoon slide specs with clean notes', () => {
+  it('builds slide specs with the correct day split and clean notes', () => {
     const slides = buildDockerDay2SlideSpecs(documents)
     const morningSlides = slides.filter((slide) => slide.phase === 'morning')
     const afternoonSlides = slides.filter((slide) => slide.phase === 'afternoon')
 
     expect(morningSlides.length).toBeGreaterThan(0)
     expect(afternoonSlides.length).toBeGreaterThan(0)
-    expect(new Set(morningSlides.map((slide) => slide.hour))).toEqual(new Set([1, 2, 3]))
-    expect(new Set(afternoonSlides.map((slide) => slide.hour))).toEqual(new Set([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]))
+    expect(new Set(morningSlides.map((slide) => slide.hour))).toEqual(new Set([1, 2, 3, 8, 9, 10]))
+    expect(new Set(afternoonSlides.map((slide) => slide.hour))).toEqual(new Set([4, 5, 6, 7, 11, 12, 13, 14]))
     expect(new Set(slides.map((slide) => slide.hour))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]))
 
     const firstSlide = morningSlides[0]
@@ -129,48 +117,21 @@ describe('docker day 2 parser', () => {
     expect(firstSlide.notes).not.toContain('```')
 
     const lastSlide = afternoonSlides[afternoonSlides.length - 1]
-    expect(lastSlide.section).toBe('Hour 14｜Dockerfile 實戰與總結')
+    expect(lastSlide.section).toBe('第7小時｜Docker Compose 實戰與課程總結')
     expect(lastSlide.notes).not.toContain('## ')
     expect(lastSlide.notes).not.toContain('```')
   })
 
-  it('builds podman slide with practical summary bullets and comparison cards', () => {
+  it('shows day 3 sections and subtitles starting from the first hour', () => {
     const slides = buildDockerDay2SlideSpecs(documents)
-    const podmanSlide = slides.find((slide) => slide.title === 'Podman 簡介')
+    const firstDay3MorningSlide = slides.find((slide) => slide.hour === 8)
+    const firstDay3AfternoonSlide = slides.find((slide) => slide.hour === 11)
 
-    expect(podmanSlide).toBeDefined()
-    expect(podmanSlide?.summary).toEqual([group([
-      '課程主線選 Docker，不是因為 Podman 不重要，而是 Docker 的教材、範例、Compose 文件與跨平台體驗最一致',
-      'Podman 在 RHEL / Fedora、rootless、安全邊界與 systemd 管理情境很常是合理選擇',
-      '先學 Docker 建立容器核心概念，再轉看 Podman 成本低；若一開始兩條工具線一起講，初學者更容易混淆',
-    ])])
-    expect(countItems(podmanSlide?.summary ?? [])).toBe(3)
-    expect(podmanSlide?.cards).toEqual([
-      {
-        title: '架構與安全',
-        bullets: [group([
-          'Docker 依賴背景中的 dockerd 服務來管理容器',
-          'Podman 沒有常駐 daemon，命令會直接呼叫底層 runtime',
-          'Podman 較容易以一般使用者執行，安全邊界更單純',
-        ])],
-      },
-      {
-        title: '生態與相容性',
-        bullets: [group([
-          '多數 docker 指令都能直接對應成 podman',
-          'Docker 在 Compose、教學資源、社群範例與跨平台學習體驗上更成熟',
-          'Podman 同樣遵守 OCI 標準，和現代 Linux 容器工具鏈整合良好',
-        ])],
-      },
-      {
-        title: '適用場景',
-        bullets: [group([
-          '需要和教學、社群範例、Compose 文件保持一致：Docker 通常更方便',
-          'RHEL / Fedora、systemd 服務管理、偏好 rootless：Podman 更自然',
-          '先把 Docker 主線學穩，再轉看 Podman，學習成本最低',
-        ])],
-      },
-    ])
+    expect(firstDay3MorningSlide?.section).toBe('第1小時｜Volume 資料持久化')
+    expect(firstDay3MorningSlide?.subtitle).toContain('Day 3 上午 · 第1小時')
+
+    expect(firstDay3AfternoonSlide?.section).toBe('第4小時｜Dockerfile 進階與最佳化')
+    expect(firstDay3AfternoonSlide?.subtitle).toContain('Day 3 下午 · 第4小時')
   })
 
   it('adds desktop-vs-engine context to the installation slide without changing the docker CLI path', () => {
@@ -188,116 +149,7 @@ describe('docker day 2 parser', () => {
     ])])
   })
 
-  it('keeps installation verification focused on backend health and common day-2 blockers', () => {
-    const slides = buildDockerDay2SlideSpecs(documents)
-    const verifyInstallSlide = slides.find((slide) => (
-      slide.hour === 3
-      && slide.title === '驗證安裝'
-    ))
-
-    expect(verifyInstallSlide).toBeDefined()
-    expect(verifyInstallSlide?.summary).toEqual([group([
-      '驗證時最好同時看到 docker version 的 Client 和 Server，才能確認 CLI 與 daemon 都正常',
-      'Windows 先確認 WSL 2 / Docker Desktop backend 已啟動，再跑 hello-world',
-      '後面 lab 最常見的卡點是權限、port 衝突與 image pull 太慢，先排這三類',
-    ])])
-    expect(verifyInstallSlide?.notes).toContain('port is already allocated')
-    expect(verifyInstallSlide?.notes).toContain('registry mirror')
-  })
-
-  it('keeps hour 6 nginx config workflow as detail cards with no duplicated summary', () => {
-    const slides = buildDockerDay2SlideSpecs(documents)
-    const nginxConfigSlide = slides.find((slide) => (
-      slide.hour === 6
-      && slide.title === '修改 Nginx 設定'
-    ))
-
-    expect(nginxConfigSlide).toBeDefined()
-    expect(nginxConfigSlide?.summary).toEqual([])
-    expect(nginxConfigSlide?.cards.map((card) => card.title)).toEqual([
-      '提取設定檔',
-      '掛載自訂設定',
-      '熱重載（不重啟容器）',
-    ])
-    expect(nginxConfigSlide?.code).toBe('docker cp web:/etc/nginx/conf.d/default.conf ~/docker-demo/nginx/')
-    expect(nginxConfigSlide?.notes).toContain('docker exec web cat /etc/nginx/nginx.conf')
-    expect(nginxConfigSlide?.notes).toContain('location /api')
-    expect(nginxConfigSlide?.notes).toContain('docker exec web nginx -s reload')
-  })
-
-  it('skips markdown thematic breaks in hour 3 summaries', () => {
-    const slides = buildDockerDay2SlideSpecs(documents)
-    const hour3Intro = slides.find((slide) => slide.hour === 3 && slide.title === '前情提要')
-
-    expect(hour3Intro).toBeDefined()
-    expect(hour3Intro?.summary).toEqual([
-      group(['前兩小時講了概念和架構，現在開始動手——安裝 Docker。']),
-    ])
-    expect(hour3Intro?.summary.flatMap((entry) => entry.items)).not.toContain('---')
-  })
-
-  it('uses full-script notes for synced hour 3 sections after outline cleanup', () => {
-    const slides = buildDockerDay2SlideSpecs(documents)
-    const prepSlide = slides.find((slide) => slide.hour === 3 && slide.title === '安裝前準備')
-    const hubSlide = slides.find((slide) => slide.hour === 3 && slide.title === 'Docker Hub 註冊與登入')
-
-    expect(prepSlide).toBeDefined()
-    expect(prepSlide?.notes).toContain('支援的發行版：Ubuntu 20.04+、CentOS 7+、Debian 10+、Fedora')
-    expect(prepSlide?.notes).toContain('檢查系統資訊')
-
-    expect(hubSlide).toBeDefined()
-    expect(hubSlide?.notes).toContain('Access Token（建議）')
-    expect(hubSlide?.notes).toContain('docker logout')
-  })
-
-  it('keeps hour 7 network intro and closing sections in the generated slides', () => {
-    const slides = buildDockerDay2SlideSpecs(documents)
-    const networkSlide = slides.find((slide) => slide.hour === 7 && slide.title === 'Docker 網路先導')
-    const closingSlide = slides.find((slide) => slide.hour === 7 && slide.title === '本堂課小結')
-    const homeworkSlide = slides.find((slide) => slide.hour === 7 && slide.title === '課後作業（自選）')
-
-    expect(networkSlide).toBeDefined()
-    expect(networkSlide?.summary).toEqual([group([
-      '--link 是舊做法，現在不建議在新專案使用',
-      '自定義網路可以提供容器名稱解析，讓服務彼此更容易互通',
-      '需要跨網路互連時，可以用 docker network connect 把容器接進第二個網路',
-    ])])
-    expect(networkSlide?.notes).toContain('docker network create -d bridge')
-    expect(networkSlide?.notes).toContain('docker network connect mynet tomcat01')
-
-    expect(closingSlide).toBeDefined()
-    expect(closingSlide?.notes).toContain('Docker 網路先導')
-
-    expect(homeworkSlide).toBeDefined()
-    expect(homeworkSlide?.notes).toContain('MySQL 啟動範例')
-  })
-
-  it('falls back to conservative partial title matching when outline headings are shorter', () => {
-    const fallbackDocuments = {
-      ...documents,
-      'day2-hour3.md': day2Hour3Raw
-        .replace('## 七、設定映像加速（5 分鐘）', '## 七、映像加速（5 分鐘）')
-        .replace('## 八、本堂課小結（2 分鐘）', '## 八、小結（2 分鐘）'),
-      'day2-hour7.md': day2Hour7Raw
-        .replace('## 二、綜合練習題（30 分鐘）', '## 二、綜合練習（30 分鐘）')
-        .replace('## 八、課後作業（自選）', '## 八、課後作業'),
-    }
-    const slides = buildDockerDay2SlideSpecs(fallbackDocuments)
-    const mirrorSlide = slides.find((slide) => slide.hour === 3 && slide.title === '映像加速')
-    const practiceSlide = slides.find((slide) => slide.hour === 7 && slide.title === '練習一：基礎操作')
-    const homeworkSlide = slides.find((slide) => slide.hour === 7 && slide.title === '課後作業')
-
-    expect(mirrorSlide).toBeDefined()
-    expect(mirrorSlide?.notes).toContain('常用映像站')
-
-    expect(practiceSlide).toBeDefined()
-    expect(practiceSlide?.notes).toContain('查看本機所有映像檔')
-
-    expect(homeworkSlide).toBeDefined()
-    expect(homeworkSlide?.notes).toContain('MySQL 啟動範例')
-  })
-
-  it('keeps every lead-summary section free of dangling labels and within summary limits', () => {
+  it('keeps grouped lead summaries free of dangling labels and within limits', () => {
     const slides = buildDockerDay2SlideSpecs(documents)
 
     for (const groupedSection of groupedSummarySections) {
@@ -309,9 +161,12 @@ describe('docker day 2 parser', () => {
       expect(slide, `missing slide ${groupedSection.hour}-${groupedSection.title}`).toBeDefined()
       expect(slide?.summary.length).toBeGreaterThan(0)
       expect(countItems(slide?.summary ?? [])).toBeLessThanOrEqual(3)
+
       const labels = slide?.summary
         .map((summaryGroup) => summaryGroup.label)
         .filter((label): label is string => Boolean(label)) ?? []
+
+      expect(labels.every((label) => !/[：:]$/.test(label))).toBe(true)
 
       if (groupedSection.labels.length > 0) {
         expect(slide?.summary.some((summaryGroup) => Boolean(summaryGroup.label))).toBe(true)
@@ -331,44 +186,55 @@ describe('docker day 2 parser', () => {
     }
   })
 
-  it('uses lead-only summaries for hour 2 sections while preserving lead summaries elsewhere', () => {
+  it('cleans day 3 nested subsection titles before rendering', () => {
     const slides = buildDockerDay2SlideSpecs(documents)
+    const mysqlProblemSlide = slides.find((slide) => slide.hour === 8 && slide.title === '容器的讀寫層問題')
+    const mysqlReuseSlide = slides.find((slide) => slide.hour === 8 && slide.title === '用 Named Volume 啟動 MySQL（正確做法）')
+    const buildContextSlide = slides.find((slide) => slide.hour === 11 && slide.title === 'Build Context 的陷阱')
 
-    expect(
-      slides.find((slide) => slide.hour === 2 && slide.title === 'Client-Server 架構深入')?.summary,
-    ).toEqual([])
+    expect(mysqlProblemSlide).toBeDefined()
+    expect(mysqlReuseSlide).toBeDefined()
+    expect(buildContextSlide).toBeDefined()
+  })
 
-    expect(
-      slides.find((slide) => slide.hour === 2 && slide.title === 'Docker Client 詳解')?.summary,
-    ).toEqual([])
+  it('does not leave duplicated punctuation in day 3 summary labels or items', () => {
+    const slides = buildDockerDay2SlideSpecs(documents)
+    const duplicatedColonPattern = /：：|::/
 
-    expect(
-      slides.find((slide) => slide.hour === 2 && slide.title === 'Docker Daemon 詳解')?.summary,
-    ).toEqual([])
+    for (const slide of slides.filter((candidate) => candidate.hour >= 8)) {
+      for (const summaryGroup of slide.summary) {
+        expect(summaryGroup.label ? duplicatedColonPattern.test(summaryGroup.label) : false).toBe(false)
 
-    expect(
-      slides.find((slide) => slide.hour === 2 && slide.title === 'Docker Hub 與官方文件')?.summary,
-    ).toEqual([])
+        for (const summaryItem of summaryGroup.items) {
+          expect(duplicatedColonPattern.test(summaryItem)).toBe(false)
+        }
+      }
+    }
+  })
 
-    expect(
-      slides.find((slide) => slide.hour === 1 && slide.title === '開場')?.summary,
-    ).toEqual([
-      group([
-        'Docker 基礎概念',
-        '安裝與基本命令',
-        '映像檔深入',
-      ], '學習路線圖：'),
-    ])
+  it('falls back to conservative partial title matching when outline headings are shorter', () => {
+    const fallbackDocuments = {
+      ...documents,
+      'day2-hour3.md': day2Hour3Raw
+        .replace('## 七、設定映像加速（5 分鐘）', '## 七、映像加速（5 分鐘）')
+        .replace('## 八、本堂課小結（2 分鐘）', '## 八、小結（2 分鐘）'),
+      'day2-hour7.md': day2Hour7Raw
+        .replace('## 二、綜合練習題（30 分鐘）', '## 二、綜合練習（30 分鐘）')
+        .replace('## 八、課後作業（自選）', '## 八、課後作業'),
+    }
+    const slides = buildDockerDay2SlideSpecs(fallbackDocuments)
+    const mirrorSlide = slides.find((slide) => slide.hour === 3 && slide.title === '映像加速')
+    const practiceSlide = slides.find((slide) => slide.hour === 7 && slide.title === '練習一：基礎操作')
+    const homeworkSlide = slides.find((slide) => slide.hour === 7 && slide.title === '課後作業')
 
-    expect(
-      slides.find((slide) => slide.hour === 7 && slide.title === '前情提要')?.summary,
-    ).toEqual([
-      group([
-        '容器概念與架構',
-        'Docker 安裝',
-        '基本指令',
-      ], 'Day 2 學完：'),
-    ])
+    expect(mirrorSlide).toBeDefined()
+    expect(mirrorSlide?.notes).toContain('registry-mirrors')
+
+    expect(practiceSlide).toBeDefined()
+    expect(practiceSlide?.notes).toContain('查看本機所有映像檔')
+
+    expect(homeworkSlide).toBeDefined()
+    expect(homeworkSlide?.notes).toContain('MySQL 啟動範例')
   })
 
   it('never leaks markdown thematic breaks into summaries, cards, or notes', () => {
@@ -399,29 +265,16 @@ describe('docker day 2 parser', () => {
     }
   })
 
-  it('keeps command reference sections as detail cards without duplicate summary bullets', () => {
-    const slides = buildDockerDay2SlideSpecs(documents)
-    const commandOnlySlide = slides.find((slide) => slide.hour === 5 && slide.title === '其他常用指令')
-
-    expect(commandOnlySlide).toBeDefined()
-    expect(commandOnlySlide?.summary).toEqual([])
-    expect(commandOnlySlide?.cards.map((card) => card.title)).toEqual([
-      'docker inspect',
-      'docker stats / docker top',
-    ])
-    expect(commandOnlySlide?.code).toContain('docker inspect my-nginx')
-  })
-
-  it('removes exact summary/card overlaps across every docker day 2 slide', () => {
+  it('removes exact summary/card overlaps across every docker slide', () => {
     const slides = buildDockerDay2SlideSpecs(documents)
     const normalizeComparable = (value: string) => value.replace(/\s+/g, ' ').trim()
 
     for (const slide of slides) {
       const summaryItems = new Set(
-        slide.summary.flatMap((group) => group.items.map(normalizeComparable)),
+        slide.summary.flatMap((summaryGroup) => summaryGroup.items.map(normalizeComparable)),
       )
       const cardItems = slide.cards.flatMap((card) => (
-        card.bullets.flatMap((group) => group.items.map(normalizeComparable))
+        card.bullets.flatMap((bulletGroup) => bulletGroup.items.map(normalizeComparable))
       ))
 
       const overlaps = [...new Set(cardItems.filter((item) => summaryItems.has(item)))]

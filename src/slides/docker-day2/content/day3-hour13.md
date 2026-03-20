@@ -4,7 +4,7 @@
 
 ## 一、為什麼需要 Docker Compose（8 分鐘）
 
-### 痛點：用 docker run 管理多容器
+**痛點：用 docker run 管理多容器**
 
 一個典型電商系統的容器組成：
 
@@ -21,7 +21,7 @@ Nginx（前端 / 反向代理）
 - 新人加入難以重現環境
 - 停止時需逐一清理
 
-### Docker Compose 解法
+**Docker Compose 解法**
 
 ```bash
 docker compose up -d    # 全部啟動
@@ -31,7 +31,7 @@ docker compose down     # 全部停止並清理
 - 所有設定寫進一個 `compose.yaml`，放進 Git 版本控制
 - 新同事 `git clone` → `docker compose up -d`，開發環境立即就緒
 
-### v1 vs v2 比較
+**v1 vs v2 比較**
 
 | 比較項目 | Compose v1（舊版） | Compose v2（新版） |
 |---------|-------------------|-------------------|
@@ -46,14 +46,14 @@ docker compose down     # 全部停止並清理
 
 ## 二、compose.yaml 基本結構（10 分鐘）
 
-### 檔案命名優先順序
+**檔案命名優先順序**
 
 1. `compose.yaml`（官方推薦）
 2. `compose.yml`
 3. `docker-compose.yaml`
 4. `docker-compose.yml`
 
-### 最簡範例
+**最簡範例**
 
 ```yaml
 services:
@@ -65,7 +65,7 @@ services:
 
 等同於：`docker run -d --name web -p 8080:80 nginx:alpine`
 
-### 完整範例（帶說明）
+**完整範例（帶說明）**
 
 ```yaml
 services:
@@ -92,7 +92,7 @@ volumes:
   db-data:
 ```
 
-### 三大頂層區塊
+**三大頂層區塊**
 
 ```yaml
 services:    # 定義服務（容器），必填
@@ -103,7 +103,7 @@ networks:    # 定義自訂網路（可選）
   ...
 ```
 
-### compose.yaml vs docker run 對照表
+**compose.yaml vs docker run 對照表**
 
 | compose.yaml 設定 | docker run 參數 | 說明 |
 |-------------------|----------------|------|
@@ -116,7 +116,7 @@ networks:    # 定義自訂網路（可選）
 | `networks: [my-net]` | `--network my-net` | 加入網路 |
 | `command: ["node", "app.js"]` | 映像檔後接的指令 | 覆蓋 CMD |
 
-### YAML 常見陷阱
+**YAML 常見陷阱**
 
 | 陷阱 | 說明 |
 |------|------|
@@ -302,7 +302,7 @@ build:
 
 ## 七、其他實用設定（5 分鐘）
 
-### restart 重啟策略
+**restart 重啟策略**
 
 | 值 | 行為 |
 |----|------|
@@ -311,7 +311,7 @@ build:
 | `on-failure` | 非正常退出才重啟 |
 | `unless-stopped` | 除非手動停止，否則重啟（正式環境推薦） |
 
-### 資源限制
+**資源限制**
 
 ```yaml
 deploy:
@@ -324,7 +324,7 @@ deploy:
       memory: 256M
 ```
 
-### Profiles — 按需啟動
+**Profiles — 按需啟動**
 
 ```yaml
 services:
@@ -341,7 +341,7 @@ docker compose up -d                    # 只啟動 web
 docker compose --profile debug up -d    # 也啟動 adminer
 ```
 
-### Logging — 日誌管理
+**Logging — 日誌管理**
 
 ```yaml
 logging:
@@ -357,7 +357,7 @@ logging:
 
 ## 八、docker compose 常用指令（5 分鐘）
 
-### 指令速查表
+**指令速查表**
 
 ```bash
 docker compose up -d              # 背景啟動所有服務（最常用）
@@ -373,14 +373,14 @@ docker compose restart web        # 重啟（可指定單一服務）
 docker compose config             # 驗證並顯示合併後的完整設定
 ```
 
-### stop vs down 的差異
+**stop vs down 的差異**
 
 | 指令 | 容器狀態 | Volume | 網路 | 適用時機 |
 |------|---------|--------|------|---------|
 | `stop` | 保留 | 保留 | 保留 | 暫停省資源，稍後還要用 |
 | `down` | 刪除 | 保留 | 刪除 | 清理環境、重新來過 |
 
-### 自動命名規則
+**自動命名規則**
 
 Compose 用**資料夾名稱**當前綴，例如 `myproject/` 中的服務：
 - 容器：`myproject-web-1`
@@ -388,190 +388,16 @@ Compose 用**資料夾名稱**當前綴，例如 `myproject/` 中的服務：
 
 ---
 
-## 九、實戰：WordPress 四服務（10 分鐘）
+## 九、Hour 14 實戰預告（3 分鐘）
 
-### 架構
+下一堂會把今天的觀念全部串起來，做一個完整的多服務 Compose 練習，不再只是講 YAML，而是真的部署與排錯。會用到四個重點：
 
-```
-          使用者（瀏覽器）
-                │
-       ┌────────▼────────┐
-       │      Nginx      │  ← 反向代理，Port 80
-       └────────┬────────┘
-                │
-       ┌────────▼────────┐
-       │    WordPress    │  ← PHP 應用程式
-       └────┬───────┬────┘
-            │       │
-     ┌──────▼──┐ ┌──▼──────┐
-     │  MySQL  │ │  Redis  │
-     └─────────┘ └─────────┘
-```
+- `.env` 抽出密碼與環境差異
+- `depends_on + healthcheck` 控制服務就緒順序
+- 前後端分離 network 驗證最小權限
+- `docker compose ps / logs / config` 當作第一線排查工具
 
-### 網路隔離設計
-
-- **frontend 網路**：Nginx + WordPress
-- **backend 網路**：WordPress + MySQL + Redis
-- Nginx 連不到 MySQL（最小權限原則）
-
-### .env 環境變數
-
-```bash
-MYSQL_ROOT_PASSWORD=my-secret-root-pw
-MYSQL_DATABASE=wordpress
-MYSQL_USER=wp_user
-MYSQL_PASSWORD=wp_password_123
-WORDPRESS_DB_HOST=mysql:3306
-WORDPRESS_DB_USER=wp_user
-WORDPRESS_DB_PASSWORD=wp_password_123
-WORDPRESS_DB_NAME=wordpress
-```
-
-### Nginx 設定
-
-```nginx
-server {
-    listen 80;
-    client_max_body_size 64M;
-    location / {
-        proxy_pass http://wordpress:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-### 完整 compose.yaml
-
-```yaml
-services:
-  nginx:
-    image: nginx:alpine
-    container_name: blog-nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      - frontend
-    depends_on:
-      wordpress:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-
-  wordpress:
-    image: wordpress:6-php8.2-apache
-    container_name: blog-wordpress
-    environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PORT', 6379);
-    volumes:
-      - wordpress-data:/var/www/html
-    networks:
-      - frontend
-      - backend
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
-
-  mysql:
-    image: mysql:8.0
-    container_name: blog-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
-
-  redis:
-    image: redis:7-alpine
-    container_name: blog-redis
-    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-
-networks:
-  frontend:
-    driver: bridge
-  backend:
-    driver: bridge
-
-volumes:
-  mysql-data:
-  wordpress-data:
-  redis-data:
-```
-
-### 啟動與驗證
-
-```bash
-docker compose up -d
-docker compose ps              # 確認 healthy
-docker compose logs --tail=20  # 觀察啟動順序
-# 瀏覽器 http://localhost → WordPress 安裝畫面
-
-# 驗證 Volume 持久化
-docker compose down            # 停止（Volume 保留）
-docker compose up -d           # 重啟 → 資料還在
-
-# 完整清理
-docker compose down -v         # ⚠️ 連資料一起刪
-```
+Hour 13 先把語法、觀念與指令講清楚，Hour 14 再完整動手做。
 
 ---
 
@@ -655,7 +481,6 @@ docker compose -f compose.yaml -f compose.prod.yaml config     # 驗證指定組
 | depends_on | 搭配 healthcheck + condition: service_healthy |
 | Build 整合 | 改程式碼要加 `--build` |
 | 其他設定 | restart、資源限制、profiles、logging |
-| WordPress 實戰 | 四服務完整架構 |
 | 環境分離 | override 自動合併、prod 手動指定 |
 | 核心指令 | `up -d` / `down` / `ps` / `logs -f` / `exec` |
 

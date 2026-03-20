@@ -70,8 +70,8 @@ export const slides: Slide[] = [
         <div className="grid gap-2">
           {[
             { day: "Day 1", icon: "🐧", am: "Linux 基礎入門", pm: "Linux 指令實作", color: "text-green-400" },
-            { day: "Day 2", icon: "🐳", am: "Docker 概念、架構與安裝", pm: "Docker 實作 + Day 3 擴充", color: "text-blue-400" },
-            { day: "Day 3", icon: "🐳", am: "容器進階操作", pm: "容器資料管理實戰", color: "text-blue-400" },
+            { day: "Day 2", icon: "🐳", am: "Docker 概念、架構與安裝", pm: "Docker 指令與 Nginx 實作", color: "text-blue-400" },
+            { day: "Day 3", icon: "🐳", am: "Volume、容器網路、Dockerfile", pm: "Dockerfile 進階與 Compose", color: "text-blue-400" },
             { day: "Day 4", icon: "☸️", am: "Kubernetes 架構", pm: "kubectl 與 YAML", color: "text-k8s-blue" },
             { day: "Day 5", icon: "📦", am: "工作負載管理", pm: "Service & Ingress", color: "text-k8s-blue" },
             { day: "Day 6", icon: "💾", am: "組態管理", pm: "持久化儲存", color: "text-k8s-blue" },
@@ -117,9 +117,9 @@ export const slides: Slide[] = [
 
 **第二階段：Docker 容器化（Day 2-3）**
 - Day 2 上午：環境一致性、容器概念、Docker 架構與安裝驗證
-- Day 2 下午：Docker 基本指令、Nginx 容器實作，並延伸到映像、生命週期、網路、Port Mapping、Volume 與 Dockerfile
-- Day 3 上午：在既有課程安排中，再次深化容器操作、網路、環境變數與資源限制
-- Day 3 下午：延續資料管理與多容器實戰，補強映像建構與應用整合觀念
+- Day 2 下午：Docker 基本指令、Nginx 容器實作，建立容器操作與排查基礎
+- Day 3 上午：Volume 持久化、容器網路與 Port Mapping、Dockerfile 基礎
+- Day 3 下午：Dockerfile 最佳化與實戰、Docker Compose 講解與練習
 
 Docker 是 Kubernetes 的基礎。Pod 裡面跑的就是容器。不懂容器，學 K8s 只能死記硬背。
 

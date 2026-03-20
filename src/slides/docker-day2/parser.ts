@@ -56,8 +56,8 @@ function normalizeLine(value: string): string {
 
 export function normalizeSectionTitle(value: string): string {
   return normalizeLine(value)
+    .replace(/^\d+(?:\.\d+)+\s*/, '')
     .replace(/^第?[一二三四五六七八九十\d]+[、.．]\s*/, '')
-    .replace(/^\d+\.\d+\s*/, '')
     .replace(/\s*（\d+\s*分鐘）\s*$/u, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -253,7 +253,7 @@ function collectGroupedKeyLines(markdown: string, limit: number): BulletGroup[] 
       continue
     }
 
-    const label = normalizeSummaryLine(line)
+    const label = normalizeSummaryLine(line).replace(/[：:]+$/, '').trim()
     if (!label) {
       continue
     }
@@ -713,6 +713,8 @@ export function buildDockerDay2SlideSpecs(
 
   for (let hour = 1; hour <= 14; hour += 1) {
     const sourceDay = hour <= 7 ? 2 : 3
+    const displayHour = sourceDay === 3 ? hour - 7 : hour
+    const displayHourLabel = sourceDay === 3 ? `第${displayHour}小時` : `Hour ${displayHour}`
     const outline = documents[`day${sourceDay}-hour${hour}.md`]
     const full = documents[`day${sourceDay}-hour${hour}-full.md`]
     const hourMeta = scheduleByHour.get(hour)
@@ -762,8 +764,8 @@ export function buildDockerDay2SlideSpecs(
           hourTitle: hourMeta.title,
           phase,
           title: chunk.isIntro ? section.title : chunk.title,
-          subtitle: `${subtitlePrefix} · Hour ${hour} · ${section.title}`,
-          section: `Hour ${hour}｜${hourMeta.title}`,
+          subtitle: `${subtitlePrefix} · ${displayHourLabel} · ${section.title}`,
+          section: `${displayHourLabel}｜${hourMeta.title}`,
           duration: String(chunkDurations[chunkIndex] ?? 0),
           summary: chunkSummary,
           cards: chunkCards,

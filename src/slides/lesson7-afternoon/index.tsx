@@ -105,7 +105,7 @@ export const slides: Slide[] = [
         <div className="grid grid-cols-2 gap-3">
           {[
             { day: "Day 1", topic: "Linux 基礎", icon: "🐧", detail: "命令列、檔案系統、權限" },
-            { day: "Day 2", topic: "Docker 基礎 + 擴充", icon: "🐳", detail: "概念、架構、安裝、指令、映像、生命週期、網路、Dockerfile" },
+            { day: "Day 2", topic: "Docker 基礎與操作", icon: "🐳", detail: "概念、架構、安裝、指令、Nginx 實作" },
             { day: "Day 3", topic: "Docker 進階", icon: "🔧", detail: "網路、Volume、Dockerfile、Compose" },
             { day: "Day 4", topic: "K8s 入門", icon: "☸️", detail: "架構、YAML、Pod、Deployment" },
             { day: "Day 5", topic: "工作負載與網路", icon: "🌐", detail: "HPA、Service、Ingress、NetworkPolicy" },
@@ -133,7 +133,7 @@ Day 1，我們從 Linux 命令列開始。很多人那天第一次用 SSH 連進
 
 Day 2，我們正式把 Linux 基礎接上 Docker：先理解環境一致性問題、容器技術與 Docker 架構，再把 Docker 安裝好，真的跑出第一個容器。下午不只做基本指令與 Nginx 實作，還一路延伸到映像、容器生命週期、網路、Port Mapping、Volume 與 Dockerfile，讓第二天就先把完整的容器心智模型建立起來。
 
-Day 3，我們把 Docker 用到更像真實工作場景：容器生命週期管理、網路、Volume、Dockerfile、Compose，全都串在一起。這一天讓你不只是會 run 容器，而是真的具備容器化應用的開發與排錯能力。
+Day 3，我們把 Docker 推進到更接近實務工作的層次：先處理 Volume 持久化、容器網路與 Port Mapping，再進到 Dockerfile 基礎、最佳化、實戰，最後用 Compose 把多服務系統串起來。這一天讓你不只是會 run 容器，而是真的具備容器化應用的建構、發佈與排錯能力。
 
 Day 4，正式進入 Kubernetes。這一天是很多人的轉折點，因為 K8s 的概念層次比 Docker 複雜很多。我們學了架構、YAML、Pod 是什麼、為什麼需要 Deployment 而不是直接管理 Pod。還記得第一次 kubectl apply 成功的感覺嗎？那個瞬間真的很有成就感。
 

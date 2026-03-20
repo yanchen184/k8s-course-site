@@ -726,248 +726,18 @@ Compose 用**資料夾名稱**當前綴。你的 compose.yaml 放在 `myproject/
 
 ---
 
-## 九、實戰：WordPress 四服務（10 分鐘）
+## 九、Hour 14 實戰預告（3 分鐘）
 
-### 9.1 為什麼選 WordPress？
+下一堂不再只是講 YAML，而是要把今天的觀念全部串起來，做一個完整的多服務 Compose 練習。重點不是背範例，而是把「服務關係、啟動順序、排錯流程」一次練熟。
 
-WordPress 的架構特別經典——反向代理 + 應用程式 + 資料庫 + 快取。不管你的應用是什麼語言寫的，Java、Python、Node.js，很多時候都是這個結構。學會了這個架構，把 WordPress 換成你自己的應用，道理都一樣。
+會用到四個重點：
 
-### 9.2 系統架構
+1. **`.env` 抽出密碼與環境差異**，不要把敏感資訊寫死在 compose.yaml
+2. **`depends_on + healthcheck` 控制啟動順序**，避免服務一啟動就連不到資料庫
+3. **frontend / backend 兩層網路隔離**，驗證最小權限原則
+4. **`docker compose ps / logs / config` 當第一線排查工具**，不是出事才亂猜
 
-```
-                    使用者（瀏覽器）
-                         │
-                ┌────────▼────────┐
-                │      Nginx      │  ← 反向代理，對外 Port 80
-                └────────┬────────┘
-                         │
-                ┌────────▼────────┐
-                │    WordPress    │  ← PHP 應用程式
-                └────┬───────┬────┘
-                     │       │
-             ┌───────▼──┐ ┌──▼───────┐
-             │  MySQL   │ │  Redis   │
-             │ (資料庫)  │ │  (快取)  │
-             └──────────┘ └──────────┘
-```
-
-四個服務：
-
-**Nginx** — 接收請求，轉發給 WordPress。擅長靜態檔案、負載均衡、SSL。
-
-**WordPress** — PHP 應用，處理業務邏輯。
-
-**MySQL** — 文章、帳號、設定全存這裡。
-
-**Redis** — 快取。查一次 MySQL 把結果放 Redis，後面直接從 Redis 拿，速度快很多倍。
-
-### 9.3 網路設計
-
-```
-┌──────────────────────────────────────────┐
-│  frontend 網路                            │
-│  Nginx  ──►  WordPress                   │
-└──────────────────┬───────────────────────┘
-                   │
-┌──────────────────┼───────────────────────┐
-│  backend 網路    │                       │
-│            WordPress                     │
-│            ┌──┴──┐                       │
-│          MySQL  Redis                    │
-└──────────────────────────────────────────┘
-```
-
-**最小權限原則**：Nginx 不需連資料庫，只加入 frontend。MySQL/Redis 只在 backend。WordPress 同時加入兩個網路作為橋樑。
-
-### 9.4 .env 環境變數
-
-```bash
-MYSQL_ROOT_PASSWORD=my-secret-root-pw
-MYSQL_DATABASE=wordpress
-MYSQL_USER=wp_user
-MYSQL_PASSWORD=wp_password_123
-WORDPRESS_DB_HOST=mysql:3306
-WORDPRESS_DB_USER=wp_user
-WORDPRESS_DB_PASSWORD=wp_password_123
-WORDPRESS_DB_NAME=wordpress
-```
-
-這些環境變數怎麼來的？去 Docker Hub 查的。MySQL 的文件告訴你 `MYSQL_ROOT_PASSWORD` 是必填的，WordPress 的文件告訴你 `WORDPRESS_DB_HOST` 要設。**兩邊的帳號密碼要對得起來。**
-
-`WORDPRESS_DB_HOST=mysql:3306` 裡面的 `mysql` 是 service name，在 Compose 的網路裡自動變成 DNS 名稱。
-
-### 9.5 Nginx 設定
-
-```nginx
-server {
-    listen 80;
-    client_max_body_size 64M;    # WordPress 圖片上傳
-
-    location / {
-        proxy_pass http://wordpress:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-**「這個設定檔哪裡來的？」** 不用背。Google 搜尋 `nginx reverse proxy config` 就有範本。改 `proxy_pass` 目標位址就好。
-
-`proxy_pass http://wordpress:80` — 用 service name `wordpress` 當 hostname。
-
-`client_max_body_size 64M` — WordPress 使用者會上傳圖片，預設 1MB 太小。
-
-### 9.6 完整 compose.yaml
-
-```yaml
-services:
-  nginx:
-    image: nginx:alpine
-    container_name: blog-nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      - frontend
-    depends_on:
-      wordpress:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-
-  wordpress:
-    image: wordpress:6-php8.2-apache
-    container_name: blog-wordpress
-    environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PORT', 6379);
-    volumes:
-      - wordpress-data:/var/www/html
-    networks:
-      - frontend
-      - backend
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
-
-  mysql:
-    image: mysql:8.0
-    container_name: blog-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
-
-  redis:
-    image: redis:7-alpine
-    container_name: blog-redis
-    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-
-networks:
-  frontend:
-    driver: bridge
-  backend:
-    driver: bridge
-
-volumes:
-  mysql-data:
-  wordpress-data:
-  redis-data:
-```
-
-這個檔案看起來很長，但拆開來看就是四個服務的重複結構。每一個服務都有 `restart: unless-stopped` 和 `deploy.resources.limits`——restart 確保服務掛了自動重啟，resources limits 確保某個服務不會吃掉所有資源。
-
-### 9.7 啟動與驗證
-
-```bash
-docker compose up -d
-
-docker compose ps
-# 全部 Up，有 healthcheck 的都顯示 healthy
-
-docker compose logs --tail=20
-# 觀察啟動順序：Redis + MySQL 先起來，然後 WordPress，最後 Nginx
-
-# 打開瀏覽器 http://localhost → WordPress 安裝畫面
-```
-
-### 9.8 驗證 Volume 持久化
-
-先在 WordPress 寫一篇文章，然後：
-
-```bash
-docker compose down    # 停止（Volume 保留）
-docker compose up -d   # 重啟
-# → 文章還在！
-```
-
-因為 MySQL 的資料存在 named volume `mysql-data` 裡面。容器刪了再建，Volume 還在，資料就還在。
-
-### 9.9 完整清理
-
-```bash
-docker compose down              # 只停容器，保留資料
-docker compose down -v           # ⚠️ 連資料一起刪
-docker compose down -v --rmi all # 連映像檔也刪
-```
+Hour 13 先把語法、觀念與指令講清楚，Hour 14 再完整動手做。這樣學員在練習時才不會一邊查語法、一邊猜錯誤在哪裡。
 
 ---
 
@@ -1064,7 +834,7 @@ docker compose config --quiet                                  # 只驗證語法
 | depends_on | 搭配 healthcheck + condition: service_healthy |
 | Build 整合 | 直接在 compose 裡 build；改程式碼要加 `--build` |
 | 其他設定 | restart 策略、資源限制、profiles、logging |
-| WordPress 實戰 | 四服務完整架構，兩個隔離網路 |
+| Hour 14 實戰預告 | 四服務整合、啟動順序與排錯重點 |
 | 環境分離 | override 自動合併、prod 手動指定 |
 | 核心指令 | up -d / down / ps / logs -f / exec |
 
@@ -1093,7 +863,7 @@ docker compose config --quiet                                  # 只驗證語法
 7. **depends_on 的坑**：時序圖展示「容器啟動 ≠ 服務 ready」
 8. **Healthcheck 參數說明**：interval、timeout、retries、start_period
 9. **常見服務 healthcheck 對照表**：MySQL、PostgreSQL、Redis
-10. **WordPress 四層架構圖**：Nginx → WordPress → MySQL + Redis，標示 network、volume
+10. **Hour 14 四服務流程圖**：Nginx / API / DB / Cache 的啟動順序、network、volume
 11. **環境分離流程圖**：compose.yaml + override / prod 合併過程
 12. **開發流程圖**：改程式碼 → docker compose up --build → 測試 → 循環
 13. **警告標誌**：`docker compose down -v` 的危險性（紅色醒目標示）

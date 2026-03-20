@@ -4,7 +4,7 @@
 
 ## 一、為什麼需要學網路（5 分鐘）
 
-上堂課：容器生命週期管理（資源限制、重啟策略、健康檢查）。
+上堂課：Volume 資料持久化（R/W Layer、Named Volume、Bind Mount、備份觀念）。
 
 本堂課：容器網路 + Port Mapping 進階
 - Docker 三種網路驅動（bridge / host / none）

@@ -75,9 +75,8 @@
 | Hour 3 | 15 分鐘 | 安裝 Docker | 巡視協助 |
 | Hour 6 | 20 分鐘 | Nginx 完整部署 | 坐下休息 |
 | Hour 7 | 30 分鐘 | 綜合練習 | 完全休息 |
-| Hour 10 | 15 分鐘 | 網路實作 | 巡視 |
-| Hour 13 | 15 分鐘 | 第一個 Dockerfile | 巡視協助 |
-| Hour 14 | 20 分鐘 | Multi-stage Build | 坐下休息 |
+| Hour 12 | 15 分鐘 | Dockerfile 實戰與 Code Review | 巡視答疑 |
+| Hour 14 | 15 分鐘 | Compose 多服務實戰 + 排錯 | 巡視答疑 |
 
 ---
 

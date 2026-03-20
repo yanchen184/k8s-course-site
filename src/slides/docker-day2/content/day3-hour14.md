@@ -9,7 +9,7 @@
 
 | # | 題目 | 難度 | 時間 |
 |---|------|:---:|:---:|
-| 1 | Nginx + API + PostgreSQL 基本 Compose | ★ | 15 分鐘 |
+| 1 | Nginx Reverse Proxy + API Mock + PostgreSQL | ★ | 15 分鐘 |
 | 2 | 加入 .env + healthcheck + 網路隔離 | ★★ | 20 分鐘 |
 | 3 | Code Review：找出 5 個問題 | ★★★ | 25 分鐘 |
 
@@ -22,20 +22,34 @@
 寫一個 `compose.yaml`，包含三個服務：
 
 1. **nginx** — 反向代理，對外 port 8080
-2. **api** — 用 `httpd:alpine` 模擬 API，port 80
+2. **api** — 用 `hashicorp/http-echo` 模擬 API，回應固定字串
 3. **db** — PostgreSQL，port 5432
 
 **要求：**
 - 設定 ports
+- `nginx` 要真的反向代理到 `api`
 - PostgreSQL 用 named volume 持久化
 - 設定 `POSTGRES_PASSWORD` 環境變數
 - 設定基本的 `depends_on`
 
+**`./nginx/default.conf`：**
+```nginx
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://api:5678;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
 **驗證：**
 ```bash
 docker compose up -d
-docker compose ps              # 三個服務都 Up
-curl http://localhost:8080      # 看到 httpd 預設頁面
+docker compose ps               # 三個服務都 Up
+curl http://localhost:8080      # → hello from api
 docker compose exec db psql -U postgres -c "SELECT 1;"
 docker compose down
 ```
@@ -50,12 +64,15 @@ services:
     image: nginx:alpine
     ports:
       - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - api
     restart: unless-stopped
 
   api:
-    image: httpd:alpine
+    image: hashicorp/http-echo:1.0.0
+    command: ["-text=hello from api", "-listen=:5678"]
     depends_on:
       - db
     restart: unless-stopped
@@ -78,7 +95,7 @@ volumes:
 ```bash
 docker compose up -d
 docker compose ps
-curl http://localhost:8080
+curl http://localhost:8080      # → hello from api
 docker compose exec db psql -U postgres -c "SELECT 1;"
 docker compose down
 ```
@@ -101,8 +118,9 @@ docker compose down
 
 **驗證清單：**
 - `docker compose ps` → db 顯示 (healthy)
-- `docker compose exec nginx ping -c 1 db` → 失敗（網路隔離）
-- `docker compose exec api ping -c 1 db` → 成功
+- `curl http://localhost:8080` → 仍然回 `hello from api`
+- `docker network inspect $(basename "$PWD")_frontend-net` → 只有 nginx + api
+- `docker network inspect $(basename "$PWD")_backend-net` → 只有 api + db
 - 密碼不在 compose.yaml 裡出現
 
 ---
@@ -123,6 +141,19 @@ POSTGRES_PASSWORD=your_password
 POSTGRES_DB=your_database
 ```
 
+**`./nginx/default.conf`：**
+```nginx
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://api:5678;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
 **compose.yaml：**
 ```yaml
 services:
@@ -130,6 +161,8 @@ services:
     image: nginx:alpine
     ports:
       - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       api:
         condition: service_started
@@ -138,7 +171,8 @@ services:
     restart: unless-stopped
 
   api:
-    image: httpd:alpine
+    image: hashicorp/http-echo:1.0.0
+    command: ["-text=hello from api", "-listen=:5678"]
     depends_on:
       db:
         condition: service_healthy
@@ -176,9 +210,10 @@ volumes:
 **驗證：**
 ```bash
 docker compose up -d
-docker compose ps                              # db 顯示 (healthy)
-docker compose exec nginx ping -c 1 db         # 失敗（網路隔離）
-docker compose exec api ping -c 1 db           # 成功
+docker compose ps                                   # db 顯示 (healthy)
+curl http://localhost:8080                          # → hello from api
+docker network inspect $(basename "$PWD")_frontend-net
+docker network inspect $(basename "$PWD")_backend-net
 docker compose down
 ```
 

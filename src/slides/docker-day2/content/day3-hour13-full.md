@@ -618,6 +618,18 @@ connection = pymysql.connect(
 
 好，接下來講環境變數管理。
 
+先回答一個大家一定會有的疑問：**「這些環境變數我怎麼知道要設哪些？」**
+
+答案是：**去 Docker Hub 看。** 每個官方 Image 的頁面都有一個 "Environment Variables" 段落，會列出它支援的所有環境變數。比如你搜尋 `mysql`，官方文件會告訴你：
+
+- `MYSQL_ROOT_PASSWORD`（必填）：root 的密碼
+- `MYSQL_DATABASE`（可選）：啟動時自動建立的資料庫
+- `MYSQL_USER` / `MYSQL_PASSWORD`（可選）：自動建立的使用者和密碼
+
+PostgreSQL、Redis、WordPress、Nginx... 每個 Image 都一樣，文件裡都寫好了。**養成習慣：用一個新的 Image 之前，先去 Docker Hub 看它的文件。** 不要用猜的。
+
+好，知道去哪裡查之後，我們來講怎麼管理這些環境變數。
+
 前面我們設定 MySQL 的時候，是不是直接把密碼寫在 compose.yaml 裡面？
 
 ```yaml

@@ -144,7 +144,15 @@ WORDPRESS_DB_PASSWORD=wp_password_123
 WORDPRESS_DB_NAME=wordpress
 ```
 
-這裡有一個重點，大家看到 `WORDPRESS_DB_HOST=mysql:3306` 這行了嗎？`mysql` 這個不是 IP 地址，它是我們待會在 compose.yaml 裡面定義的服務名稱。在 Docker Compose 的自訂網路裡，服務名稱會自動變成 DNS 名稱，可以直接拿來當 hostname 用。這個是上堂課教的，大家還有印象吧？
+**「等等，這些環境變數你怎麼知道的？」**
+
+好問題。這些不是我自己發明的，是每個 Image 的官方文件告訴你的。你去 Docker Hub 搜尋 `mysql`，打開官方頁面，往下滑到 **「Environment Variables」** 這個段落，它會列出所有支援的環境變數：`MYSQL_ROOT_PASSWORD`（必填）、`MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD`。WordPress 也一樣，去 Docker Hub 搜 `wordpress`，文件裡會告訴你要設 `WORDPRESS_DB_HOST`、`WORDPRESS_DB_USER` 等等。
+
+**這是一個非常重要的習慣：用任何第三方 Image 之前，先去 Docker Hub 看它的文件。** 看它支援哪些環境變數、需要掛載哪些 Volume、預設用哪個 port。不要用猜的，文件都寫好了。
+
+所以上面這些變數的邏輯是：MySQL 那邊建立了帳號 `wp_user`、密碼 `wp_password_123`、資料庫 `wordpress`。WordPress 這邊就要填一模一樣的值去連線。兩邊要對得起來，不然 WordPress 連不上 MySQL。
+
+再看 `WORDPRESS_DB_HOST=mysql:3306` 這行，`mysql` 這個不是 IP 地址，它是我們待會在 compose.yaml 裡面定義的服務名稱。在 Docker Compose 的自訂網路裡，服務名稱會自動變成 DNS 名稱，可以直接拿來當 hostname 用。這個是上堂課教的，大家還有印象吧？
 
 另外我要特別提醒：`.env` 檔案一定要加到 `.gitignore` 裡面。你可以另外建一個 `.env.example` 當範本給團隊成員看：
 
@@ -162,7 +170,20 @@ WORDPRESS_DB_NAME=wordpress
 
 ### 2.6 撰寫 Nginx 反向代理設定
 
-第三步，寫 Nginx 的反向代理設定：
+第三步，寫 Nginx 的反向代理設定。
+
+**「這個設定檔的內容哪裡來的？我要一行一行自己打嗎？」**
+
+不用背。Nginx 的反向代理設定是一個很標準的寫法，你 Google 搜尋 `nginx reverse proxy config` 就有一大堆範本。或者去 Nginx 的官方文件看 reverse proxy 的範例。實際工作中，大部分人都是從範本複製過來，改裡面的 `proxy_pass` 目標位址就好。
+
+具體操作就是用任何文字編輯器建立一個檔案 `nginx/default.conf`：
+
+```bash
+# 用 VS Code、vim、nano 都可以
+code nginx/default.conf
+```
+
+然後把下面的內容貼進去：
 
 ```nginx
 # nginx/default.conf

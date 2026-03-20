@@ -59,61 +59,6 @@ function getComparisonRows(items: string[]): string[][] | null {
   return typedRows
 }
 
-function renderOverview(summary: BulletGroup[], cards: SlideCardSpec[]) {
-  if (summary.length === 0 && cards.length === 0) {
-    return null
-  }
-
-  const overviewChips = summary.length === 0
-    ? cards.slice(0, 3).map((card) => card.title)
-    : []
-
-  return (
-    <div className="overflow-hidden rounded-[1.75rem] border border-cyan-400/20 bg-gradient-to-r from-blue-950/70 via-slate-900/80 to-cyan-950/65 shadow-[0_24px_60px_rgba(2,6,23,0.35)]">
-      <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.26em] text-cyan-300/80">
-          Overview
-        </p>
-      </div>
-
-      <div className="space-y-4 px-5 py-5 sm:px-6">
-        {summary.length > 0 ? (
-          summary.map((group, groupIndex) => (
-            <div key={`${group.label ?? 'group'}-${groupIndex}`} className="space-y-3">
-              {group.label && (
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-100/75">
-                  {group.label}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-2.5">
-                {group.items.map((item, itemIndex) => (
-                  <span
-                    key={`${group.label ?? 'group'}-${groupIndex}-${itemIndex}`}
-                    className="rounded-full border border-white/10 bg-white/6 px-3.5 py-1.5 text-sm font-medium leading-relaxed text-slate-100 break-normal whitespace-normal [overflow-wrap:break-word] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="flex flex-wrap gap-2.5">
-            {overviewChips.map((item) => (
-              <span
-                key={item}
-                className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3.5 py-1.5 text-sm font-semibold leading-relaxed text-cyan-100 break-normal whitespace-normal [overflow-wrap:break-word]"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 function renderComparisonGroup(group: BulletGroup, groupIndex: number, rows: string[][]) {
   const [header, ...bodyRows] = rows

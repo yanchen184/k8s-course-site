@@ -244,7 +244,6 @@ function buildSlide(spec: (typeof slideSpecs)[number]): Slide {
     notes: spec.notes,
     content: (
       <div className="space-y-5">
-        {renderOverview(spec.summary, spec.cards)}
         {renderCards(spec.cards)}
         {shouldRenderFallback ? renderFallback() : null}
       </div>

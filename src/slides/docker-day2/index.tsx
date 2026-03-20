@@ -60,6 +60,33 @@ function getComparisonRows(items: string[]): string[][] | null {
 }
 
 
+function renderSummaryChips(summary: BulletGroup[], cards: SlideCardSpec[]) {
+  if (summary.length === 0 && cards.length === 0) {
+    return null
+  }
+
+  const chips = summary.length > 0
+    ? summary.flatMap((group) =>
+        group.items.map((item) => ({ label: group.label, text: item }))
+      )
+    : cards.slice(0, 3).map((card) => ({ label: undefined, text: card.title }))
+
+  if (chips.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-2.5">
+      {chips.map((chip, i) => (
+        <span
+          key={`chip-${i}`}
+          className="rounded-full border border-white/10 bg-white/6 px-3.5 py-1.5 text-sm font-medium leading-relaxed text-slate-200 break-normal whitespace-normal [overflow-wrap:break-word]"
+        >
+          {chip.label ? `${chip.label}：${chip.text}` : chip.text}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function renderComparisonGroup(group: BulletGroup, groupIndex: number, rows: string[][]) {
   const [header, ...bodyRows] = rows
   const gridStyle = { gridTemplateColumns: `repeat(${header.length}, minmax(0, 1fr))` }
@@ -189,6 +216,7 @@ function buildSlide(spec: (typeof slideSpecs)[number]): Slide {
     notes: spec.notes,
     content: (
       <div className="space-y-5">
+        {renderSummaryChips(spec.summary, spec.cards)}
         {renderCards(spec.cards)}
         {shouldRenderFallback ? renderFallback() : null}
       </div>

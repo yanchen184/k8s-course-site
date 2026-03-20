@@ -1,8 +1,8 @@
-# Day 3 第十三小時：Docker Compose 基礎與進階
+# Day 3 第十三小時：Docker Compose 完整講解
 
 ---
 
-## 一、為什麼需要 Docker Compose（10 分鐘）
+## 一、為什麼需要 Docker Compose（8 分鐘）
 
 ### 痛點：用 docker run 管理多容器
 
@@ -42,14 +42,9 @@ docker compose down     # 全部停止並清理
 
 **本課程統一使用 v2**：`docker compose`（空格）。
 
-```bash
-docker compose version
-# Docker Compose version v2.24.5
-```
-
 ---
 
-## 二、compose.yaml 基本結構（15 分鐘）
+## 二、compose.yaml 基本結構（10 分鐘）
 
 ### 檔案命名優先順序
 
@@ -131,70 +126,64 @@ networks:    # 定義自訂網路（可選）
 
 ---
 
-## 三、docker compose 指令（10 分鐘）
+## 三、環境變數管理（8 分鐘）
 
-### 常用指令
+### Docker Hub 查詢教學
 
-```bash
-# 背景啟動所有服務（最常用）
-docker compose up -d
+用一個新的 Image 之前，先去 Docker Hub 查三個東西：
+1. **Environment Variables** — 要設哪些環境變數
+2. **Volumes** — 資料存在哪個路徑
+3. **Exposed Ports** — 預設用哪個 port
 
-# 停止並刪除容器和網路（Volume 保留）
-docker compose down
+以 MySQL 為例，Docker Hub 文件告訴你：
+- `MYSQL_ROOT_PASSWORD`（必填）
+- `MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD`（可選但常用）
 
-# 連 Volume 一起刪（⚠️ 資料不可恢復！）
-docker compose down -v
+### 三種設定方式
 
-# 查看服務狀態
-docker compose ps
+```yaml
+# 方式一：直接寫（適合非敏感設定）
+environment:
+  MYSQL_ROOT_PASSWORD: my-secret-pw
 
-# 追蹤所有服務日誌
-docker compose logs -f
+# 方式二：引用外部 .env 檔案
+env_file:
+  - .env
 
-# 追蹤特定服務日誌
-docker compose logs -f db
-
-# 進入容器執行指令
-docker compose exec web bash
-docker compose exec db mysql -uroot -psecret
-
-# 停止（不刪除容器）
-docker compose stop
-
-# 啟動已停止的容器
-docker compose start
-
-# 重啟（可指定單一服務）
-docker compose restart web
+# 方式三：${} 變數替換（含預設值語法）
+environment:
+  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+ports:
+  - "${DB_PORT:-3306}:3306"   # 未設定時預設 3306
 ```
 
-### stop vs down 的差異
+### 環境變數優先順序
 
-| 指令 | 容器狀態 | Volume | 網路 | 適用時機 |
-|------|---------|--------|------|---------|
-| `stop` | 保留 | 保留 | 保留 | 暫停省資源，稍後還要用 |
-| `down` | 刪除 | 保留 | 刪除 | 清理環境、重新來過 |
+| 優先順序 | 來源 | 說明 |
+|---------|------|------|
+| 1（最高）| Shell 環境變數 | `export KEY=val` |
+| 2 | .env 檔案 | compose.yaml 同目錄下 |
+| 3（最低）| compose.yaml 預設值 | `${VAR:-default}` |
 
-### 啟動時的自動命名規則
+### 安全最佳實踐
 
-Compose 用**資料夾名稱**當前綴，例如 `myproject/` 資料夾中的服務：
-- 容器：`myproject-web-1`、`myproject-db-1`
-- 網路：`myproject_default`
+```bash
+# .gitignore
+.env
+
+# 提供範本供團隊參考（可 commit）
+cp .env.example .env
+```
 
 ---
 
-## 四、進階功能（20 分鐘）
+## 四、Networks：自訂網路隔離（5 分鐘）
 
-### 4.1 Networks：自訂網路隔離
+### 預設行為
 
-**預設行為**：所有服務都在同一個 `資料夾_default` bridge network，可互相連線，service name 就是 hostname。
+所有服務都在同一個 `資料夾_default` bridge network，service name 就是 hostname。
 
-```bash
-docker compose exec web ping db
-# PING db (172.18.0.3): 56 data bytes
-```
-
-**為何需要隔離**：三層架構中，前端 Nginx 不該直接連到資料庫（縱深防禦）。
+### 網路隔離（縱深防禦）
 
 ```yaml
 services:
@@ -219,86 +208,40 @@ networks:
   backend-net:
 ```
 
-**關鍵觀念**：Service name = hostname。程式碼裡連資料庫要寫 service name，不是 `localhost`：
+**關鍵觀念**：Service name = hostname。程式碼裡連資料庫要寫 service name（`host: 'db'`），不是 `localhost`。
 
-```javascript
-const connection = mysql.createConnection({
-  host: 'db',   // ✅ service name
-  // host: 'localhost'  ← ❌ 連不到
-});
-```
+---
 
-### 4.2 Environment 與 .env 檔案
+## 五、depends_on + healthcheck（5 分鐘）
 
-**問題**：密碼寫在 `compose.yaml` 裡，隨 Git 推送，安全性低，且無法因環境不同而切換。
-
-**三種設定方式：**
-
-```yaml
-# 方式一：直接寫（適合非敏感設定）
-environment:
-  MYSQL_ROOT_PASSWORD: my-secret-pw
-
-# 方式二：引用外部 .env 檔案
-env_file:
-  - .env
-
-# 方式三：${} 變數替換（含預設值語法）
-environment:
-  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-ports:
-  - "${DB_PORT:-3306}:3306"   # 未設定時預設 3306
-```
-
-**環境變數優先順序：**
-
-| 優先順序 | 來源 | 說明 |
-|---------|------|------|
-| 1（最高）| Shell 環境變數 | `export KEY=val` |
-| 2 | .env 檔案 | compose.yaml 同目錄下 |
-| 3（最低）| compose.yaml 預設值 | `${VAR:-default}` |
-
-**安全最佳實踐：**
-
-```bash
-# .gitignore
-.env
-
-# 提供範本供團隊參考（可 commit）
-cp .env.example .env
-```
-
-### 4.3 depends_on + healthcheck
-
-**問題**：MySQL 容器啟動 ≠ MySQL 服務已就緒（初始化需 10～20 秒）。
+### 問題：容器啟動 ≠ 服務就緒
 
 ```
 0s  → db 容器啟動
 1s  → api 容器啟動（depends_on 條件滿足）
 2s  → api 嘗試連線 db → 失敗！MySQL 還在初始化
-15s → MySQL 就緒，但 api 已掛掉
 ```
 
-**正確解法：healthcheck + condition: service_healthy**
+### 正確解法
 
 ```yaml
 services:
   api:
     depends_on:
       db:
-        condition: service_healthy   # 等 healthcheck 通過才啟動
+        condition: service_healthy
 
   db:
     image: mysql:8.0
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psecret"]
-      interval: 5s        # 每 5 秒檢查一次
-      timeout: 3s         # 超時視為失敗
-      retries: 10         # 連續 10 次失敗才判定 unhealthy
-      start_period: 30s   # 啟動後 30 秒內失敗不計入 retries
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
 ```
 
-**常見服務的 healthcheck 指令：**
+### 常見服務的 healthcheck 指令
 
 | 服務 | Healthcheck 指令 |
 |------|-----------------|
@@ -308,21 +251,23 @@ services:
 | MongoDB | `mongosh --eval "db.runCommand('ping')"` |
 | Nginx | `curl -f http://localhost/` |
 
-### 4.4 Build 整合
+---
 
-**直接在 Compose 裡 build 自己的 Dockerfile：**
+## 六、Build 整合（5 分鐘）
+
+### 在 Compose 裡 build 自己的 Dockerfile
 
 ```yaml
 services:
   api:
     build:
-      context: ./backend          # Dockerfile 所在目錄
-      dockerfile: Dockerfile      # 可省略，預設 Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
 ```
 
-**Build 相關指令：**
+### Build 相關指令
 
 ```bash
 docker compose build              # 只 build，不啟動
@@ -331,9 +276,7 @@ docker compose up -d --build      # 強制重新 build（改程式碼必用）
 docker compose build api          # 只 build 特定服務
 ```
 
-> 改了程式碼但沒加 `--build`，Compose 會用舊映像檔，改動不會生效。
-
-**開發模式（Volume 掛載 + hot reload）：**
+### 開發模式（Volume 掛載 + hot reload）
 
 ```yaml
 services:
@@ -344,7 +287,7 @@ services:
       - ./backend/src:/app/src   # 本機改動即時同步到容器
 ```
 
-**進階 build 選項：**
+### 進階 build 選項
 
 ```yaml
 build:
@@ -355,9 +298,11 @@ build:
   target: development            # 指定 multi-stage 的 target stage
 ```
 
-### 4.5 其他實用設定
+---
 
-**restart 重啟策略：**
+## 七、其他實用設定（5 分鐘）
+
+### restart 重啟策略
 
 | 值 | 行為 |
 |----|------|
@@ -366,7 +311,7 @@ build:
 | `on-failure` | 非正常退出才重啟 |
 | `unless-stopped` | 除非手動停止，否則重啟（正式環境推薦） |
 
-**資源限制（防止服務吃光機器資源）：**
+### 資源限制
 
 ```yaml
 deploy:
@@ -379,35 +324,123 @@ deploy:
       memory: 256M
 ```
 
+### Profiles — 按需啟動
+
+```yaml
+services:
+  web:
+    image: nginx:alpine
+  adminer:
+    image: adminer
+    profiles:
+      - debug
+```
+
+```bash
+docker compose up -d                    # 只啟動 web
+docker compose --profile debug up -d    # 也啟動 adminer
+```
+
+### Logging — 日誌管理
+
+```yaml
+logging:
+  driver: json-file
+  options:
+    max-size: "10m"    # 每個日誌檔案最大 10 MB
+    max-file: "3"      # 最多保留 3 個檔案
+```
+
+**生產環境必須設定，否則日誌可能撐爆磁碟。**
+
 ---
 
-## 五、綜合實作：三層架構應用
+## 八、docker compose 常用指令（5 分鐘）
 
-### 架構圖
+### 指令速查表
+
+```bash
+docker compose up -d              # 背景啟動所有服務（最常用）
+docker compose down               # 停止並刪除容器和網路（Volume 保留）
+docker compose down -v            # 連 Volume 一起刪（⚠️ 資料不可恢復！）
+docker compose ps                 # 查看服務狀態
+docker compose logs -f            # 追蹤所有服務日誌
+docker compose logs -f db         # 追蹤特定服務日誌
+docker compose exec web bash      # 進入容器執行指令
+docker compose stop               # 停止（不刪除容器）
+docker compose start              # 啟動已停止的容器
+docker compose restart web        # 重啟（可指定單一服務）
+docker compose config             # 驗證並顯示合併後的完整設定
+```
+
+### stop vs down 的差異
+
+| 指令 | 容器狀態 | Volume | 網路 | 適用時機 |
+|------|---------|--------|------|---------|
+| `stop` | 保留 | 保留 | 保留 | 暫停省資源，稍後還要用 |
+| `down` | 刪除 | 保留 | 刪除 | 清理環境、重新來過 |
+
+### 自動命名規則
+
+Compose 用**資料夾名稱**當前綴，例如 `myproject/` 中的服務：
+- 容器：`myproject-web-1`
+- 網路：`myproject_default`
+
+---
+
+## 九、實戰：WordPress 四服務（10 分鐘）
+
+### 架構
 
 ```
-瀏覽器
-  │ Port 80
-  ▼
-┌─────────┐ frontend-net ┌─────────┐ backend-net ┌─────────┐
-│  Nginx  │─────────────▶│ Node.js │────────────▶│  MySQL  │
-│ (前端)   │              │  (API)  │             │  (DB)   │
-└─────────┘              └─────────┘             └─────────┘
+          使用者（瀏覽器）
+                │
+       ┌────────▼────────┐
+       │      Nginx      │  ← 反向代理，Port 80
+       └────────┬────────┘
+                │
+       ┌────────▼────────┐
+       │    WordPress    │  ← PHP 應用程式
+       └────┬───────┬────┘
+            │       │
+     ┌──────▼──┐ ┌──▼──────┐
+     │  MySQL  │ │  Redis  │
+     └─────────┘ └─────────┘
 ```
 
-### 專案結構
+### 網路隔離設計
 
+- **frontend 網路**：Nginx + WordPress
+- **backend 網路**：WordPress + MySQL + Redis
+- Nginx 連不到 MySQL（最小權限原則）
+
+### .env 環境變數
+
+```bash
+MYSQL_ROOT_PASSWORD=my-secret-root-pw
+MYSQL_DATABASE=wordpress
+MYSQL_USER=wp_user
+MYSQL_PASSWORD=wp_password_123
+WORDPRESS_DB_HOST=mysql:3306
+WORDPRESS_DB_USER=wp_user
+WORDPRESS_DB_PASSWORD=wp_password_123
+WORDPRESS_DB_NAME=wordpress
 ```
-my-app/
-├── compose.yaml
-├── .env
-├── .env.example
-├── .gitignore
-├── backend/
-│   ├── Dockerfile
-│   └── src/index.js
-└── nginx/
-    └── default.conf
+
+### Nginx 設定
+
+```nginx
+server {
+    listen 80;
+    client_max_body_size 64M;
+    location / {
+        proxy_pass http://wordpress:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ### 完整 compose.yaml
@@ -416,140 +449,238 @@ my-app/
 services:
   nginx:
     image: nginx:alpine
+    container_name: blog-nginx
     ports:
       - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      api:
-        condition: service_started
     networks:
-      - frontend-net
-    restart: unless-stopped
-
-  api:
-    build:
-      context: ./backend
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    volumes:
-      - ./backend/src:/app/src
+      - frontend
     depends_on:
-      db:
+      wordpress:
         condition: service_healthy
-    networks:
-      - frontend-net
-      - backend-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
-  db:
+  wordpress:
+    image: wordpress:6-php8.2-apache
+    container_name: blog-wordpress
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_REDIS_HOST', 'redis');
+        define('WP_REDIS_PORT', 6379);
+    volumes:
+      - wordpress-data:/var/www/html
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  mysql:
     image: mysql:8.0
+    container_name: blog-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - db-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 30s
-    networks:
-      - backend-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: blog-redis
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
 networks:
-  frontend-net:
-  backend-net:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
 
 volumes:
-  db-data:
+  mysql-data:
+  wordpress-data:
+  redis-data:
 ```
 
-### Nginx 反向代理設定重點
-
-```nginx
-location / {
-    proxy_pass http://api:3000;   # service name 當 hostname
-}
-```
-
-### 驗證指令
+### 啟動與驗證
 
 ```bash
-docker compose up -d --build
-docker compose ps                           # 確認 db 顯示 (healthy)
-docker compose logs -f
-curl http://localhost
+docker compose up -d
+docker compose ps              # 確認 healthy
+docker compose logs --tail=20  # 觀察啟動順序
+# 瀏覽器 http://localhost → WordPress 安裝畫面
 
-# 驗證網路隔離
-docker compose exec nginx ping api          # 可以連
-docker compose exec nginx ping db           # 連不到！
-docker compose exec api ping db             # 可以連
+# 驗證 Volume 持久化
+docker compose down            # 停止（Volume 保留）
+docker compose up -d           # 重啟 → 資料還在
 
-docker compose down
+# 完整清理
+docker compose down -v         # ⚠️ 連資料一起刪
 ```
 
 ---
 
-## 六、學生練習題
+## 十、環境分離（override）（3 分鐘）
 
-| 題號 | 練習主題 | 要求 |
-|------|---------|------|
-| 練習 1 | 基本 Compose 操作 | 建立 compose.yaml（Nginx + Redis）；用 ps / exec / down 驗證 |
-| 練習 2 | Network 隔離 | frontend / backend / database 三服務，設定兩個 network，驗證 frontend 連不到 database |
-| 練習 3 | 環境變數管理 | PostgreSQL + .env + .env.example；compose.yaml 用 ${} 引用 |
-| 練習 4 | Healthcheck 實作 | 在練習 3 加 healthcheck；新增 adminer 服務並設定 depends_on condition: service_healthy |
-| 練習 5（挑戰） | 完整三層架構 | Nginx + 自建 API + MySQL/PostgreSQL；使用自訂 network、.env、healthcheck、build、named volume |
+### 多檔案合併機制
+
+```
+compose.yaml           → 所有環境共用的基礎設定
+compose.override.yaml  → 開發環境專用（自動載入）
+compose.prod.yaml      → 生產環境專用（手動指定）
+```
+
+**compose.yaml（基礎）**
+```yaml
+services:
+  web:
+    image: myapp:latest
+    ports:
+      - "80:3000"
+    environment:
+      NODE_ENV: production
+```
+
+**compose.override.yaml（開發，自動合併）**
+```yaml
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DEBUG: "true"
+    volumes:
+      - .:/app
+      - /app/node_modules
+```
+
+**compose.prod.yaml（生產）**
+```yaml
+services:
+  web:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+| 環境 | 指令 |
+|------|------|
+| 開發（自動套用 override） | `docker compose up` |
+| 生產 | `docker compose -f compose.yaml -f compose.prod.yaml up -d` |
+
+### 驗證設定
+
+```bash
+docker compose config                                          # 展開所有變數
+docker compose -f compose.yaml -f compose.prod.yaml config     # 驗證指定組合
+```
 
 ---
 
-## 七、本堂課小結
+## 十一、本堂課小結（3 分鐘）
 
-### 基礎部分
+### 核心知識點
 
 | 主題 | 重點 |
 |------|------|
 | 為什麼需要 Compose | docker run 管理多容器痛苦，一個 YAML 搞定 |
-| 版本 | 統一使用 v2（`docker compose` 空格） |
 | compose.yaml 結構 | services / volumes / networks 三大區塊 |
-| 核心指令 | `up -d` / `down` / `ps` / `logs -f` / `exec` |
-
-### 進階部分
-
-| 主題 | 重點 |
-|------|------|
+| 環境變數 | .env 管理敏感資訊；Docker Hub 查環境變數 |
 | Networks | 自訂 network 隔離服務；service name = hostname |
-| Environment | .env 管理敏感資訊；記得加進 .gitignore |
-| depends_on | 基本用法只等容器啟動；搭配 healthcheck 才等服務 ready |
-| Build 整合 | compose 直接 build Dockerfile；改程式碼要加 `--build` |
-| 其他設定 | restart 策略、資源限制、command 覆蓋 |
+| depends_on | 搭配 healthcheck + condition: service_healthy |
+| Build 整合 | 改程式碼要加 `--build` |
+| 其他設定 | restart、資源限制、profiles、logging |
+| WordPress 實戰 | 四服務完整架構 |
+| 環境分離 | override 自動合併、prod 手動指定 |
+| 核心指令 | `up -d` / `down` / `ps` / `logs -f` / `exec` |
 
 ### 最重要的三個觀念
 
-1. **Network 隔離是好習慣**——用 network 控制誰能連誰，不是所有服務都該互通。
+1. **Network 隔離是好習慣** — 用 network 控制誰能連誰
+2. **密碼不寫在 compose.yaml** — 用 `.env` + `.gitignore`
+3. **depends_on 不等於 service ready** — 搭配 healthcheck 才正確
 
-2. **密碼不寫在 compose.yaml**——用 `.env` + `.gitignore`，這是安全底線。
+### 下堂課預告
 
-3. **depends_on 不等於 service ready**——搭配 `healthcheck` + `condition: service_healthy` 才是正確做法。
+Docker Compose 練習時間 — 三個練習題，從基礎到進階到 Code Review。
 
 ---
 
 ## 板書 / PPT 建議
 
 1. **痛點對比圖**：6 道 docker run 指令 vs 1 個 compose.yaml + 1 道指令
-2. **compose.yaml 結構圖**：services / volumes / networks 三大區塊層級關係
+2. **compose.yaml 結構圖**：services / volumes / networks 三大區塊
 3. **docker run ↔ compose.yaml 對照表**
 4. **常用指令速查表**：up / down / ps / logs / exec
-5. **Network 隔離架構圖**：frontend-net 和 backend-net，標示哪個服務在哪個 network
+5. **Network 隔離架構圖**：frontend-net 和 backend-net
 6. **環境變數優先順序**：Shell > .env > compose.yaml default
 7. **depends_on 的坑（時序圖）**：容器啟動 ≠ 服務 ready
-8. **Healthcheck 參數說明**：interval / timeout / retries / start_period
-9. **常見服務 healthcheck 對照表**：MySQL / PostgreSQL / Redis
-10. **三層架構完整圖**：Nginx → API → MySQL，標示 network、volume、port
-11. **⚠️ 警告標示**：`docker compose down -v` 會刪除所有資料，不可逆
+8. **常見服務 healthcheck 對照表**
+9. **WordPress 四層架構圖**：Nginx → WordPress → MySQL + Redis
+10. **環境分離流程圖**：compose.yaml + override / prod
+11. **⚠️ 警告標示**：`docker compose down -v` 會刪除所有資料

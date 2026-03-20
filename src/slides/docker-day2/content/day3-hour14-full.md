@@ -1,4 +1,4 @@
-# Day 3 第十四小時：Docker Compose 實戰 + 課程總結
+# Day 3 第十四小時：Docker Compose 實戰練習 + 課程總結
 
 ---
 
@@ -6,631 +6,488 @@
 
 好，各位同學，歡迎來到我們整個 Docker 課程的最後一堂課。
 
-我先問一下，大家今天的精神還好嗎？經過三天高密度的學習，我知道大家應該都有點累了。但是，最後這堂課非常重要，因為我們要把前面學到的所有東西，全部串在一起，做一個完整的實戰。
+經過三天高密度的學習，我知道大家應該都有點累了。但是，這堂課非常重要，因為我們要把上堂課學到的 Docker Compose 所有知識，用三個練習題全部練一遍。
 
-上一堂課我們學了什麼？Docker Compose 的進階功能對不對？自訂網路、環境變數管理、depends_on 搭配 healthcheck、build 整合，這些東西大家都還有印象嗎？
+上堂課我們學了什麼？Docker Compose 的完整知識——compose.yaml 語法、環境變數管理、自訂網路隔離、depends_on 搭配 healthcheck、build 整合、WordPress 四服務實戰、環境分離。內容量很大，但光聽不練是不夠的。
 
-好，那這堂課我們要做三件事情：
+今天的安排：
 
-第一件事，**真槍實彈的實戰**。我們要用 Docker Compose 從零開始搭建一個完整的部落格系統，四個服務一次全部跑起來。這不是練習題喔，這是你回去公司之後馬上可以用的真實架構。
+| # | 題目 | 難度 | 時間 |
+|---|------|:---:|:---:|
+| 1 | Nginx + API + PostgreSQL 基本 Compose | ★ | 15 分鐘 |
+| 2 | 加入 .env + healthcheck + 網路隔離 | ★★ | 20 分鐘 |
+| 3 | Code Review：找出 5 個問題 | ★★★ | 25 分鐘 |
 
-第二件事，**Docker Compose 的實用技巧**。一些你在工作中一定會碰到的場景，像是怎麼區分開發環境和生產環境、怎麼驗證設定檔等等。
+做完練習之後，我們會做一個完整的課程總結，然後展望一下 Kubernetes 的方向。
 
-第三件事，**課程總結**。我會帶大家把這三天學到的所有東西做一個完整的回顧，然後告訴你們接下來該往哪個方向學習。
-
-準備好了嗎？那我們開始吧。
+準備好了嗎？那我們開始。
 
 ---
 
-## 二、實戰：完整的部落格系統（25 分鐘）
+## 二、練習一：三服務 Compose（15 分鐘）★
 
-### 2.1 為什麼選 WordPress？
+### 2.1 題目說明（3 分鐘）
 
-好，我們這個實戰要做的是搭建一個完整的 WordPress 部落格系統。
+好，第一題。暖身題。
 
-有同學可能會問：「老師，為什麼選 WordPress？我們公司用的是 React、Vue，不是 WordPress 啊。」
+題目很直接：寫一個 `compose.yaml`，包含三個服務：
 
-選 WordPress 不是因為要你們學 WordPress，而是因為它的架構特別經典。你們看，WordPress 是一個需要搭配資料庫的 PHP 應用，前面還可以加反向代理、加快取。這個「反向代理 + 應用程式 + 資料庫 + 快取」的架構，在業界叫做四層架構，不管你的應用是什麼語言寫的，Java、Python、Node.js，很多時候都是這個結構。
+**第一個，nginx** — 反向代理，對外 port 8080。用 `nginx:alpine`。
 
-所以我們今天學會了這個架構，你回去把 WordPress 換成你自己的應用，MySQL 換成 PostgreSQL，道理都是一樣的。
+**第二個，api** — 這裡我們先不自己寫 API，用 `httpd:alpine` 來模擬。httpd 就是 Apache HTTP Server，它會自動回傳一個預設的歡迎頁面，夠用了。
 
-### 2.2 系統架構說明
+**第三個，db** — PostgreSQL 資料庫，port 5432。
 
-來，我先在白板上畫一下我們要搭的系統架構：
+要求：
+1. 設定 ports
+2. PostgreSQL 用 named volume 持久化
+3. 設定 `POSTGRES_PASSWORD` 環境變數（PostgreSQL 必填的）
+4. 設定基本的 `depends_on`
 
-```
-                    使用者（瀏覽器）
-                         │
-                         ▼
-                ┌─────────────────┐
-                │      Nginx      │  ← 反向代理，對外 Port 80
-                │   (Web Server)  │
-                └────────┬────────┘
-                         │
-                ┌────────▼────────┐
-                │    WordPress    │  ← PHP 應用程式
-                │   (App Server)  │
-                └────┬───────┬────┘
-                     │       │
-             ┌───────▼──┐ ┌──▼───────┐
-             │  MySQL   │ │  Redis   │
-             │ (資料庫)  │ │  (快取)  │
-             └──────────┘ └──────────┘
-```
+做完之後，驗證：
+- `docker compose ps` 三個服務都 Up
+- `curl http://localhost:8080` 看到頁面
+- `docker compose exec db psql -U postgres -c "SELECT 1;"` 能連上資料庫
 
-四個服務，我一個一個說：
+就這樣，不需要 healthcheck，不需要 .env，不需要 network 隔離。最基本的 compose.yaml。
 
-**Nginx** 是最外面那層，它負責接收使用者的請求，然後轉發給後面的 WordPress。為什麼不讓 WordPress 直接對外呢？因為 Nginx 很擅長處理靜態檔案、負載均衡、SSL 加密，讓它來當門面，效能更好，安全性也更高。這就好像餐廳的接待員，客人進來先找接待員，接待員再把客人帶到座位。
+好，時間開始。大家有 12 分鐘。
 
-**WordPress** 是真正處理業務邏輯的地方。它是一個 PHP 寫的應用程式，用 Apache 來跑。寫文章、管理評論、處理登入，都是它在做。
+### 2.2 給學生做題（12 分鐘）
 
-**MySQL** 是資料庫。WordPress 的文章內容、使用者帳號、網站設定，全部存在 MySQL 裡面。它就像圖書館的書架，所有的資料都放在這裡。
+（講師巡場，觀察學生進度）
 
-**Redis** 是快取。它的作用是什麼呢？WordPress 每次要顯示一篇文章，都要去 MySQL 查資料。但如果同一篇文章一分鐘有一千個人看，你不需要查一千次資料庫，查一次把結果放到 Redis 裡面，後面九百九十九次直接從 Redis 拿就好了。Redis 是記憶體型的資料庫，速度比 MySQL 快很多倍。它就像你桌上的便條紙，常用的電話號碼抄在便條紙上，不用每次都去翻通訊錄。
+常見問題：
+- 「PostgreSQL 起不來」→ 檢查有沒有設 `POSTGRES_PASSWORD`，這是必填的
+- 「curl localhost:8080 連不到」→ 檢查 nginx 的 ports 設定，確認是 `"8080:80"`
+- 「不知道 PostgreSQL 的 volume 要掛哪裡」→ `/var/lib/postgresql/data`，Docker Hub 文件有寫
 
-### 2.3 網路設計——安全性第一
+### 2.3 講解參考答案（5 分鐘）
 
-架構圖看完了，接下來一個關鍵的設計決策：網路怎麼劃分？
-
-我們要設計兩個網路：
-
-```
-┌──────────────────────────────────────────────────────┐
-│  frontend 網路                                        │
-│  ┌──────────┐         ┌──────────────┐               │
-│  │  Nginx   │ ──────► │  WordPress   │               │
-│  └──────────┘         └──────┬───────┘               │
-│                              │                        │
-└──────────────────────────────┼────────────────────────┘
-                               │
-┌──────────────────────────────┼────────────────────────┐
-│  backend 網路                │                        │
-│                       ┌──────▼───────┐               │
-│                       │  WordPress   │               │
-│                       └───┬──────┬───┘               │
-│                           │      │                    │
-│                    ┌──────▼──┐ ┌─▼────────┐          │
-│                    │  MySQL  │ │  Redis   │          │
-│                    └─────────┘ └──────────┘          │
-└───────────────────────────────────────────────────────┘
-```
-
-來，有同學問了：「老師，為什麼要分兩個網路？全部放在一個網路裡不是比較簡單嗎？」
-
-問得好。確實，全部放一個網路也能跑。但是，你想一想——Nginx 需要直接連 MySQL 嗎？不需要嘛！Nginx 的工作就是把請求轉給 WordPress，它根本不需要碰資料庫。如果 Nginx 哪天被駭了，駭客也碰不到你的資料庫，因為 Nginx 和 MySQL 根本不在同一個網路。
-
-這就是我們上堂課講的**網路隔離**。在真實的生產環境中，這是一個非常重要的安全原則——**最小權限原則**。每個服務只連上它需要的網路，不多連。
-
-注意看，WordPress 是兩個網路都有加入的，因為它是中間的橋樑。它要從 frontend 接收 Nginx 轉來的請求，也要從 backend 去連 MySQL 查資料。
-
-### 2.4 動手實作——建立專案目錄
-
-好，概念講完了，我們來動手。大家打開你們的終端機，跟我一起做。
-
-第一步，建立專案目錄：
-
-```bash
-# 建立專案目錄
-mkdir -p ~/wordpress-blog
-cd ~/wordpress-blog
-
-# 建立 Nginx 設定檔目錄
-mkdir -p nginx
-
-# 看一下目錄結構
-# wordpress-blog/
-# ├── .env                 ← 環境變數（密碼）
-# ├── compose.yaml         ← 服務定義
-# └── nginx/
-#     └── default.conf     ← Nginx 設定
-```
-
-就三個檔案。你沒看錯，三個檔案就能搭起一個完整的四服務應用。Docker Compose 就是這麼強大。
-
-### 2.5 撰寫 .env 環境變數檔
-
-第二步，寫 `.env` 檔案。還記得上堂課我講的嗎？密碼、金鑰這種敏感資訊，絕對不要寫死在 compose.yaml 裡面。
-
-```bash
-# .env
-MYSQL_ROOT_PASSWORD=my-secret-root-pw
-MYSQL_DATABASE=wordpress
-MYSQL_USER=wp_user
-MYSQL_PASSWORD=wp_password_123
-
-WORDPRESS_DB_HOST=mysql:3306
-WORDPRESS_DB_USER=wp_user
-WORDPRESS_DB_PASSWORD=wp_password_123
-WORDPRESS_DB_NAME=wordpress
-```
-
-**「等等，這些環境變數你怎麼知道的？」**
-
-好問題。上堂課我有教過怎麼查——去 Docker Hub 看官方文件。這裡快速帶一次實際的邏輯：
-
-我先去 Docker Hub 搜 `mysql`，文件告訴我 MySQL Image 支援這些環境變數：
-- `MYSQL_ROOT_PASSWORD`（必填）：root 密碼
-- `MYSQL_DATABASE`（可選）：自動建立的資料庫名稱
-- `MYSQL_USER` / `MYSQL_PASSWORD`（可選）：自動建立的使用者
-
-所以我在 .env 裡設了 `wp_user`、`wp_password_123`、`wordpress` 這些值。
-
-然後再去搜 `wordpress`，文件告訴我 WordPress 要設：
-- `WORDPRESS_DB_HOST`：MySQL 在哪裡
-- `WORDPRESS_DB_USER` / `WORDPRESS_DB_PASSWORD`：用什麼帳密連 MySQL
-- `WORDPRESS_DB_NAME`：連哪個資料庫
-
-所以 WordPress 這邊就填跟 MySQL 一模一樣的帳號密碼和資料庫名稱。**兩邊要對得起來，不然 WordPress 連不上 MySQL。**
-
-再看 `WORDPRESS_DB_HOST=mysql:3306` 這行，`mysql` 這個不是 IP 地址，它是我們待會在 compose.yaml 裡面定義的服務名稱。在 Docker Compose 的自訂網路裡，服務名稱會自動變成 DNS 名稱，可以直接拿來當 hostname 用。這個是上堂課教的，大家還有印象吧？
-
-另外我要特別提醒：`.env` 檔案一定要加到 `.gitignore` 裡面。你可以另外建一個 `.env.example` 當範本給團隊成員看：
-
-```bash
-# .env.example（這個可以推到 Git）
-MYSQL_ROOT_PASSWORD=change-me
-MYSQL_DATABASE=wordpress
-MYSQL_USER=change-me
-MYSQL_PASSWORD=change-me
-WORDPRESS_DB_HOST=mysql:3306
-WORDPRESS_DB_USER=change-me
-WORDPRESS_DB_PASSWORD=change-me
-WORDPRESS_DB_NAME=wordpress
-```
-
-### 2.6 撰寫 Nginx 反向代理設定
-
-第三步，寫 Nginx 的反向代理設定。
-
-**「這個設定檔的內容哪裡來的？我要一行一行自己打嗎？」**
-
-不用背。Nginx 的反向代理設定是一個很標準的寫法，你 Google 搜尋 `nginx reverse proxy config` 就有一大堆範本。或者去 Nginx 的官方文件看 reverse proxy 的範例。實際工作中，大部分人都是從範本複製過來，改裡面的 `proxy_pass` 目標位址就好。
-
-具體操作就是用任何文字編輯器建立一個檔案 `nginx/default.conf`：
-
-```bash
-# 用 VS Code、vim、nano 都可以
-code nginx/default.conf
-```
-
-然後把下面的內容貼進去：
-
-```nginx
-# nginx/default.conf
-server {
-    listen 80;
-    server_name localhost;
-
-    # WordPress 常常要上傳圖片，預設的 1M 太小
-    client_max_body_size 64M;
-
-    location / {
-        proxy_pass http://wordpress:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-我來解釋一下這個設定檔。
-
-`proxy_pass http://wordpress:80` 這行是最關鍵的，它告訴 Nginx：「所有的請求都轉發給 wordpress 這個服務的 80 port。」這裡的 `wordpress` 就是我們 compose.yaml 裡面的服務名稱。
-
-下面那幾行 `proxy_set_header` 是在傳遞原始的用戶端資訊。為什麼需要這個呢？你想想看，如果沒有這些 header，WordPress 看到的所有請求都來自 Nginx 的 IP，它分不出來真正的使用者是誰。加了這些 header 之後，WordPress 就能知道真正的使用者 IP、使用的協定等資訊。
-
-`client_max_body_size 64M` 也很重要。WordPress 的使用者會上傳圖片、影片，如果你不改這個設定，Nginx 預設只允許上傳 1MB 以下的檔案，很快就會被使用者投訴了。
-
-### 2.7 撰寫 compose.yaml —— 重頭戲
-
-好，重頭戲來了。大家深呼吸一下，我們來寫完整的 compose.yaml。這個檔案有點長，但裡面用到的每一個功能都是我們前面學過的，沒有新東西。
+好，時間到。我們來看參考答案。
 
 ```yaml
-# compose.yaml
-
 services:
-  # ========== Nginx 反向代理 ==========
   nginx:
     image: nginx:alpine
-    container_name: blog-nginx
     ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      - frontend
+      - "8080:80"
     depends_on:
-      wordpress:
-        condition: service_healthy
+      - api
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
 
-  # ========== WordPress 應用 ==========
-  wordpress:
-    image: wordpress:6-php8.2-apache
-    container_name: blog-wordpress
-    environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PORT', 6379);
-    volumes:
-      - wordpress-data:/var/www/html
-    networks:
-      - frontend
-      - backend
+  api:
+    image: httpd:alpine
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      - db
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
 
-  # ========== MySQL 資料庫 ==========
-  mysql:
-    image: mysql:8.0
-    container_name: blog-mysql
+  db:
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_PASSWORD: secret123
     volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
 
-  # ========== Redis 快取 ==========
-  redis:
-    image: redis:7-alpine
-    container_name: blog-redis
-    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-
-# ========== 網路定義 ==========
-networks:
-  frontend:
-    driver: bridge
-  backend:
-    driver: bridge
-
-# ========== Volume 定義 ==========
 volumes:
-  mysql-data:
-  wordpress-data:
-  redis-data:
+  db-data:
 ```
 
-好，我知道這個檔案看起來很長。但是你把它拆開來看，其實就是四個服務的重複結構。我們一個一個來分析。
+我來說幾個重點。
 
-**先看 Nginx 服務。** 它用的是 `nginx:alpine`，alpine 版本小巧快速。ports 只有 `"80:80"`，因為只有 Nginx 需要對外暴露 port。volumes 掛載了我們寫的 Nginx 設定檔，注意後面加了 `:ro`，代表唯讀，容器只能讀不能改。它只加入 frontend 網路。depends_on 設定了要等 WordPress healthy 才啟動——因為如果 WordPress 還沒準備好，Nginx 轉發過去也是白轉。
+**nginx** — `ports: "8080:80"`，把主機的 8080 對應到 Nginx 的 80。`depends_on: - api` 讓 api 先啟動。
 
-**再看 WordPress 服務。** 環境變數用 `${}` 語法從 .env 檔案讀取，沒有寫死。volumes 用了 named volume `wordpress-data` 來持久化 `/var/www/html` 目錄，這裡面放的是 WordPress 的所有檔案，包括你上傳的圖片、安裝的佈景主題和外掛。它同時加入 frontend 和 backend 兩個網路，因為它是中間的橋樑。depends_on 設定了要等 MySQL healthy、Redis started 才啟動。它自己也有 healthcheck，用 curl 去測 localhost:80 有沒有回應。
+**api** — 用 `httpd:alpine`，不需要設 port，因為在這個範例裡我們沒有直接對外暴露 api 的 port。api 和 nginx 在同一個 default network 裡，nginx 可以用 service name `api` 連到它。
 
-> 💡 **注意：** 設定 `WP_REDIS_HOST` 和 `WP_REDIS_PORT` 環境變數只是告訴 WordPress「Redis 在哪裡」，但 WordPress 本身不會自動使用 Redis。你需要在 WordPress 後台安裝 **Redis Object Cache** 外掛，並在外掛設定中啟用，WordPress 才會真正把快取存到 Redis。
+**db** — `POSTGRES_PASSWORD: secret123` 是必填的，不設 PostgreSQL 會拒絕啟動。`db-data:/var/lib/postgresql/data` 是 named volume 持久化。
 
-**MySQL 服務**在 backend 網路裡面。注意看它的 healthcheck，用的是 `mysqladmin ping` 這個指令，這是 MySQL 官方提供的健康檢查方式。`start_period: 30s` 是說啟動後前 30 秒不算失敗，因為 MySQL 啟動需要時間做初始化。
+**最外層的 `volumes: db-data:`** — 宣告 named volume。
 
-**Redis 服務**也在 backend 網路。它的 command 額外加了 `--maxmemory 64mb --maxmemory-policy allkeys-lru`，意思是最多用 64MB 記憶體，滿了之後自動淘汰最久沒用的資料。這是 Redis 快取的標準配法。
+注意我每個服務都加了 `restart: unless-stopped`，這是好習慣。
 
-**最下面的 networks 和 volumes** 是全域定義。networks 定義了 frontend 和 backend 兩個 bridge 網路。volumes 定義了三個 named volume，讓資料不會隨容器刪除而消失。
-
-大家注意到沒有？每一個服務都有 `restart: unless-stopped` 和 `deploy.resources.limits`。這兩個設定在生產環境非常重要。restart 確保服務掛了會自動重啟。resources limits 確保某個服務不會吃掉所有的系統資源，導致其他服務跟著掛。
-
-### 2.8 啟動與驗證
-
-好，三個檔案都寫好了。最令人興奮的時刻來了，我們來啟動：
-
-```bash
-# 啟動所有服務
-docker compose up -d
-
-# 你會看到類似這樣的輸出：
-# [+] Running 7/7
-#  ✔ Network wordpress-blog_frontend       Created
-#  ✔ Network wordpress-blog_backend        Created
-#  ✔ Volume "wordpress-blog_mysql-data"    Created
-#  ✔ Volume "wordpress-blog_wordpress-data" Created
-#  ✔ Volume "wordpress-blog_redis-data"    Created
-#  ✔ Container blog-redis                  Started
-#  ✔ Container blog-mysql                  Started
-#  ✔ Container blog-wordpress              Started
-#  ✔ Container blog-nginx                  Started
-```
-
-看到了嗎？一個指令，兩個網路、三個 Volume、四個容器，全部自動建立、自動啟動。你回想一下，如果用 `docker run` 手動做，你需要打多少指令？
-
-好，來檢查一下狀態：
-
-```bash
-docker compose ps
-
-# NAME              IMAGE                       STATUS                   PORTS
-# blog-mysql        mysql:8.0                   Up (healthy)
-# blog-nginx        nginx:alpine                Up                       0.0.0.0:80->80/tcp
-# blog-redis        redis:7-alpine              Up (healthy)
-# blog-wordpress    wordpress:6-php8.2-apache   Up (healthy)
-```
-
-全部 Up，而且有 healthcheck 的服務都顯示 healthy，完美。
-
-再來看看啟動順序的日誌：
-
-```bash
-docker compose logs --tail=20
-```
-
-你可以觀察到啟動順序：Redis 和 MySQL 先起來（因為它們沒有依賴任何服務），等 MySQL 的 healthcheck 通過之後 WordPress 才啟動，最後 WordPress healthy 了 Nginx 才啟動。這就是 `depends_on` 搭配 `condition: service_healthy` 的效果。
-
-現在，打開你的瀏覽器，輸入 `http://localhost`，你應該會看到 WordPress 的安裝畫面。選語言、設定管理員帳號密碼，一個完整的部落格就搭好了。
-
-### 2.9 驗證 Volume 持久化——資料不怕丟
-
-接下來我要示範一個很重要的東西。
-
-先在 WordPress 裡面寫一篇文章，隨便打幾個字，標題就叫「Docker Compose 真好用」好了。發布文章，確認可以在前台看到。
-
-現在，我要把所有容器全部刪掉：
-
-```bash
-# 停止並刪除所有容器和網路
-docker compose down
-```
-
-注意看，我用的是 `docker compose down`，不是 `docker compose down -v`。`down` 只會刪除容器和網路，Volume 會保留。
-
-然後重新啟動：
+驗證：
 
 ```bash
 docker compose up -d
-```
-
-再打開瀏覽器，回到 WordPress，你會發現——文章還在！管理員帳號也還在！所有的資料都還在！
-
-為什麼？因為 MySQL 的資料存在 named volume `mysql-data` 裡面，WordPress 上傳的檔案存在 `wordpress-data` 裡面。容器刪了再建，Volume 還在，資料就還在。
-
-這就是我們 Day 3 第八堂課學的 Volume 資料持久化的威力。你看，前面學的東西全部用上了吧？
-
-### 2.10 完整清理
-
-實驗做完了，要清理怎麼辦？
-
-```bash
-# 只停止容器，保留資料
+docker compose ps                              # 三個都 Up
+curl http://localhost:8080                      # 看到 httpd 預設頁面
+docker compose exec db psql -U postgres -c "SELECT 1;"   # 成功
 docker compose down
-
-# 連 Volume 也刪掉（⚠️ 資料全部消失）
-docker compose down -v
-
-# 連映像檔也一起刪
-docker compose down -v --rmi all
 ```
 
-在生產環境，千萬千萬不要隨便加 `-v`。我再說一次，`-v` 會刪掉所有的 Volume，你的資料庫資料就真的沒了，救不回來。除非你有備份。
+大家做出來了嗎？做出來的舉手。好，大部分都做出來了。我們進入第二題。
 
 ---
 
-## 三、Docker Compose 實用技巧（10 分鐘）
+## 三、練習二：進階 — .env + healthcheck + 網路隔離（20 分鐘）★★
 
-### 3.1 開發環境 vs 生產環境分離
+### 3.1 題目說明（5 分鐘）
 
-好，實戰做完了，接下來講一些你們上班馬上會用到的技巧。
+好，第二題。把第一題的 compose.yaml 升級。
 
-第一個，也是最重要的一個：**環境分離**。
+你需要加四個東西：
 
-你想一想，開發的時候和上線的時候，需求是不一樣的。開發的時候你希望：
-- 程式碼改了馬上看到效果（掛載本地原始碼）
-- 看到詳細的錯誤訊息（開 debug 模式）
-- 用方便的開發工具
+**第一，密碼移到 .env。** compose.yaml 裡面不要出現任何明文密碼。用 `${VARIABLE}` 引用。同時提供一個 `.env.example` 範本。
 
-上線的時候你希望：
-- 程式碼打包在映像檔裡面，不掛載外部檔案
-- 關掉 debug，只記錄必要的日誌
-- 設定資源限制，避免某個服務吃掉所有記憶體
+**第二，加 healthcheck。** PostgreSQL 用 `pg_isready` 這個指令。上堂課有給大家一張 healthcheck 對照表，翻一下就知道怎麼寫了。
 
-Docker Compose 有一個很聰明的機制來處理這個需求。你可以準備多個 compose 檔案：
+**第三，depends_on 加 condition。** api 要等 db 的 healthcheck 通過才啟動。
 
-**compose.yaml —— 基礎設定，所有環境共用：**
+**第四，網路隔離。** 分成 `frontend-net` 和 `backend-net`。nginx 只在 frontend-net，api 在兩個網路，db 只在 backend-net。
 
-```yaml
-services:
-  web:
-    image: myapp:latest
-    ports:
-      - "80:3000"
-    environment:
-      NODE_ENV: production
+做完之後，驗證四件事：
+1. `docker compose ps` → db 顯示 (healthy)
+2. `docker compose exec nginx ping -c 1 db` → 失敗（網路隔離生效）
+3. `docker compose exec api ping -c 1 db` → 成功（同一個 backend-net）
+4. compose.yaml 裡面看不到任何密碼
+
+好，時間開始。15 分鐘。
+
+### 3.2 給學生做題（15 分鐘）
+
+（講師巡場，個別指導）
+
+常見問題：
+- 「healthcheck 的 test 怎麼寫？」→ `test: ["CMD-SHELL", "pg_isready -U postgres"]`，或者如果用了自訂使用者就 `pg_isready -U ${POSTGRES_USER}`
+- 「.env 裡面的變數在 compose.yaml 裡怎麼用？」→ `${POSTGRES_PASSWORD}`，Compose 會自動讀同目錄下的 .env
+- 「網路隔離設定好了但 ping 不到」→ 確認 api 有加入兩個 network，不是只有一個
+
+### 3.3 講解參考答案（8 分鐘）
+
+好，時間到。來看答案。
+
+先看 **.env**：
+
+```bash
+POSTGRES_USER=appuser
+POSTGRES_PASSWORD=mypassword123
+POSTGRES_DB=myapp
 ```
 
-**compose.override.yaml —— 開發環境專用，自動載入：**
+三個變數，分別是使用者名稱、密碼、資料庫名稱。
+
+**.env.example**：
+
+```bash
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=your_database
+```
+
+這個是範本，可以推到 Git。新成員加入的時候 `cp .env.example .env`，填上自己的值就好。
+
+**compose.yaml**：
+
+```yaml
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - frontend-net
+    restart: unless-stopped
+
+  api:
+    image: httpd:alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - frontend-net
+      - backend-net
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend-net
+    restart: unless-stopped
+
+networks:
+  frontend-net:
+  backend-net:
+
+volumes:
+  db-data:
+```
+
+跟第一題比，多了什麼？
+
+**第一，環境變數。** `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}`，不再寫死。Compose 會自動去讀 .env 檔案裡的值。
+
+**第二，healthcheck。** `pg_isready -U ${POSTGRES_USER}` 是 PostgreSQL 官方提供的就緒檢查工具。`start_period: 10s` 給 PostgreSQL 10 秒的啟動時間，比 MySQL 短一些，因為 PostgreSQL 啟動通常比較快。
+
+**第三，depends_on 加了 condition。** api 的 `condition: service_healthy` 表示要等 db 的 healthcheck 通過才啟動。nginx 的 `condition: service_started` 表示只要 api 容器啟動了就好（httpd 不需要特別等）。
+
+**第四，網路隔離。** nginx 只在 `frontend-net`，db 只在 `backend-net`，api 同時在兩個網路，當橋樑。
+
+驗證：
+
+```bash
+docker compose up -d
+
+# 等一下讓 healthcheck 完成
+docker compose ps
+# db 顯示 (healthy)
+
+# 網路隔離測試
+docker compose exec nginx ping -c 1 db
+# ping: bad address 'db'  ← 失敗！nginx 和 db 不在同一個網路
+
+docker compose exec api ping -c 1 db
+# 64 bytes from ... ← 成功！api 和 db 都在 backend-net
+
+docker compose down
+```
+
+看到了嗎？nginx 根本找不到 db 這個 hostname，因為它們不在同一個網路。但 api 可以連到 db，因為它們都在 backend-net。
+
+這就是網路隔離的威力。如果 nginx 被駭了，駭客也碰不到你的資料庫。
+
+好，第二題結束。大家做得怎麼樣？做出來的舉手。不錯，我們進入壓軸的第三題。
+
+---
+
+## 四、練習三：Code Review — 找出 5 個問題（25 分鐘）★★★
+
+### 4.1 題目說明（5 分鐘）
+
+好，第三題。跟 Hour 12 的第三題一樣，這題是 Code Review。
+
+我給你一個 compose.yaml，它看起來沒什麼大問題，功能上也能跑。但是裡面有 **5 個問題**。你要像一個資深工程師一樣，把這 5 個問題全部找出來，說明為什麼是問題，以及怎麼修正。
+
+來，看這個 compose.yaml：
 
 ```yaml
 services:
   web:
+    image: nginx
+    container_name: my-web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - frontend
+
+  api:
     build: .
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
-      DEBUG: "true"
+      DB_HOST: localhost
+      DB_PASSWORD: my-password
+    networks:
+      - frontend
+      - backend
+
+  db:
+    image: mysql
     volumes:
-      - .:/app
-      - /app/node_modules
+      - ./data:/var/lib/mysql
+    networks:
+      - backend
+
+networks:
+  frontend:
+  backend:
 ```
 
-這裡有一個很重要的機制：當你的目錄下同時有 `compose.yaml` 和 `compose.override.yaml` 的時候，執行 `docker compose up`，Compose 會**自動**把兩個檔案合併。override 裡面的設定會覆蓋基礎設定。
+提示方向：DB_HOST 的值、密碼管理、版本號、Volume 類型、必要環境變數。
 
-所以在開發的時候，你只要打 `docker compose up`，就自動套用開發環境的設定了。不用記任何額外的參數。
+好，時間開始。15 分鐘思考。可以在紙上列出你找到的問題。
 
-**compose.prod.yaml —— 生產環境專用：**
+### 4.2 給學生做題（15 分鐘）
+
+（講師巡場，適時給提示）
+
+如果學生卡住，可以提示：
+- 「DB_HOST 設成 localhost，在 Compose 的環境裡，localhost 指的是什麼？」
+- 「密碼直接寫在 compose.yaml 裡面，如果這個檔案推到 Git 了呢？」
+- 「image: mysql 沒有版本號，明天拉到的可能是不同版本......」
+- 「./data:/var/lib/mysql 用的是什麼類型的 Volume？資料庫適合嗎？」
+- 「MySQL 啟動需要什麼必填的環境變數？」
+
+### 4.3 互動式講解答案（15 分鐘）
+
+好，時間到。我們一起來看。
+
+**「第一個問題，有沒有人注意到 DB_HOST 的值？」**
+
+（等學生回答）
+
+對！`DB_HOST: localhost`。在 Docker Compose 裡面，每個 service 是獨立的容器。`localhost` 指的是 api 容器自己，不是 db 容器。你要連 db 服務，應該用 service name：`DB_HOST: db`。
+
+這是 Compose 初學者最常踩的坑。上堂課我有特別強調過——在 Compose 的網路裡，service name 就是 hostname。寫 `localhost` 永遠只能連到自己。
+
+**「第二個問題，看 DB_PASSWORD。」**
+
+`DB_PASSWORD: my-password` 直接寫死在 compose.yaml 裡面。這個檔案通常會放進 Git。你的密碼就跟著進了 Git repository，團隊裡每個人都看得到，甚至如果是公開 repo，全世界都看得到。
+
+**修正：** 把密碼移到 `.env` 檔案，compose.yaml 裡面用 `${DB_PASSWORD}` 引用。然後把 `.env` 加到 `.gitignore`。
+
+**「第三個問題，看 db 的 image。」**
+
+`image: mysql`，沒有版本號！這等於 `mysql:latest`。今天拉到的可能是 MySQL 8.0，明天 MySQL 9.0 發布了，你再拉就變成 9.0 了。你的應用可能跟 9.0 不兼容，然後就莫名其妙壞掉了。
+
+**修正：** `image: mysql:8.0`，明確指定版本。順便看一下，nginx 也沒有版本號，也應該改成 `nginx:alpine`。
+
+**「第四個問題，看 volumes。」**
+
+`./data:/var/lib/mysql`，這是一個 bind mount。把資料庫的資料存到本機的 `./data` 目錄。
+
+這樣做有什麼問題？
+
+第一，**效能**。bind mount 在 macOS 和 Windows 上（Docker Desktop 環境）的 I/O 效能比 named volume 差很多，因為要經過一層虛擬化的檔案系統轉換。資料庫是 I/O 密集型的應用，效能差別很明顯。
+
+第二，**權限**。MySQL 容器內部用特定的 UID 來寫檔案，bind mount 到本機目錄可能會有權限問題。
+
+第三，**可攜性**。named volume 由 Docker 管理，不依賴本機的目錄結構。
+
+**修正：** 改成 named volume：`db-data:/var/lib/mysql`，然後在最外層加上 `volumes: db-data:`。
+
+**「第五個問題，db 服務少了什麼？」**
+
+（等學生回答）
+
+對！沒有設 `MYSQL_ROOT_PASSWORD`！MySQL 官方映像檔啟動時必須設定 root 密碼。你不設，MySQL 會直接報錯退出。
+
+```bash
+docker compose logs db
+# error: database is uninitialized and password option is not specified
+```
+
+**修正：** 加上 `MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}`。
+
+### 4.4 其他可改善項目
+
+除了這 5 個核心問題，還有幾個可以改善的地方：
+
+- **缺少 healthcheck** — MySQL 沒有 healthcheck，depends_on 只保證容器啟動，不保證 MySQL ready
+- **depends_on 沒有 condition** — 應該搭配 `condition: service_healthy`
+- **缺少 restart 策略** — 正式環境應該有 `restart: unless-stopped`
+- **nginx 也沒版本號** — `image: nginx` 應改為 `nginx:alpine`
+
+### 4.5 展示修正後的完整 compose.yaml
 
 ```yaml
 services:
   web:
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 1G
-      replicas: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    image: nginx:alpine
+    container_name: my-web
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - frontend
+    restart: unless-stopped
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend
+    restart: unless-stopped
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  db-data:
 ```
 
-部署到生產環境的時候，用 `-f` 參數明確指定要用哪些檔案：
+**.env**：
 
 ```bash
-# 生產環境啟動（跳過 override，用 prod）
-docker compose -f compose.yaml -f compose.prod.yaml up -d
+DB_PASSWORD=app-secret-123
+MYSQL_ROOT_PASSWORD=root-secret-456
+MYSQL_DATABASE=myapp
 ```
 
-這個機制的好處是什麼？基礎設定只寫一次，不會重複。開發和生產的差異部分各自獨立管理。新人進來只要 `docker compose up` 就能開始開發，不用看一大堆文件。
+跟原本的比一下：
 
-我在業界看過太多團隊，把開發和生產的設定混在一個檔案裡，用一堆註解來切換。那個維護起來真的很痛苦。用這種多檔案的方式，乾淨很多。
+| 面向 | 原本 | 修正後 |
+|------|------|--------|
+| DB_HOST | localhost（連不到） | db（service name） |
+| 密碼管理 | 寫死在 YAML | .env + ${VARIABLE} |
+| 映像版本 | mysql（無版本號） | mysql:8.0 |
+| Volume | bind mount（效能差） | named volume |
+| MySQL 設定 | 缺 ROOT_PASSWORD | 完整設定 |
+| 健康檢查 | 無 | healthcheck + condition |
+| 重啟策略 | 無 | unless-stopped |
 
-### 3.2 用 docker compose config 驗證設定
+大家看到差距了嗎？同樣的三個服務，但可靠性、安全性、可維護性完全不同。
 
-寫完多個 compose 檔案之後，你怎麼知道合併後的結果是不是你預期的？用 `docker compose config`：
-
-```bash
-# 驗證並顯示合併後的完整設定
-docker compose config
-
-# 驗證指定檔案的組合
-docker compose -f compose.yaml -f compose.prod.yaml config
-
-# 只驗證語法，不輸出內容
-docker compose config --quiet
-```
-
-這個指令會把所有環境變數展開、所有檔案合併，然後輸出最終的結果。如果有語法錯誤，它會告訴你哪裡有問題。我建議你們每次改完 compose 檔案，都先跑一下 `config` 確認沒問題再啟動。
-
-### 3.3 用 docker compose -f 指定檔案
-
-除了環境分離之外，`-f` 還有很多用途。比如說你可能有不同的部署場景：
-
-```bash
-# 用指定的 compose 檔案
-docker compose -f compose.prod.yaml up -d
-
-# 合併多個檔案
-docker compose -f compose.yaml -f compose.monitoring.yaml up -d
-```
-
-有些團隊會把監控相關的服務（Prometheus、Grafana）放在一個單獨的 compose 檔案裡。平常只跑核心服務，需要監控的時候再加上去。
-
-### 3.4 更新映像檔
-
-在生產環境，你經常需要更新服務的映像檔版本：
-
-```bash
-# 拉取所有服務的最新映像檔
-docker compose pull
-
-# 拉取後重新啟動
-docker compose up -d
-```
-
-`docker compose up -d` 很聰明，它會去比對現在跑的容器和新的設定（或新的映像檔），只重建有變化的服務。沒變的服務完全不會被動到。所以你不用擔心一個 `up -d` 會把所有服務都重啟。
+好，三個練習題全部結束。大家辛苦了！
 
 ---
 
-## 四、Docker Compose vs 手動 docker run 對比（5 分鐘）
-
-好，到這裡 Docker Compose 的內容全部講完了。這個我們在上一堂課已經對比過了，這裡快速帶過重點就好。
-
-### 4.1 對比表
-
-| 面向 | docker run（手動） | Docker Compose |
-|------|-------------------|----------------|
-| **啟動多服務** | 一個一個打 docker run | `docker compose up` 一個指令搞定 |
-| **網路管理** | 手動 create、手動 connect | 在 YAML 裡宣告，自動建立 |
-| **Volume 管理** | 手動 create、每個容器手動 -v | 在 YAML 裡宣告，自動建立 |
-| **環境變數** | 每個容器 -e 一個一個打 | 集中在 .env 統一管理 |
-| **啟動順序** | 你自己記住順序，自己等 | depends_on + healthcheck |
-| **查看日誌** | docker logs 一個一個看 | `docker compose logs` 全部一起看 |
-| **清理資源** | stop、rm、network rm 一個一個來 | `docker compose down` 一次搞定 |
-| **團隊協作** | 寫一堆腳本或文件 | 共享一個 compose.yaml |
-| **版本控制** | 腳本很難管理 | YAML 是純文字，放 Git |
-
-### 4.2 快速回顧：手動方式有多痛苦？
-
-上堂課我們已經示範過了——四個服務用 `docker run` 要打將近 30 行指令：建兩個網路、三個 Volume、四個 `docker run`，而且 `--network` 一次只能指定一個網路，WordPress 要加兩個網路還得額外跑 `docker network connect`。清理時也要一個一個 stop、rm、network rm。
-
-對比一下 Compose：啟動 `docker compose up -d`，清理 `docker compose down`。結案。
-
-所以我的建議是：**只要你的應用超過一個容器，就用 Compose。** 即使只有一個容器，用 Compose 也有好處，至少你的啟動參數都寫在 YAML 檔裡面，不用每次去翻之前打過的指令。
-
----
-
-## 五、Day 3 完整課程回顧（10 分鐘）
+## 五、課程總結（10 分鐘）
 
 ### 5.1 Day 3 七堂課回顧
 
-好，同學們，到這裡所有的新內容都講完了。我們來花幾分鐘回顧一下 Day 3 這七堂課到底學了什麼。
+好，同學們，到這裡所有的新內容和練習都結束了。我們來花幾分鐘回顧一下 Day 3 這七堂課。
 
-**Hour 8：Volume 資料持久化。** 我們學了容器讀寫層的限制，然後用三種掛載方式解決資料持久化問題——bind mount、named volume、tmpfs。還學了資料備份和還原。一句話總結：**容器的資料不怕丟。**
+**Hour 8：Volume 資料持久化。** 三種掛載方式——bind mount、named volume、tmpfs。備份和還原。一句話：**容器的資料不怕丟。**
 
-**Hour 9：容器網路 + Port Mapping 進階。** 我們深入了解了 Bridge、Host、None 三種網路模式，學了自訂網路的 DNS 功能，還有 Port Mapping 的完整語法和防火牆的坑。一句話總結：**讓容器之間能溝通，讓外面能連進來。**
+**Hour 9：容器網路 + Port Mapping 進階。** Bridge、Host、None 三種網路模式，自訂網路的 DNS 功能。一句話：**讓容器之間能溝通，讓外面能連進來。**
 
-**Hour 10：Dockerfile 基礎。** 學了為什麼不該用 docker commit，然後把 Dockerfile 的所有指令都走過一遍——FROM、RUN、COPY、WORKDIR、EXPOSE、CMD、ENTRYPOINT。一句話總結：**能寫出可以用的 Dockerfile。**
+**Hour 10：Dockerfile 基礎。** 所有指令走過一遍。一句話：**能寫出可以用的 Dockerfile。**
 
-**Hour 11：Dockerfile 進階與最佳化。** Multi-stage build、Build Cache 優化、安全性最佳實踐、.dockerignore。一句話總結：**能寫出又小又安全的 Dockerfile。**
+**Hour 11：Dockerfile 進階與最佳化。** Multi-stage、Cache、安全性。一句話：**能寫出又小又安全的 Dockerfile。**
 
-**Hour 12：Dockerfile 實戰 + 除錯。** 打包了 Node.js + TypeScript 和 Spring Boot Java 兩個真實專案，學會排查常見的 build 和 runtime 問題。一句話總結：**能打包真實專案並解決問題。**
+**Hour 12：Dockerfile 實戰練習。** 三個練習題——基礎、生產級、Code Review。一句話：**能實際動手寫並看出問題。**
 
-**Hour 13：Docker Compose 基礎與進階。** 學了 Compose 的語法、networks、environment、depends_on、build 整合，還有多網路隔離架構。一句話總結：**能用 YAML 管理多容器應用。**
+**Hour 13：Docker Compose 完整講解。** 語法、環境變數、networks、healthcheck、WordPress 實戰、環境分離。一句話：**能用 YAML 管理多容器應用。**
 
-**Hour 14（也就是這堂課）：Compose 實戰 + 課程總結。** 我們實際搭了一個四服務的部落格系統，學了環境分離的技巧，做了課程回顧。一句話總結：**能部署完整的應用。**
+**Hour 14（這堂課）：Compose 實戰練習 + 總結。** 三個練習題加課程回顧。一句話：**能部署完整的應用。**
 
 ### 5.2 兩天完整回顧
 
@@ -646,12 +503,12 @@ docker compose up -d
 | Day 2 | Hour 6 | Nginx 實戰 | Port mapping、Volume 初體驗 |
 | Day 2 | Hour 7 | 實作練習 | 綜合應用 |
 | Day 3 | Hour 8 | Volume 資料持久化 | 三種掛載、備份還原 |
-| Day 3 | Hour 9 | 容器網路 + Port Mapping 進階 | Bridge、Host、自訂網路、綁定策略 |
+| Day 3 | Hour 9 | 容器網路 | Bridge、Host、自訂網路 |
 | Day 3 | Hour 10 | Dockerfile 基礎 | 所有指令、Build Cache |
-| Day 3 | Hour 11 | Dockerfile 進階與最佳化 | Multi-stage、Best Practices |
-| Day 3 | Hour 12 | Dockerfile 實戰 + 除錯 | 打包真實專案、問題排查 |
-| Day 3 | Hour 13 | Docker Compose 基礎與進階 | YAML 語法、Networks、depends_on |
-| Day 3 | Hour 14 | Compose 實戰 + 總結 | 部署完整應用、後續學習 |
+| Day 3 | Hour 11 | Dockerfile 進階 | Multi-stage、Best Practices |
+| Day 3 | Hour 12 | Dockerfile 實戰練習 | 從基礎到 Code Review |
+| Day 3 | Hour 13 | Docker Compose 講解 | YAML 語法、Networks、WordPress |
+| Day 3 | Hour 14 | Compose 實戰練習 + 總結 | 部署完整應用、後續學習 |
 
 ### 5.3 Docker 完整工作流程
 
@@ -664,19 +521,15 @@ docker compose up -d
 └──────────────┘                    └──────┬───────┘                   └──────┬───────┘
                                           │                                  │
                                           │ docker run                       │ docker pull
-                                          │                                  │
                                           ▼                                  ▼
                                    ┌──────────────┐                   ┌──────────────┐
                                    │  Container   │                   │    Image     │
-                                   │  (容器)       │                   │  (映像檔)     │
                                    └──────────────┘                   └──────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │  compose.yaml  ──►  docker compose up  ──►  多個 Container + Network + Volume        │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
-
-你可以把這張圖印出來貼在你的螢幕旁邊。
 
 - **Dockerfile** 是設計圖——描述怎麼建構映像檔
 - **Image** 是模板——可以推到 Registry 分享，也可以拉回來使用
@@ -712,598 +565,54 @@ docker compose up -d
 
 ### 6.1 Docker 的限制
 
-好，最後我要跟大家聊一下接下來的學習方向。
+好，最後跟大家聊一下接下來的學習方向。
 
-到目前為止，我們所有的操作都在一台機器上。Docker Compose 很強大沒錯，但它有幾個根本性的限制：
+到目前為止，我們所有的操作都在一台機器上。Docker Compose 很強大，但它有幾個根本性的限制：
 
-第一，**單機限制**。所有容器都跑在同一台機器上。那台機器硬碟壞了、電源掛了，全部服務一起掛。
+第一，**單機限制**。所有容器都跑在同一台機器上。那台機器掛了，全部服務一起掛。
 
-第二，**沒有自動擴縮**。今天你的網站突然上了新聞，流量暴增十倍，你要自己手動加容器。流量降回來了，你又要自己手動減。
+第二，**沒有自動擴縮**。流量暴增十倍，你要自己手動加容器。
 
-第三，**沒有跨機故障恢復**。`restart: always` 可以在容器掛掉時重啟，但如果整台機器掛了呢？沒人幫你把服務搬到另一台機器上。
+第三，**沒有跨機故障恢復**。整台機器掛了，沒人幫你把服務搬到另一台機器上。
 
-第四，**沒有滾動更新**。你要更新應用版本，得先停舊的再啟新的，中間會有一段時間網站打不開。
+第四，**沒有滾動更新**。更新版本得先停舊的再啟新的，中間會有停機時間。
 
-第五，**沒有智能的負載均衡**。你有三個相同的 web 容器，但沒有內建的方式把流量平均分配給它們。
-
-當你的應用規模越來越大——幾十個、幾百個容器，分散在多台機器上——Docker 單機就不夠用了。你需要一個「容器編排平台」，而目前業界的標準答案就是 **Kubernetes**（大家通常簡稱 K8s，因為 K 和 s 之間有 8 個字母）。
+當你的應用規模越來越大——幾十個、幾百個容器，分散在多台機器上——Docker 單機就不夠用了。你需要 **Kubernetes**（K8s）。
 
 ### 6.2 Docker 到 K8s 的概念對應
 
-好消息是，你在 Docker 學到的所有概念，在 Kubernetes 裡面都有對應。你不是重學，你是「升級」。
+好消息是，你在 Docker 學到的所有概念，在 Kubernetes 都有對應：
 
 | Docker 概念 | Kubernetes 對應 | 說明 |
 |------------|-----------------|------|
-| Container | Pod | Pod 是 K8s 最小調度單位，裡面可以有一或多個 Container |
-| `docker run` | `kubectl apply` | 用 YAML 檔描述期望狀態 |
-| compose.yaml | K8s manifest YAML | 格式不同，但概念一樣：用 YAML 定義一切 |
-| 手動擴縮 | HPA（自動擴縮器） | 根據 CPU、記憶體自動擴縮 |
+| Container | Pod | Pod 是 K8s 最小調度單位 |
+| `docker run` | `kubectl apply` | 用 YAML 描述期望狀態 |
+| compose.yaml | K8s manifest YAML | 格式不同，概念相同 |
+| 手動擴縮 | HPA（自動擴縮器） | 根據 CPU/記憶體自動擴縮 |
 | `restart: always` | Deployment + ReplicaSet | 自動維持指定數量的 Pod |
 | docker network | Service + Ingress | 服務發現和外部存取 |
 | docker volume | PersistentVolume + PVC | 更完善的儲存管理 |
-| .env 檔案 | ConfigMap + Secret | 設定和敏感資訊的標準管理方式 |
+| .env 檔案 | ConfigMap + Secret | 設定和敏感資訊的標準管理 |
 
 ### 6.3 一個比喻
 
-我用一個比喻來總結：
+- **Docker** 就像你會開車——從 A 到 B
+- **Docker Compose** 就像你會管理一個車隊——同時調度好幾台車
+- **Kubernetes** 就像你是交通管理局——管理整個城市的交通，自動路線規劃、故障應變、流量控制
 
-- **Docker** 就像你會開車——你可以開一台車從 A 到 B
-- **Docker Compose** 就像你會管理一個車隊——你可以同時調度好幾台車
-- **Kubernetes** 就像你是交通管理局——你管理整個城市的交通系統，自動處理路線規劃、故障應變、流量控制
-
-你不會因為當了交通局長就忘記怎麼開車。Kubernetes 是 Docker 的延伸，不是替代。你在 Docker 學到的容器化思維、Dockerfile 撰寫、映像檔管理，在 Kubernetes 裡全部都會用到。
+你不會因為當了交通局長就忘記怎麼開車。Kubernetes 是 Docker 的延伸，不是替代。Docker 的容器化思維、Dockerfile 撰寫、映像檔管理，在 Kubernetes 裡全部用得到。
 
 **Docker 是基礎，K8s 是進階。你們已經把基礎打好了。**
 
 ---
 
-## 七、學生綜合練習題
-
-最後出幾道練習題給大家，這些是綜合題，會用到你們三天學到的所有知識。
-
-> **練習題 1：基礎 Compose**
->
-> 用 Docker Compose 搭建一個「Nginx + PHP-FPM」的網站：
-> - Nginx 對外開放 port 8080
-> - PHP-FPM 只在內部網路
-> - Nginx 的設定檔從本機掛載
-> - 網站檔案用 named volume 共享
->
-> 寫出完整的 compose.yaml。
->
-> **參考答案：**
->
-> `compose.yaml`：
-> ```yaml
-> services:
->   nginx:
->     image: nginx:alpine
->     ports:
->       - "8080:80"
->     volumes:
->       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
->       - web-content:/var/www/html:ro
->     depends_on:
->       - php
->     networks:
->       - app-net
->     restart: unless-stopped
->
->   php:
->     image: php:8.2-fpm-alpine
->     volumes:
->       - web-content:/var/www/html
->     networks:
->       - app-net
->     restart: unless-stopped
->
-> networks:
->   app-net:
->
-> volumes:
->   web-content:
-> ```
->
-> `nginx/default.conf`：
-> ```nginx
-> server {
->     listen 80;
->     root /var/www/html;
->     index index.php index.html;
->
->     location / {
->         try_files $uri $uri/ =404;
->     }
->
->     location ~ \.php$ {
->         fastcgi_pass php:9000;
->         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
->         include fastcgi_params;
->     }
-> }
-> ```
->
-> 建立測試檔案並啟動：
-> ```bash
-> docker compose up -d
-> # 把一個 PHP 測試檔案放進 Volume
-> docker compose exec php sh -c 'echo "<?php phpinfo(); ?>" > /var/www/html/index.php'
-> # 瀏覽器訪問 http://localhost:8080 即可看到 PHP 資訊頁面
-> docker compose down
-> ```
-
-> **練習題 2：Dockerfile + Compose 整合**
->
-> 你有一個 Node.js Express 應用，需要搭配 MongoDB：
-> 1. 寫一個 Dockerfile（Multi-stage build、non-root user）
-> 2. 寫一個 compose.yaml 同時啟動 Express 和 MongoDB
-> 3. MongoDB 的資料要持久化
-> 4. 用 .env 管理連線資訊
-> 5. 設定 healthcheck
->
-> **參考答案：**
->
-> `backend/Dockerfile`：
-> ```dockerfile
-> # ========== Stage 1: Build ==========
-> FROM node:20-alpine AS builder
-> WORKDIR /app
-> COPY package.json package-lock.json ./
-> RUN npm ci
-> COPY . .
->
-> # ========== Stage 2: Production ==========
-> FROM node:20-alpine
-> ENV NODE_ENV=production
-> WORKDIR /app
-> COPY package.json package-lock.json ./
-> RUN npm ci --omit=dev && npm cache clean --force
-> COPY --from=builder /app/src ./src
-> RUN chown -R node:node /app
-> USER node
-> EXPOSE 3000
-> CMD ["node", "src/index.js"]
-> ```
->
-> `.env`：
-> ```bash
-> MONGO_INITDB_ROOT_USERNAME=admin
-> MONGO_INITDB_ROOT_PASSWORD=secret123
-> MONGO_DB=myapp
-> MONGO_URI=mongodb://admin:secret123@mongo:27017/myapp?authSource=admin
-> ```
->
-> `compose.yaml`：
-> ```yaml
-> services:
->   api:
->     build: ./backend
->     ports:
->       - "3000:3000"
->     environment:
->       MONGO_URI: ${MONGO_URI}
->     depends_on:
->       mongo:
->         condition: service_healthy
->     restart: unless-stopped
->
->   mongo:
->     image: mongo:7
->     environment:
->       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
->       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
->     volumes:
->       - mongo-data:/data/db
->     healthcheck:
->       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
->       interval: 5s
->       timeout: 3s
->       retries: 5
->       start_period: 10s
->     restart: unless-stopped
->
-> volumes:
->   mongo-data:
-> ```
->
-> 操作：
-> ```bash
-> docker compose up -d --build
-> docker compose ps                  # 確認 mongo 顯示 healthy
-> curl http://localhost:3000/
-> docker compose down
-> ```
-
-> **練習題 3：環境分離**
->
-> 基於練習題 2，建立環境分離：
-> - compose.yaml：基礎設定
-> - compose.override.yaml：開發環境（掛載原始碼、啟用 debug）
-> - compose.prod.yaml：生產環境（資源限制、日誌設定）
->
-> 寫出三個檔案，並說明怎麼分別啟動。
->
-> **參考答案：**
->
-> `compose.yaml`（基礎設定，所有環境共用）：
-> ```yaml
-> services:
->   api:
->     image: myapp:latest
->     ports:
->       - "3000:3000"
->     environment:
->       NODE_ENV: production
->     depends_on:
->       mongo:
->         condition: service_healthy
->     restart: unless-stopped
->
->   mongo:
->     image: mongo:7
->     volumes:
->       - mongo-data:/data/db
->     healthcheck:
->       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
->       interval: 5s
->       timeout: 3s
->       retries: 5
->       start_period: 10s
->     restart: unless-stopped
->
-> volumes:
->   mongo-data:
-> ```
->
-> `compose.override.yaml`（開發環境，自動載入）：
-> ```yaml
-> services:
->   api:
->     build: ./backend
->     environment:
->       NODE_ENV: development
->       DEBUG: "true"
->     volumes:
->       - ./backend/src:/app/src
->     ports:
->       - "9229:9229"         # Node.js debug port
->
->   mongo:
->     ports:
->       - "27017:27017"       # 開發時開放 Mongo port，方便用 GUI 工具連
-> ```
->
-> `compose.prod.yaml`（生產環境）：
-> ```yaml
-> services:
->   api:
->     deploy:
->       resources:
->         limits:
->           cpus: "1.0"
->           memory: 512M
->     logging:
->       driver: json-file
->       options:
->         max-size: "10m"
->         max-file: "3"
->
->   mongo:
->     deploy:
->       resources:
->         limits:
->           cpus: "1.0"
->           memory: 1G
-> ```
->
-> 使用方式：
-> ```bash
-> # 開發環境（自動載入 compose.yaml + compose.override.yaml）
-> docker compose up -d --build
->
-> # 生產環境（跳過 override，用 prod）
-> docker compose -f compose.yaml -f compose.prod.yaml up -d
->
-> # 驗證合併後的設定
-> docker compose -f compose.yaml -f compose.prod.yaml config
-> ```
-
-> **練習題 4：除錯題**
->
-> 以下 compose.yaml 有 5 個問題，找出來並修正：
->
-> ```yaml
-> services:
->   web:
->     image: nginx
->     container_name: my-web
->     ports:
->       - "80:80"
->     depends_on:
->       - api
->     networks:
->       - frontend
->
->   api:
->     build: .
->     ports:
->       - "3000:3000"
->     environment:
->       DB_HOST: localhost
->       DB_PASSWORD: my-password
->     networks:
->       - frontend
->       - backend
->
->   db:
->     image: mysql
->     volumes:
->       - ./data:/var/lib/mysql
->     networks:
->       - backend
->
-> networks:
->   frontend:
->   backend:
-> ```
->
-> 提示：考慮安全性、可靠性、最佳實踐。
->
-> **參考答案：**
->
-> **5 個問題：**
->
-> 1. `DB_HOST: localhost`：應改為 `DB_HOST: db`。在 Compose 中每個 service 是獨立容器，`localhost` 指的是 api 容器自己，不是 db。要用 service name 作為 hostname。
->
-> 2. `DB_PASSWORD: my-password` 寫死在 compose.yaml：敏感資訊應放在 `.env` 檔案中，用 `${DB_PASSWORD}` 引用。
->
-> 3. `image: mysql` 沒有指定版本：應改為 `image: mysql:8.0`，避免 latest 陷阱。
->
-> 4. `./data:/var/lib/mysql` 用了 bind mount：資料庫資料應用 named volume（如 `db-data:/var/lib/mysql`），效能更好且更安全。
->
-> 5. `db` 沒有設定 `MYSQL_ROOT_PASSWORD` 環境變數：MySQL 啟動時必須設定 root 密碼，否則會直接報錯退出。
->
-> **其他可改善項目：** 缺少 healthcheck、depends_on 沒有 condition、缺少 restart 策略、nginx:latest 沒指定版本。
->
-> **修正後的 compose.yaml：**
-> ```yaml
-> services:
->   web:
->     image: nginx:alpine
->     container_name: my-web
->     ports:
->       - "80:80"
->     depends_on:
->       api:
->         condition: service_started
->     networks:
->       - frontend
->     restart: unless-stopped
->
->   api:
->     build: .
->     ports:
->       - "3000:3000"
->     environment:
->       DB_HOST: db
->       DB_PASSWORD: ${DB_PASSWORD}
->     depends_on:
->       db:
->         condition: service_healthy
->     networks:
->       - frontend
->       - backend
->     restart: unless-stopped
->
->   db:
->     image: mysql:8.0
->     environment:
->       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
->       MYSQL_DATABASE: ${MYSQL_DATABASE}
->     volumes:
->       - db-data:/var/lib/mysql
->     healthcheck:
->       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
->       interval: 5s
->       timeout: 3s
->       retries: 5
->       start_period: 30s
->     networks:
->       - backend
->     restart: unless-stopped
->
-> networks:
->   frontend:
->   backend:
->
-> volumes:
->   db-data:
-> ```
-
-> **練習題 5：架構設計題**
->
-> 你的公司要部署一個微服務系統：
-> - API Gateway（Nginx，port 80/443）
-> - 使用者服務（Node.js，port 3001）
-> - 訂單服務（Java Spring Boot，port 8080）
-> - PostgreSQL 資料庫
-> - Redis 快取
-> - RabbitMQ 訊息佇列
->
-> 請設計：
-> 1. 網路拓撲（哪些服務在哪個網路）
-> 2. Volume 規劃（哪些需要持久化）
-> 3. 啟動順序
-> 4. 畫出架構圖
->
-> **參考答案：**
->
-> **1. 網路拓撲（三個網路）：**
->
-> | 網路 | 服務 | 理由 |
-> |------|------|------|
-> | `gateway-net` | API Gateway, 使用者服務, 訂單服務 | Gateway 需要轉發到兩個微服務 |
-> | `service-net` | 使用者服務, 訂單服務, Redis, RabbitMQ | 微服務間通訊 + 快取 + 訊息佇列 |
-> | `data-net` | 使用者服務, 訂單服務, PostgreSQL | 只有微服務能連資料庫 |
->
-> **2. Volume 規劃：**
-> - `postgres-data`：PostgreSQL 資料目錄 `/var/lib/postgresql/data`（必須持久化）
-> - `redis-data`：Redis 持久化資料 `/data`（建議持久化）
-> - `rabbitmq-data`：RabbitMQ 資料 `/var/lib/rabbitmq`（建議持久化，保留佇列訊息）
->
-> **3. 啟動順序：**
-> PostgreSQL、Redis、RabbitMQ（基礎設施，先啟動） -> 使用者服務、訂單服務（依賴基礎設施） -> API Gateway（依賴微服務）
->
-> **4. 架構圖：**
-> ```
->                     Internet
->                        │
->                   Port 80/443
->                        │
->               ┌────────▼────────┐
->               │   API Gateway   │
->               │     (Nginx)     │
->               └───┬─────────┬───┘
->                   │         │
->          gateway-net        gateway-net
->                   │         │
->          ┌────────▼──┐  ┌──▼────────┐
->          │  使用者服務 │  │  訂單服務  │
->          │ (Node.js)  │  │ (Spring)  │
->          └──┬──┬──┬───┘  └──┬──┬──┬──┘
->             │  │  │         │  │  │
->   data-net──┘  │  └──service-net  │
->                │         │  │    │
->         ┌──────▼──┐  ┌──▼──▼──┐  │
->         │ Postgres │  │ Redis  │  │
->         └─────────┘  └────────┘  │
->                            ┌─────▼─────┐
->                            │ RabbitMQ  │
->                            └───────────┘
->
->    Volumes:
->    - postgres-data → /var/lib/postgresql/data
->    - redis-data    → /data
->    - rabbitmq-data → /var/lib/rabbitmq
-> ```
-
----
-
-## 八、附錄：Docker 常用指令速查表
-
-### 映像檔管理
-
-```bash
-docker pull <image>:<tag>          # 下載映像檔
-docker images                      # 列出本地映像檔
-docker rmi <image>                 # 刪除映像檔
-docker build -t <name>:<tag> .     # 建構映像檔
-docker tag <src> <dst>             # 加標籤
-docker push <image>:<tag>          # 推送到 Registry
-docker save -o <file> <image>      # 匯出為 tar
-docker load -i <file>              # 從 tar 匯入
-docker image prune                 # 清理未使用的映像檔
-docker history <image>             # 查看建構歷史
-```
-
-### 容器管理
-
-```bash
-docker run -d --name <n> <image>   # 背景啟動
-docker run -it <image> sh          # 互動式啟動
-docker ps                          # 列出執行中容器
-docker ps -a                       # 列出所有容器
-docker stop <container>            # 停止
-docker start <container>           # 啟動
-docker restart <container>         # 重啟
-docker rm <container>              # 刪除
-docker rm -f <container>           # 強制刪除
-docker logs -f <container>         # 追蹤日誌
-docker exec -it <container> sh     # 進入容器
-docker inspect <container>         # 查看詳情
-docker stats                       # 資源使用狀況
-docker cp <src> <container>:<dst>  # 複製檔案
-docker container prune             # 清理已停止容器
-```
-
-### 常用 run 參數
-
-```bash
--d                                 # 背景模式
--it                                # 互動模式
---name <name>                      # 指定名稱
--p <host>:<container>              # Port mapping
--v <host>:<container>              # Volume 掛載
--e <KEY>=<VALUE>                   # 環境變數
---env-file <file>                  # 從檔案讀取環境變數
---network <network>                # 指定網路
---restart <policy>                 # 重啟策略
---memory <limit>                   # 記憶體限制
---cpus <limit>                     # CPU 限制
---rm                               # 停止後自動刪除
-```
-
-### 網路管理
-
-```bash
-docker network create <name>       # 建立網路
-docker network ls                  # 列出網路
-docker network inspect <name>      # 查看詳情
-docker network rm <name>           # 刪除網路
-docker network connect <net> <c>   # 容器連接網路
-docker network disconnect <n> <c>  # 容器斷開網路
-docker network prune               # 清理未使用網路
-```
-
-### Volume 管理
-
-```bash
-docker volume create <name>        # 建立 Volume
-docker volume ls                   # 列出 Volume
-docker volume inspect <name>       # 查看詳情
-docker volume rm <name>            # 刪除 Volume
-docker volume prune                # 清理未使用 Volume
-```
-
-### Docker Compose
-
-```bash
-docker compose up -d               # 背景啟動所有服務
-docker compose down                # 停止並移除容器和網路
-docker compose down -v             # 同上，連 Volume 一起刪
-docker compose ps                  # 查看服務狀態
-docker compose logs                # 查看所有服務日誌
-docker compose logs -f <service>   # 追蹤特定服務日誌
-docker compose exec <svc> sh       # 進入服務容器
-docker compose build               # 建構所有服務
-docker compose pull                # 拉取所有映像檔
-docker compose restart             # 重啟所有服務
-docker compose stop                # 停止所有服務
-docker compose config              # 驗證並顯示設定
-docker compose top                 # 顯示容器內程序
-docker compose -f <file> up -d     # 使用指定檔案啟動
-docker compose --profile <p> up -d # 啟動指定 profile
-docker compose up -d --scale <s>=N # 擴展服務數量
-```
-
-### 系統清理
-
-```bash
-docker system df                   # 查看磁碟使用
-docker system prune                # 清理未使用資源
-docker system prune -a             # 清理所有（含映像檔）
-docker system prune -a --volumes   # 清理所有（含 Volume）
-```
-
----
-
-## 九、結語
+## 七、結語
 
 同學們，三天的 Docker 課程到這裡就全部結束了。
 
 回想一下 Day 2 第一堂課，你們連 Docker 是什麼都不太清楚。到現在，你們可以自己寫 Dockerfile 把應用程式打包成映像檔，可以用 Docker Compose 一次部署四個服務的完整應用，還懂得網路隔離、資料持久化、環境分離這些進階技巧。
 
-你們在三天內學到的東西，已經足夠你在公司開始使用 Docker 了。不是理論上可以用，是真的可以用——今天我們搭的那個 WordPress 部落格系統，把 WordPress 換成你們自己公司的應用，架構是一模一樣的。
+你們在三天內學到的東西，已經足夠你在公司開始使用 Docker 了。不是理論上可以用，是真的可以用——上堂課搭的那個 WordPress 部落格系統，把 WordPress 換成你們自己公司的應用，架構是一模一樣的。
 
 最後我想說的是，Docker 只是一個工具，但它背後代表的是一種**基礎設施即程式碼（Infrastructure as Code）**的思維。你用 Dockerfile 把環境寫成程式碼，用 compose.yaml 把部署方案寫成程式碼。這些程式碼可以版本控制、可以審查、可以自動化。這種思維才是最有價值的東西。
 
@@ -1315,12 +624,12 @@ docker system prune -a --volumes   # 清理所有（含 Volume）
 
 ## 板書 / PPT 建議
 
-1. **部落格系統架構圖**：四個服務的關係和網路分層（Nginx → WordPress → MySQL + Redis），用不同顏色區分 frontend 和 backend 網路
-2. **完整 compose.yaml 展示**：用語法高亮，標注 healthcheck、depends_on、networks、volumes、deploy 等關鍵設定
-3. **開發 vs 生產環境**：compose.yaml + compose.override.yaml + compose.prod.yaml 的合併流程圖
-4. **Docker Compose vs docker run 對比表**：左右對照，Compose 的優勢一目瞭然
-5. **三天課程內容總覽表**：Day 1 / Day 2 / Day 3 各小時主題
-6. **Docker 完整工作流程圖**：Dockerfile → build → Image → push/pull → Container → compose.yaml
-7. **Docker 到 K8s 對應表**：左邊 Docker、右邊 K8s、中間箭頭連線
-8. **Docker 指令速查表**：印成 cheat sheet 發給學生帶回去
-9. **練習題除錯題答案**：標出 5 個問題及修正方式
+1. **三題概覽表**：題目、難度星級、時間分配
+2. **練習一的 compose.yaml**：基本三服務
+3. **練習二的 compose.yaml**：.env、healthcheck、network 隔離
+4. **練習三的錯誤 compose.yaml**：用紅色標出 5 個問題
+5. **修正前後對照表**：DB_HOST、密碼、版本、Volume、MySQL 設定
+6. **兩天課程總覽表**：Day 2 / Day 3 各小時主題
+7. **Docker 完整工作流程圖**：Dockerfile → build → Image → push/pull → Container → compose.yaml
+8. **Docker 到 K8s 對應表**：左邊 Docker、右邊 K8s
+9. **Docker 指令速查表**：印成 cheat sheet 發給學生帶回去

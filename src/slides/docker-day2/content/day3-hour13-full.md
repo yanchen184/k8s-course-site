@@ -634,15 +634,49 @@ connection = pymysql.connect(
 
 **Step 3：往下滑，找到「Environment Variables」段落**
 
-頁面很長，你直接 `Ctrl+F`（Mac 是 `Cmd+F`）搜尋 `Environment`，就會跳到那個段落。它會列出所有支援的環境變數：
+頁面很長，你直接 `Ctrl+F`（Mac 是 `Cmd+F`）搜尋 `Environment`，就會跳到那個段落。
 
-- `MYSQL_ROOT_PASSWORD`（**必填**）：root 的密碼，不設這個容器直接啟動失敗
-- `MYSQL_DATABASE`（可選）：容器啟動時自動幫你建立這個資料庫
-- `MYSQL_USER` + `MYSQL_PASSWORD`（可選）：自動建立一個使用者並授權存取上面那個資料庫
-- `MYSQL_ALLOW_EMPTY_PASSWORD`（可選）：允許空密碼（只有開發環境才用，生產環境千萬不要）
-- `MYSQL_RANDOM_ROOT_PASSWORD`（可選）：自動產生隨機 root 密碼，印在 log 裡
+這裡有一個很重要的細節——文件把環境變數分成兩個區塊：
 
-你看，文件寫得清清楚楚，哪些必填、哪些可選、每個的作用是什麼，全部都有。
+**第一個區塊：Required variables（必填）**
+
+你會先看到這個：
+
+| Variable | Description |
+|----------|-------------|
+| `MYSQL_ROOT_PASSWORD` | Sets the password for the MySQL root superuser account. |
+
+只有一個必填的。很多人看到這裡就覺得「喔，只要設一個密碼就好了」，然後就不往下看了。**不要停在這裡！繼續往下滑。**
+
+**第二個區塊：Optional variables（可選但常用）**
+
+往下滑一點，你會看到 Optional variables：
+
+| Variable | Description |
+|----------|-------------|
+| `MYSQL_DATABASE` | 容器啟動時自動建立這個資料庫 |
+| `MYSQL_USER` | 自動建立一個使用者 |
+| `MYSQL_PASSWORD` | 那個使用者的密碼 |
+| `MYSQL_ALLOW_EMPTY_PASSWORD` | 允許空密碼（別用） |
+| `MYSQL_RANDOM_ROOT_PASSWORD` | 隨機產生 root 密碼 |
+
+雖然寫「Optional」，但實際上 `MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD` 這三個你幾乎每次都會用到。為什麼？因為你不會想用 root 帳號去跑應用程式吧？所以你會建一個專用的使用者、給它一個專用的資料庫。
+
+**怎麼判斷哪些要設？** 很簡單，問自己三個問題：
+1. **我的應用程式需要連資料庫嗎？** → 需要 → 設 `MYSQL_DATABASE`（資料庫名稱）
+2. **我要用 root 帳號還是專用帳號？** → 專用帳號比較安全 → 設 `MYSQL_USER` + `MYSQL_PASSWORD`
+3. **root 密碼要設嗎？** → 必填 → 設 `MYSQL_ROOT_PASSWORD`
+
+所以實務上，你幾乎每次都會設這四個：
+
+```bash
+MYSQL_ROOT_PASSWORD=超強的root密碼
+MYSQL_DATABASE=你的應用要用的資料庫名稱
+MYSQL_USER=你的應用要用的帳號
+MYSQL_PASSWORD=那個帳號的密碼
+```
+
+然後你的應用程式那邊（比如 WordPress），就用 `MYSQL_USER` 和 `MYSQL_PASSWORD` 去連線，不用 root。這是基本的安全常識。
 
 **Step 4：同樣方式查其他 Image**
 

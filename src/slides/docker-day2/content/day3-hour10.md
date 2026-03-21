@@ -180,21 +180,41 @@ RUN pwd          # 輸出 /app
 
 ### 3.5 ENV vs ARG：環境變數 vs 建構參數
 
-**記憶口訣**：
-- **ENV = 刺青**（建構時刺上去，容器跑起來後還在）
-- **ARG = 貼紙**（建構時用一下，建構完就撕掉）
-
-```dockerfile
-ENV APP_VERSION=1.0.0       # 執行時也存在
-ENV NODE_ENV=production
-
-ARG PYTHON_VERSION=3.11     # 只在建構時存在
-FROM python:${PYTHON_VERSION}
-```
+**記憶口訣**：ENV = 刺青（容器跑起來還在）、ARG = 貼紙（建構完就沒了）
 
 ```bash
-docker run -e NODE_ENV=development my-app        # 覆蓋 ENV
-docker build --build-arg PYTHON_VERSION=3.10 .   # 覆蓋 ARG
+# === 完整 Demo ===
+mkdir -p /tmp/env-arg-demo && cd /tmp/env-arg-demo
+
+cat > Dockerfile <<'EOF'
+ARG BUILD_ENV=production
+FROM alpine:3.18
+ENV APP_VERSION=1.0.0
+ENV NODE_ENV=production
+# ARG 要在 FROM 之後重新宣告才能用
+ARG BUILD_ENV
+RUN echo "Building for: $BUILD_ENV, version: $APP_VERSION"
+CMD ["sh", "-c", "echo APP_VERSION=$APP_VERSION && echo NODE_ENV=$NODE_ENV && echo BUILD_ENV=$BUILD_ENV"]
+EOF
+
+# 建構（不帶 --build-arg）
+docker build -t env-demo .
+
+# 跑容器，看哪些變數存在
+docker run --rm env-demo
+# → APP_VERSION=1.0.0    ← ENV 看得到（刺青）
+# → NODE_ENV=production  ← ENV 看得到
+# → BUILD_ENV=           ← ARG 看不到（貼紙撕掉了）
+
+# 用 --build-arg 覆蓋 ARG
+docker build --build-arg BUILD_ENV=development -t env-demo .
+
+# 用 -e 覆蓋 ENV
+docker run --rm -e NODE_ENV=development env-demo
+# → NODE_ENV=development ← 被覆蓋了
+
+# 清理
+docker rmi env-demo
 ```
 
 | 比較 | ENV（刺青） | ARG（貼紙） |
@@ -203,15 +223,6 @@ docker build --build-arg PYTHON_VERSION=3.10 .   # 覆蓋 ARG
 | **執行時可用** | **✅** | **❌** |
 | 建構時覆蓋 | ❌ | ✅（`--build-arg`） |
 | 執行時覆蓋 | ✅（`-e`） | ❌ |
-
-**搭配技巧**：用 ARG 接收建構參數，轉存到 ENV 讓執行時也能用：
-
-```dockerfile
-ARG APP_VERSION=1.0.0
-ENV APP_VERSION=$APP_VERSION
-```
-
-> **練習題 3**：用 ARG 定義 `BUILD_ENV`（預設 `production`），用 ENV 定義 `APP_VERSION=1.0.0`。建構兩次（帶/不帶 `--build-arg`），用 `docker run <image> env` 確認哪個變數在容器裡看得到。
 
 ### 3.6 EXPOSE：宣告埠號
 

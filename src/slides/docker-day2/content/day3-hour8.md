@@ -64,102 +64,91 @@ docker run -v my-data:/data nginx                  # Volume（沒有斜線開頭
 ### 3.1 不用 Volume 啟動 MySQL（重現問題）
 
 ```bash
+# 1. 啟動 MySQL（沒掛 Volume）
 docker run -d --name mysql-no-volume \
   -e MYSQL_ROOT_PASSWORD=test123 \
   -e MYSQL_DATABASE=school \
   mysql:8.0
-```
 
-進入 MySQL 容器：
-
-```bash
+# 2. 進入 MySQL
 docker exec -it mysql-no-volume mysql -uroot -ptest123
-```
 
-建表、插入資料、查詢（在 MySQL 裡面打）：
-
-```sql
+# 3. 在 MySQL 裡面打以下 SQL ↓↓↓
 CREATE TABLE school.students (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(100),
   grade INT
 );
-
 INSERT INTO school.students (name, grade) VALUES
-  ('小明', 85),
-  ('小華', 92),
-  ('小美', 78);
-
+  ('小明', 85), ('小華', 92), ('小美', 78);
 SELECT * FROM school.students;
-```
-
-然後離開 MySQL、砍掉容器、重建：
-
-```bash
 exit
+
+# 4. 砍掉容器、重建
 docker stop mysql-no-volume && docker rm mysql-no-volume
 docker run -d --name mysql-no-volume \
   -e MYSQL_ROOT_PASSWORD=test123 \
   -e MYSQL_DATABASE=school \
   mysql:8.0
-docker exec -it mysql-no-volume mysql -uroot -ptest123 -e "SELECT * FROM school.students;"
+
+# 5. 再查一次 → 資料消失了！
+docker exec -it mysql-no-volume mysql -uroot -ptest123 \
+  -e "SELECT * FROM school.students;"
+# → ERROR 1146: Table 'school.students' doesn't exist
 ```
 
-→ `ERROR 1146: Table 'school.students' doesn't exist`。**資料全部消失。**
+**資料全部消失。** 因為資料存在容器的讀寫層，容器砍了就沒了。
 
 ### 3.2 用 Named Volume 啟動 MySQL（正確做法）
 
 ```bash
+# 1. 建立 Named Volume
 docker volume create mysql-school-data
 
+# 2. 啟動 MySQL，掛上 Volume
 docker run -d --name mysql-with-volume \
   -e MYSQL_ROOT_PASSWORD=test123 \
   -e MYSQL_DATABASE=school \
   -v mysql-school-data:/var/lib/mysql \
   -p 3306:3306 \
   mysql:8.0
-```
 
-進入 MySQL，打一樣的 SQL：
-
-```bash
+# 3. 進入 MySQL，打一樣的 SQL ↓↓↓
 docker exec -it mysql-with-volume mysql -uroot -ptest123
-```
-
-```sql
 CREATE TABLE school.students (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(100),
   grade INT
 );
-
 INSERT INTO school.students (name, grade) VALUES
-  ('小明', 85),
-  ('小華', 92),
-  ('小美', 78);
-
+  ('小明', 85), ('小華', 92), ('小美', 78);
 SELECT * FROM school.students;
 exit
 ```
 
-### 3.3 刪容器、重建、驗證資料
+### 3.3 刪容器、重建、驗證資料還在
 
 ```bash
+# 砍掉容器
 docker stop mysql-with-volume && docker rm mysql-with-volume
-docker volume ls
-# → mysql-school-data 還在！
 
+# Volume 還在！
+docker volume ls
+
+# 重建容器，掛同一個 Volume
 docker run -d --name mysql-with-volume \
   -e MYSQL_ROOT_PASSWORD=test123 \
   -v mysql-school-data:/var/lib/mysql \
   -p 3306:3306 \
   mysql:8.0
 
-docker exec -it mysql-with-volume mysql -uroot -ptest123 -e "SELECT * FROM school.students;"
+# 資料還在！
+docker exec -it mysql-with-volume mysql -uroot -ptest123 \
+  -e "SELECT * FROM school.students;"
 # → 小明、小華、小美都還在！
 ```
 
-刪容器 → `docker volume ls` 確認 Volume 還在 → 重建容器掛同一個 Volume → **資料完整保留！**
+**資料完整保留！** 因為資料存在 Volume 裡，不隨容器生死。
 
 ### 3.4 用 inspect 查看掛載狀態
 

@@ -65,11 +65,11 @@ function renderSummaryChips(summary: BulletGroup[], cards: SlideCardSpec[]) {
     return null
   }
 
-  const groups = summary.length > 0
+  const groups: Array<{ label?: string, items: string[] }> = summary.length > 0
     ? summary
       .filter((group) => group.items.length > 0)
       .map((group) => ({ label: group.label, items: group.items }))
-    : [{ items: cards.slice(0, 3).map((card) => card.title) }]
+    : [{ label: undefined, items: cards.slice(0, 3).map((card) => card.title) }]
 
   if (groups.length === 0) return null
 

@@ -117,7 +117,7 @@ docker compose down
    - db 只在 backend-net
 
 **驗證清單：**
-- `docker compose ps` → db 顯示 (healthy)
+- 等幾秒讓 healthcheck 完成後，`docker compose ps` → db 顯示 `(healthy)`
 - `curl http://localhost:8080` → 仍然回 `hello from api`
 - `docker network inspect $(basename "$PWD")_frontend-net` → 只有 nginx + api
 - `docker network inspect $(basename "$PWD")_backend-net` → 只有 api + db
@@ -210,6 +210,7 @@ volumes:
 **驗證：**
 ```bash
 docker compose up -d
+sleep 12
 docker compose ps                                   # db 顯示 (healthy)
 curl http://localhost:8080                          # → hello from api
 docker network inspect $(basename "$PWD")_frontend-net

@@ -151,7 +151,7 @@ docker rm -f test
 
 做完之後，你需要驗證三件事：
 - `docker exec <container> whoami` → 回傳的不是 root
-- `docker ps` → 顯示 (healthy)
+- 等 healthcheck 跑完後，用 `docker inspect --format '{{.State.Health.Status}}' <container>` → 顯示 `healthy`
 - `docker images` → Image 大小合理，200MB 以內
 
 如果你想要更完整一點，可以加上 dumb-init 處理 PID 1 信號問題，然後用 `time docker stop` 驗證優雅關閉。
@@ -231,17 +231,17 @@ CMD ["node", "server.js"]
 docker build -t hello-api:prod .
 docker run -d -p 3000:3000 --name test hello-api:prod
 
-# 等 30 秒讓 HEALTHCHECK 執行
-sleep 35
+# 保守一點，等 HEALTHCHECK 穩定完成
+sleep 45
 
 docker exec test whoami
 # node ← 不是 root
 
-docker ps
-# STATUS: Up 35s (healthy) ← 健康檢查通過
+docker inspect --format '{{.State.Health.Status}}' test
+# healthy ← 健康檢查通過
 
 docker images hello-api:prod
-# SIZE: ~130MB ← 合理大小
+# SIZE 欄位應明顯小於單階段版本
 
 time docker stop test
 # real    0m1.xxx ← 1-2 秒優雅關閉，不是 10 秒

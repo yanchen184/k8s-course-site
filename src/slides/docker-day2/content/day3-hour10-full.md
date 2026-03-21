@@ -220,7 +220,7 @@ Successfully tagged my-curl:v1
 
 **第一，Step 1/3、Step 2/3、Step 3/3**——Dockerfile 裡每一行指令就是一步。
 
-**第二，每一步都產生一個新的 Layer。** 那串像亂碼一樣的 ID（`a8780b506fa4`、`7e8f9a0b1c2d`）就是每一層 Layer 的 ID。還記得我們第二天學的 Image 分層概念嗎？這就是它在實際建構中的樣子。
+**第二，不是每一步都會新增 filesystem layer。** `FROM` 和 `RUN` 這類步驟會建立或沿用 layer；`CMD` 這種指令雖然也會出現在 build step 裡，但它更新的是 image metadata。上面 Step 3 出現的 ID，可以把它理解成「套用這次設定後得到的 image 結果」，不要把它當成新的檔案系統層。
 
 **第三，`Running in ... / Removing intermediate container`**——Docker 為了執行 RUN 指令，會建立一個暫時的容器，在裡面跑命令，跑完把結果存成一個新的 Layer，然後刪掉那個暫時容器。
 
@@ -281,13 +281,13 @@ Successfully tagged my-curl:v2
 
 看到了嗎？Step 1 和 Step 2 都顯示 **Using cache**！Docker 發現前兩步的內容跟上次一模一樣，就直接用之前的結果，不需要重新執行。
 
-只有 Step 3 因為內容改了，才重新執行。
+只有 Step 3 因為內容改了，才重新套用設定。
 
 整個建構過程原本可能要一兩分鐘（因為 apt-get install 很慢），但用了快取之後，幾秒鐘就完成了。**這就是 Docker Build Cache 的威力。**
 
-但是注意一個重要的規則：**一旦某一層快取失效，它後面的所有層都要重新建構。** 這就像疊積木，你抽掉中間一塊，上面的全部要重疊。
+但是注意一個重要的規則：**一旦某個會影響結果的步驟快取失效，它後面的步驟都要重新計算。** 這就像疊積木，你抽掉中間一塊，上面的全部要重疊。
 
-所以如果你改了第二行的 RUN，那第三行的 CMD 也要重新跑，即使 CMD 本身沒有改。快取是**從上到下、連續的**，中間斷了後面全部失效。
+所以如果你改了第二行的 RUN，那第三行的 CMD 設定也會重新套用，即使 CMD 本身沒有改。快取是**從上到下、連續的**，中間斷了後面全部失效。
 
 這個概念非常非常重要，後面寫 Dockerfile 的時候會一直用到。
 
@@ -933,6 +933,8 @@ CMD ["echo", "first"]
 CMD ["echo", "second"]
 # 容器啟動時只會執行 echo second
 ```
+
+如果你要在容器啟動前先做多個步驟，不是多寫幾個 `CMD`，而是改用 `sh -c "cmd1 && cmd2"`，或更推薦寫成 `entrypoint.sh` / `start.sh`，最後再 `exec` 主程序。
 
 **錯誤 2：用 Shell Form 導致收不到信號**
 

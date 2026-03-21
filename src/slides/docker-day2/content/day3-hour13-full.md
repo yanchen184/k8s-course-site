@@ -638,7 +638,7 @@ services:
 ```
 
 ```bash
-docker compose up -d                    # 只啟動 web
+docker compose up -d web                # 只啟動 web
 docker compose --profile debug up -d    # 也啟動 adminer
 ```
 

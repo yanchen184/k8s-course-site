@@ -139,7 +139,7 @@ docker compose down
 **第四，網路隔離。** 分成 `frontend-net` 和 `backend-net`。nginx 只在 frontend-net，api 在兩個網路，db 只在 backend-net。
 
 做完之後，驗證四件事：
-1. `docker compose ps` → db 顯示 (healthy)
+1. 等幾秒讓 healthcheck 完成後，`docker compose ps` → db 顯示 `(healthy)`
 2. `docker compose exec nginx ping -c 1 db` → 失敗（網路隔離生效）
 3. `docker compose exec api ping -c 1 db` → 成功（同一個 backend-net）
 4. compose.yaml 裡面看不到任何密碼
@@ -246,6 +246,7 @@ volumes:
 docker compose up -d
 
 # 等一下讓 healthcheck 完成
+sleep 12
 docker compose ps
 # db 顯示 (healthy)
 

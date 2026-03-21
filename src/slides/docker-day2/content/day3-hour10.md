@@ -81,7 +81,7 @@ docker build -t my-curl:v1 .
 ```
 Step 1/3 : FROM ubuntu:22.04        → 基礎 Layer
 Step 2/3 : RUN apt-get install...   → 新 Layer（Running in <暫時容器>，跑完刪掉）
-Step 3/3 : CMD ["curl", "--version"] → 新 Layer
+Step 3/3 : CMD ["curl", "--version"] → 更新 image metadata（不新增 filesystem layer）
 Successfully tagged my-curl:v1
 ```
 
@@ -94,10 +94,10 @@ Dockerfile 建構本質：**一層一層疊上去**。
 ```
 Step 1/3 : FROM ubuntu:22.04         → Using cache ✅
 Step 2/3 : RUN apt-get install curl  → Using cache ✅
-Step 3/3 : CMD ["curl", "-V"]        → 重新執行（內容改了）
+Step 3/3 : CMD ["curl", "-V"]        → 重新套用 metadata（內容改了）
 ```
 
-**重要規則**：一旦某一層快取失效，它後面的所有層都要重新建構（連續性快取）。
+**重要規則**：一旦某個會影響結果的步驟快取失效，它後面的步驟都要重新計算（連續性快取）。
 
 > **練習題 1**：基於 `alpine:3.18`，安裝 `curl` 和 `wget`（用 `apk add --no-cache`），容器啟動時顯示 curl 版本。改 CMD 重新 build，觀察哪些 Step 用了 cache。
 
@@ -303,9 +303,9 @@ docker rmi demo-cmd demo-ep
 
 > **練習題 4**：分別建構只用 CMD 和只用 ENTRYPOINT 的兩個 Image，執行 `docker run <image>` 和 `docker run <image> "I am a student"`，記錄輸出差異，用一句話總結核心差異。
 
-### 3.7.1 CMD 只能有一個！要跑多個指令怎麼辦？
+### 3.7.1 Dockerfile 最終只會保留一個 CMD；要做多步驟啟動怎麼辦？
 
-一個 Dockerfile 只能有**一個 CMD**（多個只有最後一個生效），ENTRYPOINT 也一樣。
+一個 Dockerfile 最終只會有**一個生效的 CMD**（你可以寫多個，但只有最後一個會生效），ENTRYPOINT 也一樣。
 
 ```bash
 # === Demo：多個 CMD 只有最後一個生效 ===
@@ -325,19 +325,19 @@ docker run --rm multi-cmd
 # 方法一：用 sh -c 串起來（簡單情況）
 cat > Dockerfile <<'EOF'
 FROM alpine:3.18
-CMD ["sh", "-c", "echo 準備中... && echo 啟動完成 && sleep 3600"]
+CMD ["sh", "-c", "echo \"Step 1: prepare\" && echo \"Step 2: start\""]
 EOF
 docker build -t multi-cmd .
 docker run --rm multi-cmd
-# → 準備中...
-# → 啟動完成
+# → Step 1: prepare
+# → Step 2: start
 
 # 方法二：用 start.sh 腳本（推薦，好維護）
 cat > start.sh <<'SCRIPT'
 #!/bin/sh
-echo "Step 1: 資料庫遷移..."
-echo "Step 2: 啟動應用程式..."
-exec python app.py
+echo "Step 1: Prepare config..."
+echo "Step 2: Start main process..."
+exec sleep 3600
 SCRIPT
 chmod +x start.sh
 
@@ -346,6 +346,12 @@ FROM alpine:3.18
 COPY start.sh .
 CMD ["./start.sh"]
 EOF
+docker build -t multi-cmd .
+docker run -d --name multi-cmd-demo multi-cmd
+docker logs multi-cmd-demo
+# → Step 1: Prepare config...
+# → Step 2: Start main process...
+docker rm -f multi-cmd-demo
 
 # 清理
 docker rmi multi-cmd

@@ -114,7 +114,7 @@ docker rm -f test
 
 **驗證清單：**
 - `docker exec <container> whoami` → 不是 root
-- `docker ps` → 顯示 `(healthy)`
+- 等 healthcheck 跑完後，用 `docker inspect --format '{{.State.Health.Status}}' <container>` → 應顯示 `healthy`
 - Image 大小合理（< 200MB）
 
 ---
@@ -163,9 +163,10 @@ CMD ["node", "server.js"]
 ```bash
 docker build -t hello-api:prod .
 docker run -d -p 3000:3000 --name test hello-api:prod
+sleep 45                         # 保守一點，等 healthcheck 穩定完成
 docker exec test whoami          # → node
-docker ps                        # → (healthy)
-docker images hello-api:prod     # → < 200MB
+docker inspect --format '{{.State.Health.Status}}' test   # → healthy
+docker images hello-api:prod     # SIZE 欄位應明顯小於單階段版本
 docker rm -f test
 ```
 

@@ -149,14 +149,16 @@ docker rm -f demo-preview
 好，現在我們先做一件很多團隊都會做的事：**把同一個服務開成多份副本。**
 
 ```bash
-docker run -d --name web1 demo-web:v1
-docker run -d --name web2 demo-web:v1
-docker run -d --name web3 demo-web:v1
+docker run -d --name web1 --hostname web1 demo-web:v1
+docker run -d --name web2 --hostname web2 demo-web:v1
+docker run -d --name web3 --hostname web3 demo-web:v1
 
 docker ps
 ```
 
 你會看到三個 container，都來自同一個 image `demo-web:v1`。
+
+這裡我會刻意把 `--hostname` 也一起設成 `web1`、`web2`、`web3`。原因很簡單，等等做負載分流驗證時，我們希望學生直接從 API 回應就能辨認是哪個副本回的；如果不設，`socket.gethostname()` 預設通常會回傳 container ID，示範就會變得不直覺。
 
 這裡請大家腦中直接翻譯成：
 
@@ -275,20 +277,22 @@ docker run -d \
 現在打幾次：
 
 ```bash
-curl http://localhost:8080
-curl http://localhost:8080
-curl http://localhost:8080
+for i in 1 2 3 4 5 6; do
+  curl -s http://localhost:8080
+  echo
+done
 ```
 
 你很可能會看到：
 
 ```json
-{"hostname":"web1","version":"v1"}
 {"hostname":"web2","version":"v1"}
+{"hostname":"web1","version":"v1"}
 {"hostname":"web3","version":"v1"}
+{"hostname":"web2","version":"v1"}
 ```
 
-或者順序不同，但重點是 `hostname` 在換。
+或者順序不同，但重點不是一定要剛好照 `web1 -> web2 -> web3` 排，而是你多打幾次之後，會看到不只一個 `hostname` 在回應。
 
 這一刻一定要停下來講：
 
@@ -358,7 +362,7 @@ docker build -t demo-web:v2 .
 
 ```bash
 docker stop web1 && docker rm web1
-docker run -d --name web1 --network demo-net demo-web:v2
+docker run -d --name web1 --hostname web1 --network demo-net demo-web:v2
 ```
 
 這時候如果你再去 `curl`，你可能會看到：
@@ -426,7 +430,7 @@ docker stop web2
 
 ```bash
 docker rm web2
-docker run -d --name web2 --network demo-net demo-web:v2
+docker run -d --name web2 --hostname web2 --network demo-net demo-web:v2
 ```
 
 這裡學生通常會立刻感覺到差異，因為前面你已經做了很多「看起來很像平台」的事，但這一刻會發現，平台感只是表面，真正的自動維持還不存在。

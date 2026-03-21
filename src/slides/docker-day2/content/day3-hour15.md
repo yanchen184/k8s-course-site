@@ -89,12 +89,14 @@ docker rm -f demo-preview
 ### 3.1 啟動三個副本
 
 ```bash
-docker run -d --name web1 demo-web:v1
-docker run -d --name web2 demo-web:v1
-docker run -d --name web3 demo-web:v1
+docker run -d --name web1 --hostname web1 demo-web:v1
+docker run -d --name web2 --hostname web2 demo-web:v1
+docker run -d --name web3 --hostname web3 demo-web:v1
 
 docker ps
 ```
+
+這裡刻意把 `hostname` 設成和 container name 一樣，等等才可以直接從回應內容看出請求被分到哪個副本。
 
 ### 3.2 這時候要講
 
@@ -168,12 +170,13 @@ docker run -d \
 ### 4.3 驗證負載分流
 
 ```bash
-curl http://localhost:8080
-curl http://localhost:8080
-curl http://localhost:8080
+for i in 1 2 3 4 5 6; do
+  curl -s http://localhost:8080
+  echo
+done
 ```
 
-你會看到回應中的 `hostname` 在 `web1 / web2 / web3` 之間切換。
+多打幾次後，你會看到回應中的 `hostname` 在 `web1 / web2 / web3` 之間切換；順序不一定固定，重點是同一個入口後面確實有多個副本在回應。
 
 ### 4.4 對照 K8s
 
@@ -204,7 +207,7 @@ docker build -t demo-web:v2 .
 
 ```bash
 docker stop web1 && docker rm web1
-docker run -d --name web1 --network demo-net demo-web:v2
+docker run -d --name web1 --hostname web1 --network demo-net demo-web:v2
 ```
 
 重複更新 `web2`、`web3`。
@@ -239,7 +242,7 @@ docker stop web2
 
 ```bash
 docker rm web2
-docker run -d --name web2 --network demo-net demo-web:v2
+docker run -d --name web2 --hostname web2 --network demo-net demo-web:v2
 ```
 
 ### 6.3 關鍵句

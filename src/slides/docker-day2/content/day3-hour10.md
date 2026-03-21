@@ -228,60 +228,57 @@ EXPOSE 3000
 
 ### 3.7 CMD vs ENTRYPOINT（重點！）
 
-#### CMD：容器的「預設命令」
+完整 demo：建立兩個 Dockerfile，對比行為差異。
 
-```dockerfile
+```bash
+# === CMD demo ===
+mkdir -p /tmp/cmd-demo && cd /tmp/cmd-demo
+cat > Dockerfile <<'EOF'
 FROM ubuntu:22.04
 CMD ["echo", "Hello World"]
-```
+EOF
+docker build -t demo-cmd .
 
-```bash
-docker run demo-cmd                  # → Hello World（執行 CMD）
-docker run demo-cmd echo "Goodbye"   # → Goodbye（CMD 被完全覆蓋）
-docker run demo-cmd ls -la           # → 目錄列表（CMD 完全消失）
-```
+# CMD：不帶參數 → 執行預設命令
+docker run --rm demo-cmd
+# → Hello World
 
-**比喻**：手機預設鈴聲——你不改就用預設，一改就完全換掉。
+# CMD：帶參數 → 預設命令被「完全覆蓋」
+docker run --rm demo-cmd echo "Goodbye"
+# → Goodbye（CMD 消失了）
 
-#### ENTRYPOINT：容器的「主程序」
-
-```dockerfile
+# === ENTRYPOINT demo ===
+mkdir -p /tmp/ep-demo && cd /tmp/ep-demo
+cat > Dockerfile <<'EOF'
 FROM ubuntu:22.04
 ENTRYPOINT ["echo", "Hello"]
+EOF
+docker build -t demo-ep .
+
+# ENTRYPOINT：不帶參數
+docker run --rm demo-ep
+# → Hello
+
+# ENTRYPOINT：帶參數 → 參數被「附加」到後面
+docker run --rm demo-ep World
+# → Hello World
+
+docker run --rm demo-ep Docker rocks
+# → Hello Docker rocks
+
+# === 搭配使用（最精華！） ===
+# ENTRYPOINT = 主程序（固定）
+# CMD = 預設參數（可覆蓋）
+# docker run my-app           → python app.py --port 8080
+# docker run my-app --port 3000 → python app.py --port 3000
+
+# 清理
+docker rmi demo-cmd demo-ep
 ```
 
-```bash
-docker run demo-ep               # → Hello
-docker run demo-ep World         # → Hello World（參數被附加！）
-docker run demo-ep Docker rocks  # → Hello Docker rocks
-```
+**比喻**：CMD = 手機預設鈴聲（一改就換掉）、ENTRYPOINT = 咖啡機（機器不變，選口味）。
 
-**比喻**：咖啡機——機器不變（ENTRYPOINT），你選不同口味（參數），出來的一定是咖啡。
-
-#### CMD + ENTRYPOINT 搭配使用（最精華！）
-
-```dockerfile
-ENTRYPOINT ["python", "app.py"]   # 固定主程序
-CMD ["--port", "8080"]             # 可變的預設參數
-```
-
-```bash
-docker run my-app                  # → python app.py --port 8080
-docker run my-app --port 3000      # → python app.py --port 3000
-```
-
-#### Shell Form vs Exec Form（必用 Exec Form！）
-
-```
-# Exec Form 的程序樹（正確）
-PID 1: python app.py   ← 你的程式直接收到 SIGTERM，優雅退出
-
-# Shell Form 的程序樹（危險）
-PID 1: /bin/sh -c "python app.py"   ← shell 不轉發 SIGTERM
-  └── PID 7: python app.py           ← 你的程式收不到信號，被強制 SIGKILL
-```
-
-**結論：CMD 和 ENTRYPOINT 一律使用 Exec Form（JSON 陣列格式）。**
+**結論：CMD 和 ENTRYPOINT 一律用 Exec Form `["xxx"]`，不要用 Shell Form `xxx`。**
 
 #### 完整對照表
 
@@ -308,17 +305,58 @@ CMD ["python", "app.py"]
 
 ### 3.9 VOLUME：在 Dockerfile 中宣告掛載點
 
-```dockerfile
-VOLUME /var/lib/mysql   # 若用戶不用 -v 掛載，Docker 自動建立匿名 Volume
+```bash
+# Demo：VOLUME 的效果
+mkdir -p /tmp/vol-demo && cd /tmp/vol-demo
+cat > Dockerfile <<'EOF'
+FROM alpine:3.18
+RUN mkdir -p /mydata && echo "important data" > /mydata/test.txt
+VOLUME /mydata
+CMD ["cat", "/mydata/test.txt"]
+EOF
+docker build -t vol-demo .
+
+# 不指定 -v，Docker 自動建立匿名 Volume
+docker run --rm vol-demo
+# → important data
+
+# 查看匿名 Volume（名字是一串 hash，難管理）
+docker volume ls
+# → local   a3b4c5d6e7f8...（匿名 Volume）
+
+# 結論：不要依賴 Dockerfile 的 VOLUME，永遠自己指定 -v
+docker run --rm -v my-named-vol:/mydata vol-demo
+
+# 清理
+docker rmi vol-demo
+docker volume prune -f
 ```
 
 更推薦在 `docker run` 時明確指定：`-v mysql-data:/var/lib/mysql`。Dockerfile 的 VOLUME 更像是「提醒」。
 
 ### 3.10 HEALTHCHECK：健康檢查
 
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=5s \
+```bash
+# Demo：HEALTHCHECK 讓 Docker 自動檢查容器健康狀態
+mkdir -p /tmp/health-demo && cd /tmp/health-demo
+cat > Dockerfile <<'EOF'
+FROM nginx:alpine
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
   CMD curl -f http://localhost/ || exit 1
+EOF
+docker build -t health-demo .
+docker run -d --name hc-test health-demo
+
+# 等 10 秒後查看健康狀態
+sleep 12
+docker ps
+# → STATUS 會顯示 (healthy)
+
+docker inspect hc-test --format='{{.State.Health.Status}}'
+# → healthy
+
+# 清理
+docker rm -f hc-test && docker rmi health-demo
 ```
 
 | 參數 | 說明 | 預設 |

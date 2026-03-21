@@ -120,7 +120,44 @@ docker run -d --name mysql-with-volume \
   mysql:8.0
 ```
 
+進入 MySQL，打一樣的 SQL：
+
+```bash
+docker exec -it mysql-with-volume mysql -uroot -ptest123
+```
+
+```sql
+CREATE TABLE school.students (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100),
+  grade INT
+);
+
+INSERT INTO school.students (name, grade) VALUES
+  ('小明', 85),
+  ('小華', 92),
+  ('小美', 78);
+
+SELECT * FROM school.students;
+exit
+```
+
 ### 3.3 刪容器、重建、驗證資料
+
+```bash
+docker stop mysql-with-volume && docker rm mysql-with-volume
+docker volume ls
+# → mysql-school-data 還在！
+
+docker run -d --name mysql-with-volume \
+  -e MYSQL_ROOT_PASSWORD=test123 \
+  -v mysql-school-data:/var/lib/mysql \
+  -p 3306:3306 \
+  mysql:8.0
+
+docker exec -it mysql-with-volume mysql -uroot -ptest123 -e "SELECT * FROM school.students;"
+# → 小明、小華、小美都還在！
+```
 
 刪容器 → `docker volume ls` 確認 Volume 還在 → 重建容器掛同一個 Volume → **資料完整保留！**
 

@@ -86,19 +86,38 @@ docker rm -f demo-preview
 
 ## 三、多副本 = 手動 replicas（10 分鐘）
 
-### 3.1 啟動三個副本
+### 3.1 先建立這堂課共用的內部網路
 
 ```bash
-docker run -d --name web1 --hostname web1 demo-web:v1
-docker run -d --name web2 --hostname web2 demo-web:v1
-docker run -d --name web3 --hostname web3 demo-web:v1
+docker network create demo-net
+```
+
+這裡先建立 `demo-net`，不是因為「多副本一定要先有 network」，而是因為等等的 `web1~web3`、`nginx`、以及後面的 rolling update 都會在同一個 network 上運作。
+
+先把環境準備好，後面的指令才會一路對得起來：
+
+- `replicas` 處理的是「有幾份副本」
+- `network` 處理的是「這些副本怎麼互相找到」
+
+做完這一步後，你可以用 `docker network ls` 確認 `demo-net` 已經存在。
+
+### 3.2 啟動三個副本
+
+```bash
+docker run -d --name web1 --hostname web1 --network demo-net demo-web:v1
+docker run -d --name web2 --hostname web2 --network demo-net demo-web:v1
+docker run -d --name web3 --hostname web3 --network demo-net demo-web:v1
 
 docker ps
 ```
 
 這裡刻意把 `hostname` 設成和 container name 一樣，等等才可以直接從回應內容看出請求被分到哪個副本。
 
-### 3.2 這時候要講
+這一步先專注在一件事：同一個 image，可以同時跑出三個實例。
+
+做完這一步後，你應該在 `docker ps` 看到 `web1`、`web2`、`web3` 三個 container，都來自 `demo-web:v1`。
+
+### 3.3 這時候要講
 
 ```txt
 replicas = 3
@@ -109,7 +128,7 @@ replicas = 3
 | 手動開 3 個 container | 宣告 `replicas: 3` |
 | 你自己記得要維持 3 個 | Controller 自動維持 |
 
-### 3.3 先點出限制
+### 3.4 先點出限制
 
 - 這三個副本現在只是「存在」
 - 還沒有統一入口
@@ -118,21 +137,17 @@ replicas = 3
 
 ---
 
-## 四、自訂網路 + Nginx 分流（15 分鐘）
+## 四、Nginx 當統一入口（15 分鐘）
 
-### 4.1 建立內部網路
+### 4.1 先提醒現在的結構
 
-```bash
-docker network create demo-net
-```
+到這一步為止：
 
-```bash
-docker network connect demo-net web1
-docker network connect demo-net web2
-docker network connect demo-net web3
-```
+- `web1~web3` 都已經在 `demo-net`
+- 但外部還沒有單一入口
+- 也還沒有誰幫你把流量分給三個副本
 
-**這裡呼應 Hour 9：** 你今天早上才學過自訂網路與容器 DNS，現在直接拿來用。
+**這裡呼應 Hour 9：** `demo-net` 讓容器之間可以直接用名稱互相找到彼此。
 
 ### 4.2 Nginx 當入口
 
@@ -167,6 +182,10 @@ docker run -d \
   nginx
 ```
 
+因為 `nginx` 和 `web1~web3` 都在 `demo-net`，所以它可以直接用 `web1:8000`、`web2:8000`、`web3:8000` 找到後端。
+
+做完這一步後，你應該在 `docker ps` 看到 `nginx` 也已經啟動，並且可以從外部透過 `localhost:8080` 打進來。
+
 ### 4.3 驗證負載分流
 
 ```bash
@@ -177,6 +196,8 @@ done
 ```
 
 多打幾次後，你會看到回應中的 `hostname` 在 `web1 / web2 / web3` 之間切換；順序不一定固定，重點是同一個入口後面確實有多個副本在回應。
+
+如果你只看到同一個 `hostname`，先不要急著下結論；多打幾次才比較容易觀察到分流效果。
 
 ### 4.4 對照 K8s
 
@@ -210,7 +231,11 @@ docker stop web1 && docker rm web1
 docker run -d --name web1 --hostname web1 --network demo-net demo-web:v2
 ```
 
+這裡一定要把新的 `web1` 重新接回 `demo-net`，否則 `nginx` 就無法再透過 `web1:8000` 找到它。
+
 重複更新 `web2`、`web3`。
+
+做完這一步後，再打幾次 `curl http://localhost:8080`，你可能會看到有些回應已經是 `v2`，有些還是 `v1`，這代表服務入口沒變，但後端副本正在逐步替換。
 
 ### 5.3 這段要講的重點
 

@@ -148,10 +148,51 @@ docker rm -f demo-preview
 
 好，現在我們先做一件很多團隊都會做的事：**把同一個服務開成多份副本。**
 
+### 3.1 先建立這堂課共用的內部網路
+
+在啟動副本之前，我想先把這堂課後面會一路用到的運作環境準備好。
+
 ```bash
-docker run -d --name web1 --hostname web1 demo-web:v1
-docker run -d --name web2 --hostname web2 demo-web:v1
-docker run -d --name web3 --hostname web3 demo-web:v1
+docker network create demo-net
+```
+
+這裡先建立 `demo-net`，不是因為「多副本一定要先有 network」，而是因為接下來這堂課的三個核心元素都會掛在同一條線上：
+
+1. `web1 / web2 / web3` 這三個副本
+2. `nginx` 這個統一入口
+3. 後面 rolling update 重建出來的新副本
+
+如果這裡不先把 network 建好，後面學生就會在不同段落看到：
+
+- 前面啟動副本時沒寫 `--network`
+- 中間 Nginx 突然要寫 `--network demo-net`
+- 後面 rolling update 又再次寫 `--network demo-net`
+
+那注意力就會被帶去問「到底哪裡才需要 network」，而不是理解整個服務鏈怎麼串起來。
+
+所以這裡要先講一句非常重要的話：
+
+> `replicas` 解決的是「有幾份副本」
+> `network` 解決的是「這幾份副本和入口怎麼互相找到」
+
+今天這堂課會把兩件事串成一條完整 demo 線，所以先把 `demo-net` 準備好。
+
+做完這一步後，你可以順手打：
+
+```bash
+docker network ls
+```
+
+預期你會看到 `demo-net` 出現在 network 清單裡。這個動作不是多餘，而是在幫學生建立一個習慣：每做完一個基礎步驟，都先確認環境真的準備好了。
+
+### 3.2 啟動三個副本
+
+好，環境準備好之後，我們來啟動三個副本：
+
+```bash
+docker run -d --name web1 --hostname web1 --network demo-net demo-web:v1
+docker run -d --name web2 --hostname web2 --network demo-net demo-web:v1
+docker run -d --name web3 --hostname web3 --network demo-net demo-web:v1
 
 docker ps
 ```
@@ -160,15 +201,31 @@ docker ps
 
 這裡我會刻意把 `--hostname` 也一起設成 `web1`、`web2`、`web3`。原因很簡單，等等做負載分流驗證時，我們希望學生直接從 API 回應就能辨認是哪個副本回的；如果不設，`socket.gethostname()` 預設通常會回傳 container ID，示範就會變得不直覺。
 
-這裡請大家腦中直接翻譯成：
+同時我也在這一步就把它們放進 `demo-net`。請注意，這不是在說「副本概念依賴 network」，而是在說：
+
+- 後面 `nginx` 會靠 `demo-net` 用名稱找到這三個副本
+- 後面 rolling update 重建副本時，也必須回到同一個 `demo-net`
+- 所以這裡先把整條服務路徑鋪好，後面的示範才不會斷裂
+
+這一步先專注看最核心的事：
 
 ```txt
 replicas = 3
 ```
 
-### 3.2 這時候要點破的事
+也就是說，同一個 image，可以同時跑出三個實例。
 
-這三個副本的存在，本身沒有問題。你用 Docker 完全可以做到。但是它現在只是「三個分散存在的 container」，還不是一個真正被系統管理的服務。
+這裡建議你提醒學生看一下 `docker ps`。預期結果是：
+
+- 看到 `web1`、`web2`、`web3`
+- 三個都來自 `demo-web:v1`
+- 三個都處於運作中狀態
+
+這個檢查很重要，因為如果這一步就沒起來，後面不管是 `nginx`、分流、rolling update 都只會越看越亂。
+
+### 3.3 這時候要點破的事
+
+這三個副本的存在，本身沒有問題。你用 Docker 完全可以做到。但是它現在只是「三個已經在同一個 network 上的 container」，還不是一個真正被系統管理的服務。
 
 為什麼這麼說？
 
@@ -200,29 +257,23 @@ replicas = 3
 
 ---
 
-## 四、自訂網路 + Nginx 分流（15 分鐘）
+## 四、Nginx 當統一入口 + 分流（15 分鐘）
 
-### 4.1 建立內部網路
+### 4.1 先確認現在缺什麼
+
+現在 `web1`、`web2`、`web3` 都已經在 `demo-net` 裡了。這代表它們彼此之間已經具備了「可互相找到」的基礎條件。
+
+但注意，這還不等於一個完整服務。你現在還缺三件事：
+
+1. 外部統一入口
+2. 請求分流機制
+3. 一個讓外部不用知道後端副本細節的代理層
 
 這一段直接回扣 Hour 9。今天上午你們學過，自訂 network 的重點不是只是「多一條網路」，而是有容器名稱 DNS、可控的隔離、可預期的互連。
 
-先建立網路：
+為什麼前面先把副本放進 `demo-net`？因為等等我們不想靠手動查 IP 連服務。我們要直接用容器名稱 `web1`、`web2`、`web3`。這就是今天早上你們學過的 DNS 能力。
 
-```bash
-docker network create demo-net
-```
-
-然後把三個副本放進去：
-
-```bash
-docker network connect demo-net web1
-docker network connect demo-net web2
-docker network connect demo-net web3
-```
-
-這裡我不重新建立副本，而是把剛剛已經跑起來的 `web1`、`web2`、`web3` 直接接進 `demo-net`。這樣示範流程才是連續的，也不會因為重複建立同名 container 而撞錯。
-
-為什麼一定要放進自訂 network？因為等等我們不想靠手動查 IP 連服務。我們要直接用容器名稱 `web1`、`web2`、`web3`。這就是今天早上你們學過的 DNS 能力。
+如果學生這裡問：「那我不放 `demo-net` 可不可以先開起來？」答案是可以，container 仍然能跑。但那樣後面 `nginx` 就不能穩定地直接用名稱找到它們，整條示範鏈就會斷掉。所以這裡不是在討論「能不能跑」，而是在準備「後面怎麼串成一個服務」。
 
 ### 4.2 用 Nginx 做統一入口
 
@@ -263,6 +314,34 @@ docker run -d \
   nginx
 ```
 
+這裡請一定要把邏輯講完整：
+
+- `web1~web3` 已經先在 `demo-net`
+- `nginx` 也加入 `demo-net`
+- 所以 `nginx` 才能在 upstream 裡直接寫 `web1:8000`、`web2:8000`、`web3:8000`
+
+也就是說，`demo-net` 不是只服務「副本」，而是在服務整條鏈：
+
+> 副本在 `demo-net`
+> 入口也在 `demo-net`
+> 入口透過名稱找到副本
+
+這樣學生才會知道，network 的角色不是背景設定，而是整個服務拓樸的一部分。
+
+做完這一步後，也可以帶學生確認：
+
+```bash
+docker ps
+```
+
+這時候除了 `web1~web3`，還應該多看到一個 `nginx`。接著只要：
+
+```bash
+curl http://localhost:8080
+```
+
+就應該會拿到一個 JSON 回應，裡面有 `hostname` 和 `version`。
+
 這行指令也很有意思，它把 Day 3 很多內容全串在一起了：
 
 - `--network demo-net`：來自 Hour 9
@@ -293,6 +372,8 @@ done
 ```
 
 或者順序不同，但重點不是一定要剛好照 `web1 -> web2 -> web3` 排，而是你多打幾次之後，會看到不只一個 `hostname` 在回應。
+
+如果你連打很多次都只看到同一個 `hostname`，先不要立刻判定設定錯了。Nginx 的分流觀察本來就需要多幾次請求才比較明顯。這裡教學上要強調的是「同一個入口後面有多個副本可能在回應」，不是保證每三次就輪一輪。
 
 這一刻一定要停下來講：
 
@@ -365,6 +446,20 @@ docker stop web1 && docker rm web1
 docker run -d --name web1 --hostname web1 --network demo-net demo-web:v2
 ```
 
+這裡一定要停下來提醒學生：
+
+為什麼重建 `web1` 時還要再寫一次 `--network demo-net`？
+
+因為你剛剛把舊的 `web1` 刪掉了。新的 `web1` 是一個全新的 container，不會自動繼承舊 container 的 network 連線狀態。
+
+如果你忘了把新的 `web1` 接回 `demo-net`，會發生什麼事？
+
+- `nginx` upstream 還是會試圖把流量送到 `web1:8000`
+- 但新的 `web1` 不在同一個 network 上
+- 結果就是入口找不到這個副本，分流會出問題
+
+這就是為什麼前面我一直強調，`demo-net` 不是某一段臨時出現的小設定，而是整條服務鏈共同依賴的基礎。
+
 這時候如果你再去 `curl`，你可能會看到：
 
 ```json
@@ -374,6 +469,13 @@ docker run -d --name web1 --hostname web1 --network demo-net demo-web:v2
 ```
 
 也就是說，服務還在，但後端已經進入「新舊版本共存」的狀態。
+
+這裡建議你再補一句很重要的教學提示：
+
+> rolling update 的重點不是「直接把舊 container 改成新版本」
+> 而是「刪掉一個舊副本，再補上一個新版本副本，讓入口繼續接到它」
+
+這一句會直接幫學生把 Docker 手動操作和 K8s Deployment 的心智模型接起來。
 
 接著你再依序更新 `web2`、`web3`，最後全部變成 `v2`。
 

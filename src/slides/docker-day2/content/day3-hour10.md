@@ -401,25 +401,44 @@ docker rm -f hc-test && docker rmi health-demo
 
 ## 四、實作練習：打包 Python Flask 應用（10 分鐘）
 
-### 專案結構
+### Step 1：建立專案檔案
 
-```
-flask-docker-demo/
-├── app.py
-├── requirements.txt
-└── Dockerfile
-```
+```bash
+mkdir -p flask-docker-demo && cd flask-docker-demo
 
-`requirements.txt`：
-```
+# === 建立 app.py ===
+cat > app.py <<'EOF'
+from flask import Flask
+import os
+import datetime
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return {
+        "message": "Hello from Docker!",
+        "hostname": os.uname().nodename,
+        "version": "1.0.0",
+        "timestamp": datetime.datetime.now().isoformat()
+    }
+
+@app.route('/health')
+def health():
+    return {"status": "healthy"}
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+EOF
+
+# === 建立 requirements.txt ===
+cat > requirements.txt <<'EOF'
 flask==3.0.0
-```
+EOF
 
-### Dockerfile（含 Cache 最佳化）
-
-```dockerfile
+# === 建立 Dockerfile ===
+cat > Dockerfile <<'EOF'
 FROM python:3.11-slim
-
 WORKDIR /app
 
 # 先複製依賴檔並安裝（利用 Cache）
@@ -430,40 +449,52 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 
 EXPOSE 5000
-
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')" || exit 1
-
 CMD ["python", "app.py"]
+EOF
 ```
 
-**關鍵設計說明**：
-
-| 決策 | 原因 |
-|------|------|
-| 用 `python:3.11-slim` | 完整版 ~900MB，slim 版 ~120MB，省 700MB |
-| COPY 分兩步 | 善用 Build Cache，改程式碼不重跑 pip install |
-| `--no-cache-dir` | pip 快取在 Docker 裡沒用，省空間 |
-
-### 建構與驗證
+### Step 2：建構與驗證
 
 ```bash
+# 建構 Image
 docker build -t flask-demo:v1 .
+
+# 啟動容器
 docker run -d -p 5000:5000 --name my-flask flask-demo:v1
+
+# 測試
 curl http://localhost:5000
-# → {"hostname": "...", "message": "Hello from Docker!", "version": "1.0.0"}
+# → {"hostname":"...","message":"Hello from Docker!","version":"1.0.0"}
+curl http://localhost:5000/health
+# → {"status":"healthy"}
+
+# 查看健康狀態
+docker ps
+# → (healthy)
 ```
 
-### 體驗 Build Cache 的威力
+### Step 3：體驗 Build Cache
 
-修改 `app.py` 的 version 改為 `2.0.0`，重新 build：
+```bash
+# 改 app.py 的 version 為 2.0.0
+sed -i 's/1.0.0/2.0.0/' app.py
 
+# 重新 build → pip install 整個跳過！
+docker build -t flask-demo:v2 .
+# Step 1-4: Using cache ✅
+# Step 5:   重新執行（app.py 改了）
+
+# 清理
+docker rm -f my-flask
 ```
-Step 1-4: Using cache ✅（FROM、WORKDIR、COPY requirements、pip install 全部快取）
-Step 5:   重新執行（app.py 改了）
-```
 
-**pip install 整個跳過，省下一兩分鐘！**
+| 設計決策 | 原因 |
+|---------|------|
+| `python:3.11-slim` | 完整版 ~900MB，slim 版 ~120MB |
+| COPY 分兩步 | 改程式碼不重跑 pip install |
+| `--no-cache-dir` | pip 快取在 Docker 裡沒用，省空間 |
 
 **錯誤寫法 vs 正確寫法對比**：
 

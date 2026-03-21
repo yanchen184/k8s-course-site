@@ -303,6 +303,56 @@ docker rmi demo-cmd demo-ep
 
 > **練習題 4**：分別建構只用 CMD 和只用 ENTRYPOINT 的兩個 Image，執行 `docker run <image>` 和 `docker run <image> "I am a student"`，記錄輸出差異，用一句話總結核心差異。
 
+### 3.7.1 CMD 只能有一個！要跑多個指令怎麼辦？
+
+一個 Dockerfile 只能有**一個 CMD**（多個只有最後一個生效），ENTRYPOINT 也一樣。
+
+```bash
+# === Demo：多個 CMD 只有最後一個生效 ===
+mkdir -p /tmp/multi-cmd && cd /tmp/multi-cmd
+cat > Dockerfile <<'EOF'
+FROM alpine:3.18
+CMD ["echo", "第一個"]
+CMD ["echo", "第二個"]
+CMD ["echo", "第三個"]
+EOF
+docker build -t multi-cmd .
+docker run --rm multi-cmd
+# → 第三個（只有最後一個生效！）
+
+# === 那要跑多個指令怎麼辦？ ===
+
+# 方法一：用 sh -c 串起來（簡單情況）
+cat > Dockerfile <<'EOF'
+FROM alpine:3.18
+CMD ["sh", "-c", "echo 準備中... && echo 啟動完成 && sleep 3600"]
+EOF
+docker build -t multi-cmd .
+docker run --rm multi-cmd
+# → 準備中...
+# → 啟動完成
+
+# 方法二：用 start.sh 腳本（推薦，好維護）
+cat > start.sh <<'SCRIPT'
+#!/bin/sh
+echo "Step 1: 資料庫遷移..."
+echo "Step 2: 啟動應用程式..."
+exec python app.py
+SCRIPT
+chmod +x start.sh
+
+cat > Dockerfile <<'EOF'
+FROM alpine:3.18
+COPY start.sh .
+CMD ["./start.sh"]
+EOF
+
+# 清理
+docker rmi multi-cmd
+```
+
+**最佳實踐：一個容器只跑一個主程序。** 如果需要跑 Nginx + API + DB，拆成三個容器用 Docker Compose 管理（下午會教）。
+
 ### 3.8 USER：指定執行身份
 
 ```dockerfile

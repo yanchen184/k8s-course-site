@@ -708,18 +708,17 @@ export function buildDockerDay2SlideSpecs(
   documents: Record<string, string>,
 ): SlideSpec[] {
   const schedule = parseCourseSchedule(documents['course-schedule.md'] ?? '')
-  const scheduleByHour = new Map(schedule.map((hour) => [hour.hour, hour]))
   const specs: SlideSpec[] = []
 
-  for (let hour = 1; hour <= 14; hour += 1) {
+  for (const hourMeta of schedule) {
+    const hour = hourMeta.hour
     const sourceDay = hour <= 7 ? 2 : 3
     const displayHour = sourceDay === 3 ? hour - 7 : hour
     const displayHourLabel = sourceDay === 3 ? `第${displayHour}小時` : `Hour ${displayHour}`
     const outline = documents[`day${sourceDay}-hour${hour}.md`]
     const full = documents[`day${sourceDay}-hour${hour}-full.md`]
-    const hourMeta = scheduleByHour.get(hour)
 
-    if (!outline || !full || !hourMeta) {
+    if (!outline || !full) {
       continue
     }
 

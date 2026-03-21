@@ -1,11 +1,11 @@
-# Day 3 第十四小時：Docker Compose 實戰練習 + 課程總結
+# Day 3 第十四小時：Docker Compose 實戰練習
 
 ---
 
 ## 開場（3 分鐘）
 
 上堂課學完了 Docker Compose 所有知識。
-這堂課是**純實作**，三個練習題，難度遞進。最後做課程總結。
+這堂課是**純實作**，三個練習題，難度遞進。做完之後，下一堂加開橋接模組會用 Docker 手動模擬 Kubernetes 在幫你做的事。
 
 | # | 題目 | 難度 | 時間 |
 |---|------|:---:|:---:|
@@ -343,98 +343,27 @@ MYSQL_DATABASE=myapp
 
 ---
 
-## 課程總結（10 分鐘）
+## Hour 15 預告（3 分鐘）
 
-### Day 3 七堂課
+### 下一堂要做什麼
 
-| 小時 | 主題 | 一句話總結 |
-|------|------|-----------|
-| Hour 8 | Volume 資料持久化 | 容器的資料不怕丟 |
-| Hour 9 | 容器網路 + Port Mapping | 讓容器互通，讓外面連進來 |
-| Hour 10 | Dockerfile 基礎 | 能寫出可以用的 Dockerfile |
-| Hour 11 | Dockerfile 進階與最佳化 | 能寫出又小又安全的 Dockerfile |
-| Hour 12 | Dockerfile 實戰練習 | 能實際動手寫並 Code Review |
-| Hour 13 | Docker Compose 完整講解 | 能用 YAML 管理多容器應用 |
-| Hour 14 | Compose 實戰練習 + 總結 | 能部署完整的應用 |
+下一堂不是直接教 `kubectl`，而是先用今天 Day 3 已經學過的能力，手動模擬一次 Kubernetes 平常在幫你做的事情：
 
-### 兩天完整回顧
+1. 自己 build 一個可版本化的服務
+2. 自己手動開三個副本
+3. 自己手動做流量分流
+4. 自己手動做版本更新
+5. 自己手動補回壞掉的副本
 
-| 天數 | 小時 | 主題 |
-|------|------|------|
-| Day 2 | Hour 1-3 | 為什麼需要 Docker、架構、安裝 |
-| Day 2 | Hour 4-5 | Docker 基本指令 |
-| Day 2 | Hour 6-7 | Nginx 實戰 + 綜合練習 |
-| Day 3 | Hour 8-9 | Volume + 容器網路 |
-| Day 3 | Hour 10-12 | Dockerfile 三部曲 |
-| Day 3 | Hour 13-14 | Docker Compose 講課 + 練習 |
+### 為什麼要先這樣做
 
-### Docker 完整工作流程
+如果你沒有先親手看到這些麻煩事，明天看到 Pod、Deployment、Service、rolling update、self-healing 時，很容易只是在背名詞。
 
-```
-Dockerfile + 原始碼 + .dockerignore
-        ↓ docker build
-      Image（映像檔）
-        ↓ docker push          ↓ docker run
-    Registry（Hub/ECR）       Container（容器）
+### 帶著這三個問題進下一堂
 
-compose.yaml → docker compose up → 多個 Container + Network + Volume
-```
-
-### 核心觀念速查
-
-| 概念 | 一句話說明 |
-|------|-----------|
-| 容器 vs 虛擬機 | 容器共享核心，輕量快速 |
-| 映像檔分層 | 每層唯讀，多映像共享底層 |
-| Volume | 容器暫時，Volume 永久 |
-| 自訂網路 | DNS 功能，容器用名稱互通 |
-| Dockerfile | Multi-stage、利用快取、不用 root |
-| Docker Compose | 一個 YAML 定義一切 |
-
-### 最佳實踐速查
-
-| 類別 | 做法 |
-|------|------|
-| 映像檔 | 指定版本 tag；用 alpine 或 slim |
-| Dockerfile | Multi-stage；先依賴再原始碼；不用 root |
-| 容器 | 一容器一程序；設資源限制；用 healthcheck |
-| Compose | 用 .env 管密碼；depends_on 搭配 healthcheck |
-| 安全 | .env 不推 Git；用 non-root user；限制資源 |
-
----
-
-## 銜接 Kubernetes（5 分鐘）
-
-### Docker 的限制
-
-| 限制 | 說明 |
-|------|------|
-| 單機限制 | 機器掛了全部掛 |
-| 無自動擴縮 | 流量暴增需手動加容器 |
-| 無跨機故障恢復 | 服務不會自動遷移 |
-| 無滾動更新 | 更新版本有停機時間 |
-
-### Docker → Kubernetes 概念對應
-
-| Docker 概念 | Kubernetes 對應 |
-|------------|-----------------|
-| Container | Pod |
-| `docker run` | `kubectl apply` |
-| compose.yaml | K8s manifest YAML |
-| `restart: always` | Deployment + ReplicaSet |
-| docker network | Service + Ingress |
-| docker volume | PersistentVolume + PVC |
-| .env 檔案 | ConfigMap + Secret |
-
-### 一個比喻
-
-| 工具 | 比喻 |
-|------|------|
-| Docker | 會開車 |
-| Docker Compose | 管理車隊 |
-| Kubernetes | 交通管理局 |
-
-**Docker 是基礎，K8s 是進階。Docker 的容器化思維在 K8s 全部用得到。**
+1. 為什麼 `replicas: 3` 背後真正重要的是「誰在維持 3」？
+2. 為什麼流量入口不該靠人手動維護 upstream 清單？
+3. 為什麼版本更新與故障補機最後都會走向宣告式系統？
 
 ---
 
@@ -458,7 +387,6 @@ compose.yaml → docker compose up → 多個 Container + Network + Volume
 3. **練習二的 compose.yaml**：加了 .env、healthcheck、network 隔離
 4. **練習三的錯誤 compose.yaml**：用紅色標出 5 個問題
 5. **修正後的 compose.yaml**：用綠色標出修正
-6. **兩天課程總覽表**
-7. **Docker 完整工作流程圖**
-8. **Docker 到 K8s 對應表**
-9. **Docker 指令速查表**：印成 cheat sheet 發給學生
+6. **Hour 15 預告圖**：build → replicas → proxy → update → healing
+7. **三個帶著走的問題**：為什麼需要 Deployment / Service / 自癒
+8. **Docker 指令速查表**：印成 cheat sheet 發給學生

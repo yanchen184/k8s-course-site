@@ -30,7 +30,7 @@
 
 ---
 
-## Day 3 時間表（7 小時講課 + 額外實作）
+## Day 3 時間表（7 小時正課 + 額外實作 + 1 小時加開橋接）
 
 | 時段 | 內容 | 講課時間 | 實作/測驗 | 備註 |
 |------|------|----------|-----------|------|
@@ -43,10 +43,11 @@
 | Hour 12 | Dockerfile 實戰與映像檔發佈 | 50 分鐘 | +15 分鐘操作 | Node.js+TS、Spring Boot、troubleshooting |
 | Hour 13 | Docker Compose 基礎與進階 | 50 分鐘 | +10 分鐘操作 | compose.yaml、networks、depends_on |
 | **休息** | | | 10 分鐘 | |
-| Hour 14 | Docker Compose 實戰與課程總結 | 45 分鐘 | +15 分鐘操作 | WordPress 部落格系統、K8s 銜接 |
+| Hour 14 | Docker Compose 實戰練習 | 45 分鐘 | +15 分鐘操作 | WordPress 部落格系統、排錯與複盤 |
+| Hour 15 | 用 Docker 手動模擬 Kubernetes 核心機制 | 60 分鐘 | +0 分鐘 | Day 3 加開橋接模組，銜接 Day 4 |
 
 **Day 3 總計**：
-- 講課：約 5.8 小時
+- 講課：約 6.8 小時
 - 實作/測驗：約 1.3 小時
 - 休息：30 分鐘
 
@@ -180,6 +181,22 @@ docker compose down
 # WordPress + Nginx + MySQL + Redis 部落格系統
 docker compose up -d
 # 驗證四個服務正常運作
+```
+
+**Hour 15：Docker 模擬 K8s（講師示範）**
+```bash
+docker build -t demo-web:v1 .
+docker run -d --name demo-preview -p 18080:8000 demo-web:v1
+curl http://localhost:18080
+docker rm -f demo-preview
+docker run -d --name web1 demo-web:v1
+docker run -d --name web2 demo-web:v1
+docker run -d --name web3 demo-web:v1
+docker network create demo-net
+docker network connect demo-net web1
+docker network connect demo-net web2
+docker network connect demo-net web3
+docker stop web2 && docker rm web2
 ```
 
 ---

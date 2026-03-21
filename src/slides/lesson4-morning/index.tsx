@@ -38,7 +38,7 @@ export const slides: Slide[] = [
           <div className="bg-slate-800/50 p-4 rounded-lg text-center opacity-50">
             <p className="text-2xl mb-1">🔧</p>
             <p className="text-slate-400 font-semibold text-sm">Day 3</p>
-            <p className="text-slate-500 text-xs">Docker 進階</p>
+            <p className="text-slate-500 text-xs">Docker 進階 + K8s 橋接</p>
           </div>
           <div className="bg-blue-900/60 p-4 rounded-lg text-center border-2 border-k8s-blue">
             <p className="text-2xl mb-1">☸️</p>
@@ -73,9 +73,9 @@ export const slides: Slide[] = [
 
 第二天，我們開始學 Docker。Docker 解決了什麼問題？大家還記得嗎？就是那個「在我電腦可以跑，在你那邊掛了」的千古難題。Docker 用容器技術，把應用程式和它的所有依賴打包在一起，讓你可以在任何地方用同樣的方式執行它。我記得那天大家第一次 docker run 跑起來 nginx 的時候，臉上都有一種「哇，原來這麼簡單」的表情，很好，那個感覺是對的。
 
-第三天，我們繼續深入 Docker，學了怎麼寫 Dockerfile、怎麼用 docker-compose 管理多個服務、網路模式 bridge 和 host 和 none、Volume 持久化儲存，還有多階段構建和 Image 最佳化。大家昨天應該對 Docker 有了相當紮實的理解了。大家有沒有完成那個把 Node.js 應用打包的練習？大部分人應該都完成了，對吧？
+第三天，我們繼續深入 Docker，學了怎麼寫 Dockerfile、怎麼用 docker-compose 管理多個服務、網路模式 bridge 和 host 和 none、Volume 持久化儲存，還有多階段構建和 Image 最佳化。昨天最後我們還多做了一件很關鍵的事：用 Docker 手動模擬了一次 replicas、流量分流、rolling update 和 self-healing 的缺口。大家昨天應該對 Docker 有了相當紮實的理解了。大家有沒有完成那個把 Node.js 應用打包的練習？大部分人應該都完成了，對吧？
 
-那今天，我們面對的是一個更大的挑戰。你已經會用 Docker 跑容器了，但現在問題來了：當你的應用程式需要跑在幾十台、幾百台機器上的時候，你要怎麼管理這些容器？要怎麼確保它們都在正常運作？要怎麼在某台機器掛掉的時候自動把服務移到別的機器？要怎麼在流量高峰的時候快速擴容，流量退去的時候又自動縮容？這些問題，Docker 本身是沒有答案的。而 Kubernetes，就是這些問題的答案。
+那今天，我們面對的是一個更大的挑戰。你已經會用 Docker 跑容器了，而且昨天最後你其實已經親眼看過：手動把三個副本串起來、手動維護入口、手動升級版本、手動補回壞掉的副本，到底有多麻煩。現在問題來了：當你的應用程式需要跑在幾十台、幾百台機器上的時候，你要怎麼管理這些容器？要怎麼確保它們都在正常運作？要怎麼在某台機器掛掉的時候自動把服務移到別的機器？要怎麼在流量高峰的時候快速擴容，流量退去的時候又自動縮容？這些問題，Docker 本身是沒有答案的。而 Kubernetes，就是這些問題的答案。
 
 Kubernetes，也叫 K8s，這個縮寫方式很有趣：K 和 s 之間剛好有 8 個字母，所以叫 K8s。它是由 Google 開源的容器編排平台，現在由 CNCF 也就是 Cloud Native Computing Foundation 維護。K8s 可以幫你自動化容器的部署、擴縮容、故障恢復、服務發現、負載均衡，還有很多很多功能。
 

@@ -28,6 +28,8 @@ import day3Hour13FullRaw from './content/day3-hour13-full.md?raw'
 import day3Hour13Raw from './content/day3-hour13.md?raw'
 import day3Hour14FullRaw from './content/day3-hour14-full.md?raw'
 import day3Hour14Raw from './content/day3-hour14.md?raw'
+import day3Hour15FullRaw from './content/day3-hour15-full.md?raw'
+import day3Hour15Raw from './content/day3-hour15.md?raw'
 import { buildDockerDay2SlideSpecs, parseCourseSchedule } from './parser'
 import type { BulletGroup } from './parser'
 
@@ -61,6 +63,8 @@ const documents = {
   'day3-hour13.md': day3Hour13Raw,
   'day3-hour14-full.md': day3Hour14FullRaw,
   'day3-hour14.md': day3Hour14Raw,
+  'day3-hour15-full.md': day3Hour15FullRaw,
+  'day3-hour15.md': day3Hour15Raw,
 }
 
 function group(items: string[], label?: string): BulletGroup {
@@ -94,7 +98,8 @@ describe('docker day 2 parser', () => {
       { hour: 11, title: 'Dockerfile 進階與最佳化', lectureMinutes: 50 },
       { hour: 12, title: 'Dockerfile 實戰與映像檔發佈', lectureMinutes: 50 },
       { hour: 13, title: 'Docker Compose 基礎與進階', lectureMinutes: 50 },
-      { hour: 14, title: 'Docker Compose 實戰與課程總結', lectureMinutes: 45 },
+      { hour: 14, title: 'Docker Compose 實戰練習', lectureMinutes: 45 },
+      { hour: 15, title: '用 Docker 手動模擬 Kubernetes 核心機制', lectureMinutes: 60 },
     ])
   })
 
@@ -106,8 +111,8 @@ describe('docker day 2 parser', () => {
     expect(morningSlides.length).toBeGreaterThan(0)
     expect(afternoonSlides.length).toBeGreaterThan(0)
     expect(new Set(morningSlides.map((slide) => slide.hour))).toEqual(new Set([1, 2, 3, 8, 9, 10]))
-    expect(new Set(afternoonSlides.map((slide) => slide.hour))).toEqual(new Set([4, 5, 6, 7, 11, 12, 13, 14]))
-    expect(new Set(slides.map((slide) => slide.hour))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]))
+    expect(new Set(afternoonSlides.map((slide) => slide.hour))).toEqual(new Set([4, 5, 6, 7, 11, 12, 13, 14, 15]))
+    expect(new Set(slides.map((slide) => slide.hour))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]))
 
     const firstSlide = morningSlides[0]
     expect(firstSlide.section).toBe('Hour 1｜環境一致性問題與容器技術')
@@ -117,7 +122,7 @@ describe('docker day 2 parser', () => {
     expect(firstSlide.notes).not.toContain('```')
 
     const lastSlide = afternoonSlides[afternoonSlides.length - 1]
-    expect(lastSlide.section).toBe('第7小時｜Docker Compose 實戰與課程總結')
+    expect(lastSlide.section).toBe('第8小時｜用 Docker 手動模擬 Kubernetes 核心機制')
     expect(lastSlide.notes).not.toContain('## ')
     expect(lastSlide.notes).not.toContain('```')
   })
@@ -210,6 +215,18 @@ describe('docker day 2 parser', () => {
         }
       }
     }
+  })
+
+  it('adds the Day 3 bridge module as the final afternoon lesson', () => {
+    const slides = buildDockerDay2SlideSpecs(documents)
+    const bridgeIntroSlide = slides.find((slide) => (
+      slide.hour === 15
+      && slide.title === '為什麼在 Day 3 最後加這堂'
+    ))
+
+    expect(bridgeIntroSlide).toBeDefined()
+    expect(bridgeIntroSlide?.section).toBe('第8小時｜用 Docker 手動模擬 Kubernetes 核心機制')
+    expect(bridgeIntroSlide?.subtitle).toContain('Day 3 下午 · 第8小時')
   })
 
   it('falls back to conservative partial title matching when outline headings are shorter', () => {

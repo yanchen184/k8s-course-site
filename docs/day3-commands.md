@@ -15,8 +15,15 @@ docker run -v my-data:/data nginx
 
 ### 2. Bind Mount 開發用法
 ```bash
+# 先建立本機的 html 目錄和測試檔案（沒有這個目錄指令會失敗）
+mkdir -p html
+echo "<h1>Hello Docker!</h1>" > html/index.html
+
 # 把本機的 html 目錄直接掛進容器，改本機檔案就能即時看到效果，適合開發階段
-docker run -v $(pwd)/html:/usr/share/nginx/html nginx:alpine
+docker run -d -p 8080:80 -v $(pwd)/html:/usr/share/nginx/html nginx:alpine
+
+# 驗證：打開瀏覽器 http://localhost:8080 或用 curl
+curl http://localhost:8080
 ```
 
 ### 3. 沒有 Volume 的 MySQL（資料會消失）

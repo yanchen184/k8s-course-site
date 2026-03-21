@@ -70,7 +70,42 @@ docker run -d --name mysql-no-volume \
   mysql:8.0
 ```
 
-寫入資料 → 刪容器 → 重建 → `ERROR 1146: Table doesn't exist`。**資料全部消失。**
+進入 MySQL 容器：
+
+```bash
+docker exec -it mysql-no-volume mysql -uroot -ptest123
+```
+
+建表、插入資料、查詢（在 MySQL 裡面打）：
+
+```sql
+CREATE TABLE school.students (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100),
+  grade INT
+);
+
+INSERT INTO school.students (name, grade) VALUES
+  ('小明', 85),
+  ('小華', 92),
+  ('小美', 78);
+
+SELECT * FROM school.students;
+```
+
+然後離開 MySQL、砍掉容器、重建：
+
+```bash
+exit
+docker stop mysql-no-volume && docker rm mysql-no-volume
+docker run -d --name mysql-no-volume \
+  -e MYSQL_ROOT_PASSWORD=test123 \
+  -e MYSQL_DATABASE=school \
+  mysql:8.0
+docker exec -it mysql-no-volume mysql -uroot -ptest123 -e "SELECT * FROM school.students;"
+```
+
+→ `ERROR 1146: Table 'school.students' doesn't exist`。**資料全部消失。**
 
 ### 3.2 用 Named Volume 啟動 MySQL（正確做法）
 

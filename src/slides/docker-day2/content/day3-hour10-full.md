@@ -857,6 +857,9 @@ CMD ["https://www.google.com"]
 ```
 
 ```bash
+# 先重新 build 成新的 my-curl image
+docker build -t my-curl .
+
 # 預設 curl google
 docker run my-curl
 
@@ -1061,7 +1064,7 @@ VOLUME /var/lib/mysql
 但老實說，更推薦在 `docker run` 時明確用 `-v` 指定掛載路徑：
 
 ```bash
-docker run -v mysql-data:/var/lib/mysql mysql:8.0
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v mysql-data:/var/lib/mysql mysql:8.0
 ```
 
 因為匿名 Volume 的名字是一串亂碼，很難管理。Dockerfile 裡的 VOLUME 更像是一種「提醒」——告訴使用者「嘿，這個目錄的資料很重要，記得掛載！」

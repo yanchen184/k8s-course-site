@@ -873,10 +873,10 @@ Port Mapping 在 Linux 上是透過 **iptables 的 DNAT** 規則實現的——D
 
 ```bash
 # 不要這樣做
-docker run -d -p 3306:3306 mysql:8.0
+docker run -d -e MYSQL_ROOT_PASSWORD=secret123 -p 3306:3306 mysql:8.0
 
 # 要這樣做
-docker run -d -p 127.0.0.1:3306:3306 mysql:8.0
+docker run -d -e MYSQL_ROOT_PASSWORD=secret123 -p 127.0.0.1:3306:3306 mysql:8.0
 ```
 
 **方法二：用 Docker 網路替代 Port Mapping**
@@ -926,11 +926,17 @@ docker run -d -p 8081:80 --name web2 nginx:alpine
 注意，也可能不是 Docker 容器佔的。你的主機上可能有其他程式（比如本機的 Nginx、Apache、或其他服務）已經在用那個 port 了。可以用以下指令檢查：
 
 ```bash
-# Linux / Mac
+# macOS / Linux
 lsof -i :8080
 
-# 或
+# Linux
+ss -ltnp | grep 8080
+
+# 或（某些 Linux 發行版）
 netstat -tlnp | grep 8080
+
+# macOS
+lsof -nP -iTCP:8080 -sTCP:LISTEN
 ```
 
 **問題二：外部連不到**

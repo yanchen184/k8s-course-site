@@ -434,6 +434,8 @@ services:
 
   db:
     image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
     networks:
       - backend-net
 
@@ -476,6 +478,8 @@ services:
       - db
   db:
     image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
 ```
 
 加了 `depends_on` 之後，`docker compose up` 會先啟動 `db`，再啟動 `api`。
@@ -658,6 +662,8 @@ logging:
 services:
   db:
     image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 ```
 
@@ -693,7 +699,7 @@ docker compose logs -f db        # 追蹤特定服務日誌
 ### 8.3 進入容器
 
 ```bash
-docker compose exec web bash     # 用 service name，不用記容器名
+docker compose exec web sh       # 用 service name，不用記容器名
 docker compose exec db mysql -uroot -psecret
 ```
 

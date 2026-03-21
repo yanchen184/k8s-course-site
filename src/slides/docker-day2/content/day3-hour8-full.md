@@ -597,16 +597,16 @@ docker run -d -e MYSQL_ROOT_PASSWORD='my$ecr&t!' mysql:8.0
 ```bash
 # 先建好再用
 docker volume create mysql-data
-docker run -v mysql-data:/var/lib/mysql mysql:8.0
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v mysql-data:/var/lib/mysql mysql:8.0
 
 # 或者直接用名字（不存在的話 Docker 會自動建立）
-docker run -v mysql-data:/var/lib/mysql mysql:8.0
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v mysql-data:/var/lib/mysql mysql:8.0
 ```
 
 那什麼是 **Anonymous Volume（匿名卷）**？就是你只寫了容器內的路徑，沒有給 Volume 名字：
 
 ```bash
-docker run -v /var/lib/mysql mysql:8.0
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v /var/lib/mysql mysql:8.0
 ```
 
 注意看，`-v` 後面直接就是容器內路徑 `/var/lib/mysql`，沒有冒號、沒有左邊的名稱。這時候 Docker 會自動建立一個 Volume，但它的名字是一串隨機的長雜湊字串。

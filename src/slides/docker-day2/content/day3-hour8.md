@@ -184,8 +184,8 @@ docker run -d --name mysql-with-volume \
 ### 4.1 Named Volume vs Anonymous Volume
 
 ```bash
-docker run -v mysql-data:/var/lib/mysql mysql:8.0   # 具名（推薦）
-docker run -v /var/lib/mysql mysql:8.0               # 匿名（避免）
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v mysql-data:/var/lib/mysql mysql:8.0   # 具名（推薦）
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v /var/lib/mysql mysql:8.0               # 匿名（避免）
 ```
 
 匿名 Volume 得到隨機 hash 名稱，三個月後你不知道是什麼。**永遠用 Named Volume。**

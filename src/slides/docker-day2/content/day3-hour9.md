@@ -339,7 +339,7 @@ docker port web 80
 
 ```bash
 # 方法一：綁定 127.0.0.1（最簡單，推薦）
-docker run -d -p 127.0.0.1:3306:3306 mysql:8.0
+docker run -d -e MYSQL_ROOT_PASSWORD=secret123 -p 127.0.0.1:3306:3306 mysql:8.0
 
 # 方法二：不做 Port Mapping，走內部網路（最安全）
 # 參考第三節的自訂 bridge 方案
@@ -360,8 +360,16 @@ Bind for 0.0.0.0:8080 failed: port is already allocated
 換 port，或先檢查誰佔用了：
 
 ```bash
+# macOS / Linux
 lsof -i :8080
+
+# Linux
+ss -ltnp | grep 8080
+# 或
 netstat -tlnp | grep 8080
+
+# macOS
+lsof -nP -iTCP:8080 -sTCP:LISTEN
 ```
 
 **問題二：外部連不到**

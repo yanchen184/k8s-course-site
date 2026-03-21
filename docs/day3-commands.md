@@ -170,13 +170,13 @@ docker run -d -e MYSQL_ROOT_PASSWORD='my$ecr&t!' mysql:8.0
 ```bash
 # 先建立有名字的 Volume，再掛載到容器——有名字方便日後管理和辨識
 docker volume create mysql-data
-docker run -v mysql-data:/var/lib/mysql mysql:8.0
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v mysql-data:/var/lib/mysql mysql:8.0
 ```
 
 ### 22. Anonymous Volume（不建議）
 ```bash
 # 沒給名字的 Volume 會產生亂碼 ID，之後很難找回或管理
-docker run -v /var/lib/mysql mysql:8.0
+docker run -e MYSQL_ROOT_PASSWORD=secret123 -v /var/lib/mysql mysql:8.0
 ```
 
 ### 23. Volume 管理指令
@@ -573,18 +573,25 @@ docker rm -f web
 
 ### 24. Port 衝突排查
 ```bash
-# port 被佔用時，用這兩個指令找出是誰佔的
+# macOS / Linux
 lsof -i :8080
+
+# Linux
+ss -ltnp | grep 8080
+# 或
 netstat -tlnp | grep 8080
+
+# macOS
+lsof -nP -iTCP:8080 -sTCP:LISTEN
 ```
 
 ### 25. 防火牆安全做法
 ```bash
 # 不要這樣做
-docker run -d -p 3306:3306 mysql:8.0
+docker run -d -e MYSQL_ROOT_PASSWORD=secret123 -p 3306:3306 mysql:8.0
 
 # 要這樣做
-docker run -d -p 127.0.0.1:3306:3306 mysql:8.0
+docker run -d -e MYSQL_ROOT_PASSWORD=secret123 -p 127.0.0.1:3306:3306 mysql:8.0
 ```
 
 ### 26. 實作：Web + MySQL 容器通訊
@@ -815,6 +822,9 @@ CMD ["https://www.google.com"]
 ```
 
 ```bash
+# 先重新 build 成新的 my-curl image
+docker build -t my-curl .
+
 # 不帶參數——會用 CMD 的預設 URL
 docker run my-curl
 # 帶參數——CMD 被覆蓋，但 ENTRYPOINT (curl) 不變
@@ -1460,6 +1470,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
@@ -1589,6 +1600,8 @@ services:
 
   db:
     image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
     networks:
       - backend-net
 
@@ -1715,7 +1728,7 @@ docker compose logs -f
 docker compose logs -f db
 
 # 進入容器
-docker compose exec web bash
+docker compose exec web sh
 docker compose exec db mysql -uroot -psecret
 
 # 停止 / 啟動 / 重啟
@@ -2166,7 +2179,7 @@ services:
     volumes:
       - db-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 3s
       retries: 5

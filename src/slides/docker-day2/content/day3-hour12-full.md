@@ -398,6 +398,7 @@ WORKDIR /app
 # 先複製依賴清單，利用 cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # 再複製原始碼
 COPY . .
@@ -471,4 +472,3 @@ Hour 10：能寫 → Hour 11：寫得好 → Hour 12：實際能用
 5. **練習三的修正 Dockerfile**：用綠色標出修正後的寫法
 6. **修正前後對照表**：Base Image、映像大小、安全性、Cache 效率、信號處理
 7. **三堂課學習路徑**：Hour 10 能寫 → Hour 11 寫得好 → Hour 12 實際能用
-

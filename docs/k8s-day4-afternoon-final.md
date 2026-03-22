@@ -1,42 +1,40 @@
-# 第四堂下午 PPT + 逐字稿（13:00-17:00）
+# 第四堂 Pod 實作篇 PPT + 逐字稿
 
-> 學生上午已聽完 K8s 全貌概念（架構、核心資源、Master/Worker 元件），裝好 minikube
-> 下午是 Pod 動手時間：每個概念講完就實作
+> 學員已看完概念篇（K8s 全貌：架構、核心資源、Master/Worker 元件），裝好 minikube
+> 這個章節是 Pod 動手時間：每個概念講完就實作
 
 ---
 
-## 第 1 頁 | 下午開場（5min）
+## 第 1 頁 | Pod 實作：開場（5min）
 
 ### PPT 內容
 
-**上午回顧**
+**概念篇回顧**
 
-| 上午學了什麼 | 一句話 |
+| 前面學了什麼 | 一句話 |
 |:---:|---------|
 | K8s 是什麼 | 容器的管理平台，解決「容器太多管不動」的問題 |
 | 核心資源 | Pod、Service、Deployment、ConfigMap、Secret、Volume |
 | 架構 | Master（API Server + etcd + Scheduler + Controller Manager）+ Worker（kubelet + kube-proxy + Container Runtime） |
 | minikube | 已經裝好，單節點叢集跑起來了 |
 
-**下午計畫：全部都是 Pod 實作**
+**接下來的計畫：全部都是 Pod 實作**
 
-| 時段 | 內容 |
+| 順序 | 內容 |
 |------|------|
-| 13:00-13:30 | YAML 格式 + Pod 概念 |
-| 13:30-14:15 | 實作：第一個 Pod（完整 CRUD） |
-| 14:25-15:05 | Pod 生命週期 + 排錯實作 |
-| 15:15-16:00 | 多容器 Pod（Sidecar）+ kubectl 進階 |
-| 16:10-17:00 | 自由練習 + 總結 |
+| 第一部分 | YAML 格式 + Pod 概念 |
+| 第二部分 | 實作：第一個 Pod（完整 CRUD） |
+| 第三部分 | Pod 生命週期 + 排錯實作 |
+| 第四部分 | 多容器 Pod（Sidecar）+ kubectl 進階 |
+| 第五部分 | 自由練習 + 總結 |
 
 ---
 
 ### 逐字稿
 
-好，歡迎大家回來。午休有精神了吧？
+好，我們先快速回顧一下前面章節的內容。前面我們花了一整個章節講完了 Kubernetes 的全貌。我們知道了 K8s 就是一個容器的管理平台，它的核心概念包括 Pod、Service、Deployment 這些資源物件。架構方面，我們知道了 Master 節點上跑著 API Server、etcd、Scheduler、Controller Manager，Worker 節點上跑著 kubelet、kube-proxy 和 Container Runtime。然後我們也把 minikube 裝好了，用 `kubectl get nodes` 確認叢集已經在跑了。
 
-我們先快速回顧一下上午的內容。上午我們花了兩個小時講完了 Kubernetes 的全貌。我們知道了 K8s 就是一個容器的管理平台，它的核心概念包括 Pod、Service、Deployment 這些資源物件。架構方面，我們知道了 Master 節點上跑著 API Server、etcd、Scheduler、Controller Manager，Worker 節點上跑著 kubelet、kube-proxy 和 Container Runtime。然後我們也把 minikube 裝好了，用 `kubectl get nodes` 確認叢集已經在跑了。
-
-下午我們要進入最重要的環節 — 動手做。今天下午全部都是 Pod 實作，我們會從最基礎的 YAML 格式開始，然後寫出第一個 Pod，學會怎麼排錯，最後還會玩多容器 Pod。下午的節奏是：講一點概念，馬上就動手。所以大家把終端機打開，編輯器準備好，我們要開始寫 YAML 了。
+接下來我們要進入最重要的環節 — 動手做。接下來全部都是 Pod 實作，我們會從最基礎的 YAML 格式開始，然後寫出第一個 Pod，學會怎麼排錯，最後還會玩多容器 Pod。節奏是：講一點概念，馬上就動手。所以大家把終端機打開，編輯器準備好，我們要開始寫 YAML 了。
 
 ---
 
@@ -44,7 +42,7 @@
 
 ### PPT 內容
 
-**YAML = Yet Another Markup Language**
+**YAML = YAML Ain't Markup Language（遞迴縮寫）**
 
 - K8s 的配置檔案格式
 - 縮排用空格（不能用 Tab！）
@@ -90,7 +88,7 @@ spec:                     # 規格（你想要什麼）
 
 好，我們先來認識 YAML 格式。在 K8s 的世界裡，幾乎所有東西都是用 YAML 來描述的。你想要一個 Pod，寫一個 YAML；你想要一個 Service，也是寫一個 YAML；你想要一個 Deployment，還是寫一個 YAML。所以搞懂 YAML 格式是第一步。
 
-YAML 全名是 Yet Another Markup Language，它的語法其實很簡單。有三個重點要記住：第一，縮排用空格，不能用 Tab 鍵。這個是初學者最常踩的坑，用了 Tab 就會報錯。建議大家在編輯器裡把 Tab 設成兩個空格或四個空格。第二，冒號後面要有空格，寫 `name: my-pod` 這個冒號和值之間必須有空格。第三，列表用減號加空格開頭，像 `- name: xxx` 這樣。
+YAML 原本叫 Yet Another Markup Language，後來官方改名叫 YAML Ain't Markup Language，一個遞迴縮寫，表示它不是標記語言。不過名字不重要，語法其實很簡單。有三個重點要記住：第一，縮排用空格，不能用 Tab 鍵。這個是初學者最常踩的坑，用了 Tab 就會報錯。建議大家在編輯器裡把 Tab 設成兩個空格或四個空格。第二，冒號後面要有空格，寫 `name: my-pod` 這個冒號和值之間必須有空格。第三，列表用減號加空格開頭，像 `- name: xxx` 這樣。
 
 好，來看 K8s 的 YAML 有四個必備欄位，每一個 K8s 的 YAML 檔案都一定會有這四個東西。
 
@@ -266,7 +264,7 @@ spec:
 
 我們一行一行來看。`apiVersion: v1`，因為 Pod 的 API 版本是 v1，這是固定的。`kind: Pod`，我們要建的是一個 Pod。`metadata` 裡面 `name: my-nginx`，這是 Pod 的名字，之後用 kubectl 指令都會用這個名字。`labels` 裡面 `app: nginx`，這是一個標籤，後面學 Service 的時候會用到。
 
-`spec` 區塊就是最重要的部分了。`containers` 是一個列表，用減號開頭表示列表項目。`name: nginx` 是容器的名字，一個 Pod 裡面可能有多個容器，所以每個容器要有自己的名字。`image: nginx:1.27` 就是我們要用的 Docker image，這裡用的是 nginx 的 1.27 版本。`ports` 裡面 `containerPort: 80`，表示這個容器對外開放 80 port。
+`spec` 區塊就是最重要的部分了。`containers` 是一個列表，用減號開頭表示列表項目。`name: nginx` 是容器的名字，一個 Pod 裡面可能有多個容器，所以每個容器要有自己的名字。`image: nginx:1.27` 就是我們要用的 Docker image，這裡用的是 nginx 的 1.27 版本。`ports` 裡面 `containerPort: 80`，這是在宣告這個容器監聽 80 port。注意，這其實更像一個文件記錄，告訴看 YAML 的人「這個容器用 80 port」。即使你不寫 containerPort，nginx 一樣會監聽 80，但寫上去是好習慣。
 
 大家注意一下縮排。`metadata` 和 `spec` 是第一層，前面不縮排。`name`、`labels`、`containers` 是第二層，縮排兩個空格。`app`、`image`、`ports` 是第三層，縮排四個空格。YAML 的縮排非常重要，縮排錯了就會報錯。
 
@@ -275,6 +273,8 @@ spec:
 ```
 kubectl apply -f pod.yaml
 ```
+
+順帶一提，你在網路上可能會看到 `kubectl create -f` 的寫法，也可以用。差別是 `apply` 可以重複執行（有變更就更新），`create` 只能建立一次，已經存在就會報錯。我們統一用 `apply`。
 
 應該會看到 `pod/my-nginx created` 的訊息。這表示 K8s 收到了我們的請求，正在建立這個 Pod。
 
@@ -370,6 +370,7 @@ Pending → ContainerCreating → Running → Succeeded / Failed
 | `CrashLoopBackOff` | 反覆重啟 | 容器啟動後馬上 crash → K8s 重啟 → 又 crash → 間隔越來越長 |
 | `ImagePullBackOff` | 拉不到 image | image 名字拼錯、tag 不存在、私有倉庫沒權限 |
 | `ErrImagePull` | 拉 image 失敗 | 同上，第一次失敗 |
+| `Terminating` | 正在停止中 | 正在執行 graceful shutdown |
 
 **CrashLoopBackOff 重啟間隔：**
 10s → 20s → 40s → 80s → ... → 最長 5min
@@ -397,9 +398,9 @@ kubectl logs <name>           # 3. 看容器日誌
 
 碰到問題怎麼辦？記住排錯三兄弟。第一步 `kubectl get pods` 看狀態，知道是什麼錯。第二步 `kubectl describe pod` 看 Events，裡面會告訴你詳細原因。第三步 `kubectl logs` 看容器日誌，看看程式是不是報了什麼錯。這三個指令是你排錯的萬能工具，一定要記住。
 
-好，講完了概念，我們馬上就來實際體驗一下排錯的過程。
+補充一個：如果容器根本沒跑起來，logs 看不到東西，可以試試 `kubectl get events --sort-by=.metadata.creationTimestamp`，這會列出叢集裡所有最近發生的事件，有時候能找到更底層的原因。
 
-**（休息 10 分鐘）**
+好，講完了概念，我們馬上就來實際體驗一下排錯的過程。
 
 ---
 
@@ -468,7 +469,7 @@ kubectl get pods                        # STATUS: Running ✅
 
 ### 逐字稿
 
-好，休息回來了。接下來我們要做一個很有趣的實作 — 故意把 Pod 搞壞，然後學會怎麼找問題、修問題。
+好，接下來我們要做一個很有趣的實作 — 故意把 Pod 搞壞，然後學會怎麼找問題、修問題。
 
 為什麼要故意搞壞呢？因為在實際工作中，你會花大量時間在排錯上面。與其等到出了問題手忙腳亂，不如現在就先練習一遍。
 
@@ -537,7 +538,7 @@ kubectl delete pod broken-pod
 kubectl apply -f pod-broken.yaml
 ```
 
-第二種方法是用 `kubectl edit`，它會直接打開一個編輯器讓你修改正在跑的資源。但這個方法比較進階，而且改完之後不會反映到你的 YAML 檔案裡，所以我建議大家先用第一種方法，養成修改檔案再 apply 的好習慣。
+第二種方法是用 `kubectl edit`，它會直接打開一個編輯器讓你修改正在跑的資源。但這個方法有幾個限制：第一，Pod 的大部分欄位是不可變的，改了 K8s 會拒絕；第二，改完之後不會反映到你的 YAML 檔案裡。所以我建議大家養成修改檔案再 apply 的好習慣。
 
 修正完之後，再看一下狀態：
 
@@ -648,7 +649,7 @@ spec:
     # Sidecar 容器：busybox 讀取 nginx 日誌
     - name: log-reader
       image: busybox:1.36
-      command: ["sh", "-c", "tail -f /var/log/nginx/access.log"]
+      command: ["sh", "-c", "while [ ! -f /var/log/nginx/access.log ]; do sleep 1; done; tail -f /var/log/nginx/access.log"]
       volumeMounts:
         - name: shared-logs
           mountPath: /var/log/nginx
@@ -700,9 +701,7 @@ kubectl delete pod sidecar-pod
 
 好，概念講完了，接下來我們來實際建一個多容器 Pod。這個 Pod 裡面會有兩個容器：一個 nginx 負責服務 Web 請求，一個 busybox 負責即時讀取 nginx 的 access log。它們透過一個共享的 Volume 來傳遞日誌檔案。
 
-**（休息 10 分鐘）**
-
-休息回來了，我們繼續。建一個新的 YAML 檔案叫 `pod-sidecar.yaml`。這個 YAML 比之前複雜一些，但不要怕，我們一段一段看。
+建一個新的 YAML 檔案叫 `pod-sidecar.yaml`。這個 YAML 比之前複雜一些，但不要怕，我們一段一段看。
 
 ```yaml
 apiVersion: v1
@@ -723,7 +722,7 @@ spec:
 
     - name: log-reader
       image: busybox:1.36
-      command: ["sh", "-c", "tail -f /var/log/nginx/access.log"]
+      command: ["sh", "-c", "while [ ! -f /var/log/nginx/access.log ]; do sleep 1; done; tail -f /var/log/nginx/access.log"]
       volumeMounts:
         - name: shared-logs
           mountPath: /var/log/nginx
@@ -735,7 +734,7 @@ spec:
 
 我們來看重點。`spec.containers` 下面有兩個容器，不再是只有一個了。第一個容器叫 `nginx`，跟之前一樣。但是多了一個 `volumeMounts`，它把一個叫 `shared-logs` 的 Volume 掛載到 `/var/log/nginx` 這個路徑。nginx 會把 access log 和 error log 寫到這個目錄下。
 
-第二個容器叫 `log-reader`，用的是 busybox image。busybox 是一個超級小的 Linux 工具箱，很適合拿來做 Sidecar。它的 `command` 設定了容器啟動後要執行的指令：`tail -f /var/log/nginx/access.log`，也就是即時追蹤 nginx 的 access log。注意，它也掛載了同一個 `shared-logs` Volume 到同樣的路徑。
+第二個容器叫 `log-reader`，用的是 busybox image。busybox 是一個超級小的 Linux 工具箱，很適合拿來做 Sidecar。它的 `command` 設定了容器啟動後要執行的指令。注意這裡有一個小細節：我們先用 `while` 迴圈等待 `access.log` 檔案出現，然後才開始 `tail -f`。為什麼？因為 busybox 可能比 nginx 更早啟動，那時候 access.log 還不存在，直接 `tail -f` 會報錯。這是多容器 Pod 很常見的 race condition 問題，加一個等待就解決了。注意，它也掛載了同一個 `shared-logs` Volume 到同樣的路徑。
 
 最後面的 `volumes` 區塊定義了這個共享的 Volume。`emptyDir: {}` 是最簡單的 Volume 類型，它會在 Pod 建立的時候自動建立一個空的目錄，Pod 刪除的時候目錄也會跟著消失。這個就像 Docker 的匿名 Volume。
 
@@ -865,6 +864,19 @@ kubectl run quick-nginx --image=nginx:1.27
 kubectl run quick-nginx --image=nginx:1.27 --dry-run=client -o yaml
 ```
 
+**效率提升小技巧：**
+
+```bash
+# kubectl 自動補全（按 Tab 就能補全指令和資源名稱）
+source <(kubectl completion bash)
+echo 'source <(kubectl completion bash)' >> ~/.bashrc
+
+# 設定別名（之後打 k 就等於 kubectl）
+alias k=kubectl
+echo 'alias k=kubectl' >> ~/.bashrc
+# 之後就可以 k get pods
+```
+
 ---
 
 ### 逐字稿
@@ -888,6 +900,8 @@ kubectl port-forward pod/my-nginx 8080:80
 這行指令的意思是：把本機的 8080 port 轉發到 Pod 的 80 port。執行之後，你打開瀏覽器輸入 `http://localhost:8080`，就可以看到 nginx 的頁面了。
 
 要注意的是，port-forward 是臨時的。你把終端關掉或者按 Ctrl+C，轉發就斷了。這不是正式對外提供服務的方式，正式的方式是用 Service，我們下堂課會學。但是在開發和除錯的時候，port-forward 非常方便。
+
+另外提醒一下，如果你是用 SSH 連到 VM 的，`localhost` 指的是 VM 本身，不是你的筆電。你可以加 `--address 0.0.0.0` 讓外部也能連進來，然後用 VM 的 IP 存取：`kubectl port-forward pod/my-nginx 8080:80 --address 0.0.0.0`。
 
 最後教大家一個超好用的技巧 — `--dry-run=client -o yaml`。有時候你不確定 YAML 該怎麼寫，可以用 kubectl 幫你產生：
 
@@ -959,11 +973,7 @@ kubectl delete pod my-nginx
 
 ### 逐字稿
 
-好，我們來把剛才學的這些技巧實際操作一遍。
-
-**（休息 10 分鐘）**
-
-休息回來了，大家先把之前的 Pod 建回來。用我們最早寫的那個 `pod.yaml`：
+好，我們來把剛才學的這些技巧實際操作一遍。大家先把之前的 Pod 建回來。用我們最早寫的那個 `pod.yaml`：
 
 ```
 kubectl apply -f pod.yaml
@@ -1028,7 +1038,7 @@ kubectl get pods -A
 kubectl get pods -n kube-system
 ```
 
-你會看到 `coredns`、`etcd`、`kube-apiserver`、`kube-controller-manager`、`kube-proxy`、`kube-scheduler` 這些 Pod。是不是很眼熟？這就是我們上午講的那些 Master 和 Worker 元件，它們自己也是以 Pod 的形式在跑。K8s 真的是「自己管理自己」。
+你會看到 `coredns`、`etcd`、`kube-apiserver`、`kube-controller-manager`、`kube-proxy`、`kube-scheduler` 這些 Pod。是不是很眼熟？這就是我們前面講的那些 Master 和 Worker 元件，它們自己也是以 Pod 的形式在跑。K8s 真的是「自己管理自己」。
 
 好，探索完了，清理一下：
 
@@ -1105,7 +1115,7 @@ kubectl logs <pod-name> -c log-reader   # 看到 access log
 
 做完這四題的同學，可以用 `kubectl explain` 指令去探索 Pod 還有哪些可以設定的欄位。比如 `kubectl explain pod.spec.containers` 會列出所有容器可以設定的東西，非常多，可以慢慢研究。
 
-好，大家開始動手吧。有問題隨時舉手問我。
+好，大家開始動手吧。有問題隨時在討論區留言。
 
 ---
 
@@ -1115,7 +1125,7 @@ kubectl logs <pod-name> -c log-reader   # 看到 access log
 
 **今天學了什麼**
 
-| 上午 | 下午 |
+| 概念篇 | 實作篇 |
 |------|------|
 | K8s 是什麼 + 為什麼需要 | YAML 四大欄位 |
 | 核心資源總覽 | 第一個 Pod（完整 CRUD） |
@@ -1138,8 +1148,9 @@ kubectl logs <pod-name> -c log-reader   # 看到 access log
 
 **回家作業：**
 - 把今天的 Pod 練習再做一遍（不看筆記）
-- 試試跑不同的 image：`redis`、`mysql:8.0`、`python:3.12`
+- 試試跑不同的 image：`redis`、`python:3.12`、`busybox:1.36`
 - 觀察它們的日誌和行為有什麼不同
+- 進階挑戰：試試 `mysql:8.0`，但提示 — MySQL 需要設定環境變數才能啟動，Google 搜尋 "kubernetes mysql environment variable" 找答案
 
 **下堂課預告：Deployment + Service + k3s**
 
@@ -1157,11 +1168,11 @@ kubectl logs <pod-name> -c log-reader   # 看到 access log
 
 ### 逐字稿
 
-好，大家辛苦了。我們來做今天的總結。
+好，大家辛苦了。我們來做這個章節的總結。
 
-今天第四堂課我們花了一整天的時間，從概念到實作，完成了 K8s 的入門。上午我們了解了 K8s 是什麼、為什麼需要它、它的核心資源有哪些、架構長什麼樣子，然後把 minikube 裝起來了。
+第四堂課我們從概念到實作，完成了 K8s 的入門。概念篇我們了解了 K8s 是什麼、為什麼需要它、它的核心資源有哪些、架構長什麼樣子，然後把 minikube 裝起來了。
 
-下午我們進入了動手的環節。我們先學了 YAML 的四大必備欄位：apiVersion、kind、metadata、spec。然後我們寫出了人生中第一個 Pod，用 nginx 跑起來，學會了 apply、get、describe、logs、exec、delete 這些基本操作。接著我們故意把 Pod 搞壞，體驗了 ImagePullBackOff 這個錯誤狀態，學會了用 describe 看 Events 來排錯。然後我們建了一個多容器 Pod，體驗了 Sidecar 模式 — 兩個容器共享 Volume 來協同工作。最後我們學了 port-forward、dry-run 這些 kubectl 的進階技巧。
+實作篇我們先學了 YAML 的四大必備欄位：apiVersion、kind、metadata、spec。然後我們寫出了人生中第一個 Pod，用 nginx 跑起來，學會了 apply、get、describe、logs、exec、delete 這些基本操作。接著我們故意把 Pod 搞壞，體驗了 ImagePullBackOff 這個錯誤狀態，學會了用 describe 看 Events 來排錯。然後我們建了一個多容器 Pod，體驗了 Sidecar 模式 — 兩個容器共享 Volume 來協同工作。最後我們學了 port-forward、dry-run 這些 kubectl 的進階技巧。
 
 大家現在回想一下 Docker。今天學的 K8s 操作，幾乎都可以跟 Docker 一一對照。`docker run` 對應 `kubectl apply`，`docker ps` 對應 `kubectl get pods`，`docker logs` 對應 `kubectl logs`。從 Docker 過來學 K8s，其實門檻沒有那麼高對不對？
 

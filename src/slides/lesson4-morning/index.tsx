@@ -233,6 +233,45 @@ kubectl get nodes`,
     section: "核心概念",
     content: (
       <div className="space-y-3">
+        {/* 示意圖：User → Service → Pods on Nodes */}
+        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {/* 外部使用者 */}
+            <div className="bg-amber-900/40 border border-amber-500/50 px-3 py-2 rounded-lg text-center">
+              <p className="text-amber-400 text-xs font-semibold">外部使用者</p>
+            </div>
+            <span className="text-slate-400 text-lg font-bold">→</span>
+            {/* Service */}
+            <div className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-2 rounded-lg text-center">
+              <p className="text-cyan-400 text-xs font-semibold">Service</p>
+              <p className="text-slate-500 text-[10px]">穩定入口</p>
+            </div>
+            <span className="text-slate-400 text-lg font-bold">→</span>
+            {/* Nodes with Pods */}
+            <div className="flex gap-2">
+              <div className="border border-green-500/40 rounded-lg p-2 bg-green-900/20">
+                <p className="text-green-400 text-[10px] font-semibold mb-1 text-center">Node 1</p>
+                <div className="flex gap-1">
+                  <div className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-center">
+                    <p className="text-green-300 text-[10px]">Pod A</p>
+                  </div>
+                  <div className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-center">
+                    <p className="text-green-300 text-[10px]">Pod B</p>
+                  </div>
+                </div>
+              </div>
+              <div className="border border-green-500/40 rounded-lg p-2 bg-green-900/20">
+                <p className="text-green-400 text-[10px] font-semibold mb-1 text-center">Node 2</p>
+                <div className="flex gap-1">
+                  <div className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-center">
+                    <p className="text-green-300 text-[10px]">Pod C</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-slate-800/50 p-4 rounded-lg">
             <p className="text-cyan-400 font-semibold mb-2">Node（節點）</p>
@@ -253,32 +292,21 @@ kubectl get nodes`,
           </div>
         </div>
 
-        {/* 示意圖：使用者 → Service → Pod */}
-        <div className="bg-slate-900/80 border border-slate-600 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3 text-center text-xs">請求流程示意圖</p>
-          <div className="flex items-center justify-center gap-2">
-            <div className="bg-purple-900/50 border border-purple-500/50 px-3 py-2 rounded-lg text-center">
-              <p className="text-purple-300 text-xs font-semibold">使用者</p>
-            </div>
-            <span className="text-slate-500 text-lg">→</span>
-            <div className="bg-amber-900/50 border border-amber-500/50 px-3 py-2 rounded-lg text-center">
-              <p className="text-amber-300 text-xs font-semibold">Service</p>
-              <p className="text-slate-400 text-[10px]">穩定 IP</p>
-            </div>
-            <span className="text-slate-500 text-lg">→</span>
-            <div className="flex flex-col gap-1">
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1 rounded text-center">
-                <p className="text-green-300 text-xs">Pod 1 (10.0.0.5)</p>
-              </div>
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1 rounded text-center">
-                <p className="text-green-300 text-xs">Pod 2 (10.0.0.6)</p>
-              </div>
-              <div className="bg-red-900/40 border border-red-500/40 px-3 py-1 rounded text-center line-through">
-                <p className="text-red-300 text-xs">Pod 3 (掛了)</p>
-              </div>
-            </div>
+        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">為什麼需要 Service？</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>問題 1：Pod IP 是叢集內部的 → 外面連不到</p>
+            <p>問題 2：Pod 會被銷毀重建 → IP 會變</p>
           </div>
-          <p className="text-slate-400 text-[10px] text-center mt-2">Pod 掛了 → Service 自動把流量轉到健康的 Pod</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">Service = 穩定的存取入口</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>- Pod 掛了換新的 → Service 地址不變</p>
+            <p>- 自動轉發到健康的 Pod</p>
+            <p>- 對照：<code>docker run -p 8080:80</code> 做 port mapping</p>
+          </div>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
@@ -333,6 +361,60 @@ Service 有幾種類型。ClusterIP 是預設的，只能在叢集內部存取�
     section: "核心概念",
     content: (
       <div className="space-y-3">
+        {/* 示意圖：Ingress 路由 + ConfigMap/Secret */}
+        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg space-y-3">
+          {/* Ingress 路由示意 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="bg-amber-900/40 border border-amber-500/50 px-3 py-2 rounded-lg">
+              <p className="text-amber-400 text-xs font-semibold">使用者</p>
+            </div>
+            <span className="text-slate-400 text-lg font-bold">→</span>
+            <div className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-2 rounded-lg">
+              <p className="text-cyan-400 text-xs font-semibold">Ingress</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-sm font-bold">→</span>
+                <span className="text-slate-400 text-xs font-mono">/api</span>
+                <span className="text-slate-400 text-sm font-bold">→</span>
+                <div className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded text-center">
+                  <p className="text-green-300 text-[10px] font-semibold">API Service</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-sm font-bold">→</span>
+                <span className="text-slate-400 text-xs font-mono">/</span>
+                <span className="text-slate-500 text-xs">{"   "}</span>
+                <span className="text-slate-400 text-sm font-bold">→</span>
+                <div className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded text-center">
+                  <p className="text-green-300 text-[10px] font-semibold">Frontend Service</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* ConfigMap / Secret → Pod */}
+          <div className="border-t border-slate-700 pt-3 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="bg-blue-900/40 border border-blue-500/40 px-2 py-1 rounded">
+                <p className="text-blue-300 text-[10px] font-mono">ConfigMap: DB_HOST=xxx</p>
+              </div>
+              <span className="text-slate-400 text-sm font-bold">→</span>
+              <div className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded" style={{minWidth: 0}}>
+                <p className="text-green-300 text-[10px]">Pod 環境變數</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="bg-red-900/40 border border-red-500/40 px-2 py-1 rounded">
+                <p className="text-red-300 text-[10px] font-mono">Secret: PASSWORD=***</p>
+              </div>
+              <span className="text-slate-400 text-sm font-bold">→</span>
+              <div className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded" style={{minWidth: 0}}>
+                <p className="text-green-300 text-[10px]">Pod 環境變數</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">Ingress — HTTP 路由器</p>
           <div className="text-slate-300 text-sm space-y-1">
@@ -396,6 +478,36 @@ K8s 提供了 ConfigMap 來解決這個問題。你可以把所有的設定資�
     section: "核心概念",
     content: (
       <div className="space-y-3">
+        {/* 示意圖：Deployment → ReplicaSet → Pods */}
+        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
+          <div className="flex flex-col items-start gap-1 pl-2">
+            <div className="flex items-center gap-2">
+              <div className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-2 rounded-lg">
+                <p className="text-cyan-400 text-xs font-semibold">Deployment</p>
+                <p className="text-slate-500 text-[10px]">你管這個</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 pl-4">
+              <span className="text-slate-500 text-sm">└→</span>
+              <div className="bg-blue-900/40 border border-blue-500/50 px-3 py-2 rounded-lg">
+                <p className="text-blue-400 text-xs font-semibold">ReplicaSet</p>
+                <p className="text-slate-500 text-[10px]">自動管理</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 pl-12">
+              <span className="text-slate-500 text-sm">└→</span>
+              <div className="flex gap-2">
+                {["Pod 1", "Pod 2", "Pod 3"].map((pod) => (
+                  <div key={pod} className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded text-center">
+                    <p className="text-green-300 text-[10px] font-semibold">{pod}</p>
+                  </div>
+                ))}
+              </div>
+              <span className="text-slate-500 text-[10px] ml-2">實際跑的</span>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">Volume — 資料持久化</p>
           <div className="text-slate-300 text-sm space-y-1">
@@ -413,31 +525,12 @@ K8s 提供了 ConfigMap 來解決這個問題。你可以把所有的設定資�
           <div className="text-slate-300 text-sm space-y-1">
             <p>- 問題：只跑一個 Pod → 掛了就停服務</p>
             <p>- 解決：多跑幾個副本（replicas）</p>
+            <p>- Deployment = 管理 Pod 副本的控制器</p>
+            <p className="pl-4">- 副本控制：定義要跑 3 個 → 掛了一個 → 自動補一個</p>
+            <p className="pl-4">- 滾動更新：逐步替換新版本，不中斷服務</p>
+            <p className="pl-4">- 三層關係：<code>Deployment → ReplicaSet → Pod</code></p>
+            <p className="pl-4">- ReplicaSet 是自動建立的，你只管 Deployment</p>
             <p>- 對照：<code>docker compose up --scale web=3</code></p>
-          </div>
-          {/* 三層關係示意圖 */}
-          <div className="mt-3 flex flex-col items-center gap-1">
-            <div className="bg-blue-900/50 border border-blue-500/50 px-6 py-2 rounded-lg text-center w-64">
-              <p className="text-blue-300 text-sm font-semibold">Deployment</p>
-              <p className="text-slate-400 text-[10px]">你管這層：定義副本數、更新策略</p>
-            </div>
-            <span className="text-slate-500">↓ 自動建立</span>
-            <div className="bg-cyan-900/50 border border-cyan-500/50 px-6 py-2 rounded-lg text-center w-56">
-              <p className="text-cyan-300 text-sm font-semibold">ReplicaSet</p>
-              <p className="text-slate-400 text-[10px]">K8s 自動管：維持副本數量</p>
-            </div>
-            <span className="text-slate-500">↓ 自動建立</span>
-            <div className="flex gap-2">
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1.5 rounded text-center">
-                <p className="text-green-300 text-xs font-semibold">Pod 1</p>
-              </div>
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1.5 rounded text-center">
-                <p className="text-green-300 text-xs font-semibold">Pod 2</p>
-              </div>
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1.5 rounded text-center">
-                <p className="text-green-300 text-xs font-semibold">Pod 3</p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -565,6 +658,29 @@ Node 就是一台機器，對照過來就是你跑 Docker 的那台 Linux 主機
     section: "架構",
     content: (
       <div className="space-y-3">
+        {/* Worker Node 內部結構示意圖 */}
+        <div className="bg-slate-900/60 border-2 border-cyan-500/40 rounded-lg p-4">
+          <p className="text-cyan-400 text-xs font-semibold mb-2 tracking-wider">Worker Node</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-blue-900/40 border border-blue-500/40 px-3 py-1 rounded">
+              <p className="text-blue-300 text-[10px] font-semibold">kubelet</p>
+            </div>
+            <div className="bg-blue-900/40 border border-blue-500/40 px-3 py-1 rounded">
+              <p className="text-blue-300 text-[10px] font-semibold">kube-proxy</p>
+            </div>
+            <div className="bg-blue-900/40 border border-blue-500/40 px-3 py-1 rounded">
+              <p className="text-blue-300 text-[10px] font-semibold">containerd</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {["Pod", "Pod", "Pod"].map((p, i) => (
+              <div key={i} className="bg-green-900/40 border border-green-500/40 px-3 py-1.5 rounded">
+                <p className="text-green-300 text-[10px] font-semibold">{p}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">K8s = Master-Worker 架構</p>
           <div className="text-slate-300 text-sm space-y-1">
@@ -669,43 +785,16 @@ Kubernetes 是一個典型的 Master-Worker 架構。簡單來說就像一家公
           </div>
         </div>
 
-        {/* 請求流程示意圖 */}
-        <div className="bg-slate-900/80 border border-slate-600 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-3 text-center text-sm">kubectl create deployment nginx --replicas=3 的完整流程</p>
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2">
-              <div className="bg-purple-900/50 border border-purple-500/50 px-3 py-1.5 rounded-lg">
-                <p className="text-purple-300 text-xs font-semibold">kubectl</p>
-              </div>
-              <span className="text-slate-500 text-sm">① 送請求 →</span>
-              <div className="bg-blue-900/50 border border-blue-500/50 px-3 py-1.5 rounded-lg">
-                <p className="text-blue-300 text-xs font-semibold">API Server</p>
-              </div>
-              <span className="text-slate-500 text-sm">② 驗證權限</span>
-            </div>
-            <span className="text-slate-500">↓ ③ 記錄狀態</span>
-            <div className="bg-amber-900/50 border border-amber-500/50 px-4 py-1.5 rounded-lg">
-              <p className="text-amber-300 text-xs font-semibold">etcd（記錄：要 3 個 nginx Pod）</p>
-            </div>
-            <span className="text-slate-500">↓ ④ 發現待分配</span>
-            <div className="bg-cyan-900/50 border border-cyan-500/50 px-4 py-1.5 rounded-lg">
-              <p className="text-cyan-300 text-xs font-semibold">Scheduler（選 Node → 分配）</p>
-            </div>
-            <span className="text-slate-500">↓ ⑤ 通知 Node</span>
-            <div className="flex gap-3">
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1.5 rounded text-center">
-                <p className="text-green-300 text-xs font-semibold">kubelet</p>
-                <p className="text-slate-400 text-[10px]">啟動 Pod</p>
-              </div>
-              <div className="bg-green-900/40 border border-green-500/40 px-3 py-1.5 rounded text-center">
-                <p className="text-green-300 text-xs font-semibold">kubelet</p>
-                <p className="text-slate-400 text-[10px]">啟動 Pod</p>
-              </div>
-            </div>
-            <span className="text-slate-500">↑ ⑥ 持續監控</span>
-            <div className="bg-red-900/40 border border-red-500/40 px-4 py-1.5 rounded-lg">
-              <p className="text-red-300 text-xs font-semibold">Controller Manager（Pod 掛了？自動補回來）</p>
-            </div>
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">完整流程範例</p>
+          <div className="text-slate-300 text-sm font-mono space-y-1">
+            <p>你輸入：kubectl create deployment nginx --replicas=3</p>
+            <p className="mt-2">1. kubectl 把請求送到 → API Server</p>
+            <p>2. API Server 驗證你的權限 → 通過</p>
+            <p>3. API Server 把「要 3 個 nginx Pod」記錄到 → etcd</p>
+            <p>4. Scheduler 發現有 3 個 Pod 還沒分配 → 分配到合適的 Node</p>
+            <p>5. 對應 Node 的 kubelet 收到通知 → 把容器跑起來</p>
+            <p>6. Controller Manager 持續監控 → Pod 掛了就重新分配</p>
           </div>
         </div>
       </div>
@@ -731,65 +820,77 @@ Kubernetes 是一個典型的 Master-Worker 架構。簡單來說就像一家公
     section: "架構",
     content: (
       <div className="space-y-3">
-        {/* 使用者入口 */}
-        <div className="flex justify-center">
-          <div className="bg-purple-900/50 border border-purple-500/50 px-4 py-2 rounded-lg text-center">
-            <p className="text-purple-300 text-sm font-semibold">你（kubectl / Dashboard）</p>
-          </div>
-        </div>
-        <div className="text-center text-slate-500 text-sm">↓ 所有請求</div>
-
-        {/* Master Node */}
-        <div className="bg-blue-950/40 border-2 border-blue-500/40 p-4 rounded-xl">
-          <p className="text-blue-400 font-bold text-sm mb-3 text-center">Master Node（Control Plane）</p>
-          <div className="flex items-center justify-center gap-2">
-            <div className="bg-blue-900/60 border border-blue-400/50 px-3 py-2 rounded-lg text-center">
-              <p className="text-blue-300 text-xs font-bold">API Server</p>
-              <p className="text-blue-200/50 text-[9px]">大門</p>
-            </div>
-            <span className="text-slate-500 text-xs">↔</span>
-            <div className="bg-amber-900/50 border border-amber-400/50 px-3 py-2 rounded-lg text-center">
-              <p className="text-amber-300 text-xs font-bold">etcd</p>
-              <p className="text-amber-200/50 text-[9px]">儲存</p>
-            </div>
-            <span className="text-slate-500 text-xs">↔</span>
-            <div className="bg-cyan-900/50 border border-cyan-400/50 px-3 py-2 rounded-lg text-center">
-              <p className="text-cyan-300 text-xs font-bold">Scheduler</p>
-              <p className="text-cyan-200/50 text-[9px]">調度</p>
-            </div>
-            <span className="text-slate-500 text-xs">↔</span>
-            <div className="bg-red-900/40 border border-red-400/40 px-3 py-2 rounded-lg text-center">
-              <p className="text-red-300 text-xs font-bold">Ctrl Mgr</p>
-              <p className="text-red-200/50 text-[9px]">監控</p>
+        {/* 精緻架構圖 */}
+        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
+          {/* kubectl */}
+          <div className="text-center mb-2">
+            <div className="inline-block bg-amber-900/40 border border-amber-500/50 px-4 py-1.5 rounded-lg">
+              <p className="text-amber-400 text-xs font-semibold font-mono">kubectl</p>
             </div>
           </div>
-        </div>
+          <div className="text-center text-slate-500 text-sm mb-2">▼</div>
 
-        <div className="text-center text-slate-500 text-sm">↓ kubelet 接收指令 ↑ kubelet 回報狀態</div>
-
-        {/* Worker Nodes */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { name: "Worker 1", pods: ["nginx", "api"] },
-            { name: "Worker 2", pods: ["nginx", "db"] },
-            { name: "Worker 3", pods: ["api", "redis"] },
-          ].map((node) => (
-            <div key={node.name} className="bg-green-950/30 border-2 border-green-500/30 p-3 rounded-xl">
-              <p className="text-green-400 font-bold text-xs mb-2 text-center">{node.name}</p>
-              <div className="space-y-0.5 text-[10px] text-slate-400 mb-2">
-                <p>kubelet | kube-proxy | containerd</p>
-              </div>
-              <div className="flex gap-1 flex-wrap">
-                {node.pods.map((pod) => (
-                  <span key={pod} className="bg-green-900/50 text-green-300 text-[10px] px-2 py-0.5 rounded border border-green-500/30">{pod}</span>
-                ))}
-              </div>
+          {/* Master Node */}
+          <div className="border-2 border-blue-500/40 rounded-lg p-3 mb-3 bg-blue-900/10">
+            <p className="text-blue-400 text-xs font-semibold mb-2 tracking-wider">Master Node (Control Plane)</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { name: "API Server", desc: "大門" },
+                { name: "etcd", desc: "大腦" },
+                { name: "Scheduler", desc: "調度" },
+                { name: "Controller Mgr", desc: "監控" },
+              ].map((item) => (
+                <div key={item.name} className="bg-blue-900/40 border border-blue-500/30 p-2 rounded text-center">
+                  <p className="text-blue-300 text-[10px] font-semibold">{item.name}</p>
+                  <p className="text-slate-500 text-[9px]">{item.desc}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* 連接線 */}
+          <div className="flex justify-center gap-16 text-slate-500 text-sm mb-2">
+            <span>▼</span>
+            <span>▼</span>
+          </div>
+
+          {/* Worker Nodes */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { name: "Worker Node 1", pods: ["nginx", "api"] },
+              { name: "Worker Node 2", pods: ["db", "redis"] },
+            ].map((worker) => (
+              <div key={worker.name} className="border-2 border-cyan-500/40 rounded-lg p-3 bg-cyan-900/10">
+                <p className="text-cyan-400 text-[10px] font-semibold mb-2 tracking-wider">{worker.name}</p>
+                <div className="flex gap-1 mb-2">
+                  <div className="bg-slate-800/80 border border-slate-600 px-1.5 py-0.5 rounded">
+                    <p className="text-slate-300 text-[9px]">kubelet</p>
+                  </div>
+                  <div className="bg-slate-800/80 border border-slate-600 px-1.5 py-0.5 rounded">
+                    <p className="text-slate-300 text-[9px]">kube-proxy</p>
+                  </div>
+                  <div className="bg-slate-800/80 border border-slate-600 px-1.5 py-0.5 rounded">
+                    <p className="text-slate-300 text-[9px]">containerd</p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  {worker.pods.map((pod) => (
+                    <div key={pod} className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded">
+                      <p className="text-green-300 text-[10px] font-semibold">{pod}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="bg-slate-800/50 p-3 rounded-lg text-center">
-          <p className="text-slate-300 text-sm">你 → <span className="text-blue-400">API Server</span> → 指揮整個叢集 | 等一下用 <code className="text-cyan-300">kubectl get pods -n kube-system</code> 親眼看到這些組件</p>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">一句話版本</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>- 你用 <code>kubectl</code> → 跟 API Server 說話 → API Server 指揮整個叢集</p>
+            <p>- 等一下實作就會在 <code>kube-system</code> namespace 裡親眼看到這些組件</p>
+          </div>
         </div>
       </div>
     ),
@@ -1079,12 +1180,12 @@ Kubernetes 是一個典型的 Master-Worker 架構。簡單來說就像一家公
         </div>
 
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">今天結束時你會：</p>
+          <p className="text-green-400 font-semibold mb-2">學完這幾個章節你會：</p>
           <div className="text-slate-300 text-sm space-y-1">
-            <p>- 有一個能跑的 K8s 叢集</p>
-            <p>- 會用 kubectl 做基本操作</p>
-            <p>- 會寫 Pod YAML</p>
-            <p>- 會排 Pod 基本錯誤</p>
+            <p>- <code>minikube status</code> 顯示 Running，<code>kubectl get nodes</code> 看到 Ready</p>
+            <p>- 會用 <code>get</code>、<code>describe</code>、<code>logs</code>、<code>exec</code>、<code>delete</code> 五個指令</p>
+            <p>- 能獨立寫出 Pod YAML，部署 nginx 並用 <code>port-forward</code> 在瀏覽器看到頁面</p>
+            <p>- 看到 <code>ImagePullBackOff</code> 知道怎麼查、怎麼修</p>
           </div>
         </div>
       </div>
@@ -1101,9 +1202,9 @@ Kubernetes 是一個典型的 Master-Worker 架構。簡單來說就像一家公
 
 下午我們要開始寫 YAML 了。首先會講 YAML 配置檔案的基本格式，然後寫第一個 Pod 來跑 nginx，做完整的生命週期操作：建立、查看、檢查、看日誌、進容器、刪除。之後會故意把 Pod 搞壞，學會用 describe 指令來排錯，這個技能在實際工作中非常重要。最後會做一個多容器的 Pod，用 Sidecar 模式讓 nginx 和 busybox 共享 Volume。
 
-今天結束的時候，你會有一個能跑的 K8s 叢集、會用 kubectl 做基本操作、會寫 Pod YAML、還會排 Pod 的基本錯誤。這就是你帶回家的能力。
+學完這幾個章節之後，你的 minikube status 會顯示 Running，你會用 get、describe、logs、exec、delete 五個 kubectl 指令，能獨立寫出 Pod YAML 把 nginx 部署到叢集上，碰到 ImagePullBackOff 也知道怎麼查、怎麼修。
 
-好，我們中午休息，下午一點準時開始。大家吃飯的時候如果 minikube 有什麼問題可以來找我，我們一起看。`,
+好，這個章節就到這裡，我們下一章見。`,
     duration: "5"
   },
 ]

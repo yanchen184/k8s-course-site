@@ -17,7 +17,8 @@
 
 **今天開始：Kubernetes**
 
-- 上午：2 小時概念（不動手，純聽課）
+- 上午前半：概念 + 架構（純聽課）
+- 上午後半：環境搭建 + kubectl 探索（動手）
 - 下午：Pod 實作（寫 YAML、部署、排錯）
 
 **先裝起來！趁我講課的時候讓它跑：**
@@ -112,7 +113,7 @@ minikube start
 - 資料庫地址、Port 等設定 → 不要寫死在 Image 裡
 - ConfigMap = 把設定抽出來
   - 改設定不用重新 build Image
-  - 修改 ConfigMap → 重新載入 Pod 就好
+  - 修改 ConfigMap → 重啟 Pod 即可生效
   - 對照：`docker run -e ENV_VAR=value`
 - 注意：ConfigMap 是明文儲存的
 
@@ -142,7 +143,7 @@ minikube start
   - 定義副本數量（例：3 個）
   - 掛了一個 → 自動補一個新的
   - 滾動更新 → 逐步替換，不中斷服務
-  - 對照：`docker compose --scale`
+  - 對照：`docker compose up --scale web=3`
 - Deployment → ReplicaSet → Pod（三層關係）
   - ReplicaSet 是自動建立的，你只管 Deployment
 
@@ -169,7 +170,7 @@ minikube start
 | **ConfigMap** | 設定檔管理 | `-e ENV_VAR` |
 | **Secret** | 敏感資料管理 | `.env` 檔案 |
 | **Volume** | 資料持久化 | `docker volume` |
-| **Deployment** | 管理無狀態應用的副本 | `docker compose --scale` |
+| **Deployment** | 管理無狀態應用的副本 | `docker compose up --scale web=3` |
 | **StatefulSet** | 管理有狀態應用 | 手動管理 |
 
 → 後面四堂課就是一個一個展開來教
@@ -204,7 +205,7 @@ minikube start
 **kube-proxy：**
 - 負責網路代理和負載均衡
 - 請求進來 → 轉發到正確的 Pod
-- 會優先選同一個 Node 上的 Pod → 減少網路開銷
+- 在叢集內實現負載均衡，將流量分配到各個 Pod
 
 ---
 
@@ -356,7 +357,7 @@ minikube dashboard
 5. 自由練習
 
 **今天結束時你會：**
-→ 有一個能跑的 K8s 叢集
-→ 會用 kubectl 操作
-→ 會寫 Pod YAML
-→ 會排 Pod 基本錯誤
+→ `minikube status` 顯示 Running，`kubectl get nodes` 看到 Ready
+→ 會用 `get`、`describe`、`logs`、`exec`、`delete` 五個指令
+→ 能獨立寫出 Pod YAML，部署 nginx 並用 `port-forward` 在瀏覽器看到頁面
+→ 看到 `ImagePullBackOff` 知道怎麼查、怎麼修

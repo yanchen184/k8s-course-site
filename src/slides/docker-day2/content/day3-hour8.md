@@ -36,7 +36,7 @@ Day2 複習：Image / Container 概念、基礎指令、Port Mapping、Nginx Bin
 ### 2.3 -v 掛載語法
 
 ```bash
-docker run -v /home/user/html:/data nginx         # Bind Mount（斜線開頭）
+docker run -v $(pwd)/html:/data nginx              # Bind Mount（斜線開頭）
 docker run -v my-data:/data nginx                  # Volume（沒有斜線開頭）
 ```
 

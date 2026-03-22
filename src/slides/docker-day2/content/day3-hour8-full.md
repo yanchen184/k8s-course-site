@@ -77,7 +77,7 @@ docker run -v 左邊:右邊 nginx:alpine
 
 ```bash
 # Bind Mount —— 左邊是主機路徑（斜線開頭）
-docker run -v /home/user/html:/data nginx
+docker run -v $(pwd)/html:/data nginx
 
 # Volume —— 左邊是 Volume 名稱（沒有斜線開頭）
 docker run -v my-data:/data nginx

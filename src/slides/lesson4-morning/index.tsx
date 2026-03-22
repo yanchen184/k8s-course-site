@@ -50,19 +50,29 @@ export const slides: Slide[] = [
           <p className="text-k8s-blue font-semibold mb-3">今日議程</p>
           <div className="grid grid-cols-2 gap-3 text-sm text-slate-300">
             <div>
-              <p className="text-yellow-400 font-semibold mb-1">上午課程</p>
+              <p className="text-yellow-400 font-semibold mb-1">上午課程（2hr 概念 + 1hr 實作）</p>
               <p>為什麼需要 K8s</p>
-              <p>K8s 架構深入理解</p>
-              <p>核心物件概念</p>
-              <p>Minikube + kubectl 入門</p>
+              <p>K8s 核心概念全貌</p>
+              <p>K8s 架構（Master + Worker）</p>
+              <p>Minikube 安裝 + kubectl 入門</p>
             </div>
             <div>
-              <p className="text-green-400 font-semibold mb-1">下午課程</p>
-              <p>YAML 基礎語法</p>
-              <p>Deployment 實戰</p>
-              <p>ConfigMap and Label</p>
-              <p>進階 kubectl 操作</p>
+              <p className="text-green-400 font-semibold mb-1">下午課程（4hr 實作）</p>
+              <p>YAML 基礎 + 第一個 Pod</p>
+              <p>Pod 生命週期 + 排錯</p>
+              <p>多容器 Pod（Sidecar）</p>
+              <p>自由練習 + 總結</p>
             </div>
+          </div>
+        </div>
+        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">先裝起來！趁我講課的時候讓它跑</p>
+          <div className="bg-slate-900 rounded-lg p-3 font-mono text-sm space-y-1">
+            <p className="text-slate-400"># Ubuntu / Debian</p>
+            <p className="text-green-300">curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64</p>
+            <p className="text-green-300">sudo install minikube-linux-amd64 /usr/local/bin/minikube</p>
+            <p className="text-slate-400 mt-2"># 裝好後啟動（需要先有 Docker）</p>
+            <p className="text-green-300">minikube start</p>
           </div>
         </div>
       </div>

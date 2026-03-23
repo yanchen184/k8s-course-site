@@ -62,7 +62,7 @@ export const slides: Slide[] = [
           <p className="text-cyan-400 font-semibold mb-2">今天的旅程</p>
           <div className="space-y-2 text-sm text-slate-300">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-slate-400 font-semibold">上午：</span>
+              <span className="text-slate-400 font-semibold">前半段：</span>
               <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">Ingress</span>
               <span className="text-slate-400 font-bold">→</span>
               <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">ConfigMap</span>
@@ -70,7 +70,7 @@ export const slides: Slide[] = [
               <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">Secret</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-slate-400 font-semibold">下午：</span>
+              <span className="text-slate-400 font-semibold">後半段：</span>
               <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">PV/PVC</span>
               <span className="text-slate-400 font-bold">→</span>
               <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">StatefulSet</span>
@@ -87,7 +87,7 @@ export const slides: Slide[] = [
 
 答案就是今天要學的 Ingress。但 Ingress 只是今天的開胃菜。你想想看，你的 API 連進來了，但資料庫密碼還寫死在 YAML 裡面，推到 Git 就全世界都看到了；你的 Pod 跑 MySQL，Pod 一重啟資料就沒了。這些問題今天通通要解決。
 
-今天的行程：上午先搞定 Ingress，讓使用者用域名連到你的服務。然後學 ConfigMap 和 Secret，把設定和密碼從程式碼裡抽出來。下午解決資料消失的問題 — PV、PVC、StatefulSet。最後用 Helm 一鍵部署複雜應用，不用再自己手寫一大堆 YAML。
+今天的行程：先搞定 Ingress，讓使用者用域名連到你的服務。然後學 ConfigMap 和 Secret，把設定和密碼從程式碼裡抽出來。接著解決資料消失的問題 — PV、PVC、StatefulSet。最後用 Helm 一鍵部署複雜應用，不用再自己手寫一大堆 YAML。
 
 內容很多，但每一個都會動手做。好，我們開始。`,
     duration: '5',
@@ -342,7 +342,7 @@ kind: Ingress
 metadata:
   name: app-ingress
 spec:
-  ingressClassName: nginx           # 指定用哪個 Ingress Controller
+  ingressClassName: traefik         # k3s 用 traefik；minikube 用 nginx
   rules:
     - http:
         paths:
@@ -1171,14 +1171,14 @@ kubectl create secret generic my-secret --from-literal=username=admin --from-lit
 
   // ── Slide 14 整合實作：Ingress + ConfigMap + Secret ─
   {
-    title: '上午整合：Ingress + ConfigMap + Secret',
-    subtitle: '把上午學的全部串起來',
+    title: '整合：Ingress + ConfigMap + Secret',
+    subtitle: '把前面學的全部串起來',
     section: '整合',
     content: (
       <div className="space-y-4">
         {/* 整合架構圖 */}
         <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3 text-center">上午整合架構</p>
+          <p className="text-cyan-400 font-semibold mb-3 text-center">整合架構</p>
           <div className="flex flex-col gap-3">
             {/* 使用者 → Ingress */}
             <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -1233,9 +1233,21 @@ kubectl create secret generic my-secret --from-literal=username=admin --from-lit
           </div>
           <p className="text-amber-400 font-semibold mt-3">但還有一個問題... Pod 重啟資料會消失！</p>
         </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ 瀏覽器打 myapp.local 看到前端頁面（Ingress path-based routing）</p>
+            <p>✓ api.myapp.local 和 app.myapp.local 分別導到不同 Service（host-based）</p>
+            <p>✓ kubectl get configmap 看到自己建的 ConfigMap</p>
+            <p>✓ kubectl exec 進 Pod，echo $DB_HOST 輸出 ConfigMap 的值</p>
+            <p>✓ kubectl get secret -o yaml 看到 Base64 編碼的值</p>
+            <p>✓ Pod 裡的 $DB_PASSWORD 是原始密碼（K8s 自動解碼）</p>
+          </div>
+        </div>
       </div>
     ),
-    notes: `好，上午學了三個東西：Ingress、ConfigMap、Secret。我們來整理一下它們怎麼搭配在一起。
+    notes: `好，前面學了三個東西：Ingress、ConfigMap、Secret。我們來整理一下它們怎麼搭配在一起。
 
 看這個架構圖。使用者透過 Ingress 進來，app.example.com 導到前端的 Nginx，api.example.com 導到後端的 API。Nginx 的設定檔用 ConfigMap 管理，不用寫死在 Image 裡。API 的設定（LOG_LEVEL、API_URL）用 ConfigMap 管理，API 連資料庫的密碼用 Secret 管理。MySQL 的 root 密碼也用 Secret 管理。
 

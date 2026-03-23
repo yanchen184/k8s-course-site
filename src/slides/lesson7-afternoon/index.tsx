@@ -77,9 +77,9 @@ export const slides: Slide[] = [
         </div>
       </div>
     ),
-    notes: `下午好！我們繼續。
+    notes: `好，我們繼續。
 
-先講今天下午第一個主題的痛點。K8s 預設的網路政策是什麼？全通。所有 Pod 之間都可以互相通訊，不管在同一個 Namespace 還是不同 Namespace。
+先講下一個主題的痛點。K8s 預設的網路政策是什麼？全通。所有 Pod 之間都可以互相通訊，不管在同一個 Namespace 還是不同 Namespace。
 
 這在開發環境沒什麼問題，但在生產環境就是一個安全隱患。想想看，你的前端 Pod 應該只需要連 API，不應該能直接連資料庫。如果前端 Pod 被入侵了，攻擊者不應該能直接存取資料庫。但預設情況下，他可以。
 
@@ -213,6 +213,16 @@ kubectl run test-block --image=curlimages/curl --rm -it --restart=Never -- \\
             <p>前端 → 只接受 Ingress Controller 的流量</p>
             <p>API  → 只接受前端和 Ingress Controller 的流量</p>
             <p>DB   → 只接受 API 的流量</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ 建立 NetworkPolicy 後，frontend curl db-svc timeout（被擋了）</p>
+            <p>✓ api curl db-svc 成功（API → DB 允許）</p>
+            <p>✓ kubectl get pods -o wide 看到 DaemonSet 在每個 Node 都有一個 Pod</p>
+            <p>✓ kubectl get cronjob 看到排程任務</p>
           </div>
         </div>
       </div>
@@ -827,7 +837,7 @@ kubectl get hpa -n prod
 
 # Step 12：壓測（選做）
 kubectl run load-test --image=busybox:1.36 -n prod --rm -it --restart=Never -- \\
-  sh -c "while true; do wget -qO- http://api-svc:8080 > /dev/null 2>&1; done"
+  sh -c "while true; do wget -qO- http://api-svc > /dev/null 2>&1; done"
 
 # 清理
 kubectl delete namespace prod`,
@@ -1124,6 +1134,17 @@ Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace pr
             <p>- 會做基本的權限控制和網路隔離</p>
             <p>- 會用 Helm 安裝和管理複雜應用</p>
             <p>- 有一套系統化的排錯流程</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">總複習你做到了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ 瀏覽器打域名看到前端頁面</p>
+            <p>✓ 前端能呼叫 API → API 能讀寫 MySQL</p>
+            <p>✓ 刪掉一個 API Pod → 自動重建 → 服務不中斷</p>
+            <p>✓ 前端 Pod 連不到 DB（NetworkPolicy 生效）</p>
+            <p>✓ 壓測後 API 自動擴容（HPA 生效）</p>
           </div>
         </div>
 

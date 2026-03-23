@@ -796,6 +796,18 @@ docker compose up --scale web=3 對應 K8s 的 Deployment replicas。Docker 的 
           </table>
         </div>
 
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ kubectl get svc 看到 ClusterIP Service</p>
+            <p>✓ kubectl get endpoints 看到 Service 對應的 Pod IP 列表</p>
+            <p>✓ 瀏覽器打 worker-IP:30080 看到 nginx 頁面（NodePort）</p>
+            <p>✓ 從 Pod 裡 curl http://nginx-svc 用名稱連到 Service（DNS）</p>
+            <p>✓ 在不同 Namespace 部署同名 Service 不會衝突</p>
+            <p>✓ 跨 Namespace 用 svc.namespace.svc.cluster.local 連到</p>
+          </div>
+        </div>
+
         <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg text-center">
           <p className="text-green-400 font-semibold">今天的課程到這裡，大家辛苦了，我們下堂課見！</p>
         </div>

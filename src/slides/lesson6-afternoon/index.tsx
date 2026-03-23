@@ -68,9 +68,9 @@ kubectl delete pod -l app=mysql
 kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
 > USE testdb;              # ERROR: Unknown database 'testdb'
 # 資料全部不見了！`,
-    notes: `好，下午了，吃飽了嗎？我們來面對一個殘酷的現實。
+    notes: `好，我們來面對一個殘酷的現實。
 
-上午我們部署了 MySQL，建了資料庫，存了資料。但如果我告訴你，把 MySQL 的 Pod 刪掉重建，你的資料全部消失，你會怎麼想？
+前面我們部署了 MySQL，建了資料庫，存了資料。但如果我告訴你，把 MySQL 的 Pod 刪掉重建，你的資料全部消失，你會怎麼想？
 
 來做個實驗。進 MySQL 建一張表，插入一筆資料 Alice。查一下，Alice 在。好，現在退出 MySQL。
 
@@ -265,7 +265,7 @@ kubectl logs deployment/app-with-storage
 
 大家注意看 — 檔案裡面不是只有一行，而是兩行！第一行是剛才被刪掉的那個 Pod 寫的，第二行是新 Pod 寫的。這代表什麼？代表第一個 Pod 寫的資料在 Pod 被刪掉後還活著，新 Pod 掛載同一個 PVC，讀到了舊資料，然後又追加了一行。
 
-對照上午的 MySQL — 沒掛 PVC 的 MySQL 刪了 Pod 資料就沒了，掛了 PVC 的話資料就還在。這就是 PV/PVC 存在的意義。`,
+對照前面的 MySQL — 沒掛 PVC 的 MySQL 刪了 Pod 資料就沒了，掛了 PVC 的話資料就還在。這就是 PV/PVC 存在的意義。`,
     duration: '20',
   },
 
@@ -1202,6 +1202,18 @@ helm install my-redis bitnami/redis -f my-redis-values.yaml
             <p>1. 設定和程式碼分離（ConfigMap + Secret）</p>
             <p>2. 資料和 Pod 分離（PV/PVC）</p>
             <p>3. 複雜度用工具管理（Helm）</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ kubectl get pv 看到 PV，STATUS = Bound</p>
+            <p>✓ 寫入資料後 kubectl delete pod，新 Pod 起來資料還在</p>
+            <p>✓ 建 PVC 不指定 PV → StorageClass 自動建 PV</p>
+            <p>✓ kubectl get pods 看到 mysql-0、mysql-1 有序啟動（StatefulSet）</p>
+            <p>✓ helm install my-redis bitnami/redis 成功安裝</p>
+            <p>✓ helm upgrade 改參數後 helm rollback 成功回到上一版</p>
           </div>
         </div>
 

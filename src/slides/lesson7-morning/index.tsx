@@ -86,7 +86,7 @@ export const slides: Slide[] = [
 
 怎麼辦？答案就是今天第一個主題 — Probe，健康檢查。
 
-今天的內容非常豐富。上午我們學 Probe、Resource 管理加 HPA、還有 RBAC。下午學 NetworkPolicy、DaemonSet 和 Job/CronJob、日誌與除錯，最後做一個從零到一的總複習實戰，把四堂課學的東西全部串起來。準備好了嗎？我們開始。`,
+今天的內容非常豐富。我們會先學 Probe、Resource 管理加 HPA、然後是 RBAC。接著學 NetworkPolicy、DaemonSet 和 Job/CronJob、日誌與除錯，最後做一個從零到一的總複習實戰，把四堂課學的東西全部串起來。準備好了嗎？我們開始。`,
     duration: '5',
   },
 
@@ -435,10 +435,9 @@ kubectl describe pods -l app=api-probe-demo | grep -A10 "Liveness\\|Readiness"
             <p>Java Spring Boot 啟動要 60 秒</p>
             <p className="text-slate-500">─────────────────────────────</p>
             <p>0s  → Pod 建立</p>
-            <p>5s  → livenessProbe 開始（initialDelay=5）</p>
-            <p>15s → 第 1 次失敗</p>
-            <p>25s → 第 2 次失敗</p>
-            <p>35s → 第 3 次失敗 → <span className="text-red-400">重啟！</span>（但應用才啟動 35 秒）</p>
+            <p>5s  → livenessProbe 開始 → 第 1 次失敗（initialDelay=5）</p>
+            <p>15s → 第 2 次失敗（period=10）</p>
+            <p>25s → 第 3 次失敗 → <span className="text-red-400">重啟！</span>（但應用才啟動 25 秒）</p>
             <p>∞   → <span className="text-red-400">永遠啟動不了，一直在重啟迴圈</span></p>
           </div>
         </div>
@@ -463,7 +462,7 @@ startupProbe:
   failureThreshold: 10     # 5 + (5 x 10) = 最多等 55 秒`,
     notes: `剛才我們講了 liveness 和 readiness，還有一個 startupProbe 我要單獨拿出來講，因為它的用途很特別。
 
-想像你的 Java Spring Boot 應用啟動要 60 秒。如果你只設了 livenessProbe，initialDelaySeconds 設 5 秒、periodSeconds 10 秒、failureThreshold 3 次，那麼啟動後 35 秒就會因為連續失敗 3 次被判定不健康然後重啟。但你的應用要 60 秒才能啟動啊！結果就是永遠啟動不了，陷入無窮重啟迴圈。
+想像你的 Java Spring Boot 應用啟動要 60 秒。如果你只設了 livenessProbe，initialDelaySeconds 設 5 秒、periodSeconds 10 秒、failureThreshold 3 次，那麼第 5 秒開始第一次檢查，第 15 秒第二次，第 25 秒第三次 — 連續失敗 3 次，K8s 就重啟容器。但你的應用要 60 秒才能啟動啊！結果就是永遠啟動不了，陷入無窮重啟迴圈。
 
 你可能會想：那我把 initialDelaySeconds 設成 60 不就好了？可以，但這有個問題 — 如果你的應用在運行過程中真的掛了，K8s 也要等 60 秒才開始檢查。這就失去了快速偵測故障的意義。
 
@@ -498,6 +497,16 @@ startupProbe 就是解決這個問題的。在 startupProbe 通過之前，liven
             <p>- 啟動超過 30 秒的應用加 startupProbe</p>
             <p>- liveness 的 initialDelaySeconds 要大於應用啟動時間</p>
             <p>- readiness 通常設得比 liveness 敏感（period 短、threshold 低）</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ kubectl get pods 看到 RESTARTS 數字增加（livenessProbe 觸發重啟）</p>
+            <p>✓ readiness 失敗時 kubectl get endpoints 看到 Pod 被移除</p>
+            <p>✓ 能解釋 liveness 和 readiness 的差異（重啟 vs 不轉流量）</p>
+            <p>✓ 能寫出 HTTP GET 類型的 Probe YAML</p>
           </div>
         </div>
       </div>
@@ -851,6 +860,16 @@ kubectl get hpa -w
             <p>- HPA 的 maxReplicas 要考慮 Node 的承載力</p>
           </div>
         </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ 故意設太小的 memory limit → 看到 OOMKilled</p>
+            <p>✓ kubectl get hpa 看到 TARGETS 欄位顯示 CPU 使用率</p>
+            <p>✓ 壓測後 kubectl get pods -w 看到副本自動增加</p>
+            <p>✓ 停止壓測後副本自動縮回來</p>
+          </div>
+        </div>
       </div>
     ),
     notes: `好，Resource 和 HPA 做個快速小結。requests 是保底，limits 是天花板。CPU 超過 limits 被節流，記憶體超過被 OOMKilled。QoS 三個等級：Guaranteed 最不容易被殺，BestEffort 最先被殺，生產環境至少要設 requests。HPA 根據 CPU 使用率自動擴縮 Pod，前提是要設 requests 和裝 metrics-server。
@@ -1109,8 +1128,18 @@ kubectl get pods --as=system:serviceaccount:default:viewer-sa
             <p>5. <span className="text-cyan-400 font-semibold">--as</span> — 模擬其他身份操作（測試權限用）</p>
           </div>
         </div>
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ 切換到受限使用者後 kubectl get pods 成功</p>
+            <p>✓ kubectl delete pod 被拒絕，顯示 Forbidden</p>
+            <p>✓ 能解釋 Role（Namespace 級別）和 ClusterRole（叢集級別）的差異</p>
+            <p>✓ kubectl auth can-i delete pods --as=... 回傳 no</p>
+          </div>
+        </div>
+
         <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold">上午的內容到這裡！午休之後講 NetworkPolicy — Pod 之間的防火牆。</p>
+          <p className="text-amber-400 font-semibold">接下來進入下一個主題 — NetworkPolicy，Pod 之間的防火牆。</p>
         </div>
       </div>
     ),
@@ -1120,7 +1149,7 @@ kubectl get pods --as=system:serviceaccount:default:viewer-sa
 
 CKA 考試裡 RBAC 是必考題，所以如果你之後有打算考認證，今天學的東西一定要多練習。
 
-好，上午的內容到這裡！我們午休，下午第一個主題是 NetworkPolicy — Pod 之間的防火牆。`,
+好，接下來進入下一個主題 — NetworkPolicy，Pod 之間的防火牆。`,
     duration: '3',
   },
 ]

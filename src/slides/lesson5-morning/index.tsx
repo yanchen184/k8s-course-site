@@ -80,7 +80,7 @@ export const slides: Slide[] = [
 
 今天的旅程就是：Deployment → Service → DNS → Namespace。
 
-不過在開始之前，我們先來做一件事 — 把你的實驗環境從 minikube 單節點，升級成 k3s 多節點叢集。這樣等一下教到 Deployment 擴容的時候，你會看到 Pod 真的分散跑在不同的 Node 上。`,
+不過在開始之前，我們要先做一件很重要的事 — 把環境從 minikube 單節點升級成 k3s 多節點叢集。為什麼？因為 Deployment 的擴容、Pod 分散到不同 Node、NodePort 從任何機器都能連，這些你用 minikube 單節點是完全看不到效果的。所以 k3s 不是可選的，是必修的。`,
     duration: '5',
   },
 
@@ -212,15 +212,17 @@ done
 
 # 6. 驗證 — 應該看到 3 個 Ready
 multipass exec k3s-master -- sudo kubectl get nodes`,
-    notes: `好，在正式進入 Deployment 之前，我們先來升級一下實驗環境。
+    notes: `好，在進入 Deployment 之前，我們必須先升級環境。
 
-上一堂課我們用的是 minikube，它很方便、一行指令就能啟動，但有一個很大的限制 — 它只有一個 Node。所有的 Pod 都跑在同一台機器上，你看不到「Pod 分散到不同 Node」的效果。這就像你學 Docker Swarm 但只有一台電腦，怎麼測都是在同一台上面跑，感受不到叢集的威力。
+上一堂課我們用的是 minikube，它很方便、一行指令就能啟動，但有一個致命的限制 — 它只有一個 Node。所有的 Pod 都跑在同一台機器上。等一下我們教 Deployment 擴容到 5 個副本，你用 kubectl get pods -o wide 看，5 個 Pod 全部擠在同一個 Node 上，完全感受不到「分散部署」的意義。後面教 NodePort，你只有一個 Node IP 能連，體會不到「任何 Node 都能進」的效果。再後面教 DaemonSet，每個 Node 跑一份，但你只有一個 Node，那跟普通 Pod 有什麼差別？
 
-所以今天我們要升級到 k3s。k3s 是什麼？它是 Rancher Labs 開源的一個輕量版 Kubernetes。你可以把它想成「K8s 的精簡版」，功能一樣但安裝超級快、資源佔用也少很多。名字為什麼叫 k3s？因為 K8s 有 8 個字母（K-u-b-e-r-n-e-t-e-s），k3s 只有 3 個字母，代表它砍掉了很多肥肉，但核心功能全部保留。面試的時候如果有人問你知不知道 k3s，你就可以聊兩句了。
+所以我們現在要升級到 k3s。k3s 是 Rancher Labs 開源的一個輕量版 Kubernetes，功能跟 K8s 一樣但安裝超級快、資源佔用少很多。名字為什麼叫 k3s？因為 K8s 有 8 個字母（K-u-b-e-r-n-e-t-e-s），k3s 只有 3 個字母，代表它砍掉了很多肥肉，但核心功能全部保留。
 
 那我們要怎麼在你的電腦上跑出 3 台 Node 呢？用 Multipass。Multipass 是 Canonical 出品的工具，Canonical 就是做 Ubuntu 那家公司。它讓你一行指令就能建一台 Ubuntu 虛擬機，比手動裝 VM 快多了。
 
-好，來動手。首先安裝 Multipass。macOS 用 brew install multipass，Windows 用 choco install multipass，Linux 用 snap install multipass。大家根據自己的系統來。
+好，來動手。我已經幫大家準備了一個一鍵腳本 setup-k3s.sh，但我們先一步一步走過去，理解每一步在幹嘛。
+
+首先安裝 Multipass。macOS 用 brew install multipass，Windows 用 choco install multipass，Linux 用 snap install multipass。大家根據自己的系統來。
 
 裝好之後，我們建 3 台 VM。用 multipass launch 指令，--name 給它命名，--cpus 2 分配 2 顆 CPU，--memory 2G 分配 2GB 記憶體，--disk 10G 分配 10GB 硬碟。我們建一台 master 和兩台 worker。
 
@@ -228,9 +230,19 @@ VM 建好之後，我們在 master 上安裝 k3s。就一行指令：curl -sfL h
 
 裝好 master 之後，我們需要取得兩個東西：join token 和 master 的 IP。Token 是讓 worker 證明「我有權加入這個叢集」的憑證，IP 是讓 worker 知道 master 在哪裡。
 
+用 Docker 的經驗來對照，這就像 Docker Swarm。docker swarm init 初始化叢集，然後它會給你一個 docker swarm join --token xxx 的指令，你在其他機器上跑那行指令就能加入。k3s 的邏輯一模一樣，只是指令不同。
+
 拿到 token 和 IP 之後，我們用一個 for 迴圈讓兩台 worker 加入叢集。加入的指令也是 curl -sfL https://get.k3s.io | sh -，只是多了兩個環境變數：K3S_URL 告訴它 master 在哪，K3S_TOKEN 證明你有權限加入。
 
-好，現在來驗證。跑 multipass exec k3s-master -- sudo kubectl get nodes。大家猜猜看，應該會看到幾個 Node？沒錯，3 個。一個 master，兩個 worker，狀態都是 Ready。恭喜你，你現在有一個真正的多節點 K8s 叢集了！`,
+好，現在來驗證。跑 multipass exec k3s-master -- sudo kubectl get nodes。大家猜猜看，應該會看到幾個 Node？沒錯，3 個。一個 master，兩個 worker，狀態都是 Ready。恭喜你，你現在有一個真正的多節點 K8s 叢集了！
+
+最後一步，我們把 kubeconfig 複製到本機，這樣你就不用每次都 multipass exec 進去 master 跑 kubectl，直接在本機就能操作。複製出來之後記得把 IP 從 127.0.0.1 改成 master 的實際 IP，然後設定 KUBECONFIG 環境變數指向這個檔案。
+
+跑一下 kubectl get nodes，如果看到 3 個 Ready 的 Node，就代表你的環境完全搞定了。
+
+如果你懶得一步一步打，課程資料夾裡有一個 setup-k3s.sh，一鍵幫你搞定整個流程。但我建議你至少手動跑過一次，理解每一步在幹嘛。
+
+好，不管你用 minikube 還是 k3s，接下來的操作都一樣。正式進入今天的主題 — Deployment。`,
     duration: '15',
   },
 
@@ -752,6 +764,18 @@ kubectl get pods                      # 全部回到正常！`,
 
         <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg">
           <p className="text-red-400 font-semibold text-sm">→ 生產環境幾乎不會直接用 Pod，都是用 Deployment</p>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">這個章節你學會了：</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>✓ kubectl get nodes 看到 3 個 Ready 的節點（k3s 多節點叢集）</p>
+            <p>✓ kubectl get deployment 看到 READY = 3/3</p>
+            <p>✓ kubectl get pods -o wide 看到 Pod 分散在不同 Node</p>
+            <p>✓ kubectl delete pod 後自動重建（自我修復）</p>
+            <p>✓ kubectl rollout undo 成功回滾到上一版</p>
+            <p>✓ kubectl scale deployment --replicas=5 成功擴容</p>
+          </div>
         </div>
       </div>
     ),

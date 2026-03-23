@@ -912,7 +912,15 @@ Deployment 解決了無狀態應用。但資料庫呢？
         </div>
       </div>
     ),
-    notes: `K8s 是 Master-Worker 架構。Master 不跑應用，只做管理。Worker 跑 Pod。生產環境 Master 3 台高可用，Worker 幾十到上百。minikube 是單節點，Master + Worker 合一。`,
+    notes: `八個概念認識了，但 Pod 掛了是誰偵測到的？新 Pod 是誰建的？放哪台機器誰決定的？這些答案在 K8s 的架構裡。
+
+K8s 是 Master-Worker 架構，像一家公司。Master 是管理層，做決策、下指令。Worker 是員工，實際幹活。你的 Pod 跑在 Worker 上，Master 不跑你的應用。
+
+生產環境 Master 通常 3 台做高可用，Worker 幾十到上百台。我們用的 minikube 是單節點，Master + Worker 合在一起。
+
+先看 Worker，誰在現場幹活...
+
+[▶ 下一頁]`,
   },
 
   // ── 4-5（2/2）：Worker 三組件 ──
@@ -967,7 +975,17 @@ Deployment 解決了無狀態應用。但資料庫呢？
         </div>
       </div>
     ),
-    notes: `Worker 三組件：Container Runtime（containerd，跑容器）、kubelet（工頭，接指令管 Pod）、kube-proxy（網路代理，Service 轉發）。K8s 1.24 開始直接用 containerd，不需要 Docker。`,
+    notes: `Worker Node 三個組件，每個都是因為上一步的需求：
+
+要跑容器 → Container Runtime（containerd）。Docker 底層就是 containerd，K8s 1.24 開始直接用它，不需要 Docker。你用 Docker build 的 Image 照樣能跑。
+
+容器跑起來了但誰管它？→ kubelet。從 Master 接指令、建容器、監控狀態、回報。就像工地工頭。
+
+Pod 之間要互相連、Service 要轉發流量 → kube-proxy。維護網路規則，把請求轉到正確的 Pod。
+
+Worker 負責幹活，但誰下指令？→ Master Node...
+
+[▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1027,7 +1045,14 @@ Deployment 解決了無狀態應用。但資料庫呢？
         </div>
       </div>
     ),
-    notes: `Master 四組件：API Server（大門）、etcd（資料庫，最重要）、Scheduler（調度）、Controller Manager（控制迴圈，比較期望 vs 實際）。etcd 掛了最嚴重，必須備份。`,
+    notes: `Master Node 四個組件，用一條指令的旅程來理解：
+
+你下 kubectl 指令 → 誰收的？→ API Server（大門+保全，驗證身份權限）
+指令收到了「要 3 個 nginx」→ 記在哪？→ etcd（叢集的記憶，最重要的組件，掛了就失憶，一定要備份）
+etcd 記住了要 3 個但現在 0 個 → 誰發現不對？→ Controller Manager（持續比較期望 vs 實際，像恆溫空調）
+要補 3 個 Pod → 放哪台機器？→ Scheduler（看資源分配，哪台空閒放哪台）
+
+[▶ 下一頁]`,
   },
 
   // ── 4-6（2/3）：完整流程 ──
@@ -1061,7 +1086,19 @@ Deployment 解決了無狀態應用。但資料庫呢？
         </div>
       </div>
     ),
-    notes: `完整流程：kubectl → API Server 驗證 → etcd 記錄 → Controller Manager 建 ReplicaSet → Scheduler 分配 Node → kubelet 建容器。故障恢復也全自動：Controller Manager 發現少了就補。`,
+    notes: `完整流程走一遍：kubectl create deployment nginx --replicas=3
+
+1. kubectl → API Server（驗證身份權限）
+2. API Server → etcd（記錄「要 3 個 nginx」）
+3. Controller Manager 發現 0≠3 → 建 ReplicaSet 要求 3 個 Pod
+4. Scheduler 看資源 → Pod 1 和 3 去 Worker 1，Pod 2 去 Worker 2
+5. kubelet 收通知 → containerd 拉 image、建容器、啟動
+
+然後 Worker 1 硬碟壞了，兩個 Pod 沒了。Controller Manager 發現 1≠3，觸發補 2 個，Scheduler 分到 Worker 2，kubelet 重建。全自動，你不用動。
+
+如果某個組件掛了：API Server 掛了 → 不能下新指令但 Pod 繼續跑。etcd 掛了 → 最嚴重，失去所有記憶。
+
+[▶ 下一頁]`,
   },
 
   // ── 4-6（3/3）：架構圖 ──
@@ -1123,7 +1160,15 @@ Deployment 解決了無狀態應用。但資料庫呢？
         </div>
       </div>
     ),
-    notes: `架構圖：Master 有 4 組件（API Server、etcd、Scheduler、Controller Manager），Worker 有 3 組件（kubelet、kube-proxy、containerd）+ Pod。K8s 的管理組件自己也是以 Pod 形式跑。`,
+    notes: `看一下架構圖。上面 Master：API Server、etcd、Scheduler、Controller Manager。下面多個 Worker：kubelet、kube-proxy、containerd、Pod。
+
+你通過 kubectl 跟 API Server 說話，API Server 指揮整個叢集。
+
+最有趣的是：K8s 的管理組件自己也是以 Pod 形式在跑。等一下裝好 minikube，我們去 kube-system 裡面就能親眼看到。
+
+講了這麼多理論，來動手吧。
+
+[▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1186,7 +1231,17 @@ minikube start
 # 驗證叢集
 kubectl get nodes          # 看到 minikube  Ready
 kubectl cluster-info       # 看到 API Server 位址`,
-    notes: `三種方案：minikube（今天，單節點）、k3s（第五堂，多節點）、RKE（生產環境）。kubectl 學一次到處用，跟 Docker CLI 一樣角色。`,
+    notes: `架構搞清楚了，來動手驗證。先聊環境方案。
+
+三種：minikube（今天用，單節點，學習最方便）、k3s（第五堂用，多節點，看 Pod 分散到不同機器）、RKE/kubeadm（企業生產）。
+
+不管用哪種，kubectl 指令都一樣。kubectl 就像 Docker 的 docker 指令，是你跟叢集互動的主要工具。學一次到處用。
+
+安裝驗證：minikube version → minikube start → kubectl get nodes（看到 Ready）→ kubectl cluster-info。
+
+叢集跑起來了，接下來去裡面看看...
+
+[▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1251,7 +1306,13 @@ kubectl get pods -n kube-system
 # 看 Node 詳細資訊
 kubectl describe node minikube
 # 重點看：Container Runtime（containerd）、Capacity、Allocatable`,
-    notes: `在 kube-system 裡親眼看到 etcd、API Server、Scheduler、Controller Manager、kube-proxy、CoreDNS 都是以 Pod 形式在跑。describe node 看 Container Runtime 是 containerd。`,
+    notes: `最有趣的部分：kubectl get pods -n kube-system。
+
+你會看到 etcd、kube-apiserver、kube-scheduler、kube-controller-manager、kube-proxy、coredns，全部以 Pod 形式在跑。對照剛才的架構圖，每個組件都在這裡。K8s 用 Pod 跑自己的組件，自己管自己。
+
+kubectl describe node minikube → 看到 Container Runtime 是 containerd（驗證了不需要 Docker）、CPU/Memory 容量、上面跑了哪些 Pod。
+
+[▶ 下一頁]`,
   },
 
   // ── 4-8（2/2）：Namespace + Dashboard + Docker 對照 ──
@@ -1336,7 +1397,15 @@ kubectl get ns
 
 # Dashboard（瀏覽器打開）
 minikube dashboard`,
-    notes: `Namespace 像資料夾，最常用 default 和 kube-system。Dashboard 是圖形介面。Docker vs kubectl 對照表幾乎一對一，唯一差異是 exec 要加 -- 雙減號。`,
+    notes: `Namespace 就像叢集裡的資料夾。default 放你的應用，kube-system 放系統組件。kubectl get ns 可以看到。
+
+minikube dashboard 打開圖形介面，可以用滑鼠點擊看所有資源。對初學者直觀，但工作中主力還是 kubectl。
+
+Docker vs kubectl 對照表：docker ps → kubectl get pods，docker logs → kubectl logs，docker exec -it → kubectl exec -it（要加 -- 雙減號），docker compose up -f → kubectl apply -f。幾乎一對一，Docker 用熟的話 kubectl 上手很快。
+
+環境裝好了、架構也親眼看到了。接下來的問題是：怎麼告訴 K8s「我要什麼」？→ YAML。
+
+[▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1409,7 +1478,15 @@ spec:                     # 規格
       image: nginx:1.27   #     Docker Image
       ports:
         - containerPort: 80`,
-    notes: `YAML 三規則：空格不能 Tab、冒號後空格、減號列表。四大欄位：apiVersion（API 版本）、kind（資源類型）、metadata（名字標籤）、spec（規格）。對照 Docker Compose 的 YAML 來理解。`,
+    notes: `kube-system 裡看到 K8s 自己的 Pod，但我的容器呢？怎麼告訴 K8s「我要一個 nginx」？→ 寫 YAML。
+
+YAML 三規則：縮排用空格不能 Tab（最常踩的坑）、冒號後面要空格、列表用減號。
+
+四大欄位：apiVersion（用哪版 API）、kind（要建什麼東西）、metadata（名字和標籤）、spec（你要的規格）。
+
+對照 Docker Compose：version → apiVersion，services → kind + spec，image → spec.containers[].image。差別是 K8s 一個檔案描述一個資源。
+
+[▶ 下一頁]`,
   },
 
   // ── 4-9（2/2）：apiVersion 速查 + Pod 概念 + Docker 對照 ──
@@ -1469,7 +1546,15 @@ spec:                     # 規格
         </div>
       </div>
     ),
-    notes: `apiVersion 速查表：Pod/Service/ConfigMap = v1, Deployment = apps/v1, Ingress = networking.k8s.io/v1。Docker Compose 一檔多服務，K8s 一檔一資源。`,
+    notes: `apiVersion 不用背，用到時查：Pod/Service/ConfigMap 用 v1，Deployment 用 apps/v1，Ingress 用 networking.k8s.io/v1。
+
+Pod 從實作角度再講一次：K8s 管的最小單位，docker run nginx 在 K8s 就是建一個 nginx Pod。一 Pod 一容器是最佳實踐。
+
+Docker 指令對照 kubectl：docker run → kubectl run，docker ps → kubectl get pods，docker logs → kubectl logs，docker exec -it → kubectl exec -it（記得加 --）。
+
+YAML 會寫了、Pod 概念清楚了 → 來動手跑第一個！
+
+[▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1551,7 +1636,13 @@ spec:
       image: nginx:1.27
       ports:
         - containerPort: 80`,
-    notes: `逐行解釋 pod.yaml。name 只能小寫 + 數字 + 減號。image 寫明確版本號（不用 latest）。containerPort 是文件記錄，不寫也能跑。統一用 apply 不用 create。`,
+    notes: `動手了！建 ~/k8s-labs 目錄，寫 pod.yaml。逐行解釋：
+
+apiVersion: v1 → Pod 用 v1。kind: Pod。metadata 裡 name: my-nginx（只能小寫+數字+減號），labels: app: nginx（後面 Service 會用）。spec.containers 是列表，name: nginx，image: nginx:1.27（永遠寫明確版本號，不用 latest），containerPort: 80（文件記錄，不寫也能跑但寫了是好習慣）。
+
+kubectl apply -f pod.yaml → pod/my-nginx created。apply 可以重複執行（有改就更新），create 只能建一次。統一用 apply。
+
+[▶ 下一頁]`,
   },
 
   // ── 4-10（2/2）：CRUD 流程 ──
@@ -1605,7 +1696,17 @@ kubectl exec -it my-nginx -- /bin/sh
 
 # 清理
 kubectl delete pod my-nginx`,
-    notes: `完整 CRUD：apply 建、get 看、describe 查詳情（Events 最重要）、logs 看日誌、exec 進容器、delete 刪除。exec 記得加 -- 雙減號。describe Events 是排錯第一步。`,
+    notes: `完整 CRUD 流程：
+
+kubectl get pods → 看到 Running（如果是 ContainerCreating 就等一下）。-o wide 多看 IP 和 Node。
+
+kubectl describe pod my-nginx → 輸出很長但重點看 Events：Scheduled → Pulling → Pulled → Created → Started。回扣架構篇的流程。Events 是排錯第一步。
+
+kubectl logs my-nginx → nginx 日誌。kubectl exec -it my-nginx -- /bin/sh → 進容器（記得 -- 雙減號）。nginx 沒有 curl，可以 cat /usr/share/nginx/html/index.html 確認在跑，或 apt-get update && apt-get install -y curl 再 curl localhost。
+
+kubectl delete pod my-nginx → 清理。恭喜，第一個 Pod 完成！
+
+[▶ 下一頁]`,
   },
 
   // ── 4-10 學員實作題目 ──
@@ -1640,7 +1741,13 @@ kubectl delete pod my-nginx`,
         </div>
       </div>
     ),
-    notes: `兩道練習題。題目一：httpd Pod，練習改 YAML 和 CRUD 流程。題目二：修改 nginx 歡迎頁 + port-forward 驗證，思考 Pod 刪除後資料是否還在（不在，因為沒掛 Volume）。`,
+    notes: `學員實作時間！兩道題：
+
+題目一：用 httpd:2.4 建 Pod，進容器 cat /usr/local/apache2/htdocs/index.html 確認看到 It works!
+
+題目二（進階）：建 nginx Pod → 進容器 echo "Hello K8s" 到 index.html → exit → port-forward pod/my-nginx 8080:80 → 瀏覽器看到。想一想：刪掉 Pod 再重建，改的內容還在嗎？（答案：不在，因為沒掛 Volume）
+
+[▶ 下一頁 — 學員開始做，你去巡堂]`,
   },
 
   // ============================================================
@@ -1698,7 +1805,13 @@ kubectl delete pod my-nginx`,
         </div>
       </div>
     ),
-    notes: `三大踩坑：YAML 縮排（Tab vs 空格）、exec 忘加雙減號、Image tag 拼錯或用 latest。上午完整脈絡：Docker 瓶頸 → 八概念 → 架構 → 環境 → YAML → 第一個 Pod。`,
+    notes: `回頭操作：快速帶做一遍 Pod（給沒跟上的同學看）。
+
+三大踩坑：1. YAML 用了 Tab → 報 mapping values are not allowed here 2. exec 忘加 -- → 參數被 kubectl 吃掉 3. image tag 拼錯或用 latest。
+
+上午因果鏈一句話：Docker 扛不住 → K8s → Pod → Service → Ingress → ConfigMap → Secret → Volume → Deployment → StatefulSet → 架構（Master/Worker）→ minikube → YAML → 第一個 Pod。
+
+[▶ 下一頁]`,
   },
 
   // ── 4-11（2/2）：下午預告 ──
@@ -1757,6 +1870,15 @@ kubectl delete pod my-nginx`,
         </div>
       </div>
     ),
-    notes: `下午用 Loop 結構：概念 → 示範 → 練習 → 回頭操作。四個 Loop：排錯、Sidecar、kubectl 進階、環境變數。每個 Loop 有練習時間，不用擔心掉隊。`,
+    notes: `下午分四個 Loop，每個 Loop 的節奏是：先看概念影片 → 再看實作示範 → 留時間給你動手練 → 最後我回頭帶做一遍。
+
+Loop 1：Pod 狀態不是 Running？→ 排錯三兄弟
+Loop 2：日誌要收集到別處？→ Sidecar 多容器 Pod
+Loop 3：kubectl 不夠力？→ port-forward、dry-run、進階技巧
+Loop 4：MySQL 跑不起來？→ 環境變數注入 + 總結
+
+準備好了嗎？休息十分鐘，下午見。
+
+[▶ 上午結束]`,
   },
 ]

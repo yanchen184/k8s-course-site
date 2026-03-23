@@ -948,8 +948,8 @@ kubectl get pods -A 看所有 Namespace，kube-system 裡面是系統組件。ku
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-blue-400 font-semibold mb-2">探索建議（做完的同學試試）</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li><code className="text-green-400 text-xs">kubectl get pod my-nginx -o jsonpath='{'{.status.podIP}'}'</code> -- 提取 Pod IP</li>
-            <li><code className="text-green-400 text-xs">kubectl get pod my-nginx -o jsonpath='{'{.spec.containers[0].image}'}'</code> -- 提取 Image 名稱</li>
+            <li><code className="text-green-400 text-xs">{"kubectl get pod my-nginx -o jsonpath='{.status.podIP}'"}</code> — 提取 Pod IP</li>
+            <li><code className="text-green-400 text-xs">{"kubectl get pod my-nginx -o jsonpath='{.spec.containers[0].image}'"}</code> — 提取 Image 名稱</li>
             <li>jsonpath 在寫自動化腳本的時候非常好用</li>
           </ul>
         </div>

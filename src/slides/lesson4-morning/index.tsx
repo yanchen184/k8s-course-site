@@ -1434,7 +1434,7 @@ kubectl delete pod my-nginx`,
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
             <li><code>kubectl apply -f pod.yaml</code> 建 my-nginx</li>
             <li>進容器 → <code>echo "Hello Kubernetes" &gt; /usr/share/nginx/html/index.html</code></li>
-            <li>exit → <code>kubectl port-forward my-nginx 8080:80</code></li>
+            <li>exit → <code>kubectl port-forward pod/my-nginx 8080:80</code></li>
             <li>瀏覽器打開 <code>http://localhost:8080</code> 看到 "Hello Kubernetes"</li>
             <li>Ctrl+C 停止 → 想一想：<strong className="text-white">刪掉 Pod 再重建，改的內容還在嗎？</strong></li>
           </ul>
@@ -1546,7 +1546,7 @@ kubectl delete pod my-nginx`,
               </tr>
               <tr className="border-t border-slate-700">
                 <td className="py-2 pr-4 text-cyan-400 font-bold">Loop 4</td>
-                <td className="py-2">環境變數 + MySQL Pod（ConfigMap / Secret 注入）</td>
+                <td className="py-2">環境變數 + MySQL Pod（env 欄位注入）</td>
               </tr>
             </tbody>
           </table>

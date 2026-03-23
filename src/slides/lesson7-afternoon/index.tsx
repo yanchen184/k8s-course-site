@@ -77,15 +77,11 @@ export const slides: Slide[] = [
         </div>
       </div>
     ),
-    notes: `好，我們繼續。
+    notes: `K8s 預設網路政策是全通。所有 Pod 之間都可以互相通訊，不管在同一個 Namespace 還是不同 Namespace。
 
-先講下一個主題的痛點。K8s 預設的網路政策是什麼？全通。所有 Pod 之間都可以互相通訊，不管在同一個 Namespace 還是不同 Namespace。
+生產環境這就是安全隱患。前端 Pod 只需要連 API，不應該能直接連資料庫。如果前端 Pod 被入侵了，攻擊者可以直接存取資料庫。
 
-這在開發環境沒什麼問題，但在生產環境就是一個安全隱患。想想看，你的前端 Pod 應該只需要連 API，不應該能直接連資料庫。如果前端 Pod 被入侵了，攻擊者不應該能直接存取資料庫。但預設情況下，他可以。
-
-這跟你家的網路一樣。如果所有設備都在同一個 WiFi 下面，任何設備都能看到其他設備。企業環境會把訪客 WiFi 和內部網路隔開，K8s 也需要類似的隔離。
-
-用 Docker 的經驗來想，Docker 有 network 隔離。你建一個 frontend-net、一個 backend-net，不同 network 的容器不能互連。K8s 的做法更精細 — NetworkPolicy，Pod 等級的防火牆。你可以指定「只有帶某個 label 的 Pod 才能連我」，比 Docker 的 network 隔離更靈活。`,
+Docker 的做法是 docker network create 隔離，不同 network 的容器不能互連。K8s 的 NetworkPolicy 更精細 — Pod 等級的防火牆，可以用 label selector 指定「只有帶某個 label 的 Pod 才能連我」。`,
     duration: '5',
   },
 
@@ -139,13 +135,13 @@ spec:
       ports:
         - protocol: TCP
           port: 3306          # 只允許 3306 port`,
-    notes: `NetworkPolicy 的結構很直覺。podSelector 指定這條規則套用在哪些 Pod 上。policyTypes 指定管的是 ingress（進來的流量）還是 egress（出去的流量），或兩者都管。然後用 ingress 和 egress 區塊定義具體的規則。
+    notes: `NetworkPolicy 四個欄位：podSelector 指定規則套用在哪些 Pod；policyTypes 指定管 ingress（進來）還是 egress（出去）；ingress/egress 區塊定義具體規則。
 
-這裡要特別提醒一個容易混淆的點。NetworkPolicy 裡的「ingress」跟第六堂學的「Ingress Controller」完全是兩回事。NetworkPolicy 的 ingress 是指「進入 Pod 的流量」，是網路層的概念。Ingress Controller 是 HTTP 路由的概念。名字一樣但意思不同，不要搞混。
+容易混淆的點：NetworkPolicy 的「ingress」是「進入 Pod 的流量」（網路層），跟第六堂的「Ingress Controller」（HTTP 路由）完全不同。
 
-來看一個具體的例子。我要讓資料庫只接受 API Pod 的連線。podSelector 選 role: database，這條規則只套用在有這個 label 的 Pod 上。policyTypes 設 Ingress，只管進來的流量。ingress.from 裡面的 podSelector 設 role: api，表示只有帶 role=api label 的 Pod 才能連進來。ports 設 TCP 3306，只允許連 MySQL 的 port。
+看 YAML 範例。podSelector 選 role: database，只套用在 DB Pod 上。policyTypes 設 Ingress，只管進來的流量。ingress.from 的 podSelector 設 role: api，只有帶 role=api 的 Pod 才能連進來。ports 設 TCP 3306，只開 MySQL port。
 
-重要觀念：一旦你在某個 Pod 上設了 NetworkPolicy，所有不在規則裡的流量都會被拒絕。預設全拒、只開你明確允許的。這跟傳統的防火牆邏輯一樣。`,
+重要：一旦設了 NetworkPolicy，所有不在規則裡的流量都會被拒絕。預設全拒、只開明確允許的。`,
     duration: '10',
   },
 
@@ -178,15 +174,13 @@ kubectl exec $API_POD -- curl -s --max-time 3 http://fake-db-svc:3306
 kubectl run test-block --image=curlimages/curl --rm -it --restart=Never -- \\
   curl -s --max-time 3 http://fake-db-svc:3306
 # timeout = 被擋了`,
-    notes: `好，我們來實作。networkpolicy-db.yaml 裡面有四個資源：一個假的 DB Deployment（用 nginx 模擬）、一個 DB Service、一個假的 API Deployment、還有一條 NetworkPolicy。
+    notes: `networkpolicy-db.yaml 裡面有四個資源：假的 DB Deployment（nginx 模擬）、DB Service、假的 API Deployment、一條 NetworkPolicy。
 
-先部署：kubectl apply -f networkpolicy-db.yaml
+kubectl apply -f networkpolicy-db.yaml，等 Pod 跑起來。
 
-等 Pod 跑起來之後，先從 API Pod 連 DB。你應該會看到回應 — 可能是一堆亂碼，因為我們是用 HTTP 打 MySQL port，但重點是有回應，表示連線成功。
+從 API Pod 連 DB：有回應表示連線成功。從一個沒有 role=api label 的 Pod 連 DB：3 秒後 timeout，流量被 NetworkPolicy 擋掉了。
 
-現在從一個沒有 role=api label 的 Pod 來連 DB。如果 NetworkPolicy 有生效，這個請求會在 3 秒後 timeout，因為流量被擋掉了。
-
-這裡有一個重要的注意事項：NetworkPolicy 需要 CNI 插件的支援。Calico、Cilium、Weave 都支援，但 k3s 預設使用的 Flannel 不支援 NetworkPolicy。如果你的測試結果是兩個都能連，那就是 CNI 不支援。在生產環境你會用 Calico 或 Cilium，它們都支援。`,
+注意：NetworkPolicy 需要 CNI 支援。Calico、Cilium、Weave 支援；k3s 預設的 Flannel 不支援。如果兩個都能連，就是 CNI 不支援。生產環境用 Calico 或 Cilium。`,
     duration: '15',
   },
 
@@ -227,9 +221,7 @@ kubectl run test-block --image=curlimages/curl --rm -it --restart=Never -- \\
         </div>
       </div>
     ),
-    notes: `NetworkPolicy 小結。K8s 預設所有 Pod 互通，加上 NetworkPolicy 之後變成預設拒絕、只允許明確指定的流量。常見的設計就是按照三層架構：前端只接受 Ingress Controller、API 只接受前端、DB 只接受 API。
-
-好，我們繼續下一個主題。休息五分鐘。`,
+    notes: `小結：K8s 預設全通，加 NetworkPolicy 後變預設拒絕。常見設計按三層架構：前端只接受 Ingress Controller、API 只接受前端、DB 只接受 API。`,
     duration: '2',
   },
 
@@ -308,17 +300,13 @@ spec:
       containers:
         - name: logger
           image: busybox:1.36`,
-    notes: `好，接下來講兩個特殊的工作負載類型。第一個是 DaemonSet。
+    notes: `DaemonSet 保證每個 Node 上恰好跑一個 Pod。加新 Node 自動建 Pod，移除 Node 自動刪 Pod。
 
-Deployment 你設 replicas: 3，K8s 會在叢集裡跑 3 個 Pod，至於分布在哪些 Node 上，由 Scheduler 決定。可能 Node A 跑 2 個、Node B 跑 1 個、Node C 一個都沒有。
+對比 Deployment：replicas: 3 由 Scheduler 決定分布在哪些 Node，可能 Node A 跑 2 個、Node C 一個都沒有。DaemonSet 則是每個 Node 各一個。
 
-DaemonSet 不一樣。它保證每個 Node 上恰好跑一個 Pod。加一個新 Node，自動在上面建一個 Pod。移除一個 Node，對應的 Pod 也自動消失。
+典型用途：日誌收集（Fluentd/Filebeat）、監控 agent（Prometheus Node Exporter）、網路插件（kube-proxy 本身就是 DaemonSet）。
 
-什麼場景需要這個？最經典的就是日誌收集。你想收集每個 Node 上所有容器的日誌，就需要每個 Node 上都有一個日誌收集器。還有監控 agent，比如 Prometheus 的 Node Exporter，需要在每個 Node 上收集硬體指標。其實 K8s 自己的 kube-proxy 就是用 DaemonSet 跑的。
-
-DaemonSet 的 YAML 跟 Deployment 幾乎一樣，差別在 kind: DaemonSet，而且沒有 replicas 欄位 — 因為副本數就是 Node 數，不需要你指定。
-
-Docker 沒有直接對應的概念。Docker Compose 做不到「每台機器一個」這種事。`,
+YAML 跟 Deployment 幾乎一樣，差別在 kind: DaemonSet，沒有 replicas 欄位 — 副本數就是 Node 數。Docker Compose 沒有對應的概念。`,
     duration: '10',
   },
 
@@ -367,17 +355,11 @@ kubectl logs job/one-time-job
 kubectl get cronjobs
 # 等 1-2 分鐘
 kubectl get jobs    # CronJob 每分鐘建一個新 Job`,
-    notes: `第二個特殊工作負載是 Job 和 CronJob。
+    notes: `Deployment 是「跑了就不停」，適合 Web Server。Job 是「跑完就結束」，適合資料庫遷移、批次處理、備份。Pod 跑完主行程就停，狀態變 Completed。失敗時根據 backoffLimit 重試。
 
-到目前為止我們用的都是 Deployment，它的特性是「跑了就不停」，適合 Web Server、API 這種需要持續服務的應用。但有些任務是跑完就結束的，比如資料庫遷移、批次處理、備份。這些任務用 Deployment 不太對，因為你不需要它一直跑。
+CronJob 是定時版的 Job，給 cron 表達式按排程建立 Job。cron 五個欄位：分、時、日、月、星期。語法跟 Linux crontab 完全一樣。
 
-Job 就是為這種場景設計的。它建立一個 Pod，Pod 跑完主行程就停了，Job 的狀態變成 Completed。如果 Pod 失敗了，Job 會根據 backoffLimit 重試。
-
-CronJob 就是定時版的 Job。你給一個 cron 表達式，CronJob 就會按照排程定時建立 Job。
-
-cron 語法有五個欄位：分、時、日、月、星期。*/1 * * * * 就是每分鐘。0 3 * * * 就是每天凌晨 3 點。如果你用過 Linux 的 crontab，語法完全一樣。
-
-快速實作。先部署 DaemonSet，你會看到 DESIRED 和 CURRENT 等於你的 Node 數量。接下來是 Job 和 CronJob，等一兩分鐘之後你會看到 CronJob 每分鐘建了一個新的 Job。successfulJobsHistoryLimit: 3 表示只保留最近 3 個成功的 Job，舊的會自動清理。`,
+實作：先 kubectl apply -f daemonset.yaml，kubectl get daemonset 看 DESIRED 和 CURRENT 等於 Node 數量。再 kubectl apply -f cronjob.yaml，等一兩分鐘後 kubectl get jobs 會看到 CronJob 每分鐘建一個新 Job。successfulJobsHistoryLimit: 3 只保留最近 3 個成功的 Job。`,
     duration: '15',
   },
 
@@ -447,15 +429,17 @@ cron 語法有五個欄位：分、時、日、月、星期。*/1 * * * * 就是
         </div>
       </div>
     ),
-    notes: `好，接下來講日誌和除錯。這其實把前幾堂零散學的排錯技巧做一個系統化的整理。
+    notes: `排錯 SOP 固定四步：
+1. kubectl get pods — 看 STATUS 異常
+2. kubectl describe pod — 看 Events 區塊
+3. kubectl logs — 看應用日誌
+4. kubectl exec -it -- sh — 進容器內部檢查
 
-排錯的 SOP 固定四步。第一步，kubectl get pods 看 STATUS 有沒有異常。第二步，kubectl describe pod 看 Events 區塊，K8s 會在這裡記錄發生了什麼事。第三步，kubectl logs 看你的應用日誌。第四步，如果前面三步看不出問題，用 kubectl exec 進容器內部檢查。
+對應 Docker：docker ps → docker inspect → docker logs → docker exec。
 
-這四步跟 Docker 的排錯流程幾乎一樣：docker ps 看狀態、docker inspect 看細節、docker logs 看日誌、docker exec 進容器。你學 Docker 的經驗在這裡完全用得上。
+常見 STATUS 對照：ImagePullBackOff = image 名字打錯或私有倉庫沒認證。CrashLoopBackOff = 應用啟動就 crash，先看 logs。Pending = 沒有 Node 有足夠資源。OOMKilled = 記憶體超過 limits。CreateContainerConfigError = ConfigMap/Secret 不存在。
 
-常見問題我列了一個對照表。ImagePullBackOff 通常是 image 名字打錯或私有倉庫沒設認證。CrashLoopBackOff 是應用啟動就 crash，先看 logs。Pending 是沒有 Node 有足夠資源，先 describe 看原因。OOMKilled 是記憶體超過 limits。
-
-進階工具推薦三個。kubectl get events 可以看叢集層級的事件。kubectl top 可以看 CPU 和記憶體使用量。然後是 K9s，一個終端機版的 K8s 管理器，非常好用。`,
+進階工具：kubectl get events --sort-by=.lastTimestamp 看叢集事件、kubectl top pods/nodes 看資源用量、K9s 終端機版管理器。`,
     duration: '15',
   },
 
@@ -487,15 +471,11 @@ ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \\
 
 # 還原
 ETCDCTL_API=3 etcdctl snapshot restore /backup/etcd-snapshot.db`,
-    notes: `最後一個小主題：etcd 備份。這個我只講概念，不做實作，因為在我們的 k3s 環境裡操作比較複雜。但這個概念在 CKA 考試裡是必考的，所以我提一下。
+    notes: `etcd 是 K8s 的資料庫，所有 Deployment、Pod、Service、Secret、ConfigMap 全部存在 etcd 裡。etcd 掛了沒備份 = 整個叢集狀態消失。
 
-還記得第四堂講架構的時候，etcd 是什麼？它是 K8s 的資料庫。你所有的 Deployment、Pod、Service、Secret、ConfigMap，全部都存在 etcd 裡。如果 etcd 掛了又沒有備份，你整個叢集的狀態就全部消失了。所有資源都要重新建立。
+備份指令：etcdctl snapshot save，需要指定 --endpoints、--cacert、--cert、--key 四個參數。還原：etcdctl snapshot restore。CKA 必考。
 
-所以在生產環境，定期備份 etcd 是非常重要的。備份指令就是 etcdctl snapshot save，還原就是 etcdctl snapshot restore。你要指定 etcd 的憑證才能連上去。
-
-在 k3s 的環境裡，etcd 被換成了 SQLite（單節點）或嵌入式 etcd（多節點），操作方式略有不同。如果你之後要考 CKA，建議用 kubeadm 建的叢集來練習 etcd 備份和還原。
-
-好，知識講完了！接下來是今天的重頭戲 — 總複習實戰。我們休息十分鐘，回來之後從一個空的 Namespace 開始，把四堂課學到的東西全部用上。`,
+k3s 環境裡 etcd 被換成 SQLite（單節點）或嵌入式 etcd（多節點），操作方式不同。要練 etcd 備份還原，建議用 kubeadm 建的叢集。`,
     duration: '5',
   },
 
@@ -609,9 +589,9 @@ ETCDCTL_API=3 etcdctl snapshot restore /backup/etcd-snapshot.db`,
         </div>
       </div>
     ),
-    notes: `好，回來了。總複習實戰的時間到了。
+    notes: `總複習：從空的 Namespace 部署完整生產級應用。
 
-我們要從一個完全空的 Namespace 開始，部署一套完整的生產級應用。架構是這樣的：使用者透過 Ingress 用域名進來，/ 走前端、/api 走 API。API 連 MySQL 資料庫。前端有 2 個副本，API 有 3 個副本加上 HPA 自動擴縮，MySQL 用 StatefulSet 加 PVC 跑 1 個實例。所有 Pod 都有 Probe 和 Resource limits。NetworkPolicy 確保前端只能連 API、API 只能連 DB。`,
+架構：Ingress（myapp.local）→ / 走前端（2 副本）、/api 走 API（3 副本 + HPA）→ MySQL（StatefulSet + PVC）。所有 Pod 設 Probe + Resource limits。NetworkPolicy 逐層隔離：Frontend → API → DB。`,
     duration: '5',
   },
 
@@ -697,9 +677,7 @@ ETCDCTL_API=3 etcdctl snapshot restore /backup/etcd-snapshot.db`,
         </div>
       </div>
     ),
-    notes: `一共 12 步。大家看投影片上的表格，每一步都對應到前幾堂學的知識。這就是為什麼這是「總複習」— 你會用到第五堂到第七堂學的幾乎所有概念。
-
-大家打開 final-exam 目錄，裡面有所有的 YAML 檔案。我們一步一步來。`,
+    notes: `12 步，每步對應一個概念，涵蓋第五堂到第七堂幾乎所有知識點。打開 final-exam 目錄，裡面有所有 YAML 檔案。`,
     duration: '5',
   },
 
@@ -738,15 +716,13 @@ kubectl apply -f final-exam/mysql-statefulset.yaml
 kubectl get pods -n prod -w
 # 等 mysql-0 變成 1/1 Running
 kubectl get pvc -n prod`,
-    notes: `好，開始。Step 1 建 Namespace。看一下 Status 是 Active，好。
+    notes: `Step 1：kubectl apply -f namespace.yaml，確認 Status 是 Active。
 
-Step 2 建 Secret，存 MySQL 的密碼。注意所有資源都要加 -n prod，因為我們的東西都在 prod Namespace 裡。
+Step 2：kubectl apply -f secret.yaml，存 MySQL 密碼。注意後續所有指令都要加 -n prod。
 
-Step 3 建 ConfigMap，存 API 的設定和前端的 nginx 設定。你應該看到 api-config 和 frontend-nginx-config 兩個 ConfigMap。
+Step 3：kubectl apply -f configmap.yaml，應該看到 api-config 和 frontend-nginx-config 兩個 ConfigMap。
 
-Step 4 部署 MySQL。這是最重要的一步，因為 StatefulSet 加 PVC 加 Headless Service 加 Secret 注入，把第六堂學的好幾個概念串在一起了。
-
-MySQL 啟動比較慢，可能需要 30 到 60 秒。你會看到 mysql-0 從 0/1 慢慢變成 1/1 Running。順便看一下 PVC 有沒有自動建立，你應該看到 mysql-data-mysql-0 這個 PVC，狀態是 Bound。這就是 StatefulSet 的 volumeClaimTemplates 自動幫你建的。`,
+Step 4：kubectl apply -f mysql-statefulset.yaml。這一步串了 StatefulSet + PVC + Headless Service + Secret 注入。MySQL 啟動需要 30-60 秒，mysql-0 從 0/1 變成 1/1 Running。kubectl get pvc -n prod 應該看到 mysql-data-mysql-0 狀態 Bound — 這是 volumeClaimTemplates 自動建的。`,
     duration: '15',
   },
 
@@ -784,17 +760,13 @@ kubectl get svc -n prod
 # Step 8：建 Ingress
 kubectl apply -f final-exam/ingress.yaml
 kubectl get ingress -n prod`,
-    notes: `Step 5 部署 API。這個 Deployment 有 3 個副本，有 liveness、readiness、startup 三種 Probe，有 resource requests 和 limits，還從 ConfigMap 和 Secret 載入環境變數。一個 YAML 裡面用到了五個概念。
+    notes: `Step 5：kubectl apply -f api-deployment.yaml。API Deployment 包含 3 副本、liveness/readiness/startup 三種 Probe、resource requests/limits、ConfigMap 和 Secret 環境變數注入。等三個 Pod 都是 Running。
 
-等三個 Pod 都是 Running。
+Step 6：kubectl apply -f frontend-deployment.yaml。2 個副本，透過 ConfigMap 掛載自訂 nginx.conf（設定 /api/ 反向代理）。
 
-Step 6 部署前端。兩個 Pod。前端還透過 ConfigMap 掛載了自訂的 nginx 設定檔，裡面設定了 /api/ 的反向代理。
+Step 7：kubectl apply -f services.yaml。應該看到 api-svc、frontend-svc 兩個 ClusterIP Service，加上 Step 4 的 mysql-headless 共三個。
 
-Step 7 建 Service。你應該看到 api-svc 和 frontend-svc 兩個 ClusterIP Service。加上之前 Step 4 建的 mysql-headless，一共三個 Service。
-
-Step 8 建 Ingress。Ingress 設定了 myapp.local 這個域名，/ 走前端、/api 走 API。
-
-到這一步，你的應用在功能上已經完整了。接下來的 Step 9 和 10 是加上安全和彈性。`,
+Step 8：kubectl apply -f ingress.yaml。myapp.local 域名，/ 走前端、/api 走 API。`,
     duration: '15',
   },
 
@@ -841,15 +813,13 @@ kubectl run load-test --image=busybox:1.36 -n prod --rm -it --restart=Never -- \
 
 # 清理
 kubectl delete namespace prod`,
-    notes: `Step 9 設 NetworkPolicy。我們有三條規則：DB 只接受 API 的連線、API 只接受前端和 Ingress Controller 的連線、前端只接受 Ingress Controller 的連線。三層隔離。
+    notes: `Step 9：kubectl apply -f networkpolicy.yaml。三條規則：DB 只接受 API、API 只接受前端和 Ingress Controller、前端只接受 Ingress Controller。
 
-Step 10 設 HPA。API 的 CPU 超過 70% 就自動擴容，最多 10 個 Pod。
+Step 10：kubectl apply -f hpa.yaml。API CPU 超過 70% 自動擴容，最多 10 個 Pod。
 
-Step 11 完整驗證。用 kubectl get all -n prod 看一下所有資源。你應該看到一大堆東西：3 個 Deployment、1 個 StatefulSet、6 個以上的 Pod、3 個 Service、1 個 HPA。再看 PVC、Ingress、NetworkPolicy 也都在。
+Step 11：kubectl get all -n prod 驗證。預期：3 Deployment + 1 StatefulSet、6+ Pod 全部 Running、3 Service + 1 Ingress、3 NetworkPolicy + 1 HPA、1 PVC Bound。
 
-恭喜！你剛才從一個空的 Namespace 開始，部署了一套完整的生產級應用。用到了 Namespace、Secret、ConfigMap、StatefulSet、PVC、Deployment、Probe、Resource、Service、Ingress、NetworkPolicy、HPA。這就是四堂課學到的所有核心概念。
-
-Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace prod。一行就搞定。`,
+Step 12（選做）：跑壓測 Pod 打 api-svc，觀察 HPA 擴容。清理：kubectl delete namespace prod。`,
     duration: '15',
   },
 
@@ -925,17 +895,13 @@ Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace pr
         </div>
       </div>
     ),
-    notes: `好，總複習做完了。我們來回顧一下整個四堂課的旅程。
+    notes: `四堂課回顧：
+- 第四堂：架構 + Pod + kubectl → 跑一個容器（等同 docker run）
+- 第五堂：Deployment + Service + DNS → 多副本 + 可存取
+- 第六堂：Ingress + ConfigMap/Secret + PV/PVC + Helm → 專業化部署
+- 第七堂：Probe + Resource/HPA + RBAC + NetworkPolicy → 生產級
 
-第四堂，你第一次認識 K8s，學了架構、Pod、kubectl 的基本指令。那時候你能做的就是跑一個容器，跟 docker run 差不多。
-
-第五堂，你學了 Deployment 和 Service，能夠跑多個副本、讓 Pod 之間互相連線、讓外面的人連進來。
-
-第六堂，你學了 Ingress 讓使用者用域名連、ConfigMap 和 Secret 管理設定、PV 和 PVC 做資料持久化、Helm 做套件管理。
-
-第七堂，也就是今天，你學了 Probe 做健康檢查、Resource 和 HPA 管理資源和自動擴縮、RBAC 做權限控制、NetworkPolicy 做網路隔離。然後你把所有東西串起來，做了一次完整的生產級部署。
-
-投影片上有一張完整的 Docker → K8s 對照表。你在 Docker 課程裡學的每一個概念，都能在 K8s 找到對應的東西。K8s 不是一個全新的東西，它是 Docker 的延伸和進化。`,
+投影片上的 Docker → K8s 對照表：docker run → Pod、-p → Service、volume → PVC、HEALTHCHECK → Probe、--memory/--cpus → resources、docker network → NetworkPolicy。每個 Docker 概念在 K8s 都有對應物。`,
     duration: '5',
   },
 
@@ -1001,9 +967,15 @@ Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace pr
         </div>
       </div>
     ),
-    notes: `這張知識地圖把四堂課的所有概念做了一個分類。工作負載有六種：Pod、ReplicaSet、Deployment、StatefulSet、DaemonSet、Job/CronJob。網路有四個：Service、Ingress、CoreDNS、NetworkPolicy。配置管理有 ConfigMap、Secret、Namespace。儲存有 PV、PVC、StorageClass。運維有 Probe、Resource、HPA。安全有 RBAC 和 NetworkPolicy。
+    notes: `知識地圖分六大類：
+- 工作負載：Pod、ReplicaSet、Deployment、StatefulSet、DaemonSet、Job/CronJob
+- 網路：Service（ClusterIP/NodePort/LB）、Ingress、CoreDNS、NetworkPolicy
+- 配置：ConfigMap、Secret、Namespace
+- 儲存：PV、PVC、StorageClass
+- 運維：Probe、Resource requests/limits、HPA、kubectl top
+- 安全：RBAC（Role/RoleBinding）、ServiceAccount、NetworkPolicy
 
-你不需要全部背下來，但建議你把這張圖印出來貼在電腦旁邊。當你在工作中遇到某個問題的時候，先看看這張圖上有沒有對應的概念，然後去查文件。`,
+工作中遇到問題先對照這張圖找對應概念，再查官方文件。`,
     duration: '5',
   },
 
@@ -1043,11 +1015,11 @@ Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace pr
         </div>
       </div>
     ),
-    notes: `學完這四堂課之後，接下來學什麼？我推薦考 CKA — Certified Kubernetes Administrator。它是 CNCF 官方認證，業界認可度很高。考試是線上實作，不是選擇題，你要在真實的叢集上操作。
+    notes: `推薦下一步：CKA（Certified Kubernetes Administrator），CNCF 官方認證，線上實作考試（不是選擇題）。
 
-我們四堂課學的內容大概涵蓋了 CKA 約 60% 的知識點。還需要額外學的包括：用 kubeadm 從零搭建叢集、etcd 備份和還原、網路除錯、Taint/Toleration 和 Node Affinity、PDB。
+四堂課涵蓋 CKA 約 60%。額外要學：kubeadm 搭建叢集、etcd 備份還原、網路除錯、Taint/Toleration、Node Affinity、PodDisruptionBudget。
 
-推薦資源方面，K8s 官方文件是最好的學習資料，而且 CKA 考試可以查官方文件。Killer.sh 是很好的模擬考平台。KodeKloud 有互動式練習環境。如果你想深入理解底層原理，可以挑戰 Kubernetes the Hard Way。`,
+資源：K8s 官方文件（考試可查）、Killer.sh（模擬考）、KodeKloud（互動練習）、Kubernetes the Hard Way（底層原理）。`,
     duration: '5',
   },
 
@@ -1088,21 +1060,19 @@ Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace pr
         </div>
       </div>
     ),
-    notes: `最後給大家一些常見的 K8s 面試題，你可以用來測試自己學會了沒。
+    notes: `六題常見面試題：
 
-第一題：Pod 和 Container 的差別是什麼？答案是 Pod 是 K8s 最小的調度單位，一個 Pod 裡面可以有多個 Container，它們共享網路和儲存。
+Q1 Pod vs Container：Pod 是最小調度單位，可包含多個 Container，共享網路（同一個 IP）和儲存。
 
-第二題：Deployment 和 StatefulSet 的差別？Deployment 適合無狀態的應用，像 API Server。StatefulSet 適合有狀態的，像資料庫，因為它提供穩定的網路標識和每個 Pod 獨立的 PVC。
+Q2 Deployment vs StatefulSet：Deployment 適合無狀態（API），StatefulSet 適合有狀態（DB）— 穩定網路標識（pod-0, pod-1）+ 獨立 PVC。
 
-第三題：liveness 和 readiness 的差別？liveness 失敗重啟容器，readiness 失敗從 Service 移除。
+Q3 livenessProbe vs readinessProbe：liveness 失敗重啟容器，readiness 失敗從 Service endpoints 移除。
 
-第四題：requests 和 limits 的差別？requests 是保底、排程依據，limits 是天花板、硬限制。
+Q4 requests vs limits：requests 是保底（Scheduler 排程依據），limits 是天花板（超過 CPU 被 throttle、超過 memory 被 OOMKill）。
 
-第五題：如何實現滾動更新不停機？靠 Deployment 的 Rolling Update 策略加上 readinessProbe。
+Q5 滾動更新不停機：Deployment Rolling Update + readinessProbe 確保新 Pod ready 才接流量。
 
-第六題：如何確保只有 API 能連 DB？用 NetworkPolicy 限制 DB Pod 的 ingress 流量。
-
-這六題涵蓋了四堂課的核心概念。如果你都能流暢地回答，恭喜你，K8s 的基礎已經很扎實了。`,
+Q6 只有 API 能連 DB：NetworkPolicy 的 ingress.from.podSelector 限制只有 role=api 的 Pod 能連。`,
     duration: '5',
   },
 
@@ -1153,15 +1123,13 @@ Step 12 是選做的壓測。最後別忘了清理：kubectl delete namespace pr
         </div>
       </div>
     ),
-    notes: `好，我們的課程到這裡就全部結束了。
+    notes: `七堂課總結：
+- 第 1-3 堂（Docker）：docker run → Docker Compose → Dockerfile + CI
+- 第 4-7 堂（K8s）：Pod → Deployment + Service → Ingress + ConfigMap + PV + Helm → Probe + HPA + RBAC + NetworkPolicy
 
-讓我們最後回顧一下你走過的路。七堂課，從第一堂用 docker run 跑一個容器開始，到今天能從零部署一套完整的生產級 Kubernetes 應用。你會設定健康檢查讓 K8s 自動幫你重啟不健康的 Pod、會設定資源限制避免一個 Pod 吃光所有資源、會用 HPA 在流量暴增的時候自動擴容、會用 RBAC 控制誰能做什麼、會用 NetworkPolicy 隔離網路流量。
+你現在具備的能力：在 K8s 叢集上部署多服務應用、設定 Probe/Resource/HPA、做 RBAC 權限控制和 NetworkPolicy 網路隔離、用 Helm 管理套件、有系統化的排錯流程。
 
-說實話，能學到這裡的人不多。容器和 K8s 的學習曲線是很陡的，很多人學到 Deployment 就放棄了。但你堅持學完了。
-
-最後我想說的是，今天學到的東西只是 K8s 的基礎。K8s 的生態系統非常龐大，有太多東西可以深入學習。但你已經有了一個扎實的地基，接下來不管是考 CKA、學 Service Mesh、還是在工作中用 K8s，你都有足夠的基礎知識去理解和學習更進階的概念。
-
-Keep Learning. Keep Building. 大家辛苦了，我們七堂課的容器課程到這裡圓滿結束。謝謝大家！`,
+下一步建議：在工作中實際操作，遇到問題查官方文件。準備好了就挑戰 CKA 認證。`,
     duration: '5',
   },
 ]

@@ -283,7 +283,11 @@ K8s 提供了 StatefulSet 來解決這個問題。StatefulSet 跟 Deployment 很
 
 不過說實話，實務上很多團隊選擇不把資料庫放在 K8s 裡面。因為 StatefulSet 的管理比 Deployment 複雜很多，資料庫的備份、還原、主從切換，在 K8s 裡做比裸機上複雜得多。所以很多團隊的做法是：資料庫直接部署在外部機器上，或者用雲端的託管服務，像 AWS 的 RDS、GCP 的 Cloud SQL。讓專業的服務管資料庫，你只負責連線。K8s 裡只跑無狀態的應用，像 API、前端。這是一個非常常見的最佳實踐，特別是剛開始導入 K8s 的團隊。你不需要什麼都放到 K8s 裡，選最適合的方案才是對的。
 
-好，到這裡我們已經認識了 K8s 的八個核心概念。讓我用因果鏈的方式做一個總結。
+那實際上怎麼判斷你的服務該用 Deployment 還是 StatefulSet？很簡單，問自己三個問題。第一，你的服務需要持久化資料嗎？如果不需要，像一般的 API 或前端，直接用 Deployment。第二，如果需要持久化，每個副本的資料是獨立的嗎？如果資料是共享的，比如所有副本都連同一個外部資料庫，那還是用 Deployment 加上外部儲存就好。第三，如果每個副本有自己獨立的資料、需要穩定的身份和啟動順序，像 MySQL 主從、Elasticsearch 叢集，那就用 StatefulSet。簡單說，大部分情況用 Deployment 就對了，只有資料庫這類有狀態的東西才需要 StatefulSet。
+
+順帶提一個東西。除了 Deployment 和 StatefulSet，K8s 還有一個控制器叫 DaemonSet。Deployment 是「我要 N 個 Pod」，DaemonSet 是「每台 Node 都要一個 Pod」。什麼時候用？比如你要在每台機器上跑一個監控 agent 收集 CPU 和記憶體的指標，或者每台機器上跑一個日誌收集器。新 Node 加入叢集，DaemonSet 自動在上面建 Pod，Node 被移除，Pod 自動消失。這個第五堂會詳細教，現在先知道有這個東西就好。
+
+好，到這裡我們已經認識了 K8s 的核心概念。讓我用因果鏈的方式做一個總結。
 
 我們一開始的問題是 Docker 只能管一台機器上的容器，所以需要 K8s。進到 K8s 之後，第一步要跑容器，學了 Pod。Pod 跑起來了但 IP 會變、外面連不到，所以學了 Service。Service 可以從外面連但地址太醜使用者不能用，所以學了 Ingress。
 

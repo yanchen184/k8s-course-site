@@ -100,7 +100,7 @@ Pod 是 K8s 最小的部署單位。注意，不是容器，是 Pod。在 Docker
 
 ## 本集重點
 
-- 建工作目錄 ~/k8s-labs
+- git clone + cd k8s-course-labs/lesson4
 - 寫 pod.yaml（nginx:1.27）→ 逐行解釋
 - kubectl apply -f（講 apply vs create 差別）
 - CRUD 完整流程：
@@ -126,9 +126,23 @@ Pod 是 K8s 最小的部署單位。注意，不是容器，是 Pod。在 Docker
 
 請大家把終端機打開，編輯器準備好，跟著我一步一步來。
 
-第一步，建一個工作目錄。在終端機裡面輸入 mkdir -p ~/k8s-labs，然後 cd ~/k8s-labs。這個目錄我們後面所有的 K8s 練習檔案都放這裡，集中管理好找。
+第一步，把練習用的檔案拉下來。我已經把所有的 Lab 檔案放在 GitHub 上了，大家在終端機輸入 git clone。
 
-在開始之前，先確認一下 minikube 還在跑。輸入 minikube status，看一下狀態。host、kubelet、apiserver 都是 Running 就沒問題。如果不是，輸入 minikube start 重新啟動。
+指令：git clone https://github.com/yanchen184/k8s-course-labs.git
+
+然後 cd 進去。
+
+指令：cd k8s-course-labs/lesson4
+
+裡面有今天所有會用到的 YAML 檔案，包括 pod.yaml、pod-broken.yaml、pod-sidecar.yaml 這些。你不用自己從零開始寫，先用我準備好的檔案跟著做，等熟了之後再自己寫。
+
+在開始之前，先確認一下 minikube 還在跑。
+
+指令：minikube status
+
+看一下狀態。host、kubelet、apiserver 都是 Running 就沒問題。如果不是，輸入 minikube start 重新啟動。
+
+指令：minikube start
 
 好，環境確認了。打開你的編輯器，建一個新檔案叫 pod.yaml。VS Code、vim、nano 都可以。我一行一行帶你寫。
 
@@ -160,7 +174,9 @@ Pod 是 K8s 最小的部署單位。注意，不是容器，是 Pod。在 Docker
 
 寫完存檔。再提醒一次，確認你用的是空格不是 Tab。VS Code 右下角看一下，應該顯示 Spaces: 2。
 
-好，來部署。確認你在 ~/k8s-labs 目錄下，輸入 kubectl apply -f pod.yaml。
+好，來部署。確認你在 k8s-course-labs/lesson4 目錄下，輸入 kubectl apply -f pod.yaml。
+
+指令：kubectl apply -f pod.yaml
 
 這裡解釋一下 apply。你在網路上可能會看到另一個寫法 kubectl create -f pod.yaml。兩個都能用，但有一個重要差別。create 是「建立」，如果資源已經存在就報錯。apply 是「應用」，資源不存在就建立，已經存在就更新。所以 apply 可以重複執行，改了 YAML 之後再 apply 一次就能更新。我們統一用 apply，因為它更靈活。這也更符合宣告式的精神，你是在宣告「我要這個狀態」，而不是在說「幫我建一個東西」。
 
@@ -168,13 +184,19 @@ Pod 是 K8s 最小的部署單位。注意，不是容器，是 Pod。在 Docker
 
 馬上看狀態。輸入 kubectl get pods。
 
+指令：kubectl get pods
+
 你會看到一行資訊，有 NAME、READY、STATUS、RESTARTS、AGE 這幾個欄位。NAME 是 my-nginx，就是 YAML 裡設定的名字。READY 是 1/1，表示這個 Pod 裡面有一個容器而且已經準備好了。STATUS 如果是 Running，恭喜你，你的第一個 Pod 跑起來了。如果你看到 ContainerCreating，表示正在拉 Image，等幾秒再看一次就好。RESTARTS 是 0，表示沒有重啟過。AGE 是這個 Pod 跑了多久。
 
 加一個參數看更多。輸入 kubectl get pods -o wide。
 
+指令：kubectl get pods -o wide
+
 -o wide 是寬格式輸出。你會多看到 IP 和 NODE 兩個欄位。IP 是這個 Pod 在叢集內部的位址。注意，這個 IP 只能在叢集內部使用，從外面連不到。NODE 顯示 minikube，因為我們只有一個節點。等第五堂課用 k3s 多節點的時候，這裡就會顯示不同的 Node 名稱。
 
 接下來用 describe 看更詳細的資訊。輸入 kubectl describe pod my-nginx。
+
+指令：kubectl describe pod my-nginx
 
 describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Namespace、Node、Labels、IP 這些基本資訊。中間是容器的詳細資訊，包括 Image、Port、State。
 
@@ -182,9 +204,13 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
 
 再來看日誌。輸入 kubectl logs my-nginx。
 
+指令：kubectl logs my-nginx
+
 因為 nginx 剛啟動而且我們還沒發任何請求給它，所以日誌可能很少，只有啟動訊息。這跟 Docker 的 docker logs 完全一樣。
 
 好，現在最精彩的部分。我們要進到容器裡面去。輸入 kubectl exec -it my-nginx -- /bin/sh。
+
+指令：kubectl exec -it my-nginx -- /bin/sh
 
 這個指令我拆開來說。kubectl exec 就是在容器裡面執行指令，對應 Docker 的 docker exec。-i 是 interactive，保持標準輸入開啟。-t 是分配一個終端。my-nginx 是 Pod 名字。然後是兩個減號 --。這兩個減號非常重要，我要特別講一下。
 
@@ -196,13 +222,35 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
 
 不用緊張，有兩個辦法。
 
-第一個辦法比較快，直接用 cat。輸入 cat /usr/share/nginx/html/index.html。/usr/share/nginx/html 是 nginx 預設的網頁根目錄。你會看到一段 HTML，裡面有 Welcome to nginx 的字樣。看到這個就代表 nginx 的檔案確實在那裡，而且 nginx 服務是正常的。
+第一個辦法比較快，直接用 cat。輸入 cat /usr/share/nginx/html/index.html。
 
-第二個辦法是裝 curl。輸入 apt-get update，跑完之後再輸入 apt-get install -y curl。大概十秒鐘就裝好了。然後打 curl localhost，你就會看到那段完整的歡迎頁面 HTML。在容器裡面安裝額外工具，這本身就是一個很實用的技巧。日常排錯的時候你經常需要在容器裡面裝一些工具來排查問題。不過要記住，這些修改只存在於當前這個容器裡面。Pod 刪掉重建之後，安裝的工具就不見了，因為容器是無狀態的。
+指令：cat /usr/share/nginx/html/index.html
+
+/usr/share/nginx/html 是 nginx 預設的網頁根目錄。你會看到一段 HTML，裡面有 Welcome to nginx 的字樣。看到這個就代表 nginx 的檔案確實在那裡，而且 nginx 服務是正常的。
+
+第二個辦法是裝 curl。輸入 apt-get update，跑完之後再輸入 apt-get install -y curl。
+
+指令：apt-get update && apt-get install -y curl
+
+大概十秒鐘就裝好了。然後打 curl localhost。
+
+指令：curl localhost
+
+你就會看到那段完整的歡迎頁面 HTML。在容器裡面安裝額外工具，這本身就是一個很實用的技巧。日常排錯的時候你經常需要在容器裡面裝一些工具來排查問題。不過要記住，這些修改只存在於當前這個容器裡面。Pod 刪掉重建之後，安裝的工具就不見了，因為容器是無狀態的。
 
 好，驗證完了。輸入 exit 離開容器。
 
+指令：exit
+
+進容器看檔案是一種驗證方式，但其實還有一個更直觀的方法。我們可以用 port-forward 建一條臨時通道，讓你的瀏覽器直接連到 Pod。輸入 kubectl port-forward pod/my-nginx 8080:80。
+
+指令：kubectl port-forward pod/my-nginx 8080:80
+
+然後打開你的瀏覽器，輸入 localhost:8080，你就會看到 nginx 的歡迎頁面了。port-forward 的細節我們下午會專門用一支影片來講。現在先感受一下就好。看完了按 Ctrl+C 停掉 port-forward。
+
 最後一步，清理。輸入 kubectl delete pod my-nginx。
+
+指令：kubectl delete pod my-nginx
 
 你會看到 pod "my-nginx" deleted 的訊息。再用 kubectl get pods 確認，應該已經沒有 Pod 了，或者顯示 No resources found。
 
@@ -216,25 +264,45 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
 
 **題目一：用 httpd Image 建一個 Pod（基礎）**
 
-- 複製 pod.yaml，改名為 httpd-pod.yaml
-- name 改成 my-httpd
-- image 改成 httpd:2.4
-- containerPort 維持 80（httpd 也是用 80 port）
-- `kubectl apply -f httpd-pod.yaml` 部署
-- `kubectl exec -it my-httpd -- /bin/sh` 進容器
-- httpd 官方 Image 也沒有 curl，用 `cat /usr/local/apache2/htdocs/index.html` 驗證，應該看到 "It works!"
-- 或 exit 後用 `kubectl port-forward pod/my-httpd 8080:80`，瀏覽器開 localhost:8080
-- 做完 `kubectl delete pod my-httpd` 清理
+複製 pod.yaml，改名為 pod-httpd.yaml。name 改成 my-httpd，image 改成 httpd:2.4。
+
+指令：cp pod.yaml pod-httpd.yaml
+指令：（編輯 pod-httpd.yaml，把 name 改成 my-httpd，image 改成 httpd:2.4）
+
+部署它。
+
+指令：kubectl apply -f pod-httpd.yaml
+
+進容器驗證。httpd 官方 Image 也沒有 curl，用 cat 看預設頁面。
+
+指令：kubectl exec -it my-httpd -- cat /usr/local/apache2/htdocs/index.html
+
+你應該會看到 "It works!"。也可以用 port-forward 在瀏覽器看。
+
+指令：kubectl port-forward pod/my-httpd 8080:80
+
+瀏覽器開 http://localhost:8080，看到 "It works!"。Ctrl+C 停掉。做完記得清理。
+
+指令：kubectl delete pod my-httpd
 
 **題目二：修改 nginx 歡迎頁面（進階挑戰）**
 
-- 重新 `kubectl apply -f pod.yaml` 建 my-nginx
-- `kubectl exec -it my-nginx -- /bin/sh` 進容器
-- `echo "Hello Kubernetes" > /usr/share/nginx/html/index.html`
-- exit 離開
-- `kubectl port-forward my-nginx 8080:80`
-- 瀏覽器開 http://localhost:8080，看到 "Hello Kubernetes"
-- Ctrl+C 停止 port-forward
+重新部署 nginx Pod。
+
+指令：kubectl apply -f pod.yaml
+
+進容器，把歡迎頁面改成自己的文字。
+
+指令：kubectl exec -it my-nginx -- /bin/sh
+指令：echo "Hello Kubernetes" > /usr/share/nginx/html/index.html
+指令：exit
+
+用 port-forward 在瀏覽器確認。
+
+指令：kubectl port-forward pod/my-nginx 8080:80
+
+瀏覽器開 http://localhost:8080，看到 "Hello Kubernetes"。
+Ctrl+C 停止 port-forward。
 - 思考：刪掉 Pod 再重建，你改的內容還在嗎？為什麼？
 
 ---
@@ -255,9 +323,42 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
 
 好，這支影片做兩件事。第一，我從頭到尾快速帶做一遍第一個 Pod，給剛才沒完全跟上的同學一個對照的機會。第二，把上午所有內容做一個完整回顧，然後告訴大家下午的學習方式。
 
-先來快速帶做。打開終端機，確認你在 ~/k8s-labs 目錄下。如果 pod.yaml 被刪了或者改壞了，我們重新來。你也可以直接對照螢幕上的內容。就這十二行，我念一遍。apiVersion v1、kind Pod、metadata 底下 name my-nginx、labels 底下 app nginx、spec 底下 containers 列表裡面 name nginx、image nginx:1.27、ports 底下 containerPort 80。注意每一層縮排兩個空格，嚴格對齊。存檔。
+先來快速帶做。打開終端機，確認你在 k8s-course-labs/lesson4 目錄下。如果 pod.yaml 被改壞了，可以用 git checkout pod.yaml 還原。你也可以直接對照螢幕上的內容。就這十二行，我念一遍。apiVersion v1、kind Pod、metadata 底下 name my-nginx、labels 底下 app nginx、spec 底下 containers 列表裡面 name nginx、image nginx:1.27、ports 底下 containerPort 80。注意每一層縮排兩個空格，嚴格對齊。存檔。
 
-然後一路跑下去。kubectl apply -f pod.yaml，建立。kubectl get pods，等它變 Running。kubectl get pods -o wide，看 IP 和 Node。kubectl describe pod my-nginx，往下看 Events 區塊，確認有 Scheduled、Pulling、Pulled、Created、Started 五個事件。kubectl logs my-nginx 看日誌。kubectl exec -it my-nginx -- /bin/sh 進容器，記住 Pod 名字後面要加兩個減號。進去之後 cat /usr/share/nginx/html/index.html 確認 nginx 的歡迎頁面。exit 出來。最後 kubectl delete pod my-nginx 刪掉。整個流程就是這樣：建立、查看、進去玩、刪掉。
+然後一路跑下去。
+
+指令：kubectl apply -f pod.yaml
+
+建立。等它變 Running。
+
+指令：kubectl get pods
+指令：kubectl get pods -o wide
+
+看 IP 和 Node。
+
+指令：kubectl describe pod my-nginx
+
+往下看 Events 區塊，確認有 Scheduled、Pulling、Pulled、Created、Started 五個事件。
+
+指令：kubectl logs my-nginx
+
+看日誌。然後進容器，記住 Pod 名字後面要加兩個減號。
+
+指令：kubectl exec -it my-nginx -- /bin/sh
+
+進去之後確認 nginx 的歡迎頁面。
+
+指令：cat /usr/share/nginx/html/index.html
+
+exit 出來。
+
+指令：exit
+
+最後刪掉。
+
+指令：kubectl delete pod my-nginx
+
+整個流程就是這樣：建立、查看、進去玩、刪掉。
 
 好，再來聊三個初學者最容易踩到的坑。這三個坑我合稱「踩坑三兄弟」，幾乎每個剛學 K8s 的人都會遇到。
 

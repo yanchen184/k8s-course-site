@@ -113,7 +113,7 @@ kubectl explain pod.spec.containers，它會列出 containers 底下所有可以
 
 **準備工作**
 ```bash
-cd ~/k8s-labs
+cd k8s-course-labs/lesson4
 kubectl run my-nginx --image=nginx:1.27    # 如果沒有 Pod
 kubectl get pods                            # 確認 Running
 ```
@@ -165,13 +165,31 @@ echo 'alias k=kubectl' >> ~/.bashrc   # 或 ~/.zshrc
 
 好，上一支影片講了一堆技巧，現在全部來動手操作。大家把終端機打開，跟著我一步一步來。
 
-首先確保你有一個 Pod 可以拿來實驗。進到工作目錄，cd ~/k8s-labs。然後看看有沒有 Running 的 Pod，kubectl get pods。如果沒有的話，用 kubectl run my-nginx --image=nginx:1.27 快速建一個。確認 STATUS 是 Running 就好。
+首先確保你有一個 Pod 可以拿來實驗。進到工作目錄。
 
-第一個操作，port-forward。輸入 kubectl port-forward pod/my-nginx 8080:80。
+指令：cd k8s-course-labs/lesson4
+
+然後看看有沒有 Running 的 Pod。
+
+指令：kubectl get pods
+
+如果沒有的話，快速用我們 repo 裡的 pod.yaml 建一個。
+
+指令：kubectl apply -f pod.yaml
+
+確認 STATUS 是 Running 就好。
+
+第一個操作，port-forward。
+
+指令：kubectl port-forward pod/my-nginx 8080:80
 
 你會看到終端顯示 Forwarding from 127.0.0.1:8080 然後箭頭 80，表示通道建好了。注意，這個終端現在被 port-forward 佔住了，你不能再打其他指令。所以你需要開另一個終端視窗。
 
-在新的終端裡面，輸入 curl localhost:8080。你應該會看到一大段 HTML 回來，裡面有 Welcome to nginx 的字樣。如果你是圖形化環境，也可以打開瀏覽器輸入 localhost:8080，會看到 nginx 那個經典的歡迎頁面。
+在新的終端裡面，輸入 curl。
+
+指令：curl http://localhost:8080
+
+你應該會看到一大段 HTML 回來，裡面有 Welcome to nginx 的字樣。如果你是圖形化環境，也可以打開瀏覽器輸入 localhost:8080，會看到 nginx 那個經典的歡迎頁面。
 
 回到跑 port-forward 的那個終端，你會看到每收到一個請求它就印出一行 Handling connection for 8080。現在按 Ctrl+C 把它停掉。
 
@@ -179,27 +197,48 @@ echo 'alias k=kubectl' >> ~/.bashrc   # 或 ~/.zshrc
 
 好，port-forward 體驗完了。接下來試各種輸出格式。
 
-輸入 kubectl get pods -o wide。你會看到表格比之前寬了，多了好幾個欄位。最重要的是 IP 和 NODE。IP 就是這個 Pod 在叢集內部的虛擬 IP，NODE 顯示 minikube。後面還有 NOMINATED NODE 和 READINESS GATES，現在是空的，不用管。
+指令：kubectl get pods -o wide
 
-再來試 -o yaml。輸入 kubectl get pods -o yaml。輸出一下子衝出好幾百行。你可以往上滾一下看看裡面有什麼。metadata 裡面有 creationTimestamp，是 K8s 記錄的建立時間。有 uid，是自動產生的唯一識別碼。往下看 spec 區塊，你會看到一些你沒寫過的東西，像 restartPolicy 冒號 Always、dnsPolicy 冒號 ClusterFirst、terminationGracePeriodSeconds 冒號 30。這些都是 K8s 自動幫你填的預設值。最底下的 status 區塊，有 Pod 的 IP、每個容器的狀態細節。
+你會看到表格比之前寬了，多了好幾個欄位。最重要的是 IP 和 NODE。IP 就是這個 Pod 在叢集內部的虛擬 IP，NODE 顯示 minikube。後面還有 NOMINATED NODE 和 READINESS GATES，現在是空的，不用管。
+
+再來試 -o yaml。
+
+指令：kubectl get pods -o yaml
+
+輸出一下子衝出好幾百行。你可以往上滾一下看看裡面有什麼。metadata 裡面有 creationTimestamp，是 K8s 記錄的建立時間。有 uid，是自動產生的唯一識別碼。往下看 spec 區塊，你會看到一些你沒寫過的東西，像 restartPolicy 冒號 Always、dnsPolicy 冒號 ClusterFirst、terminationGracePeriodSeconds 冒號 30。這些都是 K8s 自動幫你填的預設值。最底下的 status 區塊，有 Pod 的 IP、每個容器的狀態細節。
 
 輸出太長了不好看對不對？加 pipe head -30 只看前 30 行就好。kubectl get pods -o yaml 然後 pipe head -30。這樣清爽多了。
 
-順便看一下全叢集的 Pod。輸入 kubectl get pods -A。-A 是 --all-namespaces 的縮寫。除了你在 default namespace 裡面建的 my-nginx，你還會看到一堆在 kube-system 裡面的 Pod。etcd、kube-apiserver、kube-scheduler、kube-controller-manager、kube-proxy、coredns。這些就是 K8s 的系統組件，上午概念篇講過的那些角色，它們一直安安靜靜地在背後工作。
+順便看一下全叢集的 Pod。
+
+指令：kubectl get pods -A
+
+-A 是 --all-namespaces 的縮寫。除了你在 default namespace 裡面建的 my-nginx，你還會看到一堆在 kube-system 裡面的 Pod。etcd、kube-apiserver、kube-scheduler、kube-controller-manager、kube-proxy、coredns。這些就是 K8s 的系統組件，上午概念篇講過的那些角色，它們一直安安靜靜地在背後工作。
 
 好，接下來是今天的重頭戲，dry-run。
 
-輸入 kubectl run test-pod --image=nginx:1.27 --dry-run=client -o yaml。
+指令：kubectl run test-pod --image=nginx:1.27 --dry-run=client -o yaml
 
 看到了嗎？螢幕上印出來一個完整的 Pod YAML。apiVersion v1、kind Pod、metadata 裡面有 name test-pod 和一些 labels。spec 裡面 containers 有 image nginx:1.27。關鍵的是，它沒有真的建立 Pod。你可以 kubectl get pods 確認一下，Pod 列表裡面不會有 test-pod。
 
-現在把它存成檔案。kubectl run test-pod --image=nginx:1.27 --dry-run=client -o yaml 大於號 test-pod.yaml。然後 cat test-pod.yaml 看一下內容，跟剛才螢幕上印的一模一樣。以後要寫 YAML，先用 dry-run 產生骨架再改，這是最快的方式。
+現在把它存成檔案。
 
-再來試 kubectl explain。輸入 kubectl explain pod.spec.containers。
+指令：kubectl run test-pod --image=nginx:1.27 --dry-run=client -o yaml > test-pod.yaml
+指令：cat test-pod.yaml
+
+看一下內容，跟剛才螢幕上印的一模一樣。以後要寫 YAML，先用 dry-run 產生骨架再改，這是最快的方式。
+
+再來試 kubectl explain。
+
+指令：kubectl explain pod.spec.containers
 
 你會看到一堆欄位的說明。最上面是類型和描述，然後列出所有子欄位。image 是 string，description 是 Docker image name。env 是一個列表，用來設定環境變數。ports 也是列表。resources 可以設定 CPU 和記憶體限制。
 
-往下鑽一層。kubectl explain pod.spec.containers.resources。它告訴你 resources 底下有 limits 和 requests。limits 是容器可以用的最大資源量，requests 是啟動時需要保證的最小資源量。這個第七堂課會詳細講，現在先知道怎麼查就好。
+往下鑽一層。
+
+指令：kubectl explain pod.spec.containers.resources
+
+它告訴你 resources 底下有 limits 和 requests。limits 是容器可以用的最大資源量，requests 是啟動時需要保證的最小資源量。這個第七堂課會詳細講，現在先知道怎麼查就好。
 
 最後來設定自動補全和別名。
 
@@ -352,7 +391,7 @@ K8s 提供了一個叫 Secret 的資源來解決這件事。密碼存在 Secret 
 
 **Step 1：故意做錯**
 ```bash
-cd ~/k8s-labs
+cd k8s-course-labs/lesson4
 ```
 ```yaml
 # pod-mysql-broken.yaml
@@ -413,23 +452,35 @@ kubectl delete pod mysql-pod
 
 ## 逐字稿
 
-好，我們來動手做。大家把終端機打開，進到 ~/k8s-labs。
+好，我們來動手做。大家把終端機打開，進到 k8s-course-labs/lesson4。
 
 這個實作我要從故意做錯開始。為什麼？因為在真實世界裡，你很可能就是先碰到這個錯誤，然後才去查原因。讓你先體驗錯誤，印象會比直接給正確答案深刻得多。
 
 第一步，建一個故意不寫環境變數的 MySQL Pod。用你習慣的編輯器建一個檔案叫 pod-mysql-broken.yaml。內容很簡單：apiVersion v1、kind Pod、metadata name mysql-broken、spec containers 底下 name mysql、image mysql:8.0。就這樣，故意不寫 env。
 
-存檔，apply。kubectl apply -f pod-mysql-broken.yaml。K8s 說 pod/mysql-broken created。看起來成功了對不對？
+存檔，apply。
 
-但是 kubectl get pods -w 看一下。等個十幾二十秒。你會看到 STATUS 從 ContainerCreating 變成 Running，然後很快就跳到 Error，接著變成 CrashLoopBackOff。RESTARTS 數字一直在增加。1、2、3。Pod 不斷在重啟，但每次起來就馬上掛掉。
+指令：kubectl apply -f pod-mysql-broken.yaml
+
+K8s 說 pod/mysql-broken created。看起來成功了對不對？
+
+但是用 -w 看一下。
+
+指令：kubectl get pods --watch
+
+等個十幾二十秒。你會看到 STATUS 從 ContainerCreating 變成 Running，然後很快就跳到 Error，接著變成 CrashLoopBackOff。RESTARTS 數字一直在增加。1、2、3。Pod 不斷在重啟，但每次起來就馬上掛掉。
 
 按 Ctrl+C 停掉 watch。我們來看看到底怎麼了。
 
-kubectl logs mysql-broken。往上找那行關鍵的錯誤訊息：database is uninitialized and password option is not specified。You need to specify one of the following as an environment variable: MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD, MYSQL_RANDOM_ROOT_PASSWORD。MySQL 告訴你了，你必須設定這三個環境變數中的其中一個。最常用的就是 MYSQL_ROOT_PASSWORD。
+指令：kubectl logs mysql-broken
+
+往上找那行關鍵的錯誤訊息：database is uninitialized and password option is not specified。You need to specify one of the following as an environment variable: MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD, MYSQL_RANDOM_ROOT_PASSWORD。MySQL 告訴你了，你必須設定這三個環境變數中的其中一個。最常用的就是 MYSQL_ROOT_PASSWORD。
 
 原因找到了。上一支影片講的內容完全吻合。MySQL 需要知道 root 密碼才能完成初始化，你什麼都不給它，它就退出了。
 
-先把壞掉的 Pod 刪掉。kubectl delete pod mysql-broken。
+先把壞掉的 Pod 刪掉。
+
+指令：kubectl delete pod mysql-broken
 
 第二步，寫正確的版本。建一個新檔案叫 pod-mysql.yaml。我唸一遍，大家跟著打。
 
@@ -437,21 +488,36 @@ apiVersion 冒號 v1。kind 冒號 Pod。metadata 冒號，底下 name 冒號 my
 
 注意縮排。env 跟 image 跟 name 是同一層的，都是容器的屬性。env 底下的列表項目要多縮排兩個空格。name 和 value 也是這個縮排。如果你不確定縮排對不對，有個小技巧：先用 dry-run 產生一個 Pod YAML 看看結構，kubectl run temp --image=mysql:8.0 --dry-run=client -o yaml，然後在裡面找到 image 那行，在同一層加 env 就好了。
 
-存檔，apply。kubectl apply -f pod-mysql.yaml。
+存檔，apply。
 
-kubectl get pods -w 觀察一下。你會看到 mysql-pod 從 Pending 變成 ContainerCreating。如果你之前沒拉過 mysql:8.0 這個 image 的話，ContainerCreating 可能要等一兩分鐘，因為 MySQL 的 image 比較大，大概五百多 MB。耐心等一下。然後你會看到 STATUS 變成 Running，而且不會再跳成 Error 了。穩穩地跑著。
+指令：kubectl apply -f pod-mysql.yaml
+
+觀察一下。
+
+指令：kubectl get pods --watch
+
+你會看到 mysql-pod 從 Pending 變成 ContainerCreating。如果你之前沒拉過 mysql:8.0 這個 image 的話，ContainerCreating 可能要等一兩分鐘，因為 MySQL 的 image 比較大，大概五百多 MB。耐心等一下。然後你會看到 STATUS 變成 Running，而且不會再跳成 Error 了。穩穩地跑著。
 
 Running 了。Ctrl+C 停掉 watch。我們進去驗證。
 
-輸入 kubectl exec -it mysql-pod 兩個減號 mysql -u root -pmy-secret。
+指令：kubectl exec -it mysql-pod -- mysql -u root -pmy-secret
 
 這裡有兩個小地方要注意。第一，兩個減號前後都要有空格。兩個減號是 kubectl 和容器指令之間的分隔符號，告訴 kubectl 後面的東西是要在容器裡面執行的指令。第二，-p 和 my-secret 之間沒有空格。這是 MySQL 客戶端的語法，-p 後面直接接密碼表示在命令列帶入密碼。如果 -p 後面有空格，MySQL 會把空格後面的字當成資料庫名稱而不是密碼，然後叫你另外手動輸入密碼。
 
 好，你應該看到了 mysql 大於號的提示符號。這代表你已經成功用 root 身份連上了 MySQL。恭喜。
 
-我們來操作幾下。輸入 SHOW DATABASES 分號。你會看到列出四個預設的系統資料庫：information_schema、mysql、performance_schema、sys。這些是 MySQL 內建的。
+我們來操作幾下。
 
-現在我們來建自己的資料庫。輸入 CREATE DATABASE testdb 分號。然後再 SHOW DATABASES 分號。testdb 出現在列表裡了。
+指令：SHOW DATABASES;
+
+你會看到列出四個預設的系統資料庫：information_schema、mysql、performance_schema、sys。這些是 MySQL 內建的。
+
+現在我們來建自己的資料庫。
+
+指令：CREATE DATABASE testdb;
+指令：SHOW DATABASES;
+
+testdb 出現在列表裡了。
 
 如果你想更進一步的話，可以試試 USE testdb 分號。然後 CREATE TABLE users 括號 id INT 逗號 name VARCHAR 括號 100 括號 括號 分號。然後 SHOW TABLES 分號，會看到 users 這張表。你甚至可以插入一筆資料，INSERT INTO users VALUES 括號 1 逗號 引號 Alice 引號 括號 分號。然後 SELECT 星號 FROM users 分號，就能看到那筆資料。
 
@@ -459,7 +525,14 @@ Running 了。Ctrl+C 停掉 watch。我們進去驗證。
 
 輸入 exit 離開 MySQL 客戶端。
 
-好，清理一下。kubectl delete pod mysql-pod。kubectl get pods 確認一下都刪乾淨了。
+指令：exit
+
+好，清理一下。
+
+指令：kubectl delete pod mysql-pod
+指令：kubectl get pods
+
+確認一下都刪乾淨了。
 
 回頭看一眼 pod-mysql.yaml 這個檔案。密碼 my-secret 就這樣明文寫在裡面。如果你把這個檔案 git commit 推到 GitHub 上，任何人都能看到你的資料庫密碼。學習階段我們先這樣用沒問題，但你心裡要記住，這個密碼早晚要搬到 Secret 裡面去。下堂課就會教你怎麼做。
 
@@ -544,7 +617,28 @@ kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yam
 
 先快速帶做 MySQL Pod。如果你已經做過了，趁這個時間整理一下你的筆記或者做自由練習。
 
-用 dry-run 快速產生骨架。kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml 大於號 pod-mysql.yaml。打開檔案，找到 image 冒號 mysql:8.0 那行。在同一層，加上 env 冒號。底下減號空格 name 冒號 MYSQL_ROOT_PASSWORD，下一行 value 冒號引號 my-secret 引號。存檔。kubectl apply -f pod-mysql.yaml。等 Running 之後 kubectl exec -it mysql-pod 兩個減號 mysql -u root -pmy-secret。進去 SHOW DATABASES 分號確認一下。exit 離開。kubectl delete pod mysql-pod 清理。OK，不到兩分鐘就做完了。
+用 dry-run 快速產生骨架。
+
+指令：kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yaml
+
+打開檔案，找到 image 冒號 mysql:8.0 那行。在同一層，加上 env 冒號。底下減號空格 name 冒號 MYSQL_ROOT_PASSWORD，下一行 value 冒號引號 my-secret 引號。存檔。
+
+指令：kubectl apply -f pod-mysql.yaml
+
+等 Running 之後進去驗證。
+
+指令：kubectl exec -it mysql-pod -- mysql -u root -pmy-secret
+
+進去確認一下。
+
+指令：SHOW DATABASES;
+指令：exit
+
+清理。
+
+指令：kubectl delete pod mysql-pod
+
+OK，不到兩分鐘就做完了。
 
 好，來回顧今天的內容。上午的部分我們在影片 4-11 已經回顧過了，這裡一句話帶過：上午我們從 Docker 的五個瓶頸出發，一路認識了 K8s 的八個核心概念和 Master-Worker 架構，最後動手跑了第一個 Pod 的 CRUD。
 

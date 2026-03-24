@@ -49,7 +49,29 @@ kubectl delete pod mysql-pod
 
 好，MySQL Pod 的概念和實作都跑完了。如果你前面沒跟上，趁這個時間快速補做一下。
 
-用 dry-run 快速產生骨架。kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml 大於號 pod-mysql.yaml。打開檔案，找到 image 冒號 mysql:8.0 那行。在同一層，加上 env 冒號。底下減號空格 name 冒號 MYSQL_ROOT_PASSWORD，下一行 value 冒號引號 my-secret 引號。存檔。kubectl apply -f pod-mysql.yaml。kubectl get pods -w 等到 Running。然後 kubectl exec -it mysql-pod 兩個減號 mysql -u root -pmy-secret。進去之後 SHOW DATABASES 分號，確認看到四個系統資料庫。exit 離開。最後 kubectl delete pod mysql-pod 清理掉。不到兩分鐘就完成了。
+用 dry-run 快速產生骨架。
+
+指令：kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yaml
+
+打開檔案，找到 image 冒號 mysql:8.0 那行。在同一層，加上 env 冒號。底下減號空格 name 冒號 MYSQL_ROOT_PASSWORD，下一行 value 冒號引號 my-secret 引號。存檔。
+
+指令：kubectl apply -f pod-mysql.yaml
+指令：kubectl get pods -w
+
+等到 Running。然後進去驗證。
+
+指令：kubectl exec -it mysql-pod -- mysql -u root -pmy-secret
+
+進去之後確認看到四個系統資料庫。
+
+指令：SHOW DATABASES;
+指令：exit
+
+最後清理掉。
+
+指令：kubectl delete pod mysql-pod
+
+不到兩分鐘就完成了。
 
 已經做過的同學，幫我回想一下 Loop 4 的因果鏈。我們想跑一個 MySQL，結果沒給密碼，Pod 不斷 crash。排錯三兄弟告訴我們 MySQL 需要 MYSQL_ROOT_PASSWORD 環境變數。在 YAML 的 env 欄位加上去之後，MySQL 順利跑起來了。跟 Docker 的 -e 參數是一模一樣的概念。
 
@@ -178,15 +200,21 @@ kubectl get pods                 # 還是 3 個！自動補回來了！
 
 在開始之前，我要先讓大家親身感受一件事。我們先建一個「孤獨的」nginx Pod。
 
-kubectl run lonely-nginx --image=nginx:1.27。
+指令：kubectl run lonely-nginx --image=nginx:1.27
 
-等幾秒鐘，kubectl get pods。STATUS 是 Running。看起來很好對不對？一切正常，nginx 在跑。
+等幾秒鐘，看狀態。
+
+指令：kubectl get pods
+
+STATUS 是 Running。看起來很好對不對？一切正常，nginx 在跑。
 
 好，現在假設出事了。半夜三點，這個 Pod 因為某些原因掛了。我們用 delete 來模擬這個情況。
 
-kubectl delete pod lonely-nginx。
+指令：kubectl delete pod lonely-nginx
 
-好，刪掉了。現在 kubectl get pods。
+好，刪掉了。現在看看。
+
+指令：kubectl get pods
 
 大家看看螢幕。空的。什麼都沒有。No resources found in default namespace。你的 nginx 消失了。如果這是生產環境的 API 服務，你的使用者現在正看著一個錯誤頁面。你要嘛自己爬起來手動再建一個，要嘛等到明天上班才發現。不管哪種，這段時間你的服務就是停了。
 
@@ -220,25 +248,45 @@ template 底下的 spec 就是 Pod 的 spec 了。containers 減號 name 冒號 
 
 好，YAML 寫完了，存檔。我們來部署。
 
-kubectl apply -f deployment.yaml。
+指令：kubectl apply -f deployment.yaml
 
 看到 deployment.apps/nginx-deploy created，成功了。
 
 現在我們來驗證三層結構。Deployment 自動建了 ReplicaSet，ReplicaSet 自動建了 Pod。我們一層一層看。
 
-先看 Deployment。kubectl get deployments。你會看到 nginx-deploy，READY 欄位顯示 3/3。3/3 表示你要求的三個副本全部就緒了。如果顯示 0/3 或 1/3，表示 Pod 還在建立中，等一下就好。
+先看 Deployment。
 
-再看 ReplicaSet。kubectl get replicasets。你會看到一個名字像 nginx-deploy 後面接一串亂碼的東西。這個 ReplicaSet 是 Deployment 自動建立的，你不需要手動建，甚至不需要知道它叫什麼。DESIRED 和 CURRENT 都是 3，表示期望三個、實際三個。
+指令：kubectl get deployments
 
-最後看 Pod。kubectl get pods。三個 Pod，名字的格式是 nginx-deploy 中間接 ReplicaSet 的 hash 最後接 Pod 自己的隨機字串。三個 Pod 都是 Running。
+你會看到 nginx-deploy，READY 欄位顯示 3/3。3/3 表示你要求的三個副本全部就緒了。如果顯示 0/3 或 1/3，表示 Pod 還在建立中，等一下就好。
 
-你也可以用一個指令同時看三層。kubectl get deploy,rs,pods。deploy 是 deployments 的簡寫，rs 是 replicasets 的簡寫。一個指令三個資源類型，所有資訊一目了然。
+再看 ReplicaSet。
+
+指令：kubectl get replicasets
+
+你會看到一個名字像 nginx-deploy 後面接一串亂碼的東西。這個 ReplicaSet 是 Deployment 自動建立的，你不需要手動建，甚至不需要知道它叫什麼。DESIRED 和 CURRENT 都是 3，表示期望三個、實際三個。
+
+最後看 Pod。
+
+指令：kubectl get pods
+
+三個 Pod，名字的格式是 nginx-deploy 中間接 ReplicaSet 的 hash 最後接 Pod 自己的隨機字串。三個 Pod 都是 Running。
+
+你也可以用一個指令同時看三層。
+
+指令：kubectl get deploy,rs,pods
+
+deploy 是 deployments 的簡寫，rs 是 replicasets 的簡寫。一個指令三個資源類型，所有資訊一目了然。
 
 好，三層結構都確認了。現在來做今天最精彩的實驗。
 
-從三個 Pod 裡面隨便挑一個，把它的名字複製下來，然後刪掉它。kubectl delete pod 後面接那個 Pod 的名字。
+從三個 Pod 裡面隨便挑一個，把它的名字複製下來，然後刪掉它。
 
-刪掉之後馬上 kubectl get pods。
+指令：kubectl delete pod <任意一個 pod 名字>
+
+刪掉之後馬上看。
+
+指令：kubectl get pods
 
 大家看到了嗎？還是三個 Pod。但仔細看，有一個 Pod 的名字跟剛才不一樣了，而且它的 AGE 顯示幾秒鐘。這就是 ReplicaSet 在幕後做的事情。它持續監控 Pod 的數量，發現從三個變成兩個了，不符合你定義的 replicas 冒號 3，所以馬上自動建了一個新的 Pod 補上去。整個過程你什麼都不用做，K8s 幫你搞定了。
 
@@ -246,7 +294,29 @@ kubectl apply -f deployment.yaml。
 
 這就是從「一個人」變成「一個團隊」。一個人走了就沒人了。但是一個團隊，有人離開了，馬上有新人補上。團隊的人數永遠維持在你設定的數量。半夜三點 Pod 掛了？沒關係，K8s 自動補。你不用爬起來，不用手動建，甚至可能根本不知道發生過這件事。明天早上看一下監控，會發現曾經有一次 Pod 重建的紀錄，但服務從來沒有中斷過。
 
-這就是 Deployment 的威力。今天先讓大家感受到這一點就夠了。Deployment 還有很多強大的功能，像是擴縮容、滾動更新、版本回滾。這些我們下堂課會詳細學。今天你只需要記住一件事：不要直接建 Pod，要透過 Deployment 來管理 Pod。
+這就是 Deployment 的威力。再讓你感受一個更爽的。假設雙十一流量暴增，你需要從 3 個 Pod 擴到 5 個。
+
+指令：kubectl scale deployment nginx-deploy --replicas=5
+
+馬上看。
+
+指令：kubectl get pods
+
+五個 Pod 了。多出來的兩個正在建立或已經 Running。想縮回來也很簡單。
+
+指令：kubectl scale deployment nginx-deploy --replicas=2
+
+再看。
+
+指令：kubectl get pods
+
+多出來的三個正在被砍掉，最後只剩兩個。一行指令就完成擴縮容。
+
+Deployment 還有更多強大的功能，像是滾動更新、版本回滾。這些我們下堂課會詳細學。今天你只需要記住一件事：不要直接建 Pod，要透過 Deployment 來管理 Pod。
+
+最後清理。
+
+指令：kubectl delete deployment nginx-deploy
 
 ---
 
@@ -411,9 +481,27 @@ Deployment 入門（2 項）：
 
 先做一件事。如果你前面的 Deployment 沒跟上，我快速帶你做一遍。已經做過的同學，趁這個時間做自由練習或整理筆記。
 
-kubectl apply -f deployment.yaml。然後 kubectl get deploy,rs,pods 一次看三層。確認 Deployment 的 READY 是 3/3，ReplicaSet 有一個，Pod 有三個都是 Running。接著做核心實驗，隨便挑一個 Pod 刪掉，kubectl delete pod 接 Pod 名字。然後馬上 kubectl get pods，還是三個 Pod，但有一個是新建的。這就是 Deployment 的自我修復能力。
+指令：kubectl apply -f deployment.yaml
 
-確認完了之後，kubectl delete -f deployment.yaml 把 Deployment 清掉。注意，你要刪 Deployment 就用 delete -f 指定 YAML 檔案，或者 kubectl delete deployment nginx-deploy。刪掉 Deployment 的時候，底下的 ReplicaSet 和 Pod 會一起被刪掉。這跟刪單一個 Pod 不同，刪 Pod 會被自動補回來，但刪 Deployment 就是真的全部砍掉。
+然後一次看三層。
+
+指令：kubectl get deploy,rs,pods
+
+確認 Deployment 的 READY 是 3/3，ReplicaSet 有一個，Pod 有三個都是 Running。接著做核心實驗，隨便挑一個 Pod 刪掉。
+
+指令：kubectl delete pod <任意一個 pod 名字>
+
+然後馬上看。
+
+指令：kubectl get pods
+
+還是三個 Pod，但有一個是新建的。這就是 Deployment 的自我修復能力。
+
+確認完了之後，清掉 Deployment。
+
+指令：kubectl delete -f deployment.yaml
+
+注意，你要刪 Deployment 就用 delete -f 指定 YAML 檔案，或者 kubectl delete deployment nginx-deploy。刪掉 Deployment 的時候，底下的 ReplicaSet 和 Pod 會一起被刪掉。這跟刪單一個 Pod 不同，刪 Pod 會被自動補回來，但刪 Deployment 就是真的全部砍掉。
 
 好，回頭操作完畢。我們來做第四堂課的完整回顧。
 

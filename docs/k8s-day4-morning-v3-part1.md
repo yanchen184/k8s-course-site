@@ -225,6 +225,8 @@ ConfigMap 有兩種使用方式，值得花一點時間比較。
 
 那 Secret 的意義在哪裡？意義在於 K8s 把 Secret 和 ConfigMap 分成兩種不同的資源類型。這樣你就可以用 RBAC 來分別控制權限。RBAC 就是角色型存取控制。你可以設定規則：一般開發者只能看 ConfigMap，不能看 Secret，只有運維人員才能存取 Secret。這樣密碼就不會被隨便看到了。真正的安全是靠權限控制、靠加密機制，不是靠 Base64。第七堂課會講 RBAC 的實際操作。
 
+補充一個進階的東西，叫 Sealed Secret。剛才說 Secret 的 Base64 不安全，那如果你想把 Secret 的 YAML 放進 Git 做版本控制怎麼辦？直接 commit 的話，裡面的 Base64 一解碼密碼就曝光了。Sealed Secret 是一個開源工具，它用 RSA 非對稱加密把你的 Secret 加密成 SealedSecret。什麼是非對稱加密？簡單說就是有兩把鑰匙：一把公鑰、一把私鑰。你用公鑰把密碼鎖起來，鎖起來之後只有私鑰能打開。公鑰可以給任何人，但私鑰只有 K8s 叢集裡面的 Sealed Secret controller 有。所以你在本機用公鑰加密 Secret，加密後的 YAML 可以安全地放進 Git，因為就算別人拿到了，沒有私鑰也解不開。只有你的 K8s 叢集能解密並還原成真正的 Secret。如果你的團隊用 GitOps 管理 K8s 資源，Sealed Secret 幾乎是必備的。這個我們課程不會深入實作，但你知道有這個東西，以後在生產環境會用到。
+
 如果對照 Docker 的話，ConfigMap 就像 docker run -e 的環境變數，Secret 就像 Docker Compose 裡的 .env 檔案。Docker 的 .env 檔案也是明文的，安全性也是靠檔案權限控制。概念是類似的。
 
 好，設定和密碼都處理了。還有一個問題。

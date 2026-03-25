@@ -1044,6 +1044,28 @@ K8s 提供了 StatefulSet 來解決這個問題。StatefulSet 跟 Deployment 很
     duration: '3',
     content: (
       <div className="space-y-4">
+        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2 text-center text-sm">先看全貌（這張圖最後會再看一次）</p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="col-span-3 bg-purple-900/30 border border-purple-500/30 p-2 rounded text-center">
+              <p className="text-purple-400 font-semibold">Master Node</p>
+              <p className="text-slate-400">API Server · etcd · Scheduler · Controller Manager</p>
+            </div>
+            <div className="bg-green-900/30 border border-green-500/30 p-2 rounded text-center">
+              <p className="text-green-400 font-semibold">Worker 1</p>
+              <p className="text-slate-400">kubelet · kube-proxy · containerd · Pod</p>
+            </div>
+            <div className="bg-green-900/30 border border-green-500/30 p-2 rounded text-center">
+              <p className="text-green-400 font-semibold">Worker 2</p>
+              <p className="text-slate-400">kubelet · kube-proxy · containerd · Pod</p>
+            </div>
+            <div className="bg-green-900/30 border border-green-500/30 p-2 rounded text-center">
+              <p className="text-green-400 font-semibold">Worker 3</p>
+              <p className="text-slate-400">kubelet · kube-proxy · containerd · Pod</p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-3">公司比喻</p>
           <div className="flex items-center justify-center gap-6 my-2">

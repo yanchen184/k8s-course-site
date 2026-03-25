@@ -341,7 +341,19 @@ K8s 提供了 StatefulSet 來解決這個問題。StatefulSet 跟 Deployment 很
 
 那實際上怎麼判斷你的服務該用 Deployment 還是 StatefulSet？很簡單，問自己三個問題。第一，你的服務需要持久化資料嗎？如果不需要，像一般的 API 或前端，直接用 Deployment。第二，如果需要持久化，每個副本的資料是獨立的嗎？如果資料是共享的，比如所有副本都連同一個外部資料庫，那還是用 Deployment 加上外部儲存就好。第三，如果每個副本有自己獨立的資料、需要穩定的身份和啟動順序，像 MySQL 主從、Elasticsearch 叢集，那就用 StatefulSet。簡單說，大部分情況用 Deployment 就對了，只有資料庫這類有狀態的東西才需要 StatefulSet。
 
-順帶提一個東西。除了 Deployment 和 StatefulSet，K8s 還有一個控制器叫 DaemonSet。Deployment 是「我要 N 個 Pod」，DaemonSet 是「每台 Node 都要一個 Pod」。什麼時候用？比如你要在每台機器上跑一個監控 agent 收集 CPU 和記憶體的指標，或者每台機器上跑一個日誌收集器。新 Node 加入叢集，DaemonSet 自動在上面建 Pod，Node 被移除，Pod 自動消失。這個第五堂會詳細教，現在先知道有這個東西就好。
+最後再補充一個東西叫 DaemonSet。
+
+先想一個場景。你的公司有十台伺服器跑 K8s，你的運維主管說：「每一台機器上都要跑一個監控程式，我要看到每一台的 CPU 和記憶體用了多少。」
+
+你想：「好，那我建一個 Deployment，replicas 設 10 不就好了？」不行。Deployment 是 K8s 自己決定 Pod 放在哪台 Node 上的。你設 10 個副本，K8s 可能把其中 5 個都塞在同一台比較空閒的 Node 上，另外幾台 Node 上一個都沒有。但你要的不是「10 個 Pod 隨便放」，你要的是「每一台 Node 上面剛好一個」。
+
+這就是 DaemonSet 做的事。你用 DaemonSet 部署監控程式，K8s 會保證每一台 Node 上面跑剛好一個 Pod。十台 Node 就十個 Pod，每台一個，不多不少。以後你加了第十一台 Node 進叢集，DaemonSet 自動在上面建一個新的 Pod，你不用管。某台 Node 被移除了，上面的 Pod 自動消失。
+
+簡單比較一下三個控制器。Deployment 是「我要 N 個 Pod，K8s 你自己決定放哪」。StatefulSet 是「我要 N 個有固定身份的 Pod，按順序來」。DaemonSet 是「每台 Node 都要一個，幾台 Node 就幾個 Pod」。
+
+除了監控之外，日誌收集也常用 DaemonSet。比如你想在每台機器上跑一個 Fluentd 把日誌收集到 Elasticsearch，就用 DaemonSet。其實你之前在 kube-system 裡看到的 kube-proxy 就是用 DaemonSet 部署的，因為每台 Node 都需要一個 kube-proxy 來處理網路。
+
+第五堂會實際寫 DaemonSet 的 YAML 並部署，現在先有這個概念就好。
 
 好，到這裡我們已經認識了 K8s 的核心概念。讓我用因果鏈的方式做一個總結。
 

@@ -233,13 +233,29 @@ ConfigMap 有兩種使用方式，值得花一點時間比較。
 
 Docker 裡我們用 docker volume 解決，把資料存在容器外面的磁碟上。K8s 也有 Volume，概念一樣，把資料存在 Pod 外面。Pod 被銷毀重建，資料還在。就像租房子，個人物品放儲物間，不管搬幾次家，儲物間的東西都在。
 
-K8s 的 Volume 有好幾種。最簡單的是 emptyDir，一個臨時的空目錄，Pod 裡的多個容器可以共享。但注意，emptyDir 的資料在 Pod 刪除時會消失，不適合持久化。它適合 Sidecar 模式，比如主容器寫日誌，Sidecar 容器讀取日誌並轉發。
+K8s 的 Volume 有好幾種，用途不同。我用三個場景帶你認識最重要的三種。
 
-真正做持久化的是 hostPath 和遠端儲存。hostPath 就是把 Node 上的某個目錄掛到 Pod 裡，跟 Docker 的 -v 一樣。但 hostPath 有個問題：Pod 被調度到另一個 Node，就讀不到原來那個 Node 的檔案了。
+第一種場景：兩個容器要共享檔案。比如下午我們會做的 Sidecar，nginx 把日誌寫到一個目錄，旁邊的 busybox 容器要讀同一個目錄的日誌。這兩個容器在同一個 Pod 裡面，它們需要一個共用的空間來傳資料。這就是 emptyDir。
 
-所以生產環境更常用遠端儲存。這是 K8s 的 Volume 比 Docker 強大的地方。Docker 的 volume 基本上就存在本機磁碟。K8s 的 Volume 可以掛到各種地方：本機磁碟可以，NFS 網路儲存可以，AWS 的 EBS、GCP 的 Persistent Disk 可以，分散式儲存 Ceph 也可以。好處是 Pod 被調度到不同 Node，還是可以掛載到同一個遠端儲存，資料不會丟。比如 MySQL Pod 本來在 Node 1，資料存在 AWS EBS 上。Node 1 掛了，K8s 把 MySQL Pod 調度到 Node 2。因為資料在 EBS 上不是在 Node 1 本地，Node 2 的新 Pod 可以重新掛載同一個 EBS，資料完全沒丟。Docker 的 volume 做不到這件事。
+emptyDir 是什麼？你可以把它想像成一個臨時的共用資料夾。Pod 被建立的時候，K8s 自動幫你建一個空的目錄。Pod 裡面的所有容器都可以掛載它、讀寫它。但是，注意這個「臨時」兩個字：Pod 被刪除的時候，這個目錄也跟著消失。所以 emptyDir 不是拿來存重要資料的，它只是一個容器之間的「傳紙條」的通道。
 
-K8s 的 Volume 還有一套更完整的管理機制叫 PV 和 PVC。PV 是 Persistent Volume，代表一塊實際的儲存空間。PVC 是 Persistent Volume Claim，代表 Pod 對儲存的申請。就像租房子，PV 是房子，PVC 是租約，Pod 拿著租約去找房子住。第六堂課會詳細講，現在知道有這個東西就好。
+你可能會想：「Pod 刪了資料就沒了，那它為什麼還叫 Volume？」好問題。因為 Volume 的核心概念是「比容器活得久」，不是「永遠不消失」。容器可能 crash 然後重啟，但 emptyDir 在 Pod 還在的期間不會消失。容器重啟了，emptyDir 裡的資料還在。只有整個 Pod 被刪除的時候 emptyDir 才會消失。所以它是「容器層級的持久化」，不是「Pod 層級的持久化」。下午做 Sidecar 實作的時候你就會親手用到它。
+
+第二種場景：資料庫的資料要保存下來，Pod 刪了重建資料還要在。emptyDir 做不到這件事，因為 Pod 一刪 emptyDir 就沒了。這時候需要 hostPath。
+
+hostPath 就是把 Node 上面的一個真實目錄掛到 Pod 裡面。比如你把 Node 上的 /data/mysql 這個目錄掛到 MySQL Pod 裡面的 /var/lib/mysql。MySQL 寫的資料其實存在 Node 的 /data/mysql 裡。Pod 被刪了重建，只要新的 Pod 還在同一個 Node 上，掛回同一個目錄，資料就還在。這個概念跟 Docker 的 -v /data/mysql:/var/lib/mysql 完全一樣。
+
+但 hostPath 有一個大問題。Pod 被調度到另一個 Node 怎麼辦？比如你的 MySQL Pod 本來在 Node 1，資料存在 Node 1 的 /data/mysql。結果 Node 1 掛了，K8s 把 Pod 調度到 Node 2 重建。但 Node 2 的 /data/mysql 是空的啊，資料全在 Node 1 上面，Node 2 讀不到。資料就等於丟了。hostPath 綁定了特定的 Node，不能跨 Node。
+
+第三種場景：資料不只要保存，還要跨 Node 不丟失。這就需要遠端儲存。
+
+K8s 的 Volume 可以掛載到各種遠端儲存：NFS 網路硬碟、AWS 的 EBS、GCP 的 Persistent Disk、分散式儲存 Ceph，都可以。資料不是存在某一台 Node 上，而是存在網路上的儲存服務裡。不管 Pod 被調度到哪個 Node，都能掛回同一個遠端儲存，資料不會丟。
+
+舉個具體例子。你的 MySQL Pod 在 Node 1，資料存在 AWS EBS 上。Node 1 硬碟壞了整台掛了。K8s 偵測到，把 MySQL Pod 調度到 Node 2 重建。因為資料在 EBS 上不是在 Node 1 本地，Node 2 上的新 Pod 重新掛載同一個 EBS，資料完完整整，一筆都沒丟。這就是遠端儲存的威力，也是 K8s 的 Volume 比 Docker 的 volume 強大的地方。Docker 的 volume 基本上只能存在本機磁碟，做不到跨機器。
+
+整理一下：emptyDir 是容器之間的臨時共享空間，Pod 刪就沒。hostPath 是掛 Node 本地目錄，Pod 刪資料還在但不能跨 Node。遠端儲存是掛網路儲存，Pod 去哪資料跟到哪。三種各有用途，從臨時到永久、從單機到跨機器。
+
+K8s 的 Volume 還有一套更完整的管理機制叫 PV 和 PVC。PV 是 Persistent Volume，代表一塊實際的儲存空間，由管理員建立。PVC 是 Persistent Volume Claim，代表 Pod 對儲存的申請，由開發者撰寫。就像租房子，PV 是房子，PVC 是租約，Pod 拿著租約去找房子住。管理員準備好房子，開發者寫租約，K8s 自動配對。第六堂課會詳細講並實際操作，現在知道有這個東西就好。
 
 到這裡我們解決了三個問題：設定用 ConfigMap、密碼用 Secret、資料用 Volume。加上前一支影片的 Pod、Service、Ingress，我們已經認識了六個概念。每一個都是因為上一步沒解決的問題才出現的。
 

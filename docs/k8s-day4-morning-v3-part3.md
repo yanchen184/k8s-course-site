@@ -76,23 +76,9 @@ YAML 的語法有三個重點。
 
 現在來跟你已經會的 Docker Compose 做個對照。Docker Compose 裡面寫 version 冒號 3，K8s 對應的是 apiVersion。Docker Compose 的 services 區塊定義你要跑哪些服務，K8s 這邊拆成了 kind 加 spec。Docker Compose 的 image 冒號 nginx，K8s 寫在 spec 底下的 containers 列表裡面。最大的差別是什麼？Docker Compose 一個檔案可以描述一整套系統，前端、後端、資料庫都塞在裡面。K8s 的 YAML 通常一個檔案描述一個資源。你要一個 Pod 寫一個檔案，要一個 Service 再寫一個檔案。雖然可以用三個減號的分隔線把多個資源塞在同一個檔案裡，但我們先養成好習慣，一個檔案一個資源。
 
-好，YAML 搞定了。現在來認識今天的主角，Pod。
+好，YAML 搞定了。Pod 的概念前面已經講過了：K8s 最小的調度單位，容器外面包一層，一 Pod 一容器是最佳實踐。Docker 和 kubectl 的指令對照也在 4-2 講過了。這些就不重複了。
 
-Pod 的概念我們在第四支影片已經講過一次了。當時是從「Docker 只管單一容器」這個問題出發，引出「K8s 用 Pod 包一層」。那時候是概念的角度。現在我們已經要動手寫 YAML 了，所以從實作的角度再看一次 Pod。
-
-Pod 是 K8s 最小的部署單位。注意，不是容器，是 Pod。在 Docker 裡面你 docker run 直接跑容器。在 K8s 裡面，K8s 不直接管容器，它管的是 Pod。你可以把 Pod 想成容器的膠囊，外面多包了一層。
-
-一個 Pod 裡面可以放一個或多個容器。同一個 Pod 裡的容器共享兩樣東西。第一，共享網路。同一個 Pod 裡的兩個容器用同一個 IP 位址，彼此之間用 localhost 就能互相通訊。第二，共享儲存。它們可以掛載同一個 Volume，讀寫同一批檔案。
-
-為什麼要多包一層？因為有些場景你需要把兩個緊密耦合的容器放在一起。經典的例子是 Sidecar 模式。你有一個 API 容器把日誌寫到檔案裡，旁邊放一個日誌收集容器負責把日誌傳送到集中式系統。這兩個容器需要共享目錄，放在同一個 Pod 裡最合適。Sidecar 就是「邊車」的意思，主容器是摩托車，輔助容器是掛在旁邊的邊車。
-
-不過絕大多數情況下，最佳實踐是一個 Pod 只放一個容器。你現在就把 Pod 等於一個容器來理解就好。下午我們會實際做一個多容器 Pod，到時候你就更有感覺了。
-
-最後看一下 Docker 和 kubectl 的指令對照。docker run nginx 對應 kubectl run nginx --image=nginx。docker ps 對應 kubectl get pods。docker logs 對應 kubectl logs。docker exec -it 對應 kubectl exec -it，但注意 kubectl 的版本要在 Pod 名字後面加兩個減號再接指令。docker stop 加 docker rm 對應 kubectl delete pod。docker inspect 對應 kubectl describe pod。
-
-幾乎是一對一的對應，邏輯完全一樣，只是換了一套指令。如果你 Docker 用得熟，kubectl 上手會非常快。
-
-好，概念都到位了。YAML 怎麼寫知道了，Pod 是什麼也知道了，指令對照也看過了。接下來就是今天最關鍵的一步：動手寫你的第一個 Pod YAML，把它跑起來。
+接下來就是今天最關鍵的一步：動手寫你的第一個 Pod YAML，把它跑起來。
 
 ---
 

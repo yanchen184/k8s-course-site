@@ -19,7 +19,7 @@
 
 各位同學大家好，歡迎來到第四堂課。
 
-在開始之前，先提醒大家一件事。等一下我們會需要用到 minikube 這個工具，安裝需要一點時間，所以建議你現在就先把安裝指令跑起來，讓它在背景下載，不影響你聽課。指令在螢幕上，如果你用的是 Ubuntu，就是這三行。跑完之後再執行 minikube start，讓它把叢集先建起來。好，我們邊裝邊上課。
+在開始之前，先提醒大家一件事。等一下我們會需要用到 minikube 和 kubectl 這兩個工具，安裝需要一點時間，所以建議你現在就先把安裝指令跑起來，讓它在背景下載，不影響你聽課。螢幕上有四個步驟。第一步安裝 minikube，用 curl 下載然後 sudo install。第二步安裝 kubectl，Ubuntu 上用 sudo snap install kubectl --classic。kubectl 是你之後跟叢集溝通的工具，跟 minikube 是分開裝的。第三步 minikube start 啟動叢集。第四步 kubectl get nodes 驗證。好，讓它跑著，我們邊裝邊上課。
 
 先回顧一下我們前三堂走過的路。第一堂課學了 Linux 基礎，學會在終端機裡操作檔案、管理網路。第二堂課進入 Docker 的世界，學了 Image、Container、Port Mapping、Volume。第三堂課更進一步，學了 Dockerfile 自己打包 Image，學了 Docker Compose 用一個 YAML 同時管好幾個容器。我們做了一個前端加後端加資料庫的組合，一個 docker compose up 就全部跑起來了。
 

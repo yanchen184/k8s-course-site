@@ -85,10 +85,18 @@ export const slides: Slide[] = [
         </div>
       </div>
     ),
-    code: `# Ubuntu 安裝 minikube（先跑起來，背景下載）
+    code: `# 1. 安裝 minikube
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
-minikube start`,
+
+# 2. 安裝 kubectl
+sudo snap install kubectl --classic
+
+# 3. 啟動叢集
+minikube start
+
+# 4. 驗證
+kubectl get nodes`,
     notes: `各位同學大家好，歡迎來到第四堂課。
 
 在開始之前，先提醒大家一件事。等一下我們會需要用到 minikube 這個工具，安裝需要一點時間，所以建議你現在就先把安裝指令跑起來，讓它在背景下載，不影響你聽課。指令在螢幕上，如果你用的是 Ubuntu，就是這三行。跑完之後再執行 minikube start，讓它把叢集先建起來。好，我們邊裝邊上課。

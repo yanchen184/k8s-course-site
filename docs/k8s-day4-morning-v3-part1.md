@@ -150,6 +150,8 @@ IP 會變、外面連不到。怎麼辦？K8s 說：別直接連 Pod，中間加
 
 Service 就是 Pod 前面的一個穩定代理人。不管後面的 Pod 怎麼換、IP 怎麼變，Service 的地址不變。Service 會自動追蹤後面有哪些健康的 Pod，把請求轉過去。Pod 掛了換新的，Service 知道，自動更新轉發目標。就像公司的總機號碼，不管接線員換了幾個人，總機號碼永遠不變。
 
+那 Service 怎麼知道要轉給哪些 Pod？靠的是標籤。每個 Pod 在建立的時候可以貼上標籤，比如 app 等於 nginx。Service 的設定裡面會寫一個 selector，比如 app 等於 nginx。這樣 Service 就會自動找到所有貼了 app 等於 nginx 標籤的 Pod，把流量轉過去。Pod 掛了重建，只要新 Pod 的標籤一樣，Service 自動認得它。這個 label 和 selector 的機制非常重要，第五堂會深入講，現在先知道 Service 是靠標籤找 Pod 的就好。
+
 Service 有三種類型。
 
 第一種，ClusterIP，這是預設類型。它給你一個叢集內部的虛擬 IP，只有叢集裡面的 Pod 能存取。什麼時候用？API 要連資料庫，資料庫不需要讓外面連，叢集內部能連就好，用 ClusterIP。

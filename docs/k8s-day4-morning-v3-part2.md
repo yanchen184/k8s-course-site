@@ -211,27 +211,41 @@ kubelet 掛了：那台 Node 上的 Pod 沒人管了。Master 過一段時間偵
 
 前面四支影片我們從 Docker 的五個痛點出發，一路認識了八個核心概念，又看了 Master-Worker 架構和每個組件的分工。到這裡為止，你腦中應該已經有一張比較完整的 K8s 地圖了。
 
-但是地圖跟實際走路是兩回事。講了這麼多理論，你可能已經等不及想打開終端機了。好，我們來動手。
+好，理論講完了，來動手。
 
-在開始之前，先聊一下環境方案。K8s 的環境搭建方式有好幾種，就像你要學開車，可以用模擬器練、可以在駕訓班的封閉場地練、也可以直接上路。不同的方式適合不同的階段。
-
-我們這門課會用到三種方案。
+在開始之前，先聊一下環境方案。K8s 的環境搭建方式有好幾種，我們這門課會用到三種。
 
 第一種是 minikube，適合個人學習和本機開發。它在你的電腦上模擬一個 K8s 叢集，把 Master 和 Worker 合在一台機器上。安裝只要一行指令，非常簡單。但它是單節點的，看不到 Pod 分散到不同 Node 的效果，不適合模擬生產環境。我們今天用它。
 
 第二種是 k3s，Rancher Labs 開發的輕量級 K8s 發行版。它把 K8s 精簡了很多，安裝也很簡單，但它是真正的多節點叢集。第五堂課我們會用它，在 VMware 裡面開兩台 Ubuntu 虛擬機，一台當 Master 一台當 Worker，體驗真正的多節點環境。到時候你就能看到 Pod 被 Scheduler 分配到不同 Node 上了。
 
-第三種是 RKE 或者 kubeadm，適合企業生產叢集。安裝比較複雜，但功能最完整、最接近真實的生產環境配置。這個我們課程裡不會實際操作，但會介紹概念，讓你知道有這個東西。
+第三種是 RKE 或者 kubeadm，適合企業生產叢集。安裝比較複雜，但功能最完整、最接近真實的生產環境配置。第六堂課我們會用 RKE 搭配 Rancher 的圖形介面來管理叢集。
 
-為什麼今天用 minikube？因為今天我們只需要學 Pod 和基本操作，單節點完全夠用。而且 minikube 裝起來最簡單，不需要額外的虛擬機，你筆電上就能跑。等第五堂課我們學 Deployment 和 Service 的時候，需要看到跨節點的效果，那時候再換 k3s。
+為什麼今天用 minikube？因為今天我們只需要學 Pod 和基本操作，單節點完全夠用。而且 minikube 裝起來最簡單，不需要額外的虛擬機，你筆電上就能跑。等第五堂課需要看到跨節點效果的時候再換 k3s。
 
-這裡先講一下 kubectl，因為很多初學者會搞混 minikube 和 kubectl 的關係。
+接下來講兩個工具的關係：minikube 和 kubectl。
 
-kubectl 是 K8s 的命令列工具，就像你學 Docker 時用的 docker 指令。docker ps 看容器，docker logs 看日誌，docker exec 進容器。kubectl 邏輯一樣，只是換了一套指令名稱。
+minikube 是幫你建叢集的工具。它的工作就是把一個 K8s 叢集跑起來，跑起來之後它的任務基本上就完成了。kubectl 是你跟叢集溝通的工具，建好叢集之後你日常操作全靠它。minikube 是蓋房子的，kubectl 是住在裡面管事的。房子蓋好之後，你跟管家打交道，不用再找建築工人。
 
-kubectl 跟 minikube 是兩個不同的東西。minikube 是幫你建叢集的工具，建好之後它的任務基本上就完成了。kubectl 是你跟叢集溝通的工具，建好叢集之後你日常操作全靠它。打個比方，minikube 像是蓋房子的建築工人，kubectl 像是住在裡面的管家。房子蓋好之後，你跟管家打交道，不用再找建築工人。
+kubectl 是 K8s 的命令列工具，就像你學 Docker 時用的 docker 指令。docker ps 看容器，kubectl get pods 看 Pod。docker logs 看日誌，kubectl logs 看日誌。邏輯一樣，換了一套名字。
 
-而且 kubectl 有一個很大的好處：不管你的叢集是 minikube、k3s、還是 AWS 上的 EKS、GCP 上的 GKE，kubectl 的指令完全一樣。學一次，到處用。你在本機的 minikube 上練的指令，到了公司的生產叢集上一模一樣地敲就對了。底層的叢集換了，kubectl 的用法不變。這是 K8s 生態系統的一個巨大優勢，也是為什麼我們要花時間把 kubectl 學好。
+kubectl 有一個很大的好處：不管你的叢集是 minikube、k3s、還是 AWS 上的 EKS、GCP 上的 GKE，kubectl 的指令完全一樣。學一次，到處用。你在本機的 minikube 上練的指令，到了公司的生產叢集上一模一樣地敲就對了。
+
+那 kubectl 怎麼知道要連哪個叢集？靠一個設定檔，在你的家目錄下面的 .kube/config。minikube start 跑完之後，minikube 會自動幫你寫好這個檔案。
+
+指令：cat ~/.kube/config
+
+你會看到裡面有三個重要的區塊。第一個是 clusters，記錄你有哪些叢集，包括 API Server 的地址和憑證。第二個是 users，記錄你的身份。第三個是 contexts，把叢集和身份配對起來。比如「用 minikube-user 這個身份連 minikube 這個叢集」就是一個 context。
+
+最重要的是 current-context，它告訴 kubectl「你現在連的是哪一個」。
+
+指令：kubectl config current-context
+
+你會看到 minikube。以後你的公司可能有 dev 叢集和 prod 叢集，.kube/config 裡面兩個都設好，用 kubectl config use-context 切換。
+
+指令：kubectl config use-context dev
+
+這行指令就把你切到 dev 叢集了。要小心的是，如果你忘記切回來，在 prod 叢集上不小心刪了東西就慘了。所以每次操作之前，先 kubectl config current-context 確認一下你在哪個叢集，是一個好習慣。今天我們只有 minikube 一個叢集，不用切，但這個概念先建立起來。
 
 好，來動手。如果你在第一支影片的時候有照著螢幕上的指示先跑安裝指令，現在應該已經裝好了。讓我們來驗證。
 

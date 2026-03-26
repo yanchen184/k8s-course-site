@@ -1043,10 +1043,10 @@ kubectl run test-block --image=curlimages/curl --rm -it --restart=Never -- \
 # timeout = 被擋了 ✅
 ```
 
-**⚠️ 注意：NetworkPolicy 需要支援的 CNI**
+**⚠️ 注意：NetworkPolicy 需要對應的 controller / CNI**
+- k3s 預設安裝 ✅（內建 network policy controller）
 - Calico ✅ Cilium ✅ Weave ✅
-- kindnet ❌（minikube 預設）、Flannel ❌（k3s 預設）
-- minikube 啟用 Calico：`minikube start --cni=calico`（需要重建叢集）
+- minikube 做 Lab 常用 Calico：`minikube start --cni=calico`（需要重建叢集）
 
 ### 逐字稿
 
@@ -1076,9 +1076,9 @@ kubectl run test-block --image=curlimages/curl --rm -it --restart=Never -- \
 
 如果 NetworkPolicy 有生效，這個請求會在 3 秒後 timeout，因為流量被擋掉了。
 
-這裡有一個重要的注意事項：NetworkPolicy 需要 CNI 插件的支援。Calico、Cilium、Weave 都支援，但 minikube 預設使用的 kindnet 和 k3s 預設使用的 Flannel 都不支援 NetworkPolicy。如果你的測試結果是兩個都能連，那就是 CNI 不支援。
+這裡有一個重要的注意事項：NetworkPolicy 需要底層網路外掛或對應 controller 支援。Calico、Cilium、Weave 都支援；k3s 的預設安裝本身也有 network policy controller。如果你的測試結果是兩個都能連，不要直接下結論說「Flannel 不支援」，先確認目前叢集的 controller / CNI，再檢查 selector、policyTypes 和 ports。
 
-如果你想實際測試 NetworkPolicy，需要用 Calico 啟動 minikube：`minikube start --cni=calico`。注意這需要重建叢集，所以建議在做完其他 Lab 之後再試。在生產環境你會用 Calico 或 Cilium，它們都支援。
+如果你想在 minikube 上做最可預期的 Lab，可以用 Calico 啟動：`minikube start --cni=calico`。注意這需要重建叢集，所以建議在做完其他 Lab 之後再試。在生產環境你也常會看到 Calico 或 Cilium。
 
 這個 Lab 的目的是讓你理解 NetworkPolicy 的概念和 YAML 怎麼寫。在總複習實戰裡我們也會用到 NetworkPolicy。
 

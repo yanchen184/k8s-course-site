@@ -125,7 +125,7 @@ kubectl get nodes
 
 上一堂課我們用的是 minikube，它很方便、一行指令就能啟動，但有一個致命的限制 — 它只有一個 Node。所有的 Pod 都跑在同一台機器上。等一下我們教 Deployment 擴容到 5 個副本，你用 `kubectl get pods -o wide` 看，5 個 Pod 全部擠在同一個 Node 上，完全感受不到「分散部署」的意義。後面教 NodePort，你只有一個 Node IP 能連，體會不到「任何 Node 都能進」的效果。再後面教 DaemonSet，每個 Node 跑一份，但你只有一個 Node，那跟普通 Pod 有什麼差別？
 
-所以我們現在要升級到 k3s。k3s 是 Rancher Labs 開源的一個輕量版 Kubernetes，功能跟 K8s 一樣但安裝超級快、資源佔用少很多。名字為什麼叫 k3s？因為 K8s 有 8 個字母（K-u-b-e-r-n-e-t-e-s），k3s 只有 3 個字母，代表它砍掉了很多肥肉，但核心功能全部保留。
+所以我們現在要升級到 k3s。k3s 是 Rancher Labs 開源的一個輕量版 Kubernetes，功能跟 K8s 一樣但安裝超級快、資源佔用少很多。官方對名字的說法是：Kubernetes 這個 10-letter word 可縮寫成 K8s，half as big 的 5-letter word 可寫成 K3s。重點不是「只剩 3 個字母」，而是它保留 Kubernetes API 相容性，同時把安裝和資源占用做得更輕。
 
 那我們要怎麼在你的電腦上跑出 3 台 Node 呢？用 Multipass。Multipass 是 Canonical 出品的工具，Canonical 就是做 Ubuntu 那家公司。它讓你一行指令就能建一台 Ubuntu 虛擬機，比手動裝 VM 快多了。
 

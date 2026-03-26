@@ -630,8 +630,8 @@ kubectl api-resources               # K8s 支援的所有資源類型
 
 最後我們動手裝了 minikube，用 kubectl 探索了叢集，親眼在 kube-system 裡面看到了那些架構組件。
 
-下一章我們要開始寫 YAML 了。首先會講 YAML 配置檔案的基本格式，然後寫第一個 Pod 來跑 nginx，做完整的生命週期操作：建立、查看、檢查、看日誌、進容器、刪除。之後會故意把 Pod 搞壞，學會用 `describe` 指令來排錯，這個技能在實際工作中非常重要。最後會做一個多容器的 Pod，用 Sidecar 模式讓 nginx 和 busybox 共享 Volume。
+下午我們會用五個 Loop 把 Pod 實戰做完整。先把 Pod phase 和 `kubectl get pods` 常見 STATUS 拆清楚，學會用 `describe` 和 `logs` 排錯；再做多容器 Pod / Sidecar、kubectl 進階技巧、MySQL + env，最後用 Deployment 入門把「刪 Pod 為什麼要自動補回」這件事收束起來。
 
-學完這幾個章節之後，你的 `minikube status` 會顯示 Running，你會用 `get`、`describe`、`logs`、`exec`、`delete` 五個 kubectl 指令，能獨立寫出 Pod YAML 把 nginx 部署到叢集上，碰到 `ImagePullBackOff` 也知道怎麼查、怎麼修。
+學完這幾個章節之後，你的 `minikube status` 會顯示 Running，你會用 `get`、`describe`、`logs`、`exec`、`delete` 五個 kubectl 指令，能獨立寫出 Pod YAML 把 nginx 部署到叢集上，碰到 `ImagePullBackOff` 和 `CrashLoopBackOff` 都知道怎麼查、怎麼修，也知道 Deployment 為什麼會在下一段成為主角。
 
 好，這個章節就到這裡，我們下一章見。

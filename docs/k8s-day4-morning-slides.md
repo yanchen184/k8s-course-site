@@ -350,14 +350,15 @@ minikube dashboard
 - minikube 安裝 + kubectl 探索
 
 **下午要做：**
-1. YAML 基本格式
-2. 寫第一個 Pod（nginx）→ 完整 CRUD
-3. 故意搞壞 Pod → 學會用 describe 排錯
-4. 多容器 Pod（Sidecar）
-5. 自由練習
+1. Pod phase / STATUS + 排錯
+2. 多容器 Pod（Sidecar）
+3. kubectl 進階（`-o wide` / `port-forward` / `dry-run` / `explain`）
+4. MySQL Pod + env
+5. Deployment 入門（自我修復）
 
 **今天結束時你會：**
 → `minikube status` 顯示 Running，`kubectl get nodes` 看到 Ready
 → 會用 `get`、`describe`、`logs`、`exec`、`delete` 五個指令
 → 能獨立寫出 Pod YAML，部署 nginx 並用 `port-forward` 在瀏覽器看到頁面
-→ 看到 `ImagePullBackOff` 知道怎麼查、怎麼修
+→ 看到 `ImagePullBackOff` / `CrashLoopBackOff` 知道怎麼查、怎麼修
+→ 知道 Deployment 為什麼存在，並看懂基本三層關係

@@ -6,8 +6,8 @@
 
 | 堂次 | 環境 | 為什麼 |
 |:---:|------|------|
-| 第四堂 | minikube | 學 Pod，單節點就夠 |
-| 第五堂開頭 | 裝 k3s | 教 Deployment 需要看到多節點 |
+| 第四堂 | minikube | 建立 K8s 全貌、學 Pod、kubectl 進階、MySQL env 與 Deployment 入門，單節點就夠 |
+| 第五堂開頭 | 裝 k3s | Deployment 進階、Service 與跨 Node 驗證需要看到多節點 |
 | 第五～七堂 | k3s 為主 | 多節點操作 |
 | RKE | 待定 | 之後再討論 |
 
@@ -17,14 +17,14 @@
 
 | 堂次 | 一句話 | 具體能力 |
 |:---:|------|---------|
-| 第四堂 | **會在 K8s 上跑一個容器** | 理解 K8s 全貌與架構、裝好 minikube、kubectl 基本操作、寫 Pod YAML 做 CRUD、看懂 kube-system 裡的元件、會排 Pod 基本錯誤 |
-| 第五堂 | **會讓瀏覽器連到 K8s 裡的服務** | 裝 k3s 多節點、Deployment 擴縮容/滾動更新/回滾/自我修復、Service 三種類型、DNS 服務發現、Namespace 隔離、DaemonSet、CronJob |
+| 第四堂 | **會在 K8s 上操作 Pod，並理解 Deployment 為什麼存在** | 理解 K8s 全貌與架構、裝好 minikube、kubectl 基本/進階操作、寫 Pod YAML 做 CRUD、看懂 kube-system 裡的元件、會排 Pod 基本錯誤、理解 Sidecar / env，以及 Deployment 的三層關係與自我修復 |
+| 第五堂 | **會在多節點 K8s 上管理 Deployment，並讓瀏覽器連到 K8s 裡的服務** | 裝 k3s 多節點、Deployment 擴縮容/滾動更新/回滾/自我修復、Service 三種類型、DNS 服務發現、Namespace 隔離、DaemonSet、CronJob |
 | 第六堂 | **會部署帶資料庫的完整網站** | ConfigMap 管設定、Secret 管密碼、Ingress 路由（Path + Host）、PV/PVC 持久化、StatefulSet 部署 MySQL、Helm 一鍵安裝 |
 | 第七堂 | **會從零獨立建一整套系統** | Probe 健康檢查、Resource limits、HPA 自動擴縮、RBAC 權限控制、故障排除、從零部署完整系統 12 步 |
 
 ---
 
-## 第四堂（3/28）7hr — K8s 全貌 + Pod
+## 第四堂（3/28）7hr — K8s 全貌 + Pod + Deployment 入門
 
 ### 時間表
 
@@ -32,17 +32,17 @@
 |------|:---:|------|:---:|
 | 09:00-10:00 | 講課 | **K8s 全貌（上）**：為什麼需要 K8s → 核心概念（Pod / Service / Ingress / ConfigMap / Secret / Volume / Deployment / StatefulSet） | 60min |
 | 10:00-10:10 | 休息 | | 10min |
-| 10:10-11:10 | 講課 | **K8s 全貌（下）**：K8s 架構（Master：API Server / etcd / Scheduler / Controller Manager、Worker：kubelet / kube-proxy / Container Runtime）、環境方案介紹（minikube / k3s / RKE） | 60min |
-| 11:10-12:00 | 實作 | **實作 1+2**：minikube 安裝 + kubectl 探索 + 驗證架構元件 | 50min |
+| 10:10-11:10 | 講課 + 實作 | **K8s 全貌（下）**：K8s 架構（Master：API Server / etcd / Scheduler / Controller Manager、Worker：kubelet / kube-proxy / Container Runtime）、完整流程（kubectl → Pod 跑起來）、環境方案比較（minikube / k3s / RKE） + **實作 1+2**：minikube 安裝 + kubectl 探索 + 驗證架構元件 | 60min |
+| 11:10-12:00 | 講課 + 實作 | **實作 3**：YAML 基本格式 + 第一個 Pod — 寫 pod.yaml → apply → get → describe → logs → exec → delete | 50min |
 | 12:00-13:00 | 午休 | | |
-| 13:00-13:15 | 講課 | YAML 基本格式（apiVersion / kind / metadata / spec） | 15min |
-| 13:15-14:15 | 實作 | **實作 3**：第一個 Pod — 寫 pod.yaml → apply → get → describe → logs → exec → delete | 60min |
-| 14:15-14:25 | 休息 | | 10min |
-| 14:25-15:05 | 實作 | **實作 4**：Pod 排錯 — 故意打錯 image → ImagePullBackOff → describe 找原因 → 修正 → Running | 40min |
-| 15:05-15:15 | 休息 | | 10min |
-| 15:15-16:00 | 實作 | **實作 5**：多容器 Pod（Sidecar）— nginx + busybox 共享 volume | 45min |
-| 16:00-16:40 | 實作 | 自由練習 + 回顧 | 40min |
-| 16:40-17:00 | 講課 | 第四堂總結 + 預告第五堂（Deployment + Service） | 20min |
+| 13:00-13:40 | 實作 | **實作 4**：Loop 1 — Pod phase / STATUS + 排錯（ImagePullBackOff、CrashLoopBackOff） | 40min |
+| 13:40-14:20 | 實作 | **實作 5**：Loop 2 — 多容器 Pod（Sidecar）— nginx + busybox 共享 volume | 40min |
+| 14:20-14:30 | 休息 | | 10min |
+| 14:30-15:10 | 實作 | **實作 6**：Loop 3 — kubectl 進階（-o wide / port-forward / dry-run / explain） | 40min |
+| 15:10-15:20 | 休息 | | 10min |
+| 15:20-16:05 | 實作 | **實作 7**：Loop 4 — MySQL Pod + env（故意做錯再修好） | 45min |
+| 16:05-16:45 | 實作 | **實作 8**：Loop 5 — Deployment 入門（三層關係 + 自我修復） | 40min |
+| 16:45-17:00 | 講課 | 第四堂總結 + 回家作業 + 預告第五堂（Deployment 進階 + Service） | 15min |
 
 ### 實作清單
 
@@ -53,10 +53,13 @@
 | 3 | 第一個 Pod | 寫 `pod.yaml`（nginx）→ `kubectl apply -f` → `get pods` → `describe pod` → `logs` → `exec -it -- /bin/sh` → `delete pod` | 完整 Pod 生命週期操作 |
 | 4 | Pod 排錯 | 故意寫錯 image（`ngin` 而不是 `nginx`）→ `get pods` 看 ImagePullBackOff → `describe pod` 找原因 → 修正 YAML → 重新 apply | 學會用 describe 排錯 |
 | 5 | 多容器 Pod（Sidecar） | 寫一個雙容器 Pod（nginx + busybox tail log）→ `kubectl logs <pod> -c busybox` | 兩個容器共享 volume，busybox 能看到 nginx 的 log |
+| 6 | kubectl 進階技巧 | 練習 `-o wide`、`-o yaml`、`port-forward`、`run --dry-run=client -o yaml`、`kubectl explain` | 會更快觀察狀態、臨時連 Pod、快速生 YAML 骨架 |
+| 7 | MySQL Pod + env | 故意建 `mysql-broken` → `logs` 看錯誤 → 補 `MYSQL_ROOT_PASSWORD` → `exec` 進 MySQL | 理解 env 注入與 CrashLoopBackOff 排錯 |
+| 8 | Deployment 入門 | 寫 `deployment.yaml`（nginx, replicas: 3）→ `get deploy,rs,pods` → 手動 `delete pod` → 觀察自動補回 | 看懂三層關係與自我修復 |
 
 ---
 
-## 第五堂（4/11）7hr — Deployment + Service
+## 第五堂（4/11）7hr — Deployment 進階 + Service
 
 ### 時間表
 
@@ -65,8 +68,8 @@
 | 09:00-09:15 | 講課 | 開場回顧 | 15min |
 | 09:15-10:00 | 實作 | **實作 1：裝 k3s**（VMware 兩台 Ubuntu → master 裝 k3s → worker 加入 → `kubectl get nodes` 看到兩個節點） | 45min |
 | 10:00-10:10 | 休息 | | 10min |
-| 10:10-10:25 | 講課 | Deployment 概念（三層關係：Deployment → ReplicaSet → Pod） | 15min |
-| 10:25-11:00 | 實作 | **實作 2：建立 Deployment** → `get deploy,rs,pods` → 看到三層 + Pod 分散在不同 Node | 35min |
+| 10:10-10:25 | 講課 | Deployment 複習（三層關係 + 聲明式管理） | 15min |
+| 10:25-11:00 | 實作 | **實作 2：把 Deployment 放到 k3s** → `get deploy,rs,pods -o wide` → 看到三層 + Pod 分散在不同 Node | 35min |
 | 11:00-11:15 | 講課 | 擴縮容 + 滾動更新 + 回滾概念 | 15min |
 | 11:15-12:00 | 實作 | **實作 3+4+5：擴縮容 → 滾動更新 → 回滾 → 自我修復**（手動 delete pod 看自動補回） | 45min |
 | 12:00-13:00 | 午休 | | |
@@ -88,7 +91,7 @@
 | # | 實作名稱 | 學生動手做什麼 | 預期看到什麼 |
 |:---:|---------|------------|------------|
 | 1 | k3s 安裝 | VMware 兩台 Ubuntu → master 裝 k3s → 取 token → worker 加入 | `kubectl get nodes` 看到 master + worker |
-| 2 | 建立 Deployment | 寫 `deployment.yaml`（nginx, replicas:3）→ `apply` → `get deploy,rs,pods -o wide` | 三層關係 + Pod 分散在不同 Node |
+| 2 | 把 Deployment 放到多節點叢集 | 寫 `deployment.yaml`（nginx, replicas:3）→ `apply` → `get deploy,rs,pods -o wide` | 三層關係 + Pod 分散在不同 Node |
 | 3 | 擴縮容 | `kubectl scale --replicas=5` → 觀察 → `--replicas=2` → 觀察 Pod 被砍 | 數量自動調整 |
 | 4 | 滾動更新 + 回滾 | `set image` → `rollout status` → 觀察新舊交替 → `rollout undo` → `rollout history` | 零停機更新 + 一行回滾 |
 | 5 | 自我修復 | 手動 `kubectl delete pod` → 觀察 Deployment 自動補回 | 聲明式管理 |
@@ -187,8 +190,8 @@
 
 | 堂次 | 實作數 | 講課時間 | 實作時間 |
 |:---:|:---:|:---:|:---:|
-| 第四堂 | 5 個 | ~3hr | ~4hr |
+| 第四堂 | 8 個 | ~2.5hr | ~4.5hr |
 | 第五堂 | 11 個 | ~2hr | ~5hr |
 | 第六堂 | 10 個 | ~2.5hr | ~4.5hr |
 | 第七堂 | 6 個 | ~1.5hr | ~4.5hr |
-| **合計** | **32 個** | **~9hr** | **~18hr** |
+| **合計** | **35 個** | **~9hr** | **~18hr** |

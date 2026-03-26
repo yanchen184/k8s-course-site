@@ -317,7 +317,7 @@ Ctrl+C 停止 port-forward。
   2. kubectl exec 忘記雙減號（-- 分隔 kubectl 參數和容器指令）
   3. Image tag（不寫版本 = latest 會漂移 / 拼錯名字 → ImagePullBackOff）
 - 上午因果鏈回顧（Docker 瓶頸 → 八概念 → 架構 → 裝環境 → 探索 → YAML → Pod CRUD）
-- 下午四個 Loop 結構說明 + 預告
+- 下午五個 Loop 結構說明 + 預告
 
 ## 逐字稿
 
@@ -374,7 +374,7 @@ exit 出來。
 
 現在來講下午的安排。下午跟上午不太一樣。上午是一支影片接一支影片，比較線性地從概念走到實作。下午我們用一個叫 Loop 的結構。每一個 Loop 包含三到四個步驟。第一步是概念影片，我先講清楚原理。第二步是實作示範，我在螢幕上操作給你看。第三步是你自己動手，螢幕上會有練習題目，給你十到十五分鐘的時間做。第四步是回頭操作，我從頭帶做一遍，讓沒跟上的同學可以對照。
 
-下午四個 Loop 分別是。Loop 1 是 Pod 生命週期和排錯，我會帶大家故意寫錯 YAML、故意拼錯 Image 名字，練習看錯誤訊息怎麼查、怎麼修。Loop 2 是多容器 Pod 和 Sidecar 模式，親手體驗兩個容器在同一個 Pod 裡面共享網路、共享 Volume。Loop 3 是 kubectl 進階技巧，包括 port-forward、dry-run 這些日常工作天天用到的東西。Loop 4 是環境變數和 MySQL Pod，學會怎麼把設定注入到容器裡面，為第六堂課的 ConfigMap 和 Secret 做鋪墊。
+下午五個 Loop 分別是。Loop 1 是 Pod 生命週期和排錯，我會帶大家故意寫錯 YAML、故意拼錯 Image 名字，練習看錯誤訊息怎麼查、怎麼修。Loop 2 是多容器 Pod 和 Sidecar 模式，親手體驗兩個容器在同一個 Pod 裡面共享網路、共享 Volume。Loop 3 是 kubectl 進階技巧，包括 port-forward、dry-run 這些日常工作天天用到的東西。Loop 4 是環境變數和 MySQL Pod，學會怎麼把設定注入到容器裡面，為第六堂課的 ConfigMap 和 Secret 做鋪墊。Loop 5 會把今天一路累積的問題收束到 Deployment，讓你先看到三層關係和刪 Pod 自動補回的自我修復。
 
 每個 Loop 結束都有練習時間。做完的同學可以先往下看，沒做完的就在回頭操作的時候跟著一起做。不用擔心掉隊。
 

@@ -431,7 +431,7 @@ Pod 基礎（9 項）：
 1. Pod 概念 + 為什麼不是直接管容器
 2. YAML 四大欄位：apiVersion / kind / metadata / spec
 3. Pod CRUD：apply / get / describe / logs / exec / delete
-4. Pod 生命週期 + 狀態（Pending → Running → CrashLoopBackOff...）
+4. Pod phase + kubectl 常見 STATUS
 5. 排錯三兄弟：get → describe → logs
 6. 多容器 Pod / Sidecar 模式
 7. port-forward（臨時通道存取 Pod）
@@ -456,7 +456,7 @@ Deployment 入門（2 項）：
 | `docker inspect` | `kubectl describe pod` / `-o yaml` |
 | `docker-compose.yaml` | K8s YAML（apiVersion / kind / metadata / spec） |
 | `docker compose --scale` | `kubectl scale deployment` |
-| `--restart always`（單機） | Deployment `replicas`（跨 Node 自動補） |
+| `--restart always`（單機） | Deployment `replicas`（自動補 Pod；多節點時可分散） |
 
 **回家作業**
 1. 不看筆記，從零寫 nginx Pod YAML → 完整 CRUD 流程
@@ -525,9 +525,9 @@ Deployment 入門（2 項）：
 
 五個 Loop，每一步都是因為上一步用出了新的問題。這不是巧合，這就是 K8s 設計的邏輯。每一個功能都是為了解決一個真實的痛點而存在的。
 
-螢幕上有一個知識清單，十一個項目。前九個是 Pod 相關的：Pod 概念、YAML 四欄位、Pod CRUD 六指令、Pod 生命週期、排錯三兄弟、Sidecar 多容器 Pod、port-forward、dry-run、環境變數。後面兩個是今天新加的 Deployment 入門：三層關係和自我修復。如果你能不看筆記把這十一項都解釋出來，今天的內容就完全吸收了。
+螢幕上有一個知識清單，十一個項目。前九個是 Pod 相關的：Pod 概念、YAML 四欄位、Pod CRUD 六指令、Pod phase 與 kubectl 常見 STATUS、排錯三兄弟、Sidecar 多容器 Pod、port-forward、dry-run、環境變數。後面兩個是今天新加的 Deployment 入門：三層關係和自我修復。如果你能不看筆記把這十一項都解釋出來，今天的內容就完全吸收了。
 
-Docker 對照表也更新了，多了兩行。docker compose --scale 對應 kubectl scale deployment。Docker 的 --restart always 只能管同一台機器，Deployment 的 replicas 可以跨 Node 自動補 Pod。大家截圖存起來當速查卡。
+Docker 對照表也更新了，多了兩行。docker compose --scale 對應 kubectl scale deployment。Docker 的 --restart always 只能管同一台機器，Deployment 的 replicas 會幫你維持 Pod 數量；如果是多節點叢集，Pod 還可能分散到不同的 Node，但那是 Scheduler 決定的。大家截圖存起來當速查卡。
 
 回家作業四個。第一，不看筆記從零寫 nginx Pod YAML，走一遍完整的 CRUD 流程。第二，跑不同的 Image 觀察行為差異，redis 會一直 Running，python 不給 command 會直接退出。第三，今天新加的，寫一個 Deployment YAML，replicas 設 3，刪 Pod 觀察自動補回，然後用 kubectl scale 擴到 5 再縮回 3。第四是進階題，MySQL Pod 加環境變數，進去建資料庫。
 

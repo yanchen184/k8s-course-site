@@ -1,4 +1,7 @@
-# 第四堂 Pod 實作篇 PPT + 逐字稿
+# 第四堂 Pod 實作篇 PPT + 逐字稿（舊版存檔）
+
+> 狀態說明：這份檔案保留的是較早期的 12 頁 Pod-only 版本。
+> 目前第四天下午的正式授課順序，請以 [src/slides/lesson4-afternoon/index.tsx](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/src/slides/lesson4-afternoon/index.tsx) 與 [docs/k8s-day4-afternoon-v3-part1.md](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/docs/k8s-day4-afternoon-v3-part1.md) 到 [docs/k8s-day4-afternoon-v3-part3.md](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/docs/k8s-day4-afternoon-v3-part3.md) 為準。
 
 > 學員已看完概念篇（K8s 全貌：架構、核心資源、Master/Worker 元件），裝好 minikube
 > 這個章節是 Pod 動手時間：每個概念講完就實作
@@ -238,11 +241,11 @@ kubectl delete pod my-nginx
 
 首先，打開你的終端機。我們先確認一下 minikube 還在跑。輸入 `minikube status`，看一下狀態。應該會顯示 host 是 Running、kubelet 是 Running、apiserver 是 Running。如果沒有在跑的話，輸入 `minikube start` 重新啟動一下。
 
-確認叢集在跑之後，我們來建立 YAML 檔案。先建一個工作目錄，你可以在家目錄下建一個叫 `k8s-labs` 的資料夾：
+確認叢集在跑之後，我們來建立 YAML 檔案。先建一個工作目錄，你可以在家目錄下建一個叫 `k8s-course-labs/lesson4` 的資料夾：
 
-```
-mkdir -p ~/k8s-labs
-cd ~/k8s-labs
+```bash
+mkdir -p ~/k8s-course-labs/lesson4
+cd ~/k8s-course-labs/lesson4
 ```
 
 好，然後打開你的編輯器。你可以用 vim、nano，或者用 VS Code 都可以。我們來建一個叫 `pod.yaml` 的檔案。輸入以下內容：
@@ -352,25 +355,25 @@ kubectl delete pod my-nginx
 
 ### PPT 內容
 
-**Pod 的狀態流程**
+**Pod phase（Kubernetes API 的高層摘要）**
 
 ```
-Pending → ContainerCreating → Running → Succeeded / Failed
+Pending → Running → Succeeded / Failed
 ```
 
-**常見狀態一覽：**
+**kubectl 常見 STATUS / Reason：**
 
-| 狀態 | 意思 | 常見原因 |
+| 顯示 | 意思 | 常見原因 |
 |------|------|---------|
-| `Pending` | 排隊中 | Node 資源不夠、image 很大正在拉 |
-| `ContainerCreating` | 容器建立中 | 正在拉 image |
-| `Running` | 跑起來了 | 正常 ✅ |
-| `Succeeded` | 跑完結束了 | Job 類的任務正常結束 |
-| `Failed` | 失敗了 | 容器裡的程式 crash |
-| `CrashLoopBackOff` | 反覆重啟 | 容器啟動後馬上 crash → K8s 重啟 → 又 crash → 間隔越來越長 |
+| `Pending` | Pod 尚未就緒 | 排程中、image 很大正在拉 |
+| `ContainerCreating` | `kubectl` 常見 STATUS，代表容器仍在 Waiting | 正在拉 image、掛 Volume、套用 Secret / ConfigMap |
+| `Running` | 至少一個主要 container 已啟動 | 正常 ✅ |
+| `Succeeded` | 全部容器正常結束 | Job 類的任務正常結束 |
+| `Failed` | 至少一個容器以失敗結束且不再重啟 | 容器裡的程式 crash |
+| `CrashLoopBackOff` | 容器反覆重啟 | 容器啟動後馬上 crash → K8s 重啟 → 又 crash → 間隔越來越長 |
 | `ImagePullBackOff` | 拉不到 image | image 名字拼錯、tag 不存在、私有倉庫沒權限 |
 | `ErrImagePull` | 拉 image 失敗 | 同上，第一次失敗 |
-| `Terminating` | 正在停止中 | 正在執行 graceful shutdown |
+| `Terminating` | `kubectl` 常見 STATUS，正在優雅停止 | 正在執行 graceful shutdown |
 
 **CrashLoopBackOff 重啟間隔：**
 10s → 20s → 40s → 80s → ... → 最長 5min
@@ -388,7 +391,9 @@ kubectl logs <name>           # 3. 看容器日誌
 
 好，在我們做下一個實作之前，我要先跟大家講一個很重要的概念 — Pod 的生命週期。
 
-一個 Pod 從建立到結束，會經歷幾個狀態。最開始是 `Pending`，就是「排隊中」的意思。K8s 收到了你的請求，正在找一個合適的 Node 來放這個 Pod。找到之後，Pod 會進入 `ContainerCreating` 狀態，這時候 K8s 正在拉取 Docker image 並建立容器。image 拉完、容器跑起來之後，就會變成 `Running`，表示一切正常。
+不過這裡要先分兩層。Kubernetes API 裡真正的 Pod phase，只有 `Pending`、`Running`、`Succeeded`、`Failed`，另外還有比較少遇到的 `Unknown`。你平常在 `kubectl get pods` 的 STATUS 欄看到的 `ContainerCreating`、`CrashLoopBackOff`、`Terminating`，很多時候是為了讓人比較好理解的顯示值，或是 container 的 waiting reason，不要把它們全部當成同一層的 phase。
+
+一個 Pod 從建立到結束，會經歷幾個高層的 phase。最開始是 `Pending`，就是「排隊中」的意思。K8s 收到了你的請求，正在找一個合適的 Node 來放這個 Pod。在 `Pending` 這個 phase 裡，你常常會在 STATUS 欄看到 `ContainerCreating`，代表 K8s 正在拉取 Docker image、建立容器。image 拉完、容器跑起來之後，就會變成 `Running`，表示一切正常。
 
 如果容器裡的程式是一次性的任務，跑完之後會變成 `Succeeded`。如果程式 crash 了，就會變成 `Failed`。
 

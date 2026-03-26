@@ -276,7 +276,7 @@ minikube start 跑完之後，它會自動幫你設定好 kubectl，讓 kubectl 
 | — | `kubectl describe <resource>` | 查看詳細資訊 |
 | — | `kubectl api-resources` | 列出所有資源類型 |
 
-- 上午總結 + 下午預告（YAML → 第一個 Pod）
+- 上午總結 + 下午預告（下午 5 個 Loop）
 
 ## 逐字稿
 

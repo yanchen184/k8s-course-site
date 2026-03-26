@@ -1,5 +1,7 @@
 # 第四堂下午逐字稿 v3 Part 2 — Loop 3 & 4（4-18 ~ 4-23）
 
+> 狀態說明：這份檔案保留的是「4-23 仍是總結頁」的前一版結構。
+> 目前第四天下午 4-23 之後的正式內容，請以 [docs/k8s-day4-afternoon-v3-part3.md](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/docs/k8s-day4-afternoon-v3-part3.md) 與 [src/slides/lesson4-afternoon/index.tsx](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/src/slides/lesson4-afternoon/index.tsx) 為準。
 > 承接 Loop 2 結尾（4-17）：Pod 的 CRUD、排錯、Sidecar 都會了
 > 因果鏈：kubectl 只會基本功 → 進階技巧 → Pod 跑 MySQL 結果 crash → 環境變數 → 總結
 
@@ -355,11 +357,11 @@ spec:
 
 前面三個 Loop 我們跑了 nginx、跑了 httpd、跑了 busybox。這些 Image 有一個共同點，它們不需要任何設定就能正常啟動。但是在真實世界裡，很多服務不是這樣的。最典型的例子就是資料庫。
 
-我現在丟一個情境給大家。你想在 K8s 裡面跑一個 MySQL。根據前面學的知識，你會怎麼寫 YAML？很自然的，apiVersion v1、kind Pod、metadata name mysql-pod、spec containers 裡面放一個 name mysql、image mysql:8.0。跟寫 nginx 的 YAML 沒什麼兩樣，只是把 image 換了一下。看起來很合理，對不對？
+我現在丟一個情境給大家。你想在 K8s 裡面跑一個 MySQL，而且我故意先做一份會失敗的版本。根據前面學的知識，你會怎麼寫 YAML？很自然的，apiVersion v1、kind Pod、metadata name mysql-broken、spec containers 裡面放一個 name mysql、image mysql:8.0。跟寫 nginx 的 YAML 沒什麼兩樣，只是把 image 換了一下。看起來很合理，對不對？
 
 但是如果你真的把這個 YAML 拿去 apply，你會得到一個非常讓人沮喪的結果。kubectl get pods 一看，STATUS 不是 Running，而是 CrashLoopBackOff。你看著 RESTARTS 數字一直在往上跳，1、2、3、4。Pod 啟動了就掛，掛了 K8s 自動重啟，啟動了又掛，反反覆覆。
 
-怎麼辦？排錯三兄弟。get pods 看到了 CrashLoopBackOff，describe pod 看 Events 會顯示 Back-off restarting failed container。但最關鍵的資訊在 logs 裡面。kubectl logs mysql-pod，你會看到一行錯誤訊息：database is uninitialized and password option is not specified。翻成白話就是：資料庫還沒初始化，而且你也沒給我密碼，我不知道怎麼辦，我只好退出。
+怎麼辦？排錯三兄弟。get pods 看到了 CrashLoopBackOff，describe pod 看 Events 會顯示 Back-off restarting failed container。但最關鍵的資訊在 logs 裡面。kubectl logs mysql-broken，你會看到一行錯誤訊息：database is uninitialized and password option is not specified。翻成白話就是：資料庫還沒初始化，而且你也沒給我密碼，我不知道怎麼辦，我只好退出。
 
 MySQL 的啟動邏輯是這樣的。第一次跑的時候它需要初始化資料庫，而初始化的其中一步就是設定 root 帳號的密碼。你什麼都不告訴它，它就直接退出了。這不是 bug，是 MySQL 故意這樣設計的。沒有密碼就不啟動，逼你設密碼，避免有人跑了一個沒有密碼保護的資料庫。
 
@@ -550,7 +552,7 @@ kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yam
 # 編輯加 env → apply → exec 驗證 → delete
 ```
 
-**下午四個 Loop 因果鏈**
+**本版下午四個 Loop 因果鏈（舊版結構）**
 
 | Loop | 問題 | 解決 |
 |:---|:---|:---|
@@ -563,7 +565,7 @@ kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yam
 1. Pod 概念 + 為什麼不是直接管容器
 2. YAML 四大欄位：apiVersion / kind / metadata / spec
 3. Pod CRUD：apply / get / describe / logs / exec / delete
-4. Pod 生命週期 + 狀態（Pending → Running → CrashLoopBackOff...）
+4. Pod phase + kubectl 常見 STATUS
 5. 排錯三兄弟：get → describe → logs
 6. 多容器 Pod / Sidecar 模式
 7. port-forward（臨時通道存取 Pod）
@@ -642,7 +644,7 @@ OK，不到兩分鐘就做完了。
 
 好，來回顧今天的內容。上午的部分我們在影片 4-11 已經回顧過了，這裡一句話帶過：上午我們從 Docker 的五個瓶頸出發，一路認識了 K8s 的八個核心概念和 Master-Worker 架構，最後動手跑了第一個 Pod 的 CRUD。
 
-重點回顧下午。下午的四個 Loop 是一條因果鏈，每解決一個問題就冒出下一個。
+重點回顧下午。這份舊版安排的四個 Loop 是一條因果鏈，每解決一個問題就冒出下一個。
 
 第一個 Loop，排錯。我們把 Pod 跑起來了，但 Pod 壞了怎麼辦？Image 名字拼錯了，出現 ImagePullBackOff。程式啟動就 crash，出現 CrashLoopBackOff。面對這些異常狀態，我們學了排錯三兄弟：get pods 看狀態、describe pod 看 Events、logs 看容器日誌。三個指令配合起來，大多數問題都能找到原因。我們也故意把 Pod 搞壞再修好，親手走了一遍完整的排錯流程。
 
@@ -652,9 +654,9 @@ OK，不到兩分鐘就做完了。
 
 kubectl 用得更熟了，但你發現一直在跑 nginx 和 busybox 這些簡單的 Image。你想跑一個 MySQL 試試看，結果 CrashLoopBackOff。所以第四個 Loop 學了環境變數。在 YAML 的 env 欄位注入 MYSQL_ROOT_PASSWORD，MySQL 就順利跑起來了。我們還做了故意做錯再修好的完整流程。最後發現密碼寫在 YAML 裡面不安全，為下堂課的 Secret 埋了伏筆。
 
-四個 Loop，一條因果鏈：Pod 壞了 → 排錯三兄弟 → 多容器 Pod → kubectl 進階技巧 → 環境變數注入。每一步都是因為上一步用出了新的問題。
+這份舊版安排是四個 Loop，一條因果鏈：Pod 壞了 → 排錯三兄弟 → 多容器 Pod → kubectl 進階技巧 → 環境變數注入。每一步都是因為上一步用出了新的問題。
 
-螢幕上有一個 Pod 知識清單，九個項目。我唸一遍。Pod 概念、YAML 四大欄位、Pod CRUD 六個指令、Pod 生命週期和各種狀態、排錯三兄弟、多容器 Pod 和 Sidecar、port-forward、dry-run、環境變數注入。這九個東西就是今天所有的核心知識。如果你能在不看筆記的情況下每一項都解釋出來，今天的課就完全吸收了。
+螢幕上有一個 Pod 知識清單，九個項目。我唸一遍。Pod 概念、YAML 四大欄位、Pod CRUD 六個指令、Pod phase 與 kubectl 常見 STATUS、排錯三兄弟、多容器 Pod 和 Sidecar、port-forward、dry-run、環境變數注入。這九個東西就是今天所有的核心知識。如果你能在不看筆記的情況下每一項都解釋出來，今天的課就完全吸收了。
 
 還有一個 Docker 對照表，大家截圖存起來當速查卡。docker run 對應 kubectl apply，docker run -p 對應 port-forward，docker run -e 對應 env 欄位，docker ps 對應 kubectl get pods，docker logs 對應 kubectl logs，docker exec 對應 kubectl exec，docker stop rm 對應 kubectl delete pod，docker inspect 對應 describe 或 -o yaml，Docker Compose 的 YAML 對應 K8s 的 YAML，Docker Compose 的 environment 對應 K8s 的 env。你會發現，K8s 的很多操作跟 Docker 是一一對應的。你在 Docker 學的東西沒有白學，K8s 只是把同樣的概念放到了一個更大的框架裡面。
 

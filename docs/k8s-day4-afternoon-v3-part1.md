@@ -11,7 +11,8 @@
 ## 本集重點
 
 - Pod 跑起來了，但狀態不一定是 Running — 各種狀態是什麼意思？
-- 生命週期：Pending → ContainerCreating → Running → Succeeded / Failed
+- Pod phase：Pending → Running → Succeeded / Failed
+- kubectl STATUS 常見：ContainerCreating、ErrImagePull、ImagePullBackOff、CrashLoopBackOff
 - 常見錯誤狀態：ErrImagePull、ImagePullBackOff、CrashLoopBackOff
 - CrashLoopBackOff 退避策略：10s → 20s → 40s → 80s → ... → 5min 上限
 - 排錯三兄弟：get pods → describe pod → logs
@@ -19,8 +20,8 @@
 
 | 狀態 | 意思 | 常見原因 | 第一步排錯 |
 |:---|:---|:---|:---|
+| `ContainerCreating` | `kubectl` 常見 STATUS，代表容器仍在 Waiting | 拉 Image、掛 Volume、套用 Secret / ConfigMap | `describe pod` 看 Events |
 | `Pending` | 排隊中 | Node 資源不夠 | `describe pod` 看 Events |
-| `ContainerCreating` | 容器建立中 | 拉 Image、掛 Volume | 等一下，或 `describe` |
 | `Running` | 正常運行 | — | — |
 | `Succeeded` | 跑完正常結束 | Job 類任務完成 | 正常 |
 | `Failed` | 失敗退出 | exit code 非零 | `logs` 看原因 |
@@ -38,17 +39,17 @@
 
 所以這支影片我們要搞懂兩件事。第一，Pod 的各種狀態到底代表什麼意思。第二，碰到問題的時候，你該怎麼一步一步找到原因。
 
-我們先來看 Pod 的生命週期。一個 Pod 從你 kubectl apply 開始，到最後結束，會經過好幾個狀態。你可以把它想成一個人的一天。起床、出門、上班、下班回家。Pod 也有它的「一天」。
+我們先來看 Pod 的生命週期。不過這裡要先分兩層。Kubernetes API 裡真正的 Pod phase，只有 Pending、Running、Succeeded、Failed，另外還有比較少遇到的 Unknown。你平常在 kubectl get pods 的 STATUS 欄看到的 ContainerCreating、CrashLoopBackOff、Terminating，很多時候是為了讓人比較好理解的顯示值，或是 container 的 waiting reason，不要把它們全部當成同一層的 phase。
 
 最開始是 Pending 狀態。你執行了 kubectl apply，K8s 的 API Server 收到了你的請求，把它記錄到 etcd 裡面了，但是 Pod 還沒有被分配到任何一個 Node 上面。這時候 Scheduler 正在忙著看哪個 Node 比較適合跑這個 Pod。如果你的叢集資源很充足，Pending 的時間通常非常短，短到你根本看不到。但如果叢集裡面所有 Node 的 CPU 和記憶體都快滿了，Scheduler 找不到合適的 Node，Pod 就會一直卡在 Pending。就像你到停車場找車位，車位都滿了，你只能在那邊等。
 
-Scheduler 找到合適的 Node 之後，Pod 進入 ContainerCreating 狀態。這時候那個 Node 上面的 kubelet 收到了指令，開始拉取 Image，然後建立容器。如果 Image 很大，或者網路比較慢，這個階段可能會花一點時間。一般來說幾秒到幾十秒不等。
+在 Pending 這個 phase 裡面，你常常會在 kubectl 的 STATUS 欄看到 ContainerCreating。這時候那個 Node 上面的 kubelet 收到了指令，開始拉取 Image，然後建立容器。如果 Image 很大，或者網路比較慢，這個階段可能會花一點時間。一般來說幾秒到幾十秒不等。
 
 Image 拉完了、容器建好了、程式跑起來了，Pod 就會變成 Running。這是我們最想看到的狀態，代表一切正常。
 
 如果容器裡面跑的是一次性的任務，比如一個資料庫遷移腳本，或者一個定時批次處理的程式，它跑完之後會正常退出。這時候 Pod 的狀態會變成 Succeeded，表示任務完成了，正常結束。如果程式跑到一半 crash 了，或者退出碼不是零，Pod 就會變成 Failed。
 
-這是正常的生命週期流程：Pending、ContainerCreating、Running，然後 Succeeded 或 Failed。很好理解對吧？
+所以如果你先記高層 phase，可以先抓 Pending、Running、Succeeded、Failed。ContainerCreating 比較像是 Pending 階段裡，kubectl 常會顯示給你的過程提示。很好理解對吧？
 
 但是真正讓你頭痛的，不是這些正常狀態，而是幾個「錯誤狀態」。我們來一個一個看。
 

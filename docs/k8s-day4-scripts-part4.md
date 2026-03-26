@@ -1,5 +1,7 @@
 # 第四堂下午逐字稿 Part 4 — 影片 4-18 ~ 4-23
 
+> 狀態說明：這份檔案保留的是「4-23 仍是總結頁」的舊版編排。
+> 目前第四天下午 4-23 之後的正式內容，請以 [docs/k8s-day4-afternoon-v3-part3.md](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/docs/k8s-day4-afternoon-v3-part3.md) 與 [src/slides/lesson4-afternoon/index.tsx](/Users/cy76/WorkSpace/sideProject/learn_projects/k8s-course-site/src/slides/lesson4-afternoon/index.tsx) 為準。
 > 承接 Loop 2（多容器 Pod / Sidecar 實作與回頭操作）
 > 主線：kubectl 進階技巧 → port-forward → dry-run → 環境變數 → MySQL Pod → 第四堂總結
 
@@ -99,7 +101,7 @@ K8s 的 port-forward 是這樣用的：kubectl port-forward pod/my-nginx 8080:80
 
 好，上一支影片我們講了 kubectl 的各種進階用法，現在我們全部來操作一遍。大家把終端機打開，跟著我一步一步來。
 
-首先，我們需要一個 Pod 來實驗。大家先進到工作目錄，cd ~/k8s-labs，然後用之前寫的 pod.yaml 建一個 nginx Pod 回來。輸入 kubectl apply -f pod.yaml，然後 kubectl get pods 確認一下 STATUS 是 Running。如果你之前把 pod.yaml 刪掉了也沒關係，我們等一下會用 dry-run 再產生一個。先用 kubectl run my-nginx --image=nginx:1.27 快速建一個也行。
+首先，我們需要一個 Pod 來實驗。大家先進到工作目錄，cd k8s-course-labs/lesson4，然後用之前寫的 pod.yaml 建一個 nginx Pod 回來。輸入 kubectl apply -f pod.yaml，然後 kubectl get pods 確認一下 STATUS 是 Running。如果你之前把 pod.yaml 刪掉了也沒關係，我們等一下會用 dry-run 再產生一個。先用 kubectl run my-nginx --image=nginx:1.27 快速建一個也行。
 
 好，確認 Pod 在跑了。
 
@@ -208,7 +210,7 @@ K8s 的 port-forward 是這樣用的：kubectl port-forward pod/my-nginx 8080:80
 
 好，進入今天最後一個 Loop。前面我們跑了 nginx、跑了 httpd、跑了 busybox，這些都是不需要特別設定就能跑起來的 Image。但是在真實世界裡，很多服務啟動的時候需要一些設定才能正常運作。最典型的例子就是資料庫。
 
-我先丟一個問題給大家想。假設你想在 K8s 裡面跑一個 MySQL 的 Pod。你會怎麼寫 YAML？根據前面學的知識，你可能會寫 apiVersion v1、kind Pod、metadata name mysql-pod、spec containers 裡面放一個 image 是 mysql:8.0 的容器。看起來很合理對不對？但是如果你真的 apply 它，你會得到一個 CrashLoopBackOff。為什麼？因為 MySQL 需要知道 root 密碼才能初始化資料庫。你什麼都沒告訴它，它不知道怎麼辦，就直接退出了。
+我先丟一個問題給大家想。假設你想在 K8s 裡面跑一個 MySQL 的 Pod，而且我故意先做一份會失敗的版本。你會怎麼寫 YAML？根據前面學的知識，你可能會寫 apiVersion v1、kind Pod、metadata name mysql-broken、spec containers 裡面放一個 image 是 mysql:8.0 的容器。看起來很合理對不對？但是如果你真的 apply 它，你會得到一個 CrashLoopBackOff。為什麼？因為 MySQL 需要知道 root 密碼才能初始化資料庫。你什麼都沒告訴它，它不知道怎麼辦，就直接退出了。
 
 那怎麼解決？回想一下 Docker。在 Docker 的時候，你要跑 MySQL 是怎麼做的？docker run -e MYSQL_ROOT_PASSWORD=my-secret mysql:8.0。關鍵就是 -e 參數，-e 就是設定環境變數。你透過環境變數 MYSQL_ROOT_PASSWORD 告訴 MySQL 容器「root 的密碼是 my-secret」，這樣 MySQL 啟動的時候就知道要用這個密碼來初始化。
 
@@ -256,7 +258,7 @@ K8s 提供了一個叫 Secret 的資源，專門用來管理機密資訊。Secre
 
 好，我們來動手做。這個實作我會從「故意做錯」開始，因為在真實世界裡你很可能會先碰到這個錯誤，然後才去找原因。
 
-大家先進到工作目錄 cd ~/k8s-labs。
+大家先進到工作目錄 cd k8s-course-labs/lesson4。
 
 先建一個故意不寫環境變數的 MySQL Pod。打開你的編輯器，建一個叫 pod-mysql-broken.yaml 的檔案。內容很簡單：apiVersion v1、kind Pod、metadata 裡面 name 是 mysql-broken。spec 底下 containers，name 是 mysql，image 是 mysql:8.0。就這樣，故意不寫 env。
 
@@ -332,7 +334,7 @@ Running 了。我們進去驗證。
 - Pod 概念 + 為什麼不是直接管容器
 - YAML 四大欄位：apiVersion / kind / metadata / spec
 - Pod CRUD：apply / get / describe / logs / exec / delete
-- Pod 生命週期 + 狀態（Pending → Running → CrashLoopBackOff...）
+- Pod phase + kubectl 常見 STATUS
 - 排錯三兄弟：get → describe → logs
 - 多容器 Pod / Sidecar 模式
 - port-forward（臨時通道存取 Pod）
@@ -383,7 +385,7 @@ Running 了。我們進去驗證。
 
 重點回顧下午的四個 Loop。
 
-第一個 Loop 是排錯。我們學了 Pod 的生命週期，知道了 Pending、ContainerCreating、Running 這些正常狀態，也認識了 ImagePullBackOff 和 CrashLoopBackOff 這些讓人頭痛的異常狀態。最重要的是學會了排錯三兄弟 — get pods 看狀態、describe pod 看 Events、logs 看日誌。我們還故意把 Pod 搞壞，親手排除了 Image 名字拼錯和程式 crash 兩種錯誤。
+第一個 Loop 是排錯。我們學了 Pod 的高層 phase，也學會區分 kubectl STATUS 裡常看到的 ContainerCreating、ImagePullBackOff、CrashLoopBackOff。最重要的是學會了排錯三兄弟 — get pods 看狀態、describe pod 看 Events、logs 看日誌。我們還故意把 Pod 搞壞，親手排除了 Image 名字拼錯和程式 crash 兩種錯誤。
 
 第二個 Loop 是 Sidecar。一個 Pod 裡面放兩個容器，nginx 寫日誌，busybox 用 tail -f 追蹤日誌。兩個容器透過 emptyDir Volume 共享檔案，協同工作。我們也學了判斷標準：拿掉一個容器，另一個還能不能活。能活就分開放，不能活就放一起。
 

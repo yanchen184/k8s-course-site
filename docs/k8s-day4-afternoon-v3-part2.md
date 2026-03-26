@@ -274,7 +274,7 @@ kubectl get pod my-nginx -o jsonpath='{.spec.containers[0].image}'
 **學員實作（~10min）**
 1. `dry-run` 產 httpd Pod YAML → 存 my-httpd.yaml → apply → port-forward 9090:80 → curl 看到 "It works!"
 2. `-o yaml` 查看 Pod 完整配置 → 找出 K8s 自動填充的欄位（uid / creationTimestamp / restartPolicy）
-3. `kubectl explain pod.spec.containers.resources` → 預習 limits / requests
+3. `kubectl explain pod.spec.containers.ports` → 看看 containerPort 旁邊還能設什麼（protocol / name / hostPort）
 
 ## 逐字稿
 

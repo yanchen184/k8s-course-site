@@ -2405,10 +2405,6 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
           </table>
         </div>
 
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-1">不用擔心掉隊</p>
-          <p className="text-slate-300 text-sm">做完的同學可以先往下看，沒做完的同學在<strong className="text-white">回頭操作</strong>環節跟著做。</p>
-        </div>
       </div>
     ),
     notes: `現在來講下午的安排。下午跟上午不太一樣。上午是一支影片接一支影片，比較線性地從概念走到實作。下午我們用一個叫 Loop 的結構。每一個 Loop 包含三到四個步驟。第一步是概念影片，我先講清楚原理。第二步是實作示範，我在螢幕上操作給你看。第三步是你自己動手，螢幕上會有練習題目，給你十到十五分鐘的時間做。第四步是回頭操作，我從頭帶做一遍，讓沒跟上的同學可以對照。

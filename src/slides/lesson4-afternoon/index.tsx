@@ -1698,7 +1698,7 @@ testdb 出現在列表裡了。
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">沒跟上的同學，快速補做 MySQL Pod</p>
+          <p className="text-cyan-400 font-semibold mb-2">快速補做 MySQL Pod</p>
           <pre className="text-green-300 text-xs bg-slate-900/80 p-3 rounded overflow-x-auto whitespace-pre-wrap">
 {`kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yaml
 # 編輯加 env → apply → exec 驗證 → delete`}

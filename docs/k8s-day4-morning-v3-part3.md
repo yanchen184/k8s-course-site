@@ -64,7 +64,7 @@ YAML 的語法有三個重點。
 
 好，語法知道了。那 K8s 的 YAML 到底長什麼樣子？不管你要建什麼資源，每一個 K8s 的 YAML 檔案都有四個必備欄位。
 
-第一個是 apiVersion。你可以把它理解成「你要用哪一版的語言跟 K8s 說話」。不同的資源類型有不同的 apiVersion。Pod 用 v1，Deployment 用 apps/v1，Ingress 用 networking.k8s.io/v1。你不需要背這些，寫的時候查一下就好。螢幕上有一個對照表，大家可以截圖存起來。
+第一個是 apiVersion。K8s 的功能非常多，它把這些功能分成不同的群組。比如 Pod、Service、ConfigMap 這些最基礎的功能放在核心群組，版本號是 v1。Deployment、StatefulSet 這些管理應用的功能放在 apps 群組，版本號是 apps/v1。Ingress 放在網路群組，版本號是 networking.k8s.io/v1。apiVersion 就是告訴 K8s「我要用的功能在哪個群組」。你不需要背，就跟填表格一樣，寫 Pod 就填 v1，寫 Deployment 就填 apps/v1，查一下就好。螢幕上有對照表。
 
 第二個是 kind，就是你要建什麼東西。Pod、Service、Deployment、ConfigMap，你要建什麼就寫什麼。
 

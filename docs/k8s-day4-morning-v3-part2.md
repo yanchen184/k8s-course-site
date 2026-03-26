@@ -336,13 +336,29 @@ minikube start 跑完之後，它會自動幫你設定好 kubectl，讓 kubectl 
 
 你會看到四個 Namespace。default 是預設的，你之後建的 Pod 如果不指定 Namespace 就會放在這裡。kube-system 就是剛才看的，放管理組件。kube-public 放一些公開可讀的資訊。kube-node-lease 記錄 Node 的心跳，K8s 用它來判斷 Node 還活不活著。最常用的就是 default 和 kube-system，其他兩個知道有就好。
 
-好，來看一個好玩的東西。執行 minikube dashboard。
+好，來看一個好玩的東西，K8s 的 Dashboard，圖形化管理介面。
 
-這會在你的瀏覽器裡打開 K8s 的 Dashboard，一個圖形化的管理介面。左邊是導覽列，你可以看到 Namespaces、Nodes、Pods、Services、Deployments 各種資源。你點 Workloads 裡面的 Pods，選 kube-system 這個 Namespace，就會看到剛才用 kubectl 看到的那些 Pod，用圖形化的方式呈現。每個 Pod 的狀態、IP、啟動時間都列得清清楚楚。
+如果你是在有瀏覽器的電腦上跑 minikube，直接執行 minikube dashboard 就會自動開瀏覽器。但我們的環境是 VMware 裡面的 Ubuntu，沒有圖形介面也沒有瀏覽器，所以要換一個方式。
+
+指令：minikube dashboard --url
+
+這行指令不會開瀏覽器，它只會印出一個 URL，類似 http://127.0.0.1:隨機port。但這個 127.0.0.1 是 VM 裡面的本機，你的筆電連不到。所以我們要用 kubectl proxy 把它開放出來。
+
+開另一個終端視窗，執行：
+
+指令：kubectl proxy --address='0.0.0.0' --disable-filter=true
+
+這行指令的意思是：把 K8s 的 API（包括 Dashboard）開放給所有 IP 連線。--address 0.0.0.0 讓外部能連，--disable-filter=true 允許非 localhost 的請求。
+
+然後在你筆電的瀏覽器打開：http://你的VM的IP:8001/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/
+
+你的 VM IP 可以用 ip addr 或 hostname -I 查到。
+
+打開之後你就會看到 Dashboard 的介面了。左邊是導覽列，你可以看到 Namespaces、Nodes、Pods、Services、Deployments 各種資源。你點 Workloads 裡面的 Pods，選 kube-system 這個 Namespace，就會看到剛才用 kubectl 看到的那些 Pod，用圖形化的方式呈現。每個 Pod 的狀態、IP、啟動時間都列得清清楚楚。
 
 你也可以點 Cluster 裡面的 Nodes，看到 minikube 這個 Node 的 CPU 和記憶體使用率。跟剛才 kubectl describe node 看到的資訊是一樣的，只是換了圖表的方式呈現。
 
-Dashboard 對初學者很有幫助，直觀地理解叢集狀態。但日常工作中，大部分工程師還是用 kubectl，打指令比點滑鼠快得多，而且可以寫成腳本自動化。兩種方式各有優點，看場景選擇。
+Dashboard 可以幫你更直觀地理解叢集狀態。但日常工作中，大部分工程師還是用 kubectl，打指令比點滑鼠快得多，而且可以寫成腳本自動化。兩種方式各有優點，看場景選擇。
 
 好，最後我們來做一個 Docker 和 kubectl 的指令對照，幫你建立直覺。
 

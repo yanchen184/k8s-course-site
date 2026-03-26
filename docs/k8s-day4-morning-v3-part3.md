@@ -38,7 +38,7 @@
 
 ## 逐字稿
 
-好，歡迎回來。上午休息之前，我們在 kube-system 這個 Namespace 裡面看到了一堆 Pod。etcd、API Server、Scheduler、Controller Manager，K8s 自己的管理組件全都以 Pod 的身份在跑。我們用 describe node 看了 CPU、記憶體、Container Runtime，還打開了 Dashboard 的圖形介面。到這裡為止，我們已經驗證了一件事：K8s 的叢集是活的，而且裡面已經有東西在跑了。
+好，前面我們在 kube-system 裡看到 K8s 自己的管理組件全都以 Pod 的身份在跑。叢集是活的，裡面已經有東西在跑了。
 
 但是那些都是 K8s 自己的東西。我的 nginx 呢？我的應用程式呢？我怎麼把我自己的容器放進去？
 
@@ -376,6 +376,4 @@ exit 出來。
 
 下午五個 Loop 分別是。Loop 1 是 Pod 生命週期和排錯，我會帶大家故意寫錯 YAML、故意拼錯 Image 名字，練習看錯誤訊息怎麼查、怎麼修。Loop 2 是多容器 Pod 和 Sidecar 模式，親手體驗兩個容器在同一個 Pod 裡面共享網路、共享 Volume。Loop 3 是 kubectl 進階技巧，包括 port-forward、dry-run 這些日常工作天天用到的東西。Loop 4 是環境變數和 MySQL Pod，學會怎麼把設定注入到容器裡面，為第六堂課的 ConfigMap 和 Secret 做鋪墊。Loop 5 會把今天一路累積的問題收束到 Deployment，讓你先看到三層關係和刪 Pod 自動補回的自我修復。
 
-每個 Loop 結束都有練習時間。做完的同學可以先往下看，沒做完的就在回頭操作的時候跟著一起做。不用擔心掉隊。
-
-好，上午到這裡。大家休息一下，下午見。
+好，上午到這裡。

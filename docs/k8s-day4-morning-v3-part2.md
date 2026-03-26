@@ -259,9 +259,13 @@ minikube start 跑完之後，它會自動幫你設定好 kubectl，讓 kubectl 
 
 好，來用 kubectl 探索。
 
-第一個指令，kubectl get nodes。你應該會看到一行輸出，一個 Node，名字叫 minikube，狀態 Ready，角色 control-plane。Ready 代表這個 Node 是健康的。control-plane 就是 Master 的意思。因為 minikube 是單節點，Master 和 Worker 合在一起，所以只有一個 Node 同時扮演兩個角色。等第五堂課用 k3s，你就會看到兩個 Node 了，一個 control-plane、一個 worker。
+指令：kubectl get nodes
 
-第二個指令，kubectl cluster-info。這會顯示 API Server 的位址和 CoreDNS 的位址。API Server 就是上一支影片講的叢集大門，你看到它跑在一個 https 的位址上，通常是 https 加上一個 IP 和 Port。CoreDNS 就是叢集內部的 DNS 服務，讓 Pod 可以用 Service 名字找到對方。
+你應該會看到一行輸出，一個 Node，名字叫 minikube，狀態 Ready，角色 control-plane。Ready 代表這個 Node 是健康的。control-plane 就是 Master 的意思。因為 minikube 是單節點，Master 和 Worker 合在一起，所以只有一個 Node 同時扮演兩個角色。等第五堂課用 k3s，你就會看到兩個 Node 了，一個 control-plane、一個 worker。
+
+指令：kubectl cluster-info
+
+這會顯示 API Server 的位址和 CoreDNS 的位址。API Server 就是上一支影片講的叢集大門，你看到它跑在一個 https 的位址上，通常是 https 加上一個 IP 和 Port。CoreDNS 就是叢集內部的 DNS 服務，讓 Pod 可以用 Service 名字找到對方。
 
 你可能會問，為什麼 API Server 用 https 不是 http？因為安全。所有跟叢集的溝通都要加密，這是 K8s 的安全設計。kubectl 發出的每一個請求都帶著你的身份憑證，經過 TLS 加密傳輸給 API Server。API Server 驗證你的身份之後才會處理。這些細節你現在不用深究，知道有這層安全機制就好。
 

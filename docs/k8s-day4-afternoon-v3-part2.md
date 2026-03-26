@@ -167,19 +167,13 @@ echo 'alias k=kubectl' >> ~/.bashrc   # 或 ~/.zshrc
 
 好，上一支影片講了一堆技巧，現在全部來動手操作。大家把終端機打開，跟著我一步一步來。
 
-首先確保你有一個 Pod 可以拿來實驗。進到工作目錄。
+首先我們需要一個 Pod 來實驗。前面做完 Sidecar 應該清理過了，所以先建一個回來。
 
 指令：cd k8s-course-labs/lesson4
-
-然後看看有沒有 Running 的 Pod。
-
+指令：kubectl apply -f pod.yaml
 指令：kubectl get pods
 
-如果沒有的話，快速用我們 repo 裡的 pod.yaml 建一個。
-
-指令：kubectl apply -f pod.yaml
-
-確認 STATUS 是 Running 就好。
+等到 my-nginx 的 STATUS 變成 Running 就可以了。
 
 第一個操作，port-forward。
 

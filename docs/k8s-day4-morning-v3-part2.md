@@ -255,7 +255,7 @@ kubectl 有一個很大的好處：不管你的叢集是 minikube、k3s、還是
 
 如果叢集還沒啟動，執行 minikube start。這個指令會下載 K8s 的映像檔，建立一個虛擬機或容器，取決於你的 driver 設定，然後在裡面啟動 K8s 叢集。第一次跑會比較久，大概三到五分鐘，因為要下載東西。之後再啟動就快了，映像檔已經在本地了。
 
-minikube start 跑完之後，它會自動幫你設定好 kubectl，讓 kubectl 指向你的 minikube 叢集。這個設定其實是寫在一個叫 kubeconfig 的檔案裡，通常在你的 home 目錄下的 .kube/config。kubectl 每次執行指令的時候都會去讀這個檔案，知道要連哪個叢集、用什麼身份。你現在不需要手動去改這個檔案，minikube 都幫你設好了。但後面如果你同時有多個叢集，就需要了解 kubeconfig 的切換，到時候再說。
+minikube start 跑完之後，它會自動幫你設定好 kubectl，讓 kubectl 指向你的 minikube 叢集。你現在不需要了解背後的細節，minikube 都幫你設好了。
 
 好，來用 kubectl 探索。
 

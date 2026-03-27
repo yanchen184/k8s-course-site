@@ -54,7 +54,7 @@ YAML 全名是 YAML Ain't Markup Language，一個遞迴縮寫，表示它不是
 
 YAML 的語法有三個重點。
 
-第一個，縮排用空格，絕對不能用 Tab。這是初學者最常踩的坑，待會實作的時候你就會知道有多痛。你在編輯器裡面按 Tab 鍵，看起來好像是空格，但其實它是一個 Tab 字元，YAML 解析器會直接報錯。我強烈建議大家現在就打開你的編輯器，把 Tab 設定成自動轉換為兩個空格。VS Code 的話在右下角可以直接改。vim 的話在設定檔裡加上 set expandtab、set tabstop=2、set shiftwidth=2。這個設定做一次，後面就不會再踩到了。
+第一個，縮排用空格，絕對不能用 Tab。這是最常踩的坑，待會實作的時候你就會知道有多痛。你在編輯器裡面按 Tab 鍵，看起來好像是空格，但其實它是一個 Tab 字元，YAML 解析器會直接報錯。我強烈建議大家現在就打開你的編輯器，把 Tab 設定成自動轉換為兩個空格。VS Code 的話在右下角可以直接改。vim 的話在設定檔裡加上 set expandtab、set tabstop=2、set shiftwidth=2。這個設定做一次，後面就不會再踩到了。
 
 第二個，冒號後面要有空格。寫 name 冒號空格 my-pod，冒號跟值之間一定要有一個空格。如果你寫 name 冒號 my-pod，中間沒有空格，YAML 會把整段當成一個 key，解析就錯了。
 
@@ -74,13 +74,11 @@ YAML 的語法有三個重點。
 
 那 Pod 的 spec 裡面最常用的欄位有哪些？我先幫大家整理一下。最重要的是 containers，這是一個列表，定義你要跑哪些容器。每個容器裡面有 name、image、ports、env 就是環境變數、command 可以覆蓋容器預設的啟動指令、還有 volumeMounts 用來掛載 Volume。containers 以外，spec 底下還有 volumes 用來定義 Volume、restartPolicy 是重啟策略，預設值是 Always，也就是容器掛了就自動重啟。今天我們先用到 containers 裡面的 name、image、ports 這三個，其他的欄位後面用到再講，不用一次記住。
 
-四個欄位，你可以用四個問題來記。apiVersion 是「你要說哪種語言」，kind 是「你要建什麼」，metadata 是「它叫什麼名字」，spec 是「它長什麼樣子」。
+四個欄位，你可以用四個問題來記。apiVersion 是「屬於哪個 API 群組」，kind 是「你要建什麼」，metadata 是「它叫什麼名字」，spec 是「它長什麼樣子」。
 
 現在來跟你已經會的 Docker Compose 做個對照。Docker Compose 裡面寫 version 冒號 3，K8s 對應的是 apiVersion。Docker Compose 的 services 區塊定義你要跑哪些服務，K8s 這邊拆成了 kind 加 spec。Docker Compose 的 image 冒號 nginx，K8s 寫在 spec 底下的 containers 列表裡面。最大的差別是什麼？Docker Compose 一個檔案可以描述一整套系統，前端、後端、資料庫都塞在裡面。K8s 的 YAML 通常一個檔案描述一個資源。你要一個 Pod 寫一個檔案，要一個 Service 再寫一個檔案。雖然可以用三個減號的分隔線把多個資源塞在同一個檔案裡，但我們先養成好習慣，一個檔案一個資源。
 
-好，YAML 搞定了。Pod 的概念前面已經講過了：K8s 最小的調度單位，容器外面包一層，一 Pod 一容器是最佳實踐。Docker 和 kubectl 的指令對照也在 4-2 講過了。這些就不重複了。
-
-接下來就是今天最關鍵的一步：動手寫你的第一個 Pod YAML，把它跑起來。
+好，YAML 搞定了。接下來就是今天最關鍵的一步：動手寫你的第一個 Pod YAML，把它跑起來。
 
 ---
 
@@ -110,7 +108,7 @@ YAML 的語法有三個重點。
 
 ## 逐字稿
 
-好，這是今天上午最重要的一個實作。前面所有影片都在「看」和「理解」，這支影片我們開始「做」。你學了 YAML 的格式，學了 Pod 的概念，現在把這兩樣東西合起來，寫出你人生中第一個 K8s YAML 檔案，然後讓它跑起來。
+好，這是今天上午最重要的一個實作。前面所有影片都在「看」和「理解」，這支影片我們開始「做」。你學了 YAML 的格式，學了 Pod 的概念，現在把這兩樣東西合起來，寫出你第一個 K8s YAML 檔案，然後讓它跑起來。
 
 請大家把終端機打開，編輯器準備好，跟著我一步一步來。
 

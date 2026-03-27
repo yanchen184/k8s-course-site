@@ -72,6 +72,8 @@ YAML 的語法有三個重點。
 
 第四個是 spec，specification 的縮寫，規格的意思。你想要什麼容器、用什麼 Image、開什麼 Port、掛什麼 Volume，全部寫在 spec 裡面。spec 是整個 YAML 裡面最重要、也是變化最多的部分。不同資源的 spec 內容完全不一樣。
 
+那 Pod 的 spec 裡面最常用的欄位有哪些？我先幫大家整理一下。最重要的是 containers，這是一個列表，定義你要跑哪些容器。每個容器裡面有 name、image、ports、env 就是環境變數、command 可以覆蓋容器預設的啟動指令、還有 volumeMounts 用來掛載 Volume。containers 以外，spec 底下還有 volumes 用來定義 Volume、restartPolicy 是重啟策略，預設值是 Always，也就是容器掛了就自動重啟。今天我們先用到 containers 裡面的 name、image、ports 這三個，其他的欄位後面用到再講，不用一次記住。
+
 四個欄位，你可以用四個問題來記。apiVersion 是「你要說哪種語言」，kind 是「你要建什麼」，metadata 是「它叫什麼名字」，spec 是「它長什麼樣子」。
 
 現在來跟你已經會的 Docker Compose 做個對照。Docker Compose 裡面寫 version 冒號 3，K8s 對應的是 apiVersion。Docker Compose 的 services 區塊定義你要跑哪些服務，K8s 這邊拆成了 kind 加 spec。Docker Compose 的 image 冒號 nginx，K8s 寫在 spec 底下的 containers 列表裡面。最大的差別是什麼？Docker Compose 一個檔案可以描述一整套系統，前端、後端、資料庫都塞在裡面。K8s 的 YAML 通常一個檔案描述一個資源。你要一個 Pod 寫一個檔案，要一個 Service 再寫一個檔案。雖然可以用三個減號的分隔線把多個資源塞在同一個檔案裡，但我們先養成好習慣，一個檔案一個資源。
@@ -148,7 +150,7 @@ YAML 的語法有三個重點。
 
 第八行，空兩格，containers 冒號。
 
-第九行，空四格，減號空格 name 冒號空格 nginx。這是容器的名字。一個 Pod 裡面可能有多個容器，每個容器要有自己的名字。
+第九行，空四格，減號空格 name 冒號空格 nginx。這是容器的名字。這裡有兩個 name，容易搞混，我特別說一下。metadata 底下的 name 是 Pod 的名字，你用 kubectl get pods 看到的就是這個名字，kubectl delete pod 也是刪這個名字。containers 裡面的 name 是容器的名字，一個 Pod 裡面可以有多個容器，用這個名字來區分它們。當你的 Pod 有多個容器的時候，kubectl logs 和 kubectl exec 要用 -c 指定是哪個容器。如果只有一個容器，容器名字寫什麼都行，但建議跟 Image 名字一致，方便辨認。
 
 第十行，空六格，image 冒號空格 nginx:1.27。這就是我們要跑的 Docker Image。nginx 冒號 1.27 是指定 1.27 版。你也可以寫 nginx:latest 或者只寫 nginx，但在正式環境裡我們永遠建議寫明確的版本號。因為 latest 這個 tag 會隨著 Image 作者的更新而變，今天是 1.27，明天可能就 1.28 了。寫死版本號才能確保每次部署都是同一個東西。
 
@@ -163,6 +165,8 @@ YAML 的語法有三個重點。
 好，來部署。確認你在 k8s-course-labs/lesson4 目錄下，輸入 kubectl apply -f pod.yaml。
 
 指令：kubectl apply -f pod.yaml
+
+-f 是 file 的意思，告訴 kubectl 從這個檔案讀取設定。沒有 -f 的話 kubectl 不知道你要 apply 什麼。
 
 這裡解釋一下 apply。你在網路上可能會看到另一個寫法 kubectl create -f pod.yaml。兩個都能用，但有一個重要差別。create 是「建立」，如果資源已經存在就報錯。apply 是「應用」，資源不存在就建立，已經存在就更新。所以 apply 可以重複執行，改了 YAML 之後再 apply 一次就能更新。我們統一用 apply，因為它更靈活。這也更符合宣告式的精神，你是在宣告「我要這個狀態」，而不是在說「幫我建一個東西」。
 
@@ -228,17 +232,21 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
 
 指令：exit
 
-進容器看檔案是一種驗證方式，但其實還有一個更直觀的方法。我們可以用 port-forward 建一條臨時通道，讓你的瀏覽器直接連到 Pod。輸入 kubectl port-forward pod/my-nginx 8080:80。
+進容器看檔案是一種驗證方式，但其實還有一個更直觀的方法。我們可以用 port-forward 建一條臨時通道，讓你的瀏覽器直接連到 Pod。port-forward 是 kubectl 的一個指令，可以在你的本機和 Pod 之間建一條臨時的通道。你在本機的瀏覽器打 localhost:8080，流量會被轉發到 Pod 的 80 port。下午 Loop 3 會詳細教，現在先照著打就好。
+
+輸入 kubectl port-forward pod/my-nginx 8080:80。
 
 指令：kubectl port-forward pod/my-nginx 8080:80
 
-然後打開你的瀏覽器，輸入 localhost:8080，你就會看到 nginx 的歡迎頁面了。port-forward 的細節我們下午會專門用一支影片來講。現在先感受一下就好。看完了按 Ctrl+C 停掉 port-forward。
+然後打開你的瀏覽器，輸入 localhost:8080，你就會看到 nginx 的歡迎頁面了。看完了按 Ctrl+C 停掉 port-forward。
 
 最後一步，清理。輸入 kubectl delete pod my-nginx。
 
 指令：kubectl delete pod my-nginx
 
-你會看到 pod "my-nginx" deleted 的訊息。再用 kubectl get pods 確認，應該已經沒有 Pod 了，或者顯示 No resources found。
+你會看到 pod "my-nginx" deleted 的訊息。注意，kubectl 沒有 stop 這個指令，跟 Docker 不一樣。Docker 是先 docker stop 再 docker rm，分成暫停和刪除兩步。K8s 只有 delete，一步到位，直接刪掉。
+
+再用 kubectl get pods 確認，應該已經沒有 Pod 了，或者顯示 No resources found。
 
 恭喜大家，你們剛剛完成了 Pod 的完整 CRUD。C 是 Create，用 kubectl apply 建立。R 是 Read，用 get、describe、logs 查看。U 是 Update，改了 YAML 之後再 apply 就是更新。D 是 Delete，用 kubectl delete 刪除。
 
@@ -250,10 +258,12 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
 
 **題目一：用 httpd Image 建一個 Pod（基礎）**
 
-複製 pod.yaml，改名為 pod-httpd.yaml。name 改成 my-httpd，image 改成 httpd:2.4。
+複製 pod.yaml，改名為 pod-httpd.yaml。name 改成 my-httpd，image 改成 httpd:2.4，containerPort 故意寫 81 而不是 80。
 
 指令：cp pod.yaml pod-httpd.yaml
-指令：（編輯 pod-httpd.yaml，把 name 改成 my-httpd，image 改成 httpd:2.4）
+指令：（編輯 pod-httpd.yaml，把 name 改成 my-httpd，image 改成 httpd:2.4，containerPort 改成 81）
+
+containerPort 故意寫 81，看看會不會出錯。答案是不會。containerPort 只是文件記錄，httpd 實際監聽的 port 不受這個值影響。httpd 本身就是聽 80 的，你 containerPort 寫 81、寫 9999 甚至不寫，httpd 照樣在 80 port 服務。這呼應了我們前面講的：containerPort 更像是一個註解，告訴看 YAML 的人這個容器用了什麼 port，但它不會真的去改容器裡面的設定。
 
 部署它。
 

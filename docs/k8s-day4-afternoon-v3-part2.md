@@ -65,7 +65,7 @@ kubectl explain pod.spec.containers.env
 
 第二個，-o yaml。這個輸出會很長，因為它會把 Pod 的完整配置用 YAML 格式全部吐出來。什麼叫完整配置？不只是你自己在 YAML 裡面寫的那些東西，還包含一大堆 K8s 自動幫你填進去的預設值。比如你沒寫 restartPolicy，K8s 預設幫你填 Always，表示容器掛了就自動重啟。你也沒寫 dnsPolicy，K8s 預設填 ClusterFirst。最底下還有一整塊 status 區塊，裡面有 Pod 的 IP、啟動時間、每個容器的詳細狀態。排錯的時候這些資訊非常有價值。如果你用過 Docker，-o yaml 就像 docker inspect，讓你看到容器的完整內部資訊。
 
-第三個，-o json。跟 -o yaml 輸出的內容完全一樣，只是格式變成 JSON。如果你需要寫腳本去處理這些資料，或者要用 jq 做過濾和提取，JSON 格式會比 YAML 方便。
+第三個，-o json。跟 -o yaml 輸出的內容完全一樣，只是格式變成 JSON。如果你需要寫腳本去處理這些資料，或者要用 jq 做過濾和提取，JSON 格式會比 YAML 方便。jq 是一個命令列的 JSON 處理工具，可以從 JSON 輸出裡面過濾和提取你要的欄位。如果你沒裝過，Ubuntu 上用 sudo apt install jq 就好。今天不深入 jq，知道有這個工具就好。
 
 第四個，-o name。只吐出資源的名字，像 pod/my-nginx 這種格式。寫自動化腳本的時候用得到。
 
@@ -473,6 +473,8 @@ K8s 說 pod/mysql-broken created。看起來成功了對不對？
 往上找那行關鍵的錯誤訊息：database is uninitialized and password option is not specified。You need to specify one of the following as an environment variable: MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD, MYSQL_RANDOM_ROOT_PASSWORD。MySQL 告訴你了，你必須設定這三個環境變數中的其中一個。最常用的就是 MYSQL_ROOT_PASSWORD。
 
 原因找到了。上一支影片講的內容完全吻合。MySQL 需要知道 root 密碼才能完成初始化，你什麼都不給它，它就退出了。
+
+你可能會想：能不能不刪 Pod，直接用 kubectl edit 把 env 加上去？答案是不行。Pod 的 spec 大部分欄位是建立之後就不能改的，包括 containers 裡面的 env。你只能刪掉再重建。如果是用 Deployment 管的 Pod，改 Deployment 的 YAML 然後 apply 就好，Deployment 會幫你自動重建 Pod。這就是為什麼生產環境不直接建 Pod，而是用 Deployment。Deployment 是下一個 Loop 的主角。
 
 先把壞掉的 Pod 刪掉。
 

@@ -641,7 +641,7 @@ ConfigMap 有兩種使用方式。第一種，環境變數注入。Pod 啟動的
 
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">解法：Volume -- 資料存在 Pod 外面</p>
-          <p className="text-slate-300 text-sm">就像租房子把個人物品放<strong className="text-white">儲物間</strong>，不管搬幾次家，儲物間的東西都在。</p>
+          <p className="text-slate-300 text-sm">就像 <strong className="text-white">USB 隨身碟</strong>，電腦壞了換一台，USB 插上去資料還在。Pod 是電腦，Volume 是 USB。</p>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
@@ -692,7 +692,7 @@ ConfigMap 有兩種使用方式。第一種，環境變數注入。Pod 啟動的
     ),
     notes: `當容器被銷毀或者重啟的時候，容器中的資料也會跟著消失。這對於一些需要持久化儲存的應用程式，比如資料庫來說顯然是不行的。你的 MySQL 容器存了幾百萬筆客戶訂單，結果容器重啟一下，資料全沒了。你老闆明天就會請你離開。
 
-為了解決這個問題，Kubernetes 提供了一個叫做 Volume 的組件。它可以將一些持久化儲存的資源掛載到叢集中的本地磁碟上，或者掛載到叢集外部的遠端儲存上。這樣即使容器被銷毀或者重啟，這些資料也不會遺失，也就實現了容器中資料的持久化儲存。就像租房子，個人物品放儲物間，不管搬幾次家，儲物間的東西都在。
+為了解決這個問題，Kubernetes 提供了一個叫做 Volume 的組件。它可以將一些持久化儲存的資源掛載到叢集中的本地磁碟上，或者掛載到叢集外部的遠端儲存上。這樣即使容器被銷毀或者重啟，這些資料也不會遺失，也就實現了容器中資料的持久化儲存。就像 USB 隨身碟，電腦壞了換一台，USB 插上去資料還在。Pod 是電腦，Volume 是 USB。
 
 K8s 的 Volume 有好幾種。最簡單的是 emptyDir，一個臨時的空目錄，Pod 裡的多個容器可以共享。但注意，emptyDir 的資料在 Pod 刪除時會消失，不適合持久化。它適合 Sidecar 模式，比如主容器寫日誌，Sidecar 容器讀取日誌並轉發。
 

@@ -39,48 +39,177 @@ kubectl create deployment nginx --image=nginx --replicas=3
 
 ---
 
-## 4-7 動手做
+## 4-7 環境搭建 + 驗證
 
 ```bash
-cat ~/.kube/config
-# → 看三個區塊：clusters（叢集位址）、users（認證資訊）、contexts（叢集+使用者的組合）
-# → 重點看 current-context 是指向哪個叢集
+# ── 驗證安裝 ──
 
-kubectl config current-context
-# → 確認目前連的是哪個叢集（minikube / docker-desktop / 其他）
+minikube version
+# → 預期輸出：minikube version: v1.xx.x
+# → 確認 minikube 有裝好，沒有 command not found
 
-kubectl config use-context dev
-# → 切換叢集，確認輸出顯示 Switched to context "dev"
-# → 如果沒有 dev context 會報錯，正常，用來演示切換概念
+minikube status
+# → 預期輸出：
+#    minikube
+#    type: Control Plane
+#    host: Running
+#    kubelet: Running
+#    apiserver: Running
+#    kubeconfig: Configured
+# → 四個都是 Running / Configured = 叢集正常
+# → 如果看到 Stopped 或 host: Nonexistent → 需要 minikube start
+
+minikube start
+# → 只在 status 不是 Running 時才需要執行
+# → 第一次 start 會下載 VM Image + K8s 組件，可能要 3-5 分鐘
+# → 成功後會看到 "kubectl is now configured to use minikube cluster"
+
+# ── 驗證叢集 ──
 
 kubectl get nodes
-# → 看 NAME、STATUS（Ready/NotReady）、ROLES（control-plane）、AGE、VERSION
-# → minikube 應該只有一個 node，STATUS 必須是 Ready
+# → 預期輸出：
+#    NAME       STATUS   ROLES           AGE   VERSION
+#    minikube   Ready    control-plane   xxd   v1.xx.x
+# → 重點看：
+#    STATUS = Ready（叢集健康）。NotReady = 有問題
+#    ROLES = control-plane（Master + Worker 合一，minikube 特有）
+#    VERSION = K8s 版本號
 
 kubectl cluster-info
-# → 看 Kubernetes control plane 的 URL（通常是 https://127.0.0.1:xxxxx）
-# → 確認 CoreDNS 是否 running
+# → 預期輸出：
+#    Kubernetes control plane is running at https://127.0.0.1:xxxxx
+#    CoreDNS is running at https://127.0.0.1:xxxxx/api/v1/...
+# → control plane URL = API Server 的位址，kubectl 就是連這個
+# → CoreDNS running = 叢集內部 DNS 正常（Service 名稱解析靠它）
+# → 如果出現 "The connection to the server was refused" → minikube 沒在跑
+
+# ── kubeconfig（kubectl 怎麼知道連哪個叢集）──
+
+cat ~/.kube/config
+# → 這個檔案是 kubectl 的「通訊錄」，決定連哪個叢集
+# → 整個連線流程就像去銀行：驗證銀行是真的（CA）→ 出示身份證（client 憑證）→ 進門辦事
+#
+# → 實際輸出長這樣（以 minikube 為例）：
+#
+# → 【clusters — 連去哪裡？（銀行地址 + 驗證銀行身份）】
+#    clusters:
+#    - cluster:
+#        certificate-authority: /home/user/.minikube/ca.crt   ← CA 憑證
+#        server: https://192.168.49.2:8443                    ← API Server 位址
+#      name: minikube
+#    → server = API Server 的 IP + Port，kubectl 所有指令都發到這裡
+#    → certificate-authority = CA 憑證，叢集的「身份證」
+#      CA 憑證做什麼？驗證你連的真的是你的叢集，不是別人偽裝的
+#      類似 HTTPS：瀏覽器打開銀行網站，靠 SSL 憑證確認那真的是銀行
+#      kubectl 連 API Server 也一樣，靠 CA 憑證確認那真的是你的叢集
+#
+# → 【users — 我是誰？（出示你的身份證）】
+#    users:
+#    - name: minikube
+#      user:
+#        client-certificate: /home/user/.minikube/profiles/minikube/client.crt  ← 你的「員工證」
+#        client-key: /home/user/.minikube/profiles/minikube/client.key          ← 你的「私鑰」
+#    → client-certificate = 證明你有權限操作這個叢集
+#    → client-key = 配合 certificate 做身份驗證（像印章配身份證）
+#    → 有些叢集用 token 代替憑證（像是 AWS EKS 用 IAM token）
+#
+# → 【contexts — 組合起來（用哪個身份去哪家銀行）】
+#    contexts:
+#    - context:
+#        cluster: minikube    ← 連這個叢集
+#        user: minikube       ← 用這個身份
+#        namespace: default   ← 預設操作這個 Namespace
+#      name: minikube
+#    → 如果你有公司叢集 + 測試叢集 + 本機 minikube，就會有三組 context
+#    → 切換 context = 切換你在操作哪個叢集
+#
+# → 【current-context — 目前用哪組】
+#    current-context: minikube
+#    → kubectl 所有指令都是對這個 context 操作
+#
+# → minikube start 的時候自動幫你寫好了，不用手動設定
+
+kubectl config current-context
+# → 預期輸出：minikube
+# → 確認目前連的是哪個叢集
+# → 如果你有多個叢集（minikube + 公司叢集），這裡會顯示目前用哪個
+
+kubectl config use-context dev
+# → 切換到名叫 "dev" 的 context
+# → 如果有這個 context → 輸出 Switched to context "dev"
+# → 如果沒有 → 報錯 error: no context exists with the name: "dev"
+# → 這裡故意演示切換概念，報錯是正常的
+
+kubectl config use-context minikube
+# → 切回 minikube（確保後面的操作連對叢集）
 ```
 
 ---
 
-## 4-8 動手做
+## 4-8 探索叢集
 
 ```bash
-# ── Dashboard 啟動（VMware 環境，從宿主機瀏覽器存取）──
+# ── 親眼看到架構組件 ──
+
+kubectl get pods -n kube-system
+# → -n kube-system 指定 Namespace（叢集裡的「資料夾」）
+# → 預期看到這些 Pod（全部 STATUS = Running）：
+#    etcd-minikube                       ← etcd，叢集的資料庫
+#    kube-apiserver-minikube             ← API Server，叢集的大門
+#    kube-scheduler-minikube             ← Scheduler，決定 Pod 放哪台 Node
+#    kube-controller-manager-minikube    ← Controller Manager，24 小時監工
+#    kube-proxy-xxxxx                    ← kube-proxy，網路轉發（每個 Node 一個）
+#    coredns-xxxxx                       ← CoreDNS，叢集內部 DNS
+# → 重點：K8s 自己的管理組件也是用 Pod 跑的！自己管自己
+
+kubectl describe node minikube
+# → 輸出很長，帶你看重點區塊：
+#
+# → 【System Info】
+#    Container Runtime Version:  containerd://1.x.x  ← 不是 Docker！驗證了架構篇講的
+#    Kubelet Version:            v1.xx.x              ← kubelet 版本，通常跟 K8s 版本一致
+#    Operating System:           linux
+#    Architecture:               amd64
+#
+# → 【Capacity vs Allocatable】
+#    Capacity:     cpu: 2,  memory: 4000Mi   ← Node 的總資源
+#    Allocatable:  cpu: 2,  memory: 3800Mi   ← 可分配給 Pod 的量（K8s 保留一些給系統）
+#    → Scheduler 就是看 Allocatable 還有多少餘量，決定 Pod 放哪裡
+#
+# → 【Non-terminated Pods】
+#    列出這台 Node 上所有正在跑的 Pod 和它們各用了多少 CPU/記憶體
+#    → 就是剛才 get pods -n kube-system 看到的那些
+
+# ── Namespace ──
+
+kubectl get ns
+# → 預期輸出：
+#    NAME              STATUS   AGE
+#    default           Active   xxd   ← 你的 Pod 預設放這裡
+#    kube-system       Active   xxd   ← K8s 管理組件（剛才看的）
+#    kube-public       Active   xxd   ← 公開可讀資訊（很少用）
+#    kube-node-lease   Active   xxd   ← Node 心跳記錄（K8s 用它判斷 Node 還活不活）
+# → ns 是 namespace 的簡寫，kubectl 很多資源都有簡寫
+# → 最常用的就是 default 和 kube-system
+
+# ── Dashboard（VMware 環境，從宿主機瀏覽器存取）──
 
 minikube dashboard &
 # → 背景啟動 dashboard 服務，按 Enter 回到命令列
 # → 會自動在 minikube 內部署 kubernetes-dashboard
+# → 如果看到 "Verifying dashboard health ..." 然後卡住，等一下就好
 
 kubectl proxy --address='0.0.0.0' --accept-hosts='.*' --port=8001 &
 # → 背景啟動 API proxy，綁定所有網路介面（0.0.0.0）讓外部連入
 # → 按 Enter 回到命令列，終端機可以繼續操作
+# → 預設只綁 127.0.0.1，VMware 宿主機連不到，所以要加 --address='0.0.0.0'
 
 hostname -I
 # → 查看 VM 的 IP 位址（例如 192.168.xxx.xxx）
 # → 宿主機瀏覽器打開：
 # → http://<VM-IP>:8001/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/
+# → 在 Dashboard 裡點 Workloads → Pods → 選 kube-system Namespace
+# → 就會看到剛才 kubectl 看到的那些管理組件 Pod，用圖形介面呈現
 
 # ── 用完後關閉 ──
 jobs
@@ -88,12 +217,19 @@ jobs
 kill %1 %2
 # → 關閉 dashboard 和 proxy
 
-# ── 其他指令 ──
+# ── 資源類型速查 ──
 
 kubectl api-resources
-# → 看所有資源類型的清單：NAME、SHORTNAMES、APIVERSION、NAMESPACED、KIND
-# → 重點：po=pods, svc=services, deploy=deployments, ns=namespaces（縮寫可以少打字）
-# → NAMESPACED 欄位：true 代表有命名空間隔離，false 代表叢集級別
+# → 列出所有資源類型：NAME、SHORTNAMES、APIVERSION、NAMESPACED、KIND
+# → 常用簡寫：
+#    po = pods
+#    svc = services
+#    deploy = deployments
+#    ns = namespaces
+#    cm = configmaps
+#    no = nodes
+# → NAMESPACED 欄位：true = 有命名空間隔離，false = 叢集級別（如 Node）
+# → 以後打指令用簡寫會快很多：kubectl get po = kubectl get pods
 ```
 
 ---

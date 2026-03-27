@@ -536,82 +536,48 @@ testdb 出現在列表裡了。
 
 ---
 
-# 影片 4-23：第四堂總結 + 自由練習 + 下堂課預告（~12min）
+# 影片 4-23（修改版）：Loop 4 回頭操作 — MySQL Pod 補做 + 銜接 Deployment（~8min）
 
 ## PPT 上的內容
 
-**快速帶做 MySQL Pod（沒跟上的補做）**
+**沒跟上的同學，快速補做 MySQL Pod**
 ```bash
 kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yaml
 # 編輯加 env → apply → exec 驗證 → delete
 ```
 
-**本版下午四個 Loop 因果鏈（舊版結構）**
+```yaml
+# pod-mysql.yaml 關鍵部分
+spec:
+  containers:
+  - name: mysql
+    image: mysql:8.0
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: "my-secret"
+```
 
-| Loop | 問題 | 解決 |
-|:---|:---|:---|
-| 1 排錯 | Pod 壞了看不出原因 | get → describe → logs 排錯三兄弟 |
-| 2 Sidecar | 日誌怎麼收集 | 多容器 Pod + emptyDir |
-| 3 進階技巧 | 資訊不夠 / 連不上 / YAML 記不住 | -o wide / port-forward / dry-run |
-| 4 環境變數 | MySQL 跑不起來 | env 欄位注入環境變數 |
+```bash
+kubectl apply -f pod-mysql.yaml
+kubectl get pods -w              # 等 Running
+kubectl exec -it mysql-pod -- mysql -u root -pmy-secret
+# SHOW DATABASES; → exit
+kubectl delete pod mysql-pod
+```
 
-**Pod 知識清單（9 項）**
-1. Pod 概念 + 為什麼不是直接管容器
-2. YAML 四大欄位：apiVersion / kind / metadata / spec
-3. Pod CRUD：apply / get / describe / logs / exec / delete
-4. Pod phase + kubectl 常見 STATUS
-5. 排錯三兄弟：get → describe → logs
-6. 多容器 Pod / Sidecar 模式
-7. port-forward（臨時通道存取 Pod）
-8. dry-run 產生 YAML 模板
-9. 環境變數注入（env 欄位）
+**Loop 4 小結**
+- MySQL 不給密碼 → CrashLoopBackOff
+- 排錯三兄弟找原因 → env 欄位注入環境變數 → 正常啟動
+- Docker `-e KEY=VALUE` = K8s `env:` 欄位
 
-**Docker → K8s 完整對照表**
-
-| 你會的 Docker | 今天學的 K8s |
-|:---|:---|
-| `docker run nginx` | `kubectl apply -f pod.yaml` |
-| `docker run -p 8080:80` | `kubectl port-forward pod/xxx 8080:80`（臨時） |
-| `docker run -e KEY=VALUE` | YAML 裡的 `env:` 欄位 |
-| `docker ps` | `kubectl get pods` |
-| `docker logs` | `kubectl logs` |
-| `docker exec -it` | `kubectl exec -it -- /bin/sh` |
-| `docker stop / rm` | `kubectl delete pod` |
-| `docker inspect` | `kubectl describe pod` / `-o yaml` |
-| `docker-compose.yaml` | K8s YAML（apiVersion / kind / metadata / spec） |
-| Docker Compose `environment:` | K8s YAML `env:` |
-
-**學員自由練習**
-
-必做：
-1. MySQL Pod（設 `MYSQL_ROOT_PASSWORD`）→ exec 進去建資料庫
-2. 不看筆記寫 nginx Pod → port-forward → 瀏覽器看到頁面
-
-挑戰：
-3. Redis Pod（`redis:7`，不用 env）→ `exec -- redis-cli ping` → 回 PONG
-4. Python HTTP Server（`python:3.12`，command: `["python","-m","http.server","8000"]`）→ port-forward 8000 → 瀏覽器看到目錄列表
-
-**回家作業**
-1. 不看筆記，從零寫 nginx Pod YAML → 完整 CRUD 流程
-2. 跑不同 image：redis / python:3.12 / busybox:1.36 → 觀察行為差異
-3. 進階：MySQL Pod + env → exec 建資料庫
-
-**下堂課預告**
-
-| 主題 | 解決什麼問題 |
-|:---|:---|
-| Deployment | Pod 掛了沒人管 → 自動維持副本數、滾動更新 |
-| Service | port-forward 是臨時的 → 正式的存取入口 |
-| k3s 多節點 | minikube 只有一台 → 真正的分散式叢集 |
-
-> 今天的 Pod = 一個人做事
-> 下堂課的 Deployment = 一個團隊做事
+**銜接下一個 Loop**
+- 今天跑的所有 Pod 都有一個共同的弱點
+- 刪掉就沒了，沒人幫你補
+- 「一個人做事」→ 下一個 Loop 要變成「一個團隊做事」
 
 ## 逐字稿
 
-好，大家辛苦了，我們到了第四堂課最後一支影片。這支影片我做三件事。第一，如果你前面的 MySQL Pod 沒跟上，我快速帶你做一遍。第二，回顧今天學的所有東西。第三，預告下堂課的內容，給你一個期待。
-
-先快速帶做 MySQL Pod。如果你已經做過了，趁這個時間整理一下你的筆記或者做自由練習。
+好，MySQL Pod 的概念和實作都跑完了。如果你前面沒跟上，趁這個時間快速補做一下。
 
 用 dry-run 快速產生骨架。
 
@@ -620,60 +586,34 @@ kubectl run mysql-pod --image=mysql:8.0 --dry-run=client -o yaml > pod-mysql.yam
 打開檔案，找到 image 冒號 mysql:8.0 那行。在同一層，加上 env 冒號。底下減號空格 name 冒號 MYSQL_ROOT_PASSWORD，下一行 value 冒號引號 my-secret 引號。存檔。
 
 指令：kubectl apply -f pod-mysql.yaml
+指令：kubectl get pods -w
 
-等 Running 之後進去驗證。
+等到 Running。然後進去驗證。
 
 指令：kubectl exec -it mysql-pod -- mysql -u root -pmy-secret
 
-進去確認一下。
+進去之後確認看到四個系統資料庫。
 
 指令：SHOW DATABASES;
 指令：exit
 
-清理。
+最後清理掉。
 
 指令：kubectl delete pod mysql-pod
 
-OK，不到兩分鐘就做完了。
+不到兩分鐘就完成了。
 
-好，來回顧今天的內容。上午的部分我們在影片 4-11 已經回顧過了，這裡一句話帶過：上午我們從 Docker 的五個瓶頸出發，一路認識了 K8s 的八個核心概念和 Master-Worker 架構，最後動手跑了第一個 Pod 的 CRUD。
+已經做過的同學，幫我回想一下 Loop 4 的因果鏈。我們想跑一個 MySQL，結果沒給密碼，Pod 不斷 crash。排錯三兄弟告訴我們 MySQL 需要 MYSQL_ROOT_PASSWORD 環境變數。在 YAML 的 env 欄位加上去之後，MySQL 順利跑起來了。跟 Docker 的 -e 參數是一模一樣的概念。
 
-重點回顧下午。這份舊版安排的四個 Loop 是一條因果鏈，每解決一個問題就冒出下一個。
+好，Loop 4 到這邊結束。
 
-第一個 Loop，排錯。我們把 Pod 跑起來了，但 Pod 壞了怎麼辦？Image 名字拼錯了，出現 ImagePullBackOff。程式啟動就 crash，出現 CrashLoopBackOff。面對這些異常狀態，我們學了排錯三兄弟：get pods 看狀態、describe pod 看 Events、logs 看容器日誌。三個指令配合起來，大多數問題都能找到原因。我們也故意把 Pod 搞壞再修好，親手走了一遍完整的排錯流程。
+但是在進入下一個 Loop 之前，我要請大家想一件事。
 
-排錯會了，但你發現一個 Pod 裡面只能放一個容器嗎？不是。所以第二個 Loop 講了 Sidecar。一個 Pod 裡面放兩個容器，nginx 寫日誌，busybox 用 tail -f 追蹤日誌。兩個容器透過 emptyDir Volume 共享同一個目錄，各司其職。判斷標準很簡單，拿掉一個容器另一個還能不能正常工作。能的話就分開放，不能的話就放同一個 Pod。
+今天下午我們已經跑過很多 Pod 了。nginx、httpd、busybox、mysql。每一個 Pod 跑起來的時候你都很開心，Running，看起來一切正常。但是你有沒有注意到，我們在清理的時候都是 kubectl delete pod，刪掉之後那個 Pod 就真的消失了。kubectl get pods，空空如也。如果你是在生產環境跑一個 API 服務，半夜三點你的 Pod 掛了，沒有人幫你重建，你的使用者就看到錯誤頁面了。
 
-多容器 Pod 會做了，但你回頭一想，我一直在用 kubectl get pods，每次看到的資訊就那幾個欄位，不夠用。而且 Pod 跑起來了我在瀏覽器卻打不開。寫 YAML 還要一直翻文件。所以第三個 Loop 教了 kubectl 的進階技巧。-o wide 看更多資訊，-o yaml 看完整配置。port-forward 建臨時通道讓瀏覽器連到 Pod。dry-run 自動產生 YAML 模板。explain 查內建文件。自動補全和別名讓你打指令更快。
+這就是「一個人做事」的問題。一個人生病了、請假了、走了，事情就停了。
 
-kubectl 用得更熟了，但你發現一直在跑 nginx 和 busybox 這些簡單的 Image。你想跑一個 MySQL 試試看，結果 CrashLoopBackOff。所以第四個 Loop 學了環境變數。在 YAML 的 env 欄位注入 MYSQL_ROOT_PASSWORD，MySQL 就順利跑起來了。我們還做了故意做錯再修好的完整流程。最後發現密碼寫在 YAML 裡面不安全，為下堂課的 Secret 埋了伏筆。
+今天我們還有最後一個 Loop。在這個 Loop 裡面，我要帶你把「一個人做事」變成「一個團隊做事」。這個讓你從一個人變成一個團隊的東西，叫做 Deployment。
 
-這份舊版安排是四個 Loop，一條因果鏈：Pod 壞了 → 排錯三兄弟 → 多容器 Pod → kubectl 進階技巧 → 環境變數注入。每一步都是因為上一步用出了新的問題。
+上午的概念篇其實已經提過 Deployment 了，它負責管理多個副本、自動補 Pod、滾動更新。但是光聽概念跟親手操作是完全不一樣的。接下來的影片，我要讓你親眼看到「一個人」有多脆弱，然後親手感受「一個團隊」有多強大。
 
-螢幕上有一個 Pod 知識清單，九個項目。我唸一遍。Pod 概念、YAML 四大欄位、Pod CRUD 六個指令、Pod phase 與 kubectl 常見 STATUS、排錯三兄弟、多容器 Pod 和 Sidecar、port-forward、dry-run、環境變數注入。這九個東西就是今天所有的核心知識。如果你能在不看筆記的情況下每一項都解釋出來，今天的課就完全吸收了。
-
-還有一個 Docker 對照表，大家截圖存起來當速查卡。docker run 對應 kubectl apply，docker run -p 對應 port-forward，docker run -e 對應 env 欄位，docker ps 對應 kubectl get pods，docker logs 對應 kubectl logs，docker exec 對應 kubectl exec，docker stop rm 對應 kubectl delete pod，docker inspect 對應 describe 或 -o yaml，Docker Compose 的 YAML 對應 K8s 的 YAML，Docker Compose 的 environment 對應 K8s 的 env。你會發現，K8s 的很多操作跟 Docker 是一一對應的。你在 Docker 學的東西沒有白學，K8s 只是把同樣的概念放到了一個更大的框架裡面。
-
-好，螢幕上有自由練習題目，分必做和挑戰兩組。
-
-必做第一題，自己從頭寫一個 MySQL Pod 的 YAML，加上 MYSQL_ROOT_PASSWORD 環境變數，apply 之後 exec 進去建一個資料庫，確認成功再刪掉。必做第二題，不看任何筆記，從零手寫一個 nginx Pod 的 YAML。apply、port-forward、從瀏覽器看到 Welcome to nginx 頁面、然後刪除。如果卡住了再翻筆記，看看是卡在哪裡。
-
-挑戰題給有餘力的同學。第一個是跑一個 Redis Pod，image 用 redis:7，Redis 不需要設環境變數就能啟動。跑起來之後用 kubectl exec -it redis-pod 兩個減號 redis-cli ping，如果回 PONG 就成功了。第二個是跑一個 Python HTTP Server，image 用 python:3.12，但你要在 YAML 裡面加 command 欄位覆蓋掉預設的啟動指令，設成 python -m http.server 8000。然後 port-forward 到 8000，瀏覽器會看到一個目錄列表的頁面。
-
-回家作業三個。第一，把今天的 Pod 練習從頭到尾做一遍，不看筆記。如果能憑記憶完成整個流程，今天的內容就完全內化了。第二，跑不同的 Image 觀察行為差異。redis 會一直 Running。python:3.12 如果你不給它 command，它會啟動之後直接退出變成 Completed。busybox 也是。想想為什麼。第三，進階作業，跑 MySQL Pod 加環境變數，進去建資料庫。
-
-最後預告一下下堂課。
-
-今天你有沒有注意到一件事？我們一直在手動管理 Pod。手動建、手動刪、手動排錯。如果生產環境有幾十個 Pod，你也一個一個手動管嗎？半夜 Pod 掛了你要爬起來手動補嗎？更新版本的時候一個一個刪舊的建新的嗎？
-
-這些問題的答案都是不需要。下堂課要學的 Deployment 就是解決這些問題的。你告訴 Deployment 我要三個 nginx Pod，它就幫你維持三個。掛了一個自動補一個。要更新版本，Deployment 幫你做滾動更新，新的起來了再關舊的，不中斷服務。要擴容，改一個數字從三變十。要縮容，改回三。全部自動化。
-
-除了 Deployment 還有 Service。今天我們用 port-forward 來存取 Pod，但那只是臨時的除錯工具，關掉終端就斷了。Service 才是正式讓外部流量連到你的 Pod 的方式。下堂課會學 ClusterIP 讓叢集內部互連、NodePort 讓叢集外面連進來。
-
-還有一個讓人期待的東西，k3s。今天我們用的 minikube 是單節點的，所有 Pod 都跑在同一台機器上。下堂課我們會建一個真正的多節點叢集，一台 Master 一台 Worker。你會看到 Pod 被分散到不同的機器上，真正體會到 K8s 的分散式管理能力。那個感覺跟今天在 minikube 上操作是完全不一樣的。
-
-用一個比喻來結尾。今天學的 Pod 是一個人做事。一個人會生病、會請假、會累。下堂課學的 Deployment 是一個團隊做事。團隊裡有人倒了馬上有人頂上。需要更多人手，團隊可以擴編。忙完了，團隊可以縮編。從一個人到一個團隊，這就是 Deployment 的價值。
-
-好，第四堂課到這裡。今天的內容量非常大，從完全不認識 K8s 到能夠獨立操作 Pod，大家真的辛苦了。回去好好消化，把練習做一做。下堂課我們會進入更精彩的部分。Deployment、Service、多節點叢集，你會看到 K8s 真正強大的地方。
-
-下堂課見，大家辛苦了。

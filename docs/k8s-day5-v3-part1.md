@@ -372,11 +372,12 @@ kubectl scale deployment my-httpd --replicas=1
 
 | 操作 | 指令 |
 |:---|:---|
-| 觸發滾動更新 | kubectl set image deployment/名稱 容器名=新image |
+| 觸發滾動更新 | 改 YAML image → kubectl apply -f deployment.yaml |
 | 看更新進度 | kubectl rollout status deployment/名稱 |
 | 回滾到上一版 | kubectl rollout undo deployment/名稱 |
 | 回滾到指定版本 | kubectl rollout undo deployment/名稱 --to-revision=N |
 | 看歷史版本 | kubectl rollout history deployment/名稱 |
+| 快捷方式（替代） | kubectl set image deployment/名稱 容器名=新image |
 
 ## 逐字稿
 
@@ -437,18 +438,19 @@ K8s 預設會保留最近十個版本的 ReplicaSet 記錄，這個數字由 Dep
 ## 本集重點
 
 - 確認 Deployment 在跑（nginx:1.26）
-- kubectl set image 觸發滾動更新到 1.27
+- 改 YAML image → kubectl apply -f 觸發滾動更新到 1.27
 - kubectl rollout status 看逐步替換過程
 - kubectl get pods 看新舊 Pod 交替
 - kubectl get rs 看兩個 ReplicaSet
-- 驗證：kubectl describe pod 確認 Image 是 1.27
+- 驗證：kubectl describe deployment 確認 Image 是 1.27
 - 回滾：kubectl rollout undo
 - kubectl rollout history 看歷史
 - rollout undo --to-revision=N
+- 補充：kubectl set image 快捷方式（提一句）
 
 學員實作題目：
-- 必做：建 nginx:1.26 Deployment → set image 更新到 1.27 → rollout status 看過程 → get rs 看兩個 ReplicaSet → rollout undo 回滾 → 確認回到 1.26
-- 挑戰：故意更新到 nginx:99.99（不存在的版本）→ 觀察滾動更新卡住 → rollout undo 救回來
+- 必做：建 nginx:1.26 Deployment → 改 YAML image 為 1.27 → kubectl apply -f 更新 → rollout status 看過程 → get rs 看兩個 ReplicaSet → rollout undo 回滾 → 確認回到 1.26
+- 挑戰：故意改 YAML image 為 nginx:99.99（不存在的版本）→ kubectl apply -f → 觀察滾動更新卡住 → rollout undo 救回來
 
 ## 逐字稿
 
@@ -469,13 +471,17 @@ kubectl describe deployment my-nginx | grep Image
 
 你應該看到 nginx:1.26。三個 Pod 都跑 1.26 版。
 
-好，現在要來觸發滾動更新了。我們把 Image 從 nginx:1.26 更新到 nginx:1.27。用 kubectl set image 指令。
+好，現在要來觸發滾動更新了。我們把 Image 從 nginx:1.26 更新到 nginx:1.27。生產環境的標準做法是改 YAML 再 apply。我們先把 Deployment 的 YAML 匯出來。
 
-kubectl set image deployment/my-nginx nginx=nginx:1.27
+kubectl get deployment my-nginx -o yaml > deployment.yaml
 
-注意這個指令的格式。deployment/my-nginx 是你要更新的 Deployment 名稱。後面的 nginx=nginx:1.27，等號前面的 nginx 是容器的名字，不是 Deployment 的名字。容器名字在哪裡定義的？在 YAML 的 spec.template.spec.containers.name，或者你用 kubectl create deployment 建的時候它預設用 Image 的名字。等號後面是新的 Image。
+打開 deployment.yaml，找到 spec.template.spec.containers 下面的 image 欄位，把 nginx:1.26 改成 nginx:1.27。改好存檔。
 
-指令一打完，滾動更新就開始了。馬上用 rollout status 來觀察。
+改完之後，用 kubectl apply 把新的 YAML 送進去。
+
+kubectl apply -f deployment.yaml
+
+apply 的瞬間，K8s 發現 Image 版本變了，滾動更新就自動開始了。馬上用 rollout status 來觀察。
 
 kubectl rollout status deployment/my-nginx
 
@@ -535,13 +541,15 @@ kubectl rollout undo deployment/my-nginx --to-revision=2
 
 這會回到 revision 2，也就是 nginx:1.27。
 
+補充一個快捷方式。除了改 YAML 再 apply，K8s 還提供一個指令叫 kubectl set image，可以直接在指令裡換版本，不用改檔案。像這樣：kubectl set image deployment/my-nginx nginx=nginx:1.27。效果一樣，也會觸發滾動更新。但我們統一用改 YAML 再 apply 的方式，因為這是生產環境的標準做法。改 YAML 的好處是你的檔案永遠跟叢集狀態一致，放進 Git 做版本控制，團隊協作的時候大家看檔案就知道現在跑什麼版本。
+
 好，接下來是你們的實作時間。螢幕上有兩個題目。
 
-必做題就是我剛才示範的完整流程。建 nginx:1.26 的 Deployment，replicas 3。用 set image 更新到 1.27。用 rollout status 看更新過程。用 get rs 確認看到兩個 ReplicaSet。用 rollout undo 回滾。用 describe 確認回到 1.26。每一步都要自己親手打一遍。
+必做題就是我剛才示範的完整流程。建 nginx:1.26 的 Deployment，replicas 3。改 YAML 把 image 換成 1.27，kubectl apply -f 觸發更新。用 rollout status 看更新過程。用 get rs 確認看到兩個 ReplicaSet。用 rollout undo 回滾。用 describe 確認回到 1.26。每一步都要自己親手打一遍。
 
-挑戰題更有趣。故意把 Image 更新到一個不存在的版本，nginx:99.99。
+挑戰題更有趣。故意把 YAML 裡的 Image 改成一個不存在的版本，nginx:99.99，然後 apply。
 
-kubectl set image deployment/my-nginx nginx=nginx:99.99
+kubectl apply -f deployment.yaml
 
 然後看 Pod。
 
@@ -565,8 +573,8 @@ kubectl rollout undo deployment/my-nginx
 
 ## 本集重點
 
-- 帶做滾動更新 + 回滾
-- 常見坑：set image 的語法（容器名 vs Deployment 名）、回滾是回到上一版不是初始版
+- 帶做滾動更新 + 回滾（改 YAML → apply）
+- 常見坑：改完 YAML 忘了 apply、回滾是回到上一版不是初始版
 - 上午總結：k3s 多節點 → 擴縮容 → 滾動更新 + 回滾
 - 下午預告
 
@@ -574,13 +582,13 @@ kubectl rollout undo deployment/my-nginx
 
 好，時間到了，我們來回頭操作，然後做上午總結。
 
-滾動更新的操作流程很簡單，就三個指令。set image 觸發更新，rollout status 看進度，rollout undo 回滾。大家跟我做一遍。
+滾動更新的操作流程很簡單。改 YAML 的 image、apply 觸發更新、rollout status 看進度、rollout undo 回滾。大家跟我做一遍。
 
 先確認你有一個 Deployment 在跑。kubectl get deploy。如果沒有，建一個。kubectl create deployment my-nginx --image=nginx:1.26 --replicas=3。
 
-觸發更新。
+觸發更新。打開你的 deployment.yaml，把 image 從 nginx:1.26 改成 nginx:1.27，存檔。然後 apply。
 
-kubectl set image deployment/my-nginx nginx=nginx:1.27
+kubectl apply -f deployment.yaml
 
 看進度。
 
@@ -596,7 +604,7 @@ kubectl describe deployment my-nginx | grep Image
 
 好，講兩個常見的坑。
 
-第一個坑，set image 的語法。kubectl set image deployment/my-nginx nginx=nginx:1.27。很多同學會搞混等號前面那個 nginx 是什麼。它是容器的名字，不是 Deployment 的名字，也不是 Image 的名字。容器名字在哪裡看？kubectl get deployment my-nginx -o yaml，找 spec.template.spec.containers 下面的 name 欄位。用 kubectl create deployment 建的話，容器名字預設跟 Image 的名字一樣，所以都叫 nginx，容易搞混。如果你的容器名字叫 web-server，那指令就是 kubectl set image deployment/my-nginx web-server=nginx:1.27。
+第一個坑，改完 YAML 忘了 apply。有同學把 deployment.yaml 裡的 image 改好了，存檔了，然後就去看 Pod，發現版本沒變，覺得奇怪。原因是你只是改了本機的檔案，K8s 不會自動偵測你的檔案變化。你一定要 kubectl apply -f deployment.yaml，把新的設定送進叢集，K8s 才會觸發滾動更新。改檔案和 apply 是兩個步驟，缺一不可。
 
 第二個坑，rollout undo 是回到上一版，不是回到初始版。如果你的歷史是 1.26、1.27、1.28，你在 1.28 的時候 rollout undo，回到的是 1.27，不是 1.26。如果你要回到 1.26，要用 --to-revision 指定版本號。很多同學以為 undo 就是回到最開始，結果回到的不是自己想要的版本。
 
@@ -608,7 +616,7 @@ kubectl describe deployment my-nginx | grep Image
 
 第二件事，學了 Deployment 的擴縮容。流量來了 kubectl scale 加 Pod，流量退了 scale 縮回來。一行指令，Pod 自動分散到不同 Node。背後是 Controller Manager 偵測差異、Scheduler 分配 Node、kubelet 啟動容器。
 
-第三件事，學了滾動更新和回滾。kubectl set image 觸發更新，Deployment 逐步替換舊 Pod 為新 Pod，零停機。背後是新舊 ReplicaSet 的蹺蹺板。萬一新版有問題，kubectl rollout undo 一行指令回到上一版。
+第三件事，學了滾動更新和回滾。改 YAML 的 image 再 kubectl apply，Deployment 逐步替換舊 Pod 為新 Pod，零停機。背後是新舊 ReplicaSet 的蹺蹺板。萬一新版有問題，kubectl rollout undo 一行指令回到上一版。
 
 三件事串起來就是一條因果鏈。只有一個 Node 看不到分散的效果，所以裝了 k3s 多節點。多節點之後流量來了要加 Pod，所以學了擴縮容。Pod 數量會調了，但版本也要更新，所以學了滾動更新。新版可能有問題，所以學了回滾。每一步都是上一步沒解決的問題。
 

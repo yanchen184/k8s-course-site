@@ -1147,9 +1147,9 @@ kubectl explain pod.spec.containers，它會列出 containers 底下所有可以
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
             <li>確認有一個 Running 的 nginx Pod</li>
             <li>執行 <code className="text-green-400">kubectl port-forward pod/my-nginx 8080:80</code></li>
-            <li>終端被佔住 → 開<strong className="text-white">另一個終端</strong></li>
+            <li>終端被佔住 → 開<strong className="text-white">另一個終端</strong>，或加 <code className="text-cyan-400">&</code> 丟背景</li>
             <li>新終端：<code className="text-green-400">curl localhost:8080</code> → 看到 Welcome to nginx</li>
-            <li>回原終端按 <code className="text-cyan-400">Ctrl+C</code> 停止</li>
+            <li>停止：<code className="text-cyan-400">fg</code> 拉回前台再 <code>Ctrl+C</code>，或 <code className="text-cyan-400">kill %1</code> 直接殺</li>
             <li>再 curl → <code className="text-red-400">Connection refused</code>（通道已斷）</li>
           </ol>
         </div>
@@ -1166,6 +1166,13 @@ kubectl get pods
 
 # port-forward（佔住終端）
 kubectl port-forward pod/my-nginx 8080:80
+
+# 或丟背景（不佔終端）
+kubectl port-forward pod/my-nginx 8080:80 &
+
+# 停止背景的 port-forward
+fg          # 拉回前台再 Ctrl+C
+kill %1     # 或直接殺掉
 
 # === 開另一個終端 ===
 curl localhost:8080          # Welcome to nginx!

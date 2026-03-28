@@ -24,7 +24,11 @@
 
 **學員練習：**
 - 必做：建 httpd Deployment replicas:2 → scale 到 5 → `-o wide` 觀察 → scale 回 1
-- 挑戰：scale 到 0（Pod 全砍但 Deployment 還在，scale 回來就恢復）
+- 挑戰 1：scale 到 0（Pod 全砍但 Deployment 還在，scale 回來就恢復）
+- 挑戰 2（預告體驗 — 模擬自動擴縮）：
+  - 終端 1：`kubectl get pods -w`（持續觀察）
+  - 終端 2：快速連打 `scale --replicas=5` → `8` → `10` → `3`，每次等 5 秒
+  - 看 Pod 快速增減 → 這就是第七堂 HPA 自動做的事
 
 ---
 

@@ -449,8 +449,10 @@ K8s 預設會保留最近十個版本的 ReplicaSet 記錄，這個數字由 Dep
 - 補充：kubectl set image 快捷方式（提一句）
 
 學員實作題目：
-- 必做：建 nginx:1.26 Deployment → 改 YAML image 為 1.27 → kubectl apply -f 更新 → rollout status 看過程 → get rs 看兩個 ReplicaSet → rollout undo 回滾 → 確認回到 1.26
-- 挑戰：故意改 YAML image 為 nginx:99.99（不存在的版本）→ kubectl apply -f → 觀察滾動更新卡住 → rollout undo 救回來
+- 必做 1：建 nginx:1.26 Deployment → 改 YAML image 為 1.27 → kubectl apply -f → rollout status 看逐步替換 → get rs 看新舊兩個 ReplicaSet
+- 必做 2：rollout undo 回滾 → describe 確認版本退回 1.26
+- 必做 3：故意改 image 為 nginx:99.99（不存在）→ apply → 觀察：舊 Pod 還在跑，新 Pod 卡在 ImagePullBackOff → K8s 不會把舊的砍光 → rollout undo 救回來
+- 挑戰：做三次更新（1.26 → 1.27 → 1.28）→ rollout history 看三個版本 → rollout undo --to-revision=1 直接跳回 1.26
 
 ## 逐字稿
 

@@ -947,48 +947,53 @@ K8s 預設會保留最近十個版本的 ReplicaSet 記錄，這個數字由 Dep
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">操作流程</p>
+          <p className="text-cyan-400 font-semibold mb-2">操作流程（改 YAML → apply）</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
             <li>建 <code className="text-green-400">nginx:1.26</code> Deployment, replicas:3</li>
-            <li><code className="text-green-400">kubectl set image</code> 更新到 1.27</li>
-            <li><code className="text-green-400">kubectl rollout status</code> 看逐步替換</li>
+            <li>改 YAML 的 image 從 1.26 → <code className="text-green-400">1.27</code></li>
+            <li><code className="text-green-400">kubectl apply -f deployment.yaml</code> 觸發滾動更新</li>
+            <li><code className="text-green-400">kubectl rollout status</code> 看更新進度</li>
+            <li><code className="text-green-400">kubectl get pods -w</code> 看 Pod 逐步替換（Terminating / ContainerCreating）</li>
             <li><code className="text-green-400">kubectl get rs</code> → 兩個 ReplicaSet（新 3/舊 0）</li>
-            <li><code className="text-green-400">kubectl describe deploy | grep Image</code> → 確認 1.27</li>
             <li><code className="text-green-400">kubectl rollout undo</code> → 回到 1.26</li>
-            <li><code className="text-green-400">kubectl rollout history</code> → 看版本紀錄</li>
           </ol>
         </div>
 
-        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">set image 語法重點</p>
-          <div className="bg-slate-900/50 p-2 rounded mt-1">
-            <code className="text-green-400 text-sm">kubectl set image deployment/<span className="text-cyan-400">my-nginx</span> <span className="text-amber-400">nginx</span>=nginx:1.27</code>
+        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">觀察技巧：兩個終端並排</p>
+          <div className="text-slate-300 text-sm space-y-1">
+            <p>終端 1：<code className="text-cyan-400">kubectl get pods -w</code>（持續觀察 Pod 增減）</p>
+            <p>終端 2：改 YAML → <code className="text-cyan-400">kubectl apply -f</code>（觸發更新）</p>
+            <p className="text-slate-400 text-xs mt-1">終端 1 會即時顯示：新 Pod Creating → Running，舊 Pod Terminating → 消失</p>
           </div>
-          <p className="text-slate-300 text-xs mt-2"><span className="text-cyan-400">藍色</span> = Deployment 名稱 | <span className="text-amber-400">橘色</span> = 容器名稱（不是 Deployment 名稱）</p>
         </div>
       </div>
     ),
-    code: `# 清掉重建
-kubectl delete deployment my-nginx my-httpd
-kubectl create deployment my-nginx --image=nginx:1.26 --replicas=3
+    code: `# 終端 1（持續觀察）
+kubectl get pods -w
 
-# 確認版本
+# 終端 2（操作）
+# 1. 確認版本
 kubectl describe deployment my-nginx | grep Image  # nginx:1.26
 
-# 觸發滾動更新
-kubectl set image deployment/my-nginx nginx=nginx:1.27
+# 2. 改 YAML image 從 1.26 → 1.27，然後 apply
+kubectl apply -f deployment.yaml
 kubectl rollout status deployment/my-nginx
 
-# 驗證
-kubectl get pods          # 新 Pod（名字的 hash 不同）
+# 3. 驗證
 kubectl get rs            # 兩個 RS：新版 3/3、舊版 0/0
 kubectl describe deployment my-nginx | grep Image  # nginx:1.27
 
-# 回滾
+# 4. 回滾
 kubectl rollout undo deployment/my-nginx
 kubectl rollout status deployment/my-nginx
 kubectl describe deployment my-nginx | grep Image  # 回到 1.26
-kubectl rollout history deployment/my-nginx`,
+
+# 5. 看歷史版本
+kubectl rollout history deployment/my-nginx
+
+# 補充快捷方式（不用改檔案）
+kubectl set image deployment/my-nginx nginx=nginx:1.27`,
     notes: `好，這支影片我們來實際操作滾動更新和回滾。請大家打開終端機。
 
 先把之前的 Deployment 清掉，我們重新建一個乾淨的環境。

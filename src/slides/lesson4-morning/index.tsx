@@ -2253,7 +2253,7 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
           <p className="text-cyan-400 font-semibold mb-2">題目 1：httpd:2.4 Pod（基礎）</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
             <li>複製 pod.yaml → <code>httpd-pod.yaml</code></li>
-            <li>name 改 <code>my-httpd</code>、image 改 <code className="text-green-400">httpd:2.4</code>、containerPort 改 <code>80</code></li>
+            <li>name 改 <code>my-httpd</code>、image 改 <code className="text-green-400">httpd:2.4</code>、containerPort 故意改 <code className="text-amber-400">81</code>（會出錯嗎？）</li>
             <li><code>kubectl apply -f httpd-pod.yaml</code> 部署</li>
             <li>進容器 → <code>cat /usr/local/apache2/htdocs/index.html</code>（看到 "It works!"）</li>
             <li>或 <code>kubectl port-forward pod/my-httpd 8080:80</code> → 瀏覽器 localhost:8080</li>
@@ -2275,7 +2275,7 @@ describe 的輸出比較長，不要被嚇到。往上看你會看到 Name、Nam
     ),
     notes: `題目一：用 httpd Image 建一個 Pod（基礎）
 
-複製 pod.yaml，改名為 httpd-pod.yaml。name 改成 my-httpd，image 改成 httpd:2.4，containerPort 維持 80。
+複製 pod.yaml，改名為 httpd-pod.yaml。name 改成 my-httpd，image 改成 httpd:2.4，containerPort 故意改成 81。會出錯嗎？答案是不會。containerPort 只是文件記錄，告訴看 YAML 的人這個容器用什麼 port，httpd 實際監聽的 port 不受這個值影響。
 
 指令：cp pod.yaml httpd-pod.yaml
 指令：（編輯 httpd-pod.yaml，把 name 改成 my-httpd，image 改成 httpd:2.4）

@@ -418,13 +418,13 @@ spec:
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">題目 2：觀察 CrashLoopBackOff 退避策略（進階觀察）</p>
+          <p className="text-cyan-400 font-semibold mb-2">題目 2：CrashLoopBackOff vs Completed（進階觀察）</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>建 Pod：image 用 <code>nginx:1.27</code>，加上 <code className="text-red-400">command: ["/bin/sh", "-c", "exit 1"]</code></li>
-            <li>用 <code>kubectl get pods --watch</code> 持續觀察 RESTARTS 欄位</li>
-            <li>用 <code>kubectl logs</code> 看輸出（會是空的，想想為什麼？）</li>
-            <li>感受退避間隔：10s → 20s → 40s → ...</li>
-            <li>觀察完記得清理</li>
+            <li>建 Pod：image <code>busybox:1.36</code>，command: <code className="text-red-400">["/bin/sh", "-c", "echo 'K8s is awesome' && sleep 5 && exit 1"]</code></li>
+            <li><code>kubectl get pods --watch</code> 觀察 CrashLoopBackOff + 退避間隔</li>
+            <li><code>kubectl logs</code> → 看到 <strong className="text-green-400">K8s is awesome</strong></li>
+            <li>把 <code>exit 1</code> 改成 <code>exit 0</code> → 重新 apply → STATUS 變成 <strong className="text-cyan-400">Completed</strong>（不是 CrashLoopBackOff）</li>
+            <li>思考：exit 1 vs exit 0 的差別是什麼？</li>
           </ul>
         </div>
       </div>
@@ -500,7 +500,22 @@ spec:
 
 整個排錯流程六步驟：apply、get pods 看狀態、describe 看原因、刪掉、改 YAML、重新 apply。這個流程要練到變成反射動作。
 
-第二個排錯練習，CrashLoopBackOff。建一個 pod-crash.yaml，image 用 nginx:1.27 但加上 command，陣列裡面三個元素 "/bin/sh"、"-c"、"exit 1"。apply 之後觀察狀態變成 CrashLoopBackOff，RESTARTS 數字一直增加。用 logs 看，可能是空的，因為程式還沒來得及輸出就退出了。試試 kubectl logs crash-pod --previous。觀察完之後 kubectl delete pod crash-pod 清理。
+第二個排錯練習，CrashLoopBackOff。我們用 lab repo 裡準備好的 pod-crash.yaml。
+
+指令：kubectl apply -f pod-crash.yaml
+
+這個 Pod 用的 image 是 busybox:1.36，command 設成 /bin/sh -c "echo hello && exit 1"。容器啟動後先印 hello，然後以 exit code 1 結束，故意失敗。
+
+指令：kubectl get pods --watch
+
+你會看到 STATUS 從 Running 變成 Error，再變成 CrashLoopBackOff。RESTARTS 一直增加，而且間隔越來越長。按 Ctrl+C 停止。
+
+指令：kubectl logs crash-pod
+
+你會看到 hello。因為我們的 command 有 echo hello，容器有印東西再退出的。如果 command 只有 exit 1 沒有 echo，log 就會是空的。
+
+指令：kubectl logs crash-pod --previous
+指令：kubectl delete pod crash-pod
 
 這裡提醒幾個常踩的坑。第一，Image 名字永遠用小寫，Docker Hub 上的 Image 名字全部是小寫的。第二，Image tag 要確認存在，可以去 Docker Hub 網站搜尋。記住幾個常用的就好：nginx 用 1.27，httpd 用 2.4，busybox 用 1.36。第三，command 裡面要用 exit 的話，一定要用 /bin/sh -c 包起來，因為 exit 是 shell 內建指令，不是獨立的執行檔。
 

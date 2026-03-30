@@ -136,7 +136,13 @@ kubectl delete pod 加上你複製的 Pod 名字。
 
 這個實驗告訴我們一件非常重要的事：Labels 不只是裝飾，它是 K8s 的認親機制。Deployment 靠 Labels 認 Pod，Service 也靠 Labels 認 Pod。標籤對了就是自己人，標籤不對就不認識。
 
-好，學員實作時間。必做的部分：delete Pod 看自我修復，用 --show-labels 看標籤，用 -l 篩選 Pod。挑戰的部分：把某個 Pod 的 app label 改掉，觀察 Deployment 補新 Pod 和舊 Pod 變孤兒的現象。做完之後把孤兒 Pod 清理掉。
+好，學員實作時間。
+
+必做 1：用 kubectl get pods -o wide 記下每個 Pod 在哪個 Node。delete 掉其中一個。再看 -o wide，新補的 Pod 跑到哪個 Node 了？是回到原來那台還是去了別台？K8s 不保證補回同一台，Scheduler 會重新決定。
+
+必做 2：你的叢集裡有 kube-system 的 Pod 和你自己的 Pod 混在一起。用 kubectl get pods -l app=nginx 只列出你的。再用 kubectl get pods -A -l app 列出所有 Namespace 裡有 app 標籤的 Pod。想一下：如果公司有十個團隊各自部署服務，Labels 怎麼幫你快速找到自己的東西？
+
+必做 3：不要 delete Pod，改用 kubectl label pod 加上其中一個 Pod 的名字 app=hacked --overwrite。觀察三件事：第一，kubectl get pods 會看到 4 個 Pod，因為 Deployment 認不到被改標籤的那個了，馬上補了一個新的。第二，被改標籤的 Pod 還在跑，但變成孤兒。第三，現在把標籤改回來，kubectl label pod 加上那個 Pod 的名字 app=nginx --overwrite。Deployment 發現多了一個，會砍掉一個回到 3 個。這就證明了 Labels 是 K8s 的認親機制。
 
 ---
 

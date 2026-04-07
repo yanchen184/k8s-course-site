@@ -808,16 +808,35 @@ kubectl get pods
         </div>
       </div>
     ),
-    code: `# Step 1：apply 並觀察
+    code: `# ── 把以下內容存成 api-service.yaml ──
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: api
+        image: nginx:1.25
+
+# ── Step 1：apply 並觀察 ──
 kubectl apply -f api-service.yaml
 kubectl get deploy          # 看 READY 欄位
 kubectl get pods            # 看 Pod 狀態
 kubectl describe deployment api-service
 
-# Step 2：修好後重新 apply
+# ── Step 2：修好後重新 apply ──
 kubectl apply -f api-service.yaml
 
-# Step 3：驗收 + 擴容
+# ── Step 3：驗收 + 擴容 ──
 kubectl get deploy          # READY: 3/3
 kubectl scale deployment api-service --replicas=5
 kubectl get pods -o wide    # 確認 NODE 分散`,

@@ -163,6 +163,7 @@ deployment "nginx-deploy" successfully rolled out
 **異常狀況：**
 - 卡在某一行不動超過 2 分鐘 → 可能 image 拉不下來，開另一個 terminal 跑 `kubectl get pods` 查狀態
 - 出現 `error: deployment "nginx-deploy" exceeded its progress deadline` → 超時失敗，需要 undo
+- 中途按 `Ctrl+C` 中斷輸出 → **更新仍然在背景繼續進行**，Ctrl+C 只是停止「看」，不是停止更新；若要確認進度，再跑一次 `kubectl rollout status`
 
 ---
 
@@ -236,7 +237,9 @@ deployment.apps/nginx-deploy annotated
 之後再跑 `kubectl rollout history`，CHANGE-CAUSE 欄位就會顯示你寫的說明。
 
 **異常狀況：**
-- 想要覆蓋已存在的 annotation → 加 `--overwrite` 旗標
+- `error: --overwrite is false but found the following declared annotation(s)` → 這個 key 已存在，要覆蓋需加 `--overwrite` 旗標，完整指令：`kubectl annotate deployment nginx-deploy kubernetes.io/change-cause="..." --overwrite`
+- annotation 加在 Deployment 上，不會自動套用到 Pod → `rollout history` 看到的是 Deployment 的 annotation，不是 Pod 的
+- 如果想讓每個 revision 都有記錄，要在**每次 set image 之後**立刻跑 annotate，順序不能弄錯
 
 ---
 
@@ -254,6 +257,11 @@ kubectl set image deployment/nginx-deploy nginx=nginx:9.9.9
 deployment.apps/nginx-deploy image updated
 ```
 指令本身成功，但 Pod 會拉不到 image。
+
+**異常狀況：**
+- 如果在上一次 set image 還沒完成時就再跑一次 set image → K8s 會以最新的 image 為目標，舊的 rolling update 會被放棄，直接換成最新的。history 裡舊的 revision 仍然保留，可以回滾
+- `nginx:9.9.9` 改成其他不存在的 tag 效果一樣，任何拉不到的 image 都會產生 `ErrImagePull` → `ImagePullBackOff`
+- 不小心把 image 打對了（真的存在的版本）→ 那就不是「壞掉的更新」，Pod 會正常跑起來；重新跑一次 `set image` 換成真正不存在的 tag
 
 ---
 

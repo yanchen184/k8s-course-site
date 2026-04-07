@@ -172,7 +172,7 @@ port vs targetPort：
 - port：Service 監聽的 port（呼叫方連這個）
 - targetPort：流量轉發到 Pod 的哪個 port（Pod 內的應用程式監聽的）
 - 兩者可以不同，例如 port: 80 轉發到 targetPort: 8080
-- Docker 對照：docker run -p 8080:80，左邊是 port，右邊是 targetPort
+- Docker 對照：Docker Compose 同一個 network 下，web 容器可以直接用 db 當主機名稱連線，ClusterIP 就是同樣的概念（Service 名稱即主機名稱）
 
 黃金法則：Deployment selector = Pod template labels = Service selector，三者要對上！
 
@@ -366,7 +366,129 @@ kubectl describe svc nginx-svc  # 確認 Service 的 Selector 是什麼
 
 題目 3：為什麼 ClusterIP 從你的筆電直接 curl http://10.96.123.45 會失敗？
 解答 3：ClusterIP 是叢集內部虛擬 IP，只存在 K8s 叢集的 overlay 網路內。你的筆電和叢集網路不通，封包無法路由到 ClusterIP。要從外部存取，需要 NodePort 或 LoadBalancer。
-[▶ 下一頁]`,
+[▶ 下一頁：DNS 深度偵探]`,
+  },
+
+  // ── 5-14 DNS 深度偵探 ──
+  {
+    title: 'DNS 深度偵探：撥開黑盒子',
+    subtitle: 'resolv.conf → nslookup → 跨 Namespace 斷訊 → CoreDNS',
+    section: 'Loop 4：ClusterIP Service',
+    duration: '10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">① 觀察 Pod 的「通訊錄」設定</p>
+          <p className="text-slate-300 text-xs mb-1">進入 test-curl Pod 後：</p>
+          <code className="text-green-400 text-xs">cat /etc/resolv.conf</code>
+          <div className="mt-2 space-y-1 text-xs text-slate-400">
+            <p><span className="text-amber-400">nameserver 10.96.0.10</span> → 叢集「查號台」CoreDNS</p>
+            <p><span className="text-amber-400">search default.svc.cluster.local ...</span> → 輸入 nginx-svc 會自動補全後綴去查詢</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">② 手動查 DNS</p>
+          <code className="text-green-400 text-xs">nslookup nginx-svc</code>
+          <p className="text-slate-400 text-xs mt-1">Address 1 = CoreDNS IP，Address 2 = nginx-svc 的 ClusterIP</p>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2 text-sm">③ 跨 Namespace 斷訊實驗</p>
+          <div className="space-y-1 text-xs text-slate-300">
+            <p><code className="text-green-400">kubectl create ns dev</code></p>
+            <p><code className="text-green-400">kubectl run test-dev --image=curlimages/curl -n dev -it --rm -- sh</code></p>
+            <p className="text-red-400 mt-1">curl http://nginx-svc → 失敗！Could not resolve host</p>
+            <p className="text-green-400">curl http://nginx-svc.default → 成功！跨 Namespace 要補 Namespace 名稱</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">④ CoreDNS 是什麼？</p>
+          <div className="space-y-1 text-xs text-slate-300">
+            <p><code className="text-green-400">kubectl get pod -n kube-system -l k8s-app=kube-dns</code></p>
+            <p className="text-slate-400 mt-1">它是跑在 kube-system 裡的 Deployment，監聽 API Server 維護名稱↔IP 對照表</p>
+            <p><code className="text-green-400 mt-1 block">kubectl get cm coredns -n kube-system -o yaml</code></p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# ① 觀察 DNS 設定（在 test-curl Pod 內）
+cat /etc/resolv.conf
+# nameserver 10.96.0.10   ← CoreDNS
+# search default.svc.cluster.local svc.cluster.local cluster.local
+
+# ② 手動 DNS 查詢
+nslookup nginx-svc
+# Server:    10.96.0.10
+# Address 1: 10.96.0.10 kube-dns.kube-system.svc.cluster.local
+# Address 2: 10.43.0.150 nginx-svc.default.svc.cluster.local
+
+# ③ 跨 Namespace 測試
+kubectl create ns dev
+kubectl run test-dev --image=curlimages/curl -n dev -it --rm -- sh
+# 在 Pod 內：
+curl http://nginx-svc          # 失敗：Could not resolve host
+curl http://nginx-svc.default  # 成功：Welcome to nginx!
+
+# ④ 查看 CoreDNS
+kubectl get pod -n kube-system -l k8s-app=kube-dns
+kubectl get cm coredns -n kube-system -o yaml`,
+    notes: `【① 課程內容】
+DNS 深度偵探：讓學生理解「Service 名稱怎麼變成 IP」這個黑盒子。
+
+① /etc/resolv.conf：
+- nameserver 10.96.0.10 → 這是 CoreDNS 的 ClusterIP，每個 Pod 預設都向它查詢
+- search default.svc.cluster.local ... → 自動補全清單，所以打 nginx-svc 等同打 nginx-svc.default.svc.cluster.local
+
+② nslookup nginx-svc：
+- 親眼看到 CoreDNS 把名字翻成 ClusterIP
+- 學生常問「我怎麼知道 Service 的 IP？」→ 就是 nslookup 回傳的 Address 2
+
+③ 跨 Namespace 斷訊（震撼教育）：
+- 不同 Namespace 的 Pod 打 nginx-svc 會失敗，因為 search domain 是 dev.svc.cluster.local，找不到 default namespace 的 Service
+- 修法：用完整格式 nginx-svc.default 或 nginx-svc.default.svc.cluster.local
+- 這是實務最常踩的坑，一定要讓學生親手踩一次
+
+④ CoreDNS 實體：
+- 讓學生看到「DNS 也只是 K8s 裡的 Pod」，打破黑盒子感
+- ConfigMap 裡可以看到 Corefile 設定，進階可自訂解析規則
+
+口訣送給學生：
+「DNS 給你地圖（名字變 IP），kube-proxy 帶你走路（IP 變 Pod）。地圖丟了，認得路也沒用；路斷了（Selector 錯），地圖再準也到不了。」
+
+【② 指令講解】
+指令 1（Pod 內）：cat /etc/resolv.conf
+用途：查看 Pod 的 DNS 設定
+打完要看：nameserver（CoreDNS IP）和 search domain 清單
+
+指令 2（Pod 內）：nslookup nginx-svc
+用途：手動解析 Service 名稱，確認 DNS 正常運作
+打完要看：Address 2 應該是 nginx-svc 的 ClusterIP
+
+指令 3：kubectl create ns dev
+用途：建立新 Namespace 模擬跨命名空間環境
+
+指令 4：kubectl run test-dev --image=curlimages/curl -n dev -it --rm -- sh
+用途：在 dev namespace 建臨時 Pod
+
+指令 5（Pod 內）：curl http://nginx-svc（預期失敗）→ curl http://nginx-svc.default（成功）
+用途：示範跨 Namespace 必須加 Namespace 名稱
+
+指令 6：kubectl get pod -n kube-system -l k8s-app=kube-dns
+用途：讓學生看到 CoreDNS 是真實跑著的 Pod
+
+指令 7：kubectl get cm coredns -n kube-system -o yaml
+用途：查看 CoreDNS 設定檔（Corefile）
+
+【③④ 延伸題目 + 解答】
+Q4 延伸題：如果把 CoreDNS Pod 刪掉（replicas 設為 0），curl <ClusterIP> 會通嗎？curl <Service名稱> 會通嗎？為什麼？
+
+解答：
+- curl <ClusterIP> 會通。流量轉發由 Node 上的 kube-proxy（iptables/IPVS）處理，不需要 DNS。
+- curl <Service名稱> 會失敗。沒有 CoreDNS 把名稱翻成 IP，程式報 Name resolution failed。
+教學意義：讓學生區分「域名解析」和「網路轉發」是兩套獨立的機制。
+[▶ 下一頁：Lab 4]`,
   },
 
   // ── Lab 4：ClusterIP 情境修復 ──

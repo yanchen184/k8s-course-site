@@ -759,128 +759,136 @@ kubectl get pods
 [▶ 下一頁]`,
   },
 
-  // ── 5-4（2/3）：學員必做題 ──
+  // ── 5-4（2/3）：Lab 1 — 你被叫去救火 ──
   {
-    title: '學員實作：擴縮容練習',
-    subtitle: '建 httpd → scale 5 → 看分散 → scale 1',
+    title: 'Lab 1：你被叫去救火',
+    subtitle: '新入職工程師接手有 bug 的 YAML，找問題、修好、擴容',
     section: '5-4：擴縮容實作',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-3">必做題</p>
-          <ol className="text-slate-300 text-sm space-y-2 list-decimal list-inside">
-            <li>建一個 <strong className="text-white">httpd</strong> Deployment，初始 replicas: <strong className="text-white">2</strong></li>
-            <li><code className="text-green-400">kubectl scale</code> 到 <strong className="text-white">5</strong></li>
-            <li><code className="text-green-400">kubectl get pods -o wide</code> → 確認 Pod 分散在不同 Node</li>
-            <li><code className="text-green-400">kubectl scale</code> 回 <strong className="text-white">1</strong>，確認只剩 1 個 Pod</li>
-          </ol>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">挑戰：scale 到 0</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>Pod 全砍，Deployment 仍然存在（READY: 0/0）</li>
-            <li>scale 回 3 → Pod 又建回來</li>
-            <li>用途：暫時停掉服務做維護，不用刪 Deployment</li>
-          </ul>
-        </div>
-      </div>
-    ),
-    code: `kubectl create deployment my-httpd --image=httpd --replicas=2
-kubectl scale deployment my-httpd --replicas=5
-kubectl get pods -o wide       # 看 NODE 欄位分散情況
-kubectl get deploy             # READY: 5/5
-kubectl scale deployment my-httpd --replicas=1
-kubectl get pods               # 只剩 1 個
-
-# 挑戰
-kubectl scale deployment my-httpd --replicas=0
-kubectl get deploy             # READY: 0/0
-kubectl scale deployment my-httpd --replicas=3`,
-    notes: `接下來是你們的實作時間。
-
-必做題：建一個 httpd 的 Deployment，初始副本數 2，scale 到 5，用 kubectl get pods -o wide 確認 Pod 分散在不同 Node，再 scale 回 1。
-
-有餘力可以試試 scale 到 0，觀察 Deployment 還在但 Pod 全消失了，再 scale 回來確認 Pod 重建。
-
-大家動手做，有問題舉手。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 5-4（3/3）：情境題：接手壞掉的 Deployment ──
-  {
-    title: '情境題：接手壞掉的 Deployment',
-    subtitle: '同事留下一個有 bug 的 YAML，Pod 一直起不來，你來修',
-    section: '5-4：擴縮容實作',
-    duration: '10',
+    duration: '12',
     content: (
       <div className="space-y-3">
         <div className="bg-red-900/20 border border-red-500/40 p-3 rounded-lg">
           <p className="text-red-400 font-semibold mb-1">情境</p>
-          <p className="text-slate-300 text-sm">同事離職，留下這份 YAML。你 apply 之後，Pod 一直起不來。請找出 bug 並修復。</p>
+          <p className="text-slate-300 text-sm">你是新入職的工程師。同事部署了一個 API 服務但設定有問題，你要接手修好。這份 YAML 裡有 <strong className="text-white">兩個 bug</strong>，自己找。</p>
         </div>
 
         <div className="bg-slate-900/80 p-3 rounded-lg text-xs font-mono leading-5">
           <div><span className="text-purple-400">apiVersion</span><span className="text-slate-300">: apps/v1</span></div>
           <div><span className="text-purple-400">kind</span><span className="text-slate-300">: Deployment</span></div>
           <div><span className="text-purple-400">metadata</span><span className="text-slate-300">:</span></div>
-          <div className="pl-4"><span className="text-purple-400">name</span><span className="text-slate-300">: web-broken</span></div>
+          <div className="pl-4"><span className="text-purple-400">name</span><span className="text-slate-300">: api-service</span></div>
           <div><span className="text-purple-400">spec</span><span className="text-slate-300">:</span></div>
-          <div className="pl-4"><span className="text-purple-400">replicas</span><span className="text-slate-300">: 1</span></div>
+          <div className="pl-4"><span className="text-purple-400">replicas</span><span className="text-slate-300">: </span><span className="text-red-400">1</span></div>
           <div className="pl-4"><span className="text-purple-400">selector</span><span className="text-slate-300">:</span></div>
           <div className="pl-6"><span className="text-purple-400">matchLabels</span><span className="text-slate-300">:</span></div>
-          <div className="pl-8"><span className="text-yellow-300">app: web</span></div>
+          <div className="pl-8"><span className="text-yellow-300">app: api</span></div>
           <div className="pl-4"><span className="text-purple-400">template</span><span className="text-slate-300">:</span></div>
           <div className="pl-6"><span className="text-purple-400">metadata</span><span className="text-slate-300">:</span></div>
           <div className="pl-8"><span className="text-purple-400">labels</span><span className="text-slate-300">:</span></div>
-          <div className="pl-10"><span className="text-red-400">app: website</span>  <span className="text-slate-500"># ← 注意這裡</span></div>
+          <div className="pl-10"><span className="text-red-400">app: backend</span></div>
           <div className="pl-6"><span className="text-purple-400">spec</span><span className="text-slate-300">:</span></div>
           <div className="pl-8"><span className="text-purple-400">containers</span><span className="text-slate-300">:</span></div>
-          <div className="pl-8"><span className="text-slate-300">- </span><span className="text-purple-400">name</span><span className="text-slate-300">: web</span></div>
+          <div className="pl-8"><span className="text-slate-300">- </span><span className="text-purple-400">name</span><span className="text-slate-300">: api</span></div>
           <div className="pl-10"><span className="text-purple-400">image</span><span className="text-slate-300">: nginx:1.25</span></div>
         </div>
 
         <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
           <p className="text-green-400 font-semibold mb-1">任務</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>把上面 YAML 存成 <code className="text-green-400">broken-deploy.yaml</code>，apply 到叢集</li>
-            <li>觀察發生什麼事（Deployment 狀態？Pod 數量？）</li>
-            <li>找出 bug，說明它會造成什麼問題</li>
-            <li>修復 YAML，重新 apply，驗證 Pod 正常 Running</li>
+            <li>把 YAML 存成 <code className="text-green-400">api-service.yaml</code>，apply 到叢集</li>
+            <li>觀察發生什麼事（用學過的指令自己查）</li>
+            <li>找出兩個 bug，各自說明問題是什麼</li>
+            <li>修好 YAML，重新 apply，讓 READY 變成 <strong className="text-white">3/3</strong></li>
+            <li>用 <code className="text-green-400">kubectl scale</code> 擴到 <strong className="text-white">5</strong>，確認 Pod 分散在不同 Node</li>
           </ol>
         </div>
 
         <div className="bg-slate-800/50 p-2 rounded text-xs text-slate-400">
-          驗收：<code className="text-green-400">kubectl get pods</code> → Running ｜
-          <code className="text-green-400 ml-2">kubectl describe deployment web-broken</code> → Selector 與 Pod Labels 一致
+          驗收：READY 3/3 → scale 5 → <code className="text-green-400">kubectl get pods -o wide</code> 看 NODE 欄位分散
         </div>
       </div>
     ),
-    code: `# Step 1：apply（先不要修）
-kubectl apply -f broken-deploy.yaml
-kubectl get pods          # 觀察狀態
-kubectl describe deployment web-broken
+    code: `# Step 1：apply 並觀察
+kubectl apply -f api-service.yaml
+kubectl get deploy          # 看 READY 欄位
+kubectl get pods            # 看 Pod 狀態
+kubectl describe deployment api-service
 
-# Step 2：修復 YAML 後重新 apply
-kubectl apply -f broken-deploy.yaml
+# Step 2：修好後重新 apply
+kubectl apply -f api-service.yaml
 
-# Step 3：驗收
-kubectl get pods          # STATUS = Running
-kubectl describe deployment web-broken | grep -A3 Selector
+# Step 3：驗收 + 擴容
+kubectl get deploy          # READY: 3/3
+kubectl scale deployment api-service --replicas=5
+kubectl get pods -o wide    # 確認 NODE 分散`,
+    notes: `這是 Lab 1，你被叫去救火。
 
-# 清理
-kubectl delete deployment web-broken`,
-    notes: `這是今天的情境題。這份 YAML 有一個 bug，你的任務是找出來、修復它，讓 Pod 正常跑起來。
+規則：YAML 裡有兩個 bug，不告訴你在哪裡。你要自己 apply，觀察叢集的反應，再用學過的指令找出問題。
 
-先不要急著看答案。把 YAML 存起來 apply，觀察叢集的反應，再想想剛才教的 Labels/Selector 概念，bug 在哪裡？
+提示方向：想想剛才教的 Labels/Selector 概念，還有老闆對副本數的要求。
 
-提示：仔細比對 selector 和 template labels 的值。
+做完五個步驟才算完成，記得最後要 scale 到 5 確認 Pod 分散。
 
-做完別忘了用 describe 驗收，確認 Selector 和 Pod Template Labels 完全一致。
+有問題舉手。
 
-有問題舉手，我來巡堂。
+[▶ 下一頁]`,
+  },
+
+  // ── 5-4（3/3）：Lab 2 — 版本事故 ──
+  {
+    title: 'Lab 2：版本事故（深夜 11 點）',
+    subtitle: '有人推了壞版本，服務正在掛掉，不准用 rollout undo',
+    section: '5-4：擴縮容實作',
+    duration: '12',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold mb-1">情境</p>
+          <p className="text-slate-300 text-sm">深夜 11 點，你收到警報。有人把 API 更新到壞掉的版本，服務正在掛掉。你要在不重新部署的情況下，讓服務恢復正常。</p>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">準備環境（依序執行）</p>
+          <div className="text-xs font-mono space-y-1">
+            <div className="text-slate-300"><span className="text-green-400">kubectl create deployment</span> night-api --image=<span className="text-cyan-300">httpd:2.4</span> --replicas=2</div>
+            <div className="text-slate-300"><span className="text-green-400">kubectl annotate deployment</span> night-api kubernetes.io/change-cause=<span className="text-cyan-300">"v1: 正常版本"</span></div>
+            <div className="text-slate-300"><span className="text-green-400">kubectl set image</span> deployment/night-api httpd=<span className="text-cyan-300">httpd:99.99.99</span></div>
+            <div className="text-slate-300"><span className="text-green-400">kubectl annotate deployment</span> night-api kubernetes.io/change-cause=<span className="text-cyan-300">"v2: 緊急更新（錯誤版本）"</span> --overwrite</div>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold mb-1">任務（不給任何指令提示）</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>確認目前 Pod 壞掉的狀態</li>
+            <li>查部署歷史，找到哪個版本是正常的 <code className="text-cyan-300">httpd:2.4</code></li>
+            <li>回滾到那個版本（<strong className="text-red-400">不准用</strong> <code className="text-red-400">rollout undo</code> 不帶參數）</li>
+            <li>驗證 Pod 全部 Running，並確認現在跑的是 <code className="text-cyan-300">httpd:2.4</code></li>
+          </ol>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded text-xs text-slate-400">
+          驗收：<code className="text-green-400">kubectl get pods</code> → 全 Running ｜ 說出你用哪個指令確認 image 版本
+        </div>
+      </div>
+    ),
+    code: `# 準備環境（照順序貼上執行）
+kubectl create deployment night-api --image=httpd:2.4 --replicas=2
+kubectl annotate deployment night-api kubernetes.io/change-cause="v1: 正常版本"
+kubectl rollout status deployment/night-api
+kubectl set image deployment/night-api httpd=httpd:99.99.99
+kubectl annotate deployment night-api kubernetes.io/change-cause="v2: 緊急更新（錯誤版本）" --overwrite
+
+# 你的任務從這裡開始（自己找指令）`,
+    notes: `Lab 2，版本事故。
+
+這個 Lab 我不給任何指令提示，只給任務說明。你要自己想想：確認 Pod 狀態用什麼指令？查歷史用什麼指令？回滾到指定版本用什麼指令？
+
+規則：不能用 rollout undo 不帶參數。要用 rollout history 找到正確的版本號，再用 --to-revision 指定。
+
+為什麼不能直接用 undo？因為不帶參數的 undo 只會往「上一版」走，如果你已經 undo 過一次，再undo 就又跳回來了，無法精確控制。
+
+先做準備環境那四行，等服務壞掉之後再開始任務。
 
 [▶ 下一頁]`,
   },

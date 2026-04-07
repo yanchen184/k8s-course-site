@@ -834,65 +834,6 @@ kubectl get pods -o wide    # 確認 NODE 分散`,
 [▶ 下一頁]`,
   },
 
-  // ── 5-4（3/3）：Lab 2 — 版本事故 ──
-  {
-    title: 'Lab 2：版本事故（深夜 11 點）',
-    subtitle: '有人推了壞版本，服務正在掛掉，不准用 rollout undo',
-    section: '5-4：擴縮容實作',
-    duration: '12',
-    content: (
-      <div className="space-y-3">
-        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded-lg">
-          <p className="text-red-400 font-semibold mb-1">情境</p>
-          <p className="text-slate-300 text-sm">深夜 11 點，你收到警報。有人把 API 更新到壞掉的版本，服務正在掛掉。你要在不重新部署的情況下，讓服務恢復正常。</p>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">準備環境（依序執行）</p>
-          <div className="text-xs font-mono space-y-1">
-            <div className="text-slate-300"><span className="text-green-400">kubectl create deployment</span> night-api --image=<span className="text-cyan-300">httpd:2.4</span> --replicas=2</div>
-            <div className="text-slate-300"><span className="text-green-400">kubectl annotate deployment</span> night-api kubernetes.io/change-cause=<span className="text-cyan-300">"v1: 正常版本"</span></div>
-            <div className="text-slate-300"><span className="text-green-400">kubectl set image</span> deployment/night-api httpd=<span className="text-cyan-300">httpd:99.99.99</span></div>
-            <div className="text-slate-300"><span className="text-green-400">kubectl annotate deployment</span> night-api kubernetes.io/change-cause=<span className="text-cyan-300">"v2: 緊急更新（錯誤版本）"</span> --overwrite</div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold mb-1">任務（不給任何指令提示）</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>確認目前 Pod 壞掉的狀態</li>
-            <li>查部署歷史，找到哪個版本是正常的 <code className="text-cyan-300">httpd:2.4</code></li>
-            <li>回滾到那個版本（<strong className="text-red-400">不准用</strong> <code className="text-red-400">rollout undo</code> 不帶參數）</li>
-            <li>驗證 Pod 全部 Running，並確認現在跑的是 <code className="text-cyan-300">httpd:2.4</code></li>
-          </ol>
-        </div>
-
-        <div className="bg-slate-800/50 p-2 rounded text-xs text-slate-400">
-          驗收：<code className="text-green-400">kubectl get pods</code> → 全 Running ｜ 說出你用哪個指令確認 image 版本
-        </div>
-      </div>
-    ),
-    code: `# 準備環境（照順序貼上執行）
-kubectl create deployment night-api --image=httpd:2.4 --replicas=2
-kubectl annotate deployment night-api kubernetes.io/change-cause="v1: 正常版本"
-kubectl rollout status deployment/night-api
-kubectl set image deployment/night-api httpd=httpd:99.99.99
-kubectl annotate deployment night-api kubernetes.io/change-cause="v2: 緊急更新（錯誤版本）" --overwrite
-
-# 你的任務從這裡開始（自己找指令）`,
-    notes: `Lab 2，版本事故。
-
-這個 Lab 我不給任何指令提示，只給任務說明。你要自己想想：確認 Pod 狀態用什麼指令？查歷史用什麼指令？回滾到指定版本用什麼指令？
-
-規則：不能用 rollout undo 不帶參數。要用 rollout history 找到正確的版本號，再用 --to-revision 指定。
-
-為什麼不能直接用 undo？因為不帶參數的 undo 只會往「上一版」走，如果你已經 undo 過一次，再undo 就又跳回來了，無法精確控制。
-
-先做準備環境那四行，等服務壞掉之後再開始任務。
-
-[▶ 下一頁]`,
-  },
-
   // ============================================================
   // 5-5：回頭操作 Loop 1（1 張）
   // ============================================================

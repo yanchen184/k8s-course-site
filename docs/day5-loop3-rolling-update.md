@@ -334,81 +334,112 @@ deployment.apps/nginx-deploy rolled back
 
 ---
 
-## 5-8 回頭操作 Loop 2（15 分鐘）
+## 5-8 回頭操作 Loop 2 — Lab 2 情境練習（20 分鐘）
 
 ### ① 課程內容
 
 **本節目標**
-- 用剛學的指令解決 Loop 2 的挑戰題
-- 驗證回滾結果，養成「做完要確認」的習慣
-- 深入思考 rollout undo 的行為邊界
+- 先帶做一遍滾動更新三指令（5 分鐘）
+- 再給學生做 Lab 2 情境題（15 分鐘）：版本事故，強制用 `--to-revision` 精確回滾
+
+> 📋 學生看 PPT 投影片（5-8 第二張「Lab 2：版本事故」），上面有完整準備環境指令和任務說明。
+
+**帶做順序：**
+1. `kubectl set image` 觸發更新
+2. `kubectl rollout status` 看進度
+3. `kubectl rollout undo` 回滾（帶做）
+4. `kubectl rollout history` 查歷史（帶做）
+5. `kubectl rollout undo --to-revision=<n>` 指定版本（帶做）
 
 ---
 
 ### ② 所有指令＋講解
 
-（本節複習已學指令，重點在組合應用，無新指令。）
+（本節複習已學指令，無新指令，重點在組合應用與 Lab 2 情境。）
 
 ---
 
-### ③ 題目
+### ③ 題目（Lab 2：版本事故）
 
-**挑戰題**
-用 `rollout history` 找到 revision 1 的版本號，使用 `--to-revision` 參數直接回滾到第一版（不能用 `rollout undo` 不加參數的方式）。
+**情境：深夜 11 點，你收到警報。有人把 API 更新到壞掉的版本，服務正在掛掉。**
 
-**驗證題**
-回滾完之後，要怎麼確認「現在跑的是哪個 image 版本」？列出你會用的所有指令，並說明各自能看到什麼資訊。
+**準備環境（學生自己跑）：**
+```bash
+kubectl create deployment night-api --image=httpd:2.4 --replicas=2
+kubectl annotate deployment night-api kubernetes.io/change-cause="v1: 正常版本"
+kubectl rollout status deployment/night-api
+kubectl set image deployment/night-api httpd=httpd:99.99.99
+kubectl annotate deployment night-api kubernetes.io/change-cause="v2: 緊急更新（錯誤版本）" --overwrite
+```
 
-**思考題**
-如果已經執行了 `rollout undo`（回到了上一版），想要再往更舊的版本回，直接再跑一次 `rollout undo` 有用嗎？為什麼？正確做法是什麼？
+**任務（不給指令提示，自己想）：**
+1. 確認目前 Pod 壞掉的狀態
+2. 查部署歷史，找到哪個版本是正常的 `httpd:2.4`
+3. 回滾到那個版本（**不准用** `rollout undo` 不帶參數）
+4. 驗證 Pod 全部 Running，確認現在跑的是 `httpd:2.4`
+
+**驗收：**
+- `kubectl get pods` 全部 Running
+- 說出你用哪個指令確認 image 版本
+
+---
 
 ### ④ 解答
 
-**挑戰題解答**
+**Step 1：確認 Pod 狀態**
 
 ```bash
-# 第一步：查看版本歷史，找到 revision 1
-kubectl rollout history deployment/nginx-deploy
-
-# 第二步：直接回滾到 revision 1
-kubectl rollout undo deployment/nginx-deploy --to-revision=1
+kubectl get pods
+# 看到 Pod 狀態是 ErrImagePull 或 ImagePullBackOff
+kubectl get deploy    # READY: 0/2 或 1/2，說明部分 Pod 壞了
 ```
 
-**驗證題解答**
-
-驗證方式有以下幾種，建議都跑一遍：
+**Step 2：查部署歷史**
 
 ```bash
-# 方法一：看 Deployment 的 image 欄位（最直接）
-kubectl describe deployment nginx-deploy | grep Image
+kubectl rollout history deployment/night-api
+```
+```
+REVISION  CHANGE-CAUSE
+1         v1: 正常版本
+2         v2: 緊急更新（錯誤版本）
+```
+目標版本是 revision 1（httpd:2.4）。
 
-# 方法二：看 Pod 的詳細資訊（確認實際跑的 Pod 用的 image）
+**Step 3：精確回滾到 revision 1**
+
+```bash
+kubectl rollout undo deployment/night-api --to-revision=1
+```
+```
+deployment.apps/night-api rolled back
+```
+
+**Step 4：驗收**
+
+```bash
+# 確認 Pod 全部 Running
+kubectl get pods
+
+# 確認 image 版本（方法一：最直接）
+kubectl describe deployment night-api | grep Image
+# Image: httpd:2.4
+
+# 確認 image 版本（方法二：看 Pod）
 kubectl describe pod <pod-name> | grep Image
 
-# 方法三：看 rollout history（確認目前在哪個 revision）
-kubectl rollout history deployment/nginx-deploy
-
-# 方法四：看 ReplicaSet（看哪個 RS 目前 DESIRED > 0）
-kubectl get rs
+# 確認 rollout 歷史
+kubectl rollout history deployment/night-api
+# revision 3 會出現（每次 rollout 都是新的 revision）
 ```
 
-| 指令 | 能看到什麼 |
-|------|-----------|
-| `describe deployment \| grep Image` | Deployment spec 裡設定的 image |
-| `describe pod \| grep Image` | 該 Pod 實際使用的 image（含 Image ID，可看到 digest） |
-| `rollout history` | 版本號歷史，CHANGE-CAUSE 說明 |
-| `get rs` | 哪個 RS 目前有副本在跑 |
-
-**思考題解答**
-
-不能直接用。`rollout undo` 的行為是「切換到上一個 revision」，執行一次 undo 之後，K8s 會把這次操作本身也記錄成一個新的 revision，下次 undo 只是在最近兩個版本之間來回跳。
-
-正確做法：
+**清理：**
 ```bash
-# 查歷史，找到想要的 revision 號碼
-kubectl rollout history deployment/nginx-deploy
-
-# 用 --to-revision 指定確切的版本
-kubectl rollout undo deployment/nginx-deploy --to-revision=<想要的版本號>
+kubectl delete deployment night-api
 ```
-這樣才能精確跳到任意歷史版本，不會「跳錯地方」。
+
+**老師補充說明重點：**
+- `rollout undo` 不帶參數只回「上一版」——這裡 revision 2 → revision 1，剛好對，但如果有四個 revision 且已 undo 過一次，再 undo 就在最後兩版間來回，永遠跳不到更舊的
+- `--to-revision` 才能精確指定任意歷史版本，是生產環境的正確做法
+- 每次 rollout（包括 undo）都會產生一個新的 revision，history 越來越長
+- 用 `describe deployment | grep Image` 或 `describe pod | grep Image` 都能確認 image，前者看 Deployment spec，後者看 Pod 實際跑的

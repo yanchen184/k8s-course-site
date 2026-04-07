@@ -260,16 +260,65 @@ Pod Template:
 
 ---
 
-### ③ 題目
+### ③ 題目（Lab 3：除錯工程師）
 
-1. 執行 `kubectl delete pod -l app=nginx` 之後，Deployment 的 Pod 數量會一直是 0 嗎？為什麼？
-2. 對一個 Pod 用 `kubectl label pod <name> app=other` 把 `app` label 改成別的值（而非 `nginx`），會發生什麼事？
+**情境：正式環境跑著 3 個 Pod 的 nginx 服務。其中一個 Pod 行為異常（回應很慢，但還沒死）。你需要把它「隔離」出來調查，同時不能中斷服務。**
+
+**任務：**
+1. 確認目前有 3 個 Pod（用 `--show-labels` 看）
+2. 選一個 Pod，把它的 `app` label 改成 `app=isolated`
+3. 觀察：Pod 總數變幾個？Deployment 的 READY 是什麼？
+4. 對孤兒 Pod 執行 `kubectl describe`，找出它的 Node、Events、狀態
+5. 調查完畢，手動刪除孤兒 Pod，確認恢復 3 個 Pod
+
+**驗收：**
+- 能說出孤兒 Pod 在哪個 Node
+- 能說明 Deployment 為什麼自動補 Pod
+- 最後 `kubectl get pods` 回到 3 個 Running
+
+> 📋 學生看 PPT 5-10 第二張（Lab 3：除錯工程師），上面有完整說明和對照表。
 
 ### ④ 解答
 
-1. 不會一直是 0。Deployment 的 controller loop 偵測到實際 Pod 數（0）少於期望數（3），立刻開始補 Pod。通常幾秒內就會看到 Pod 變成 ContainerCreating，接著 Running。Pod 總數最終仍會回到 3。
+**為什麼用孤兒 Pod 而不是其他方法：**
 
-2. 當 `app` label 從 `nginx` 改成 `other`，這個 Pod 就不再符合 Deployment 的 selector（`app=nginx`）了。從 Deployment 的角度看，它「失去」了一個 Pod，立刻補一個新的 Pod（符合 `app=nginx`）。而那個被改了 label 的 Pod 變成「孤兒 Pod」，沒有任何 Deployment 管它，會繼續跑，直到手動刪除。最終結果：原本 3 個 Pod，變成 4 個（3 個被 Deployment 管的 + 1 個孤兒）。
+| 方法 | 問題 |
+|------|------|
+| 直接刪 Pod | Pod 消失，無法調查根本原因 |
+| scale 到 1 留問題 Pod | 其他正常 Pod 被砍，服務降容影響用戶 |
+| ✅ 改 label 孤兒化 | Deployment 補新 Pod 繼續服務，舊 Pod 穩定存活等你查 |
+
+**完整操作：**
+
+```bash
+# Step 1：確認 Pod + 看 labels
+kubectl get pods --show-labels
+# 記下一個 Pod 的名字，例如 nginx-deploy-xxx-aaa
+
+# Step 2：改 label，孤兒化
+kubectl label pod nginx-deploy-xxx-aaa app=isolated --overwrite
+# 輸出：pod/nginx-deploy-xxx-aaa labeled
+
+# Step 3：觀察
+kubectl get pods --show-labels
+# 看到 4 個 Pod：3 個 app=nginx + 1 個 app=isolated
+kubectl get deploy
+# READY 仍然是 3/3（Deployment 已自動補一個新 Pod）
+
+# Step 4：調查孤兒 Pod
+kubectl describe pod nginx-deploy-xxx-aaa
+# 重點看：Node、Labels（確認 app=isolated）、Events
+
+# Step 5：清理
+kubectl delete pod nginx-deploy-xxx-aaa
+kubectl get pods   # 回到 3 個
+```
+
+**老師補充說明重點：**
+- 孤兒化的核心：改掉 label → 脫離 Deployment 的 selector → Deployment 以為副本不足 → 補新 Pod
+- 孤兒 Pod 不受任何控制器管，不會被自動重啟也不會被自動刪除，是穩定的調查對象
+- 這是生產環境工程師實際使用的技巧，不是玩具實驗
+- 調查完一定要手動刪，否則會有殘留的孤兒 Pod 佔用資源
 
 ---
 

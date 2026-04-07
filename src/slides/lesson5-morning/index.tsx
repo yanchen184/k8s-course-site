@@ -1734,54 +1734,74 @@ kubectl delete pod 加上你複製的 Pod 名字。
 [▶ 下一頁]`,
   },
 
-  // ── 5-10（2/2）：學員實作題目 ──
+  // ── 5-10（2/2）：Lab 3 — 除錯工程師 ──
   {
-    title: '學員實作：自我修復 + Labels 練習',
-    subtitle: '必做：delete Pod + show-labels | 挑戰：改 label 造孤兒',
+    title: 'Lab 3：除錯工程師',
+    subtitle: '生產環境有 Pod 行為異常，隔離它、調查它、不影響服務',
     section: '5-10：自我修復 + Labels 實作',
-    duration: '8',
+    duration: '15',
     content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-3">必做題</p>
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold mb-1">情境</p>
+          <p className="text-slate-300 text-sm">正式環境跑著 3 個 Pod 的 nginx 服務。你收到報告，<strong className="text-white">其中一個 Pod 行為異常</strong>（回應很慢，但還沒死）。你需要把它「隔離」出來調查，<strong className="text-white">同時不能中斷服務</strong>。</p>
+        </div>
+
+        <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg">
+          <p className="text-blue-400 font-semibold mb-1">為什麼用孤兒 Pod 而不是直接刪？</p>
+          <table className="w-full text-xs">
+            <tbody className="text-slate-300">
+              <tr className="border-t border-slate-700"><td className="py-1 pr-3 text-red-400">直接刪 Pod</td><td className="py-1">Pod 消失，無法調查根本原因</td></tr>
+              <tr className="border-t border-slate-700"><td className="py-1 pr-3 text-red-400">scale 到 1</td><td className="py-1">其他正常 Pod 被砍，服務降容</td></tr>
+              <tr className="border-t border-slate-700"><td className="py-1 pr-3 text-green-400">✅ 改 label 孤兒化</td><td className="py-1">Deployment 補新 Pod 繼續服務，舊 Pod 穩定等你查</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold mb-1">任務</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl delete pod &lt;name&gt;</code> → 看自我修復</li>
-            <li><code className="text-green-400">kubectl get pods --show-labels</code> → 看標籤</li>
-            <li><code className="text-green-400">kubectl get pods -l app=nginx</code> → 用 label 篩選</li>
+            <li>確認目前有 3 個 Pod 在跑（用 <code className="text-green-400">--show-labels</code> 看）</li>
+            <li>選一個 Pod，把它的 <code className="text-green-400">app</code> label 改成 <code className="text-green-400">app=isolated</code></li>
+            <li>觀察：Pod 總數變幾個？Deployment 的 READY 是什麼？</li>
+            <li>對孤兒 Pod 執行 <code className="text-green-400">kubectl describe</code>，找出它的 Node、Events、狀態</li>
+            <li>調查完畢，手動刪除孤兒 Pod，確認恢復 3 個 Pod</li>
           </ol>
         </div>
 
-        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-3">挑戰題：改 app label → 觀察孤兒 Pod</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl label pod &lt;name&gt; app=other --overwrite</code></li>
-            <li><code className="text-green-400">kubectl get pods</code> → 看到 <strong className="text-white">4 個 Pod</strong></li>
-            <li><code className="text-green-400">kubectl get pods --show-labels</code> → 3 個 app=nginx + 1 個 app=other</li>
-            <li>孤兒 Pod 不被 Deployment 管理 → 手動 <code className="text-green-400">delete</code> 清理</li>
-          </ol>
-          <p className="text-slate-400 text-xs mt-2">結論：Labels 不只是裝飾，是 K8s 的認親機制</p>
+        <div className="bg-slate-800/50 p-2 rounded text-xs text-slate-400">
+          驗收：能說出孤兒 Pod 在哪個 Node？Events 有什麼？Deployment 為什麼自動補 Pod？
         </div>
       </div>
     ),
-    notes: `好，現在來做一個很有趣的思考題。如果你把某個 Pod 的 app=nginx 標籤改掉，會發生什麼事？
+    code: `# 準備（如果還沒有 nginx-deploy）
+kubectl create deployment nginx-deploy --image=nginx:1.25 --replicas=3
 
-想一下。Deployment 的 selector 是 matchLabels app=nginx。它靠這個標籤來認 Pod。如果某個 Pod 的 app 標籤被你改成 app=other，Deployment 就認不出這個 Pod 了，它會覺得自己少了一個 Pod，然後補一個新的。
+# Step 1：確認 Pod + 看 labels
+kubectl get pods --show-labels
 
-來試試看。先記下一個 Pod 的名字，執行 kubectl label pod 加上 Pod 名字 app=other --overwrite。注意要加 --overwrite，因為 app 這個 key 已經存在了，你要覆蓋它。
+# Step 2：選一個 Pod，改它的 app label
+kubectl label pod <pod-name> app=isolated --overwrite
 
-執行完之後馬上 kubectl get pods。
+# Step 3：觀察
+kubectl get pods --show-labels   # 4 個 Pod！
+kubectl get deploy               # READY 仍然是 3/3
 
-你會看到四個 Pod！三個是 Running 狀態，一個是剛建的。等幾秒鐘再看，會穩定在四個 Pod。
+# Step 4：調查孤兒 Pod
+kubectl describe pod <那個 pod-name>
 
-為什麼是四個？因為你改了標籤的那個 Pod 還活著，只是它不再屬於 Deployment 了，變成了一個「孤兒」Pod。Deployment 看到自己只剩兩個 Pod（只有兩個有 app=nginx 標籤），不符合 replicas=3，所以補了一個新的。
+# Step 5：清理
+kubectl delete pod <孤兒-pod-name>
+kubectl get pods                 # 回到 3 個`,
+    notes: `這是 Lab 3，除錯工程師。
 
-跑 kubectl get pods --show-labels 確認一下。你會看到三個有 app=nginx，一個有 app=other。
+先說明這個技巧為什麼在生產環境有價值。Deployment 會一直維持副本數，如果你只是 exec 進去查，Pod 可能被重啟打斷你的調查。如果你 scale 到 1，其他正常 Pod 被砍，用戶受影響。最乾淨的做法是把有問題的 Pod 從 Deployment 「摘出來」，Deployment 自動補一個新的 Pod 繼續服務，問題 Pod 獨立存活讓你慢慢調查。調查完再手動刪掉。
 
-這個孤兒 Pod 不會被 Deployment 管，不會被自動修復，也不會被自動刪除。你要手動把它刪掉：kubectl delete pod 加上那個孤兒 Pod 的名字。
+這是真實 K8s 工程師會用的除錯技巧，不是玩具實驗。
 
-這個實驗告訴我們一件非常重要的事：Labels 不只是裝飾，它是 K8s 的認親機制。Deployment 靠 Labels 認 Pod，Service 也靠 Labels 認 Pod。標籤對了就是自己人，標籤不對就不認識。
+好，學員開始做。選哪個 Pod 都可以，步驟照 PPT 上面做。做完能回答三個問題：孤兒 Pod 在哪個 Node？Deployment 的 READY 有沒有變？Events 裡有什麼有趣的東西？
 
-好，學員實作時間。必做的部分：delete Pod 看自我修復，用 --show-labels 看標籤，用 -l 篩選 Pod。挑戰的部分：把某個 Pod 的 app label 改掉，觀察 Deployment 補新 Pod 和舊 Pod 變孤兒的現象。做完之後把孤兒 Pod 清理掉。
+有問題舉手。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
   },

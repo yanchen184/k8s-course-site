@@ -1974,6 +1974,121 @@ A2：檢查 YAML 裡面有沒有殘留的 replicas 欄位。DaemonSet 不認 rep
 [▶ 下一頁],
   },
 
+
+  // -- Lab 7：DaemonSet 情境 Lab --
+  {
+    title: 'Lab 7：日誌收集工具部署情境',
+    subtitle: 'DaemonSet vs Deployment -- 發現問題 → 改寫 → 驗證',
+    section: 'Loop 7：DaemonSet + CronJob',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">情境說明</p>
+          <p className="text-slate-300 text-sm">你的團隊要部署 Fluentd 日誌收集工具，需要在<strong className="text-white">每個 Node 上都跑一份</strong>。但同事 Jimmy 用 Deployment 部署了，只有一個 Pod，而且 Pod 只跑在其中一個 Node 上。你需要找出問題並改正。</p>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">任務</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>套用 Jimmy 的 Deployment YAML，觀察 Pod 只在一個 Node 上</li>
+            <li>改寫成 DaemonSet YAML（移除 replicas，改 kind）</li>
+            <li>kubectl apply 後，驗證每個 Node 都有一個 Pod</li>
+          </ol>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗收標準</p>
+          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
+            <li><code className="text-green-400">kubectl get daemonsets</code> 顯示 DESIRED = Node 數量</li>
+            <li><code className="text-green-400">kubectl get pods -o wide</code> 每個 Node 上各一個 Pod</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    code: `# Step 1: Jimmy 的問題 YAML (Deployment)
+# jimmy-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log-collector
+  template:
+    metadata:
+      labels:
+        app: log-collector
+    spec:
+      containers:
+        - name: fluentd
+          image: fluent/fluentd:v1.16
+
+# kubectl apply -f jimmy-deployment.yaml
+# kubectl get pods -o wide  # 觀察：Pod 只在一個 Node！
+
+---
+# Step 2: 正確的 DaemonSet
+# daemonset-correct.yaml
+apiVersion: apps/v1
+kind: DaemonSet           # 改這裡
+metadata:
+  name: log-collector
+spec:
+  # 刪除 replicas 欄位
+  selector:
+    matchLabels:
+      app: log-collector
+  template:
+    metadata:
+      labels:
+        app: log-collector
+    spec:
+      containers:
+        - name: fluentd
+          image: fluent/fluentd:v1.16
+
+# Step 3: 驗證
+# kubectl delete deployment log-collector
+# kubectl apply -f daemonset-correct.yaml
+# kubectl get daemonsets
+# kubectl get pods -o wide -l app=log-collector`,
+    notes: `【① 課程內容】
+本節為 Loop 7 的學生情境 Lab。情境：你的團隊要部署 Fluentd 日誌收集工具，需要每個 Node 上都跑一份。同事用 Deployment 部署，只有一個 Pod，且只在一個 Node 上跑。學生需要發現問題、改寫成 DaemonSet，並驗證結果。
+
+【② 指令講解】
+kubectl apply -f jimmy-deployment.yaml
+→ 用途：套用有問題的 Deployment
+→ 打完要看：deployment.apps/log-collector created
+
+kubectl get pods -o wide
+→ 用途：觀察問題 - Pod 只在一個 Node 上
+→ 打完要看：NODE 欄位只出現一個 Node 名稱（問題）
+
+kubectl delete deployment log-collector
+→ 用途：刪掉有問題的 Deployment
+
+kubectl apply -f daemonset-correct.yaml
+→ 用途：套用正確的 DaemonSet
+→ 打完要看：daemonset.apps/log-collector created
+
+kubectl get daemonsets
+→ 打完要看：DESIRED = Node 數量（例如 2 或 3）
+
+kubectl get pods -o wide -l app=log-collector
+→ 打完要看：每個 Node 名稱各出現一次 → 驗收通過！
+
+【③④ 題目 + 解答】
+Q：如果你用 Deployment 設定 replicas=3（跟 Node 數一樣），能達到和 DaemonSet 一樣的效果嗎？
+A：不能完全達到。
+問題 1：K8s Scheduler 不保證每台 Node 各一個，可能把 2 個 Pod 排在同一台 Node。
+問題 2：未來叢集加入新 Node，Deployment 的 Pod 數量不會自動增加，需要手動調整 replicas。
+問題 3：某台 Node 被移除時，Deployment 會把 Pod 重新排程到其他 Node，而不是消失。
+DaemonSet 的語意更清楚：讓 K8s 自動處理「每台 Node 都要跑一份」的所有邊界情況。
+
+[▶ 下一頁]`,
+  },
+
   // ============================================================
   // Loop 8：綜合實作 + 總結（5-24, 5-25, 5-26）
   // ============================================================
@@ -2003,47 +2118,54 @@ A2：檢查 YAML 裡面有沒有殘留的 replicas 欄位。DaemonSet 不認 rep
         </div>
       </div>
     ),
-    notes: `好，今天學了很多東西。從早上的 k3s 多節點、擴縮容、滾動更新、回滾、自我修復、Labels，到下午的 ClusterIP、NodePort、DNS、Namespace、DaemonSet、CronJob。一整天的內容。
+    notes: `【① 課程內容】
+目標架構：外部瀏覽器 → NodePort（30080）→ frontend Deployment（nginx x2）→ ClusterIP → api Deployment（httpd x2）+ log-collector DaemonSet（每個 Node 各1個），全在 fullstack-demo Namespace 內。
 
-現在我們要做一件事：把這些東西從零到一串起來。不是回顧，是真正的從頭到尾動手做一遍。為什麼？因為之前每個 Loop 都是單獨練一個功能，你可能知道每個功能怎麼用，但不一定知道它們怎麼組合在一起。
+架構涵蓋的知識點：
+- frontend NodePort → Loop 5：NodePort 對外暴露
+- api ClusterIP → Loop 4：ClusterIP 服務內部通訊
+- frontend curl api-svc → Loop 4+6：Service DNS 短名稱
+- fullstack-demo Namespace → Loop 6：Namespace 隔離
+- log-collector DaemonSet → Loop 7：每個 Node 跑一個 agent
 
-這個練習模擬的是一個最基本的 K8s 服務上線流程。在真實的工作場景中，你部署一個新服務大概就是這個順序。
+從今天 Loop 7 md 的 full-stack.yaml 包含：Namespace、frontend Deployment（nginx:1.27 x2）、frontend-svc NodePort（30080）、api Deployment（httpd:2.4 x2）、api-svc ClusterIP、log-collector DaemonSet。
 
-Step 1，建 Namespace。
+【② 指令講解】
+kubectl apply -f full-stack.yaml
+→ 用途：一次套用所有資源（YAML 內多個資源用 --- 分隔）
+→ 打完要看：每一行都是 created，例如：
+   namespace/fullstack-demo created
+   deployment.apps/frontend created
+   service/frontend-svc created
+   deployment.apps/api created
+   service/api-svc created
+   daemonset.apps/log-collector created
+→ 異常：namespaces "fullstack-demo" already exists → 可忽略或先刪除 namespace
 
-kubectl create namespace my-app
+kubectl get all -n fullstack-demo
+→ 用途：確認 namespace 內所有資源（Pod、Deployment、Service）
+→ 打完要看：所有 Pod 都是 Running，兩個 Service 都建立完成
+→ 異常：Pod 持續 Pending → kubectl describe pod 看原因
 
-為什麼第一步是建 Namespace？因為你不會把東西直接丟到 default 裡面。真實的專案都會有自己的 Namespace。這是一個好習慣，跟 Docker Compose 你會建一個專案目錄一樣。
+kubectl get pods -o wide -n fullstack-demo
+→ 用途：查看 Pod 分布在哪些 Node
+→ 打完要看：frontend 和 api 的 Pod 分散在不同 Node；log-collector 每個 Node 各一個
 
-Step 2，建 Deployment。
+kubectl apply -f nodeport.yaml
+→ 用途：若 frontend-svc 未在 full-stack.yaml 內，另外建 NodePort Service
+→ 打完要看：service/frontend-svc created（或 configured）
 
-kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app
+【③④ 題目 + 解答】
+Q1：kubectl apply -f full-stack.yaml 後，某個 Pod 一直是 Pending，你的排查順序是什麼？
+A1：
+1. kubectl get pods -n fullstack-demo 確認哪個 Pod 是 Pending
+2. kubectl describe pod <pod-name> -n fullstack-demo 看 Events
+3. 常見原因：資源不足（CPU/Memory）/ Node 全部 NotReady / image 拉取失敗
 
-在 my-app 裡面建一個 nginx 的 Deployment，三個副本。等幾秒鐘，看一下 Pod 跑起來了沒有。
+Q2：為什麼第一步要建 Namespace，而不是直接用 default？
+A2：真實工作中不應把東西直接丟到 default。Namespace 提供邏輯隔離，讓不同環境/專案的資源互不干擾。好習慣是每個專案有自己的 Namespace，日後清理也方便（kubectl delete namespace 一行搞定）。
 
-kubectl get pods -o wide -n my-app
-
-三個 Pod 分散在不同的 Node 上，全部 Running。
-
-Step 3，建 ClusterIP Service。
-
-kubectl expose deployment nginx-deploy --port=80 -n my-app
-
-expose 指令預設建的就是 ClusterIP。
-
-Step 4，從叢集內部驗證。
-
-kubectl run test --image=busybox:1.36 --rm -it --restart=Never -n my-app -- wget -qO- http://nginx-deploy
-
-注意我們的 busybox 也建在 my-app Namespace 裡面，所以可以用短名字 nginx-deploy 直接連。你應該看到 nginx 的歡迎頁面。叢集內部的連線沒問題了。
-
-Step 5，建 NodePort Service，讓外面也能連。
-
-這裡用 YAML 比較好，因為 expose 指令建 NodePort 的時候沒辦法指定 nodePort 的值。你可以建一個 nodeport.yaml：
-
-apiVersion: v1，kind: Service，metadata 的 name 寫 nginx-nodeport，namespace 寫 my-app。spec 裡面 type: NodePort，selector: app: nginx-deploy，ports 裡面 port 80，targetPort 80，nodePort 30080。
-
-kubectl apply -f nodeport.yaml [▶ 下一頁]`,
+[▶ 下一頁],
   },
 
   // ── 5-24 綜合實作引導（2/2）：Step 6-10 ──
@@ -2076,43 +2198,48 @@ kubectl apply -f nodeport.yaml [▶ 下一頁]`,
         </div>
       </div>
     ),
-    notes: `Step 6，從外面驗證。
+    notes: `【① 課程內容】
+本節完成完整服務生命周期的後半段：外部驗證 → 擴縮容 → 滾動更新 → 回滾 → 清理。
 
-找到 Node 的 IP，curl http:// 加上 Node IP 冒號 30080。看到 nginx 歡迎頁面，外部存取也通了。
+【② 指令講解】
+curl http://<node-ip>:30080
+→ 用途：從外部驗證 NodePort 是否通
+→ 先取得 Node IP：kubectl get nodes -o wide 或 multipass info k3s-worker1 | grep IPv4
+→ 打完要看：nginx 預設首頁 HTML（Welcome to nginx!）
+→ 異常：Connection refused → nodePort 或 Node IP 填錯
 
-Step 7，擴縮容。
+kubectl exec -it <frontend-pod-name> -n fullstack-demo -- curl http://api-svc
+→ 用途：從 frontend Pod 內驗證能否連到 api-svc（ClusterIP + DNS）
+→ 先取得 Pod 名稱：kubectl get pods -n fullstack-demo | grep frontend
+→ 打完要看：Apache httpd 的預設首頁 "It works!"
+→ 異常：Could not resolve host: api-svc → 確認兩個資源都在同一個 namespace
 
-kubectl scale deployment nginx-deploy --replicas=5 -n my-app
+kubectl run dns-final -n fullstack-demo --image=busybox:1.36 --rm -it --restart=Never -- nslookup api-svc
+→ 用途：DNS 解析驗證，確認 api-svc 能被解析到正確 ClusterIP
+→ 打完要看：Name: api-svc / Address 1: 10.96.x.x api-svc.fullstack-demo.svc.cluster.local
 
-kubectl get pods -n my-app，五個 Pod。
+kubectl get ds -n fullstack-demo
+→ 用途：確認 DaemonSet 狀態
+→ 打完要看：DESIRED 等於 Node 數，READY 與 DESIRED 相同
 
-kubectl scale deployment nginx-deploy --replicas=3 -n my-app
+kubectl delete namespace fullstack-demo
+→ 用途：清理所有資源（一行刪掉 namespace 內所有東西）
+→ 打完要看：namespace "fullstack-demo" deleted
+→ 注意：刪除需要時間（30秒到2分鐘），先顯示 Terminating 再完成
+→ 高危操作：刪前務必確認 namespace 名稱正確
 
-回到三個。
+【③④ 題目 + 解答】
+Q1：kubectl exec -it frontend-pod -n fullstack-demo -- curl http://api-svc 能成功嗎？如果把 api-svc 改名為 backend-svc，curl http://api-svc 還能用嗎？
+A1：能成功。frontend Pod 和 api-svc 在同一個 namespace，短名稱能被 CoreDNS 解析。
+如果改名為 backend-svc：curl http://api-svc 就會失敗（Could not resolve host）。必須更新程式碼改成 http://backend-svc。這也是為什麼 Service 名稱要謹慎命名，改名代價很高。
 
-Step 8，滾動更新。
+Q2：curl http://api-svc 和 curl http://api-svc.fullstack-demo.svc.cluster.local 結果一樣嗎？哪種比較好？
+A2：結果一樣。短名稱和 FQDN 最終解析到相同的 ClusterIP。短名稱比較好：更簡潔，可讀性高。只有跨 namespace 才需要用長名稱。
 
-kubectl set image deployment/nginx-deploy nginx=nginx:1.28 -n my-app
+Q3：如果 frontend Deployment 從 2 個副本擴展到 5 個，NodePort 的行為會改變嗎？
+A3：NodePort 行為不變，但分流的 Pod 變多了。nodePort 30080 依然在每個 Node 上開放，Service 的 Endpoints 從 2 個 Pod IP 增加到 5 個，每個請求仍被負載均衡，只是現在有 5 個 Pod 可以分流。
 
-kubectl rollout status deployment/nginx-deploy -n my-app
-
-看到 successfully rolled out。用 kubectl describe deployment nginx-deploy -n my-app 確認 Image 已經是 1.28。
-
-Step 9，回滾。
-
-假設 1.28 有問題，退回去。
-
-kubectl rollout undo deployment/nginx-deploy -n my-app
-
-kubectl describe deployment nginx-deploy -n my-app，確認 Image 回到 1.27。
-
-Step 10，清理。
-
-kubectl delete namespace my-app
-
-一行搞定，Namespace 裡面所有的東西都刪乾淨了。
-
-這十個步驟就是一個最基本的 K8s 服務生命周期。建環境、部署、對內暴露、對外暴露、擴縮容、更新、回滾、清理。第六堂課我們會在這個基礎上再加上 Ingress 用域名路由、ConfigMap 管設定、Secret 管密碼、PV/PVC 做資料持久化。每加一個功能，你的服務就離正式上線更近一步。 [▶ 下一頁]`,
+[▶ 下一頁],
   },
 
   // ── 5-25 學員自由練習 ──
@@ -2157,15 +2284,34 @@ kubectl delete namespace my-app
         </div>
       </div>
     ),
-    notes: `學員自由練習時間。
+    notes: `【① 課程內容】
+學員自由練習時間。從零獨立完成完整 10 步驟鏈路，再挑戰進階題。
 
-必做：跟著剛才的十個步驟完整做一遍。Namespace、Deployment、ClusterIP、busybox 驗證、NodePort、外部 curl、scale、滾動更新、回滾、清理。整套走一遍。
+【② 指令講解】
+完整 10 步驟流程（不看筆記完成）：
+1. kubectl create namespace my-app
+2. kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app
+3. kubectl expose deployment nginx-deploy --port=80 -n my-app
+4. kubectl run test --image=busybox:1.36 --rm -it --restart=Never -n my-app -- wget -qO- http://nginx-deploy
+5. kubectl apply -f nodeport.yaml（nodePort: 30080，namespace: my-app）
+6. curl http://<Node-IP>:30080
+7. kubectl scale deployment nginx-deploy --replicas=5 -n my-app → 縮回 3
+8. kubectl set image deployment/nginx-deploy nginx=nginx:1.28 -n my-app
+9. kubectl rollout undo deployment/nginx-deploy -n my-app
+10. kubectl delete namespace my-app
 
-挑戰 1：同時部署兩個服務。在 my-app 裡同時部署 nginx（標籤 app: frontend）和 httpd（標籤 app: api）。各自有 Deployment 加 ClusterIP Service 加 NodePort Service。nginx 用 NodePort 30080，httpd 用 NodePort 30081。從外面分別 curl 兩個 NodePort 驗證。
+挑戰指令：
+kubectl run cross-test --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://frontend-svc.my-app.svc.cluster.local
+→ 用途：跨 Namespace DNS 驗證
 
-挑戰 2：跨 Namespace DNS。用 busybox Pod 從叢集內部 curl 兩個 Service 的 DNS 名字。curl frontend-svc.my-app.svc.cluster.local。curl api-svc.my-app.svc.cluster.local。
+【③④ 題目 + 解答】
+今天學了四種 workload（Deployment、DaemonSet、CronJob、Job），各自適合什麼場景？
+- Deployment：長期執行的無狀態服務（API server、Web server、Frontend）
+- DaemonSet：每個 Node 都需要的 agent（日誌、監控、網路插件）
+- CronJob：定時排程任務（備份、清理、報表）
+- Job：一次性任務，跑完即結束（資料遷移、批次處理）
 
-回顧題：不看筆記列出今天學的所有 kubectl 指令。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+[▶ 下一頁 -- 學員開始做，你去巡堂],
   },
 
   // ── 5-26 總結（1/2）：因果鏈回顧 + 指令清單 ──
@@ -2211,35 +2357,56 @@ kubectl delete namespace my-app
         </div>
       </div>
     ),
-    notes: `好，最後一支影片，我們來做第五堂的總結。
+    notes: `【① 課程內容】
+今日因果鏈總覽：每個 K8s 概念都是因為前一步的問題才引出來的。
 
-今天一整天下來，我們走了一條很長的因果鏈。每一個概念都是因為上一步沒解決的問題才引出來的，不是隨便排的。我帶大家用因果鏈的方式快速回顧一遍。
+k3s 多節點 → 擴縮容（流量大了） → 滾動更新（新版本上線） → 回滾（版本有 bug）
+→ 自我修復（Pod 掛了） → Labels + Selector（K8s 怎麼認 Pod）
+→ ClusterIP（外面連不到） → NodePort（外面也要連）
+→ DNS（用 IP 太麻煩） → Namespace（環境要隔離）
+→ DaemonSet（每台 Node 都要跑一份） → CronJob（定時跑任務）
+→ 綜合實作（全部串起來）
 
-第四堂結尾我們用 Deployment 跑了三個 Pod，但那是在 minikube 單節點上，三個 Pod 全擠在同一台，完全看不出分散的效果。所以今天第一件事就是升級到 k3s 多節點叢集。裝好 k3s 之後，kubectl get pods -o wide 一看，Pod 真的分散在不同的 Node 上了。
+今日新學 kubectl 指令速查清單：
+kubectl scale deployment <name> --replicas=N
+kubectl set image deployment/<name> <container>=<image>
+kubectl rollout status / history / undo
+kubectl get svc / endpoints（ep）
+kubectl run <name> --image=<img> --rm -it --restart=Never -- <cmd>
+kubectl expose deployment <name> --port=80
+kubectl create namespace <name>
+kubectl get <resource> -n <namespace> / -A
+kubectl get daemonsets（ds）/ cronjobs（cj）/ jobs
+kubectl get all -n <namespace>
+kubectl delete namespace <name>（高危！）
 
-Pod 分散了之後，我們開始學 Deployment 的三個核心能力。第一個是擴縮容。流量大了，kubectl scale 把副本從三個拉到五個。流量小了，縮回三個。Pod 自動在多個 Node 之間分散。
+【② 指令講解】
+本節為複習整理，詳細指令說明見各 Loop 的② 區塊。
 
-第二個是滾動更新。新版本要上線，kubectl set image 一行指令，K8s 自動逐步替換，舊的一個一個砍，新的一個一個建，服務不中斷。
+kubectl get all -n fullstack-demo
+→ 用途：一次看 namespace 內所有常見資源
+→ 注意：DaemonSet 不在 get all 的預設列表，需另外 kubectl get ds -n fullstack-demo
 
-第三個是回滾。新版本上了才發現有 bug，kubectl rollout undo 一行指令退回去。K8s 把舊的 ReplicaSet 重新擴容，幾秒鐘就恢復了。
+【③④ 題目 + 解答】
+Q1：你要幫公司部署三個環境（dev、staging、prod）在同一個 K8s 叢集，你會怎麼用 Namespace 規劃？有什麼要注意的？
+A1：
+建立方式：kubectl create namespace dev / staging / prod
 
-然後我們問了一個問題：Pod 掛了 K8s 真的會自動補嗎？動手驗證了自我修復。刪掉一個 Pod，馬上就有新的出現。在多節點上更震撼，就算整台 Node 掛了，Pod 也會被調度到其他 Node 上重建。
+注意事項：
+1. 資源隔離：不同 namespace 的資源不共用名稱，但 ClusterRole 和 PersistentVolume 是全域的
+2. 網路不隔離：要阻止 dev 的 Pod 連到 prod，需要 NetworkPolicy
+3. 危險操作：kubectl delete namespace prod 會刪掉 prod 所有資源，操作前務必確認
+4. RBAC：可針對不同 namespace 設定不同人員的權限
+5. 資源限制：可用 ResourceQuota 限制各 namespace 的 CPU/Memory 使用量
 
-接著我們搞清楚了 K8s 靠什麼認親。Labels 和 Selector 是 K8s 的認親機制。Deployment 的 selector、Pod 的 labels、Service 的 selector，三者要對上。這是最容易出錯的地方。
+Q2：CoreDNS 掛掉了（kubectl get pods -n kube-system 看到 CoreDNS 是 Error），叢集裡的 Service 連線會有什麼影響？
+A2：
+- 已建立連線不影響：已建立的 TCP 連線繼續正常（DNS 只在建立連線時查詢一次）
+- 新的 Service 名稱解析失敗：任何用 Service 名稱建立新連線的請求都會失敗（Could not resolve host）
+- IP 直連還能用：如果知道 ClusterIP，直接用 IP 連線仍然可以
+- K8s 預設跑兩個 CoreDNS Pod（高可用），確保其中一個掛掉時服務不中斷
 
-上午搞定了 Deployment，下午的問題來了：Pod 跑起來了，但外面的人連不到。ClusterIP Service 解決了叢集內部的連線，給了一個穩定的地址加上自動負載均衡。但 ClusterIP 只能叢集內部用。
-
-外面也要連怎麼辦？NodePort Service 在每個 Node 上開一個 Port，外面的人用 Node IP 加上 Port 就能連進來。三種 Service 類型我們做了一個完整的比較。
-
-用了 Service 之後，叢集內部 Pod 之間用 IP 連太蠢了。DNS 服務發現出場，K8s 的 CoreDNS 自動幫每個 Service 註冊 DNS 名字，Pod 裡面直接用 Service 名字就能連。
-
-DNS 名字有一個 Namespace 的部分，這就帶出了 Namespace。Namespace 是叢集裡的資料夾，用來隔離不同環境。dev 和 prod 各自有自己的 Namespace，同名的 Service 不衝突。同 Namespace 用短名字，跨 Namespace 帶上 Namespace 名字。
-
-然後我們學了兩個特殊的工作負載。DaemonSet 確保每個 Node 上跑一個 Pod，適合日誌收集和監控 agent 這種節點級服務。CronJob 按照排程定時建 Job 執行任務，適合備份和清理。
-
-最後我們把所有東西從零串了一遍。Namespace、Deployment、ClusterIP、NodePort、擴縮容、滾動更新、回滾，十個步驟走完就是一個最基本的服務上線流程。
-
-螢幕上列了今天新學的所有 kubectl 指令，大家截圖存起來。 [▶ 下一頁]`,
+[▶ 下一頁],
   },
 
   // ── 5-26 總結（2/2）：Docker 對照表 + 回家作業 + 預告 ──
@@ -2325,24 +2492,197 @@ DNS 名字有一個 Namespace 的部分，這就帶出了 Namespace。Namespace 
         </div>
       </div>
     ),
-    notes: `還有更新過的 Docker 到 K8s 對照表，Docker 的 scale 對應 Deployment 的 replicas，Docker 的 -p 對應 Service，Docker network 的 DNS 對應 CoreDNS，不同 Compose 專案對應 Namespace，crontab 對應 CronJob。
+    notes: `【① 課程內容】
+Docker → K8s 完整對照表（今日更新版）：
 
-回家作業三個。第一，從零做一遍完整鏈路，不看筆記。Namespace、Deployment、Service、scale、滾動更新、回滾，整套走一遍。做到不看筆記也能完成，你就真正搞懂了。第二，在兩個 Namespace 各部署一個服務，從 busybox 跨 Namespace curl。第三，建一個 DaemonSet 和一個 CronJob，觀察它們的行為。
+Docker / Compose → K8s 對應
+docker run -p 8080:80 → Service NodePort（對外暴露 port）
+Compose service name（DNS）→ Service ClusterIP + CoreDNS
+Compose networks: → Namespace + NetworkPolicy
+docker run --restart=always → Deployment
+docker run --rm → Job
+crontab → CronJob
+在所有機器上 docker run → DaemonSet
+docker ps → kubectl get pods
+docker logs → kubectl logs
+docker exec -it → kubectl exec -it
 
-最後預告下堂課。
+下堂課預告（因果鏈繼續）：
+- 192.168.64.3:30080 太醜了 → Ingress（域名路由）
+- 設定寫死在 Image → ConfigMap（抽出設定）
+- 密碼不能明文 → Secret（加密敏感資訊）
+- Pod 掛了資料消失 → PV / PVC（持久化）
 
-今天你的服務已經可以對外了，NodePort 讓外面的人連得到。但是 192.168.64.3:30080 這種地址也太醜了吧？你能叫客戶輸入這個嗎？所以下堂課要學 Ingress，讓你用漂亮的域名來路由，myapp.com 到前端，myapp.com/api 到後端。
+【② 指令講解】
+本節為回顧整理，無新指令。
 
-你的設定現在寫死在 YAML 裡面，改設定就要重新 build Image，太痛苦了。所以下堂課要學 ConfigMap，把設定從 Image 抽出來。
+【③④ 題目 + 解答】
+今天學了四種 workload（Deployment、DaemonSet、CronJob、Job）。請說明各自適合什麼場景？
+- Deployment：長期執行的無狀態服務（API server、Web server、Frontend）
+- DaemonSet：每個 Node 都需要的 agent（日誌、監控、網路插件）
+- CronJob：定時排程任務（備份、清理、報表）
+- Job：一次性任務，跑完即結束（資料遷移、批次處理）
 
-密碼呢？你不會把資料庫密碼寫在 ConfigMap 裡吧？ConfigMap 沒有加密，所有人都看得到。所以要學 Secret，專門管敏感資訊。
+回家作業三個：
+1. 從零做一遍完整鏈路，不看筆記（Namespace → Deployment → Service → scale → 更新 → 回滾）
+2. 在兩個 Namespace 各部署一個服務，從 busybox 跨 Namespace curl
+3. 建一個 DaemonSet 和一個 CronJob，觀察它們的行為
 
-還有一個問題。Pod 掛了重建，容器裡面的資料就消失了。如果是資料庫，資料沒了可不是鬧著玩的。所以要學 PV 和 PVC，讓資料持久化。
-
-最後，你現在每個功能都要寫一個 YAML 檔案，一個服務可能有五六個 YAML。管起來很麻煩。所以要學 Helm，K8s 的套件管理工具，用一個 chart 把所有東西打包在一起。
-
-打個比方。今天你的團隊學會了讓服務對外。但這個服務現在穿著睡衣出門，沒有域名、沒有設定管理、沒有密碼保護、資料也沒有持久化。下堂課就是給它穿上正式的衣服，域名、設定、密碼、資料持久化，一件一件穿上去，讓它真正可以上線面對客戶。
-
-好，今天的課程到這裡。大家辛苦了，回去做回家作業，我們下堂課見。 [▶ 第五堂結束]`,
+[▶ 第五堂結束],
   },
+  // -- Lab 8：綜合實作情境 Lab --
+  {
+    title: 'Lab 8：從零建完整 Web 服務架構',
+    subtitle: 'Deployment + ClusterIP + NodePort + CronJob -- 全部串起來',
+    section: 'Loop 8：綜合實作 + 總結',
+    duration: '20',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">情境說明</p>
+          <p className="text-slate-300 text-sm">你需要從零建立一個完整的 web 服務架構，包含對外服務、內部通訊，以及定時健康檢查。</p>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">任務清單</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>建立 nginx Deployment（3 副本）</li>
+            <li>建 ClusterIP Service，讓叢集內部可以連</li>
+            <li>建 NodePort Service（port 30088），讓外部可以連</li>
+            <li>建 CronJob 每分鐘 curl nginx 做 health check</li>
+            <li>驗證：<code className="text-green-400">kubectl get all</code> 看到所有資源正常</li>
+          </ol>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗收標準</p>
+          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
+            <li>3 個 nginx Pod 全部 Running</li>
+            <li>從 busybox 內 curl nginx-svc 成功（ClusterIP）</li>
+            <li>curl Node-IP:30088 看到 nginx 歡迎頁（NodePort）</li>
+            <li>CronJob Pod 狀態 Completed，logs 有 Health check OK</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    code: `# nginx-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-web
+  template:
+    metadata:
+      labels:
+        app: nginx-web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+---
+# nginx-clusterip.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-web
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# nginx-nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: nginx-web
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30088
+---
+# health-check-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: health-check
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 60
+      template:
+        spec:
+          containers:
+            - name: checker
+              image: busybox:1.36
+              command: ["sh", "-c",
+                "wget -qO- http://nginx-svc && echo Health check OK"]
+          restartPolicy: OnFailure
+
+# 驗收指令
+# kubectl get all
+# kubectl run test --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://nginx-svc
+# curl http://<Node-IP>:30088
+# kubectl get jobs   # 等1分鐘後
+# kubectl logs <health-check-pod-name>
+# 清理：kubectl delete deployment nginx-web && kubectl delete svc nginx-svc nginx-nodeport && kubectl delete cronjob health-check`,
+    notes: `【① 課程內容】
+本節為 Loop 8 的學生情境 Lab。完整整合今日所學：Deployment、ClusterIP、NodePort、CronJob。情境是從零建一個完整的 web 服務架構，包含外部存取和定時健康檢查。
+
+【② 指令講解】
+kubectl apply -f nginx-deployment.yaml
+→ 打完要看：deployment.apps/nginx-web created
+
+kubectl apply -f nginx-clusterip.yaml
+→ 打完要看：service/nginx-svc created
+
+kubectl apply -f nginx-nodeport.yaml
+→ 打完要看：service/nginx-nodeport created
+
+kubectl apply -f health-check-cronjob.yaml
+→ 打完要看：cronjob.batch/health-check created
+
+kubectl get all
+→ 用途：一次確認所有資源
+→ 打完要看：3 個 Pod Running，2 個 Service，1 個 Deployment，CronJob 存在
+
+kubectl run test --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://nginx-svc
+→ 用途：叢集內部 ClusterIP 驗證
+→ 打完要看：nginx 歡迎頁 HTML
+
+curl http://<Node-IP>:30088
+→ 用途：外部 NodePort 驗證
+→ Node IP 取法：kubectl get nodes -o wide
+→ 打完要看：nginx 歡迎頁 HTML
+
+kubectl get jobs（等一分鐘後）
+→ 打完要看：health-check-xxxxx 的 COMPLETIONS 1/1
+
+kubectl logs <health-check-pod-name>
+→ 打完要看：nginx 歡迎頁 HTML + "Health check OK"
+
+【③④ 題目 + 解答】
+Q1：CronJob 的 command 是 wget -qO- http://nginx-svc，它能找到 nginx-svc 嗎？為什麼？
+A1：能找到。CronJob 的 Pod 和 nginx-svc 在同一個 namespace（default），CoreDNS 會把 nginx-svc 解析成正確的 ClusterIP。Pod 裡面用 Service 短名稱就能連，不需要用完整的 FQDN。
+
+Q2：如果你想讓 health-check CronJob 只在平日（週一到週五）的上午跑，schedule 怎麼寫？
+A2：schedule: "* 9-18 * * 1-5" 表示週一到週五 09:00~18:00 之間每小時觸發一次（不是每分鐘）。標準 cron 的最小單位是分鐘，無法表達「9點到18點之間每分鐘」這樣的時段+頻率組合，需要在應用程式層面加時間判斷。
+
+Q3：你的 nginx-svc 的 Endpoints 是空的（kubectl get ep nginx-svc 顯示 none），CronJob 的健康檢查會怎樣？
+A3：CronJob Pod 執行 wget 時會連線失敗，log 會顯示 wget: can't connect 或 Connection refused。原因是 Endpoints 空代表沒有 Pod 被 Service selector 匹配到。排查：kubectl get pods -l app=nginx-web 確認 Pod 存在且 Running，再用 kubectl describe svc nginx-svc 確認 selector 和 Pod labels 是否一致。
+
+[▶ 第五堂結束]`,
+  },
+
 ]

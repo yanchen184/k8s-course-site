@@ -1460,14 +1460,14 @@ scale 對象是 Deployment，不是 Pod。kubectl edit deployment 也能改 repl
             <div><span className="text-purple-400">metadata</span><span className="text-slate-300">:</span></div>
             <div className="pl-4"><span className="text-purple-400">name</span><span className="text-slate-300">: api-service</span></div>
             <div><span className="text-purple-400">spec</span><span className="text-slate-300">:</span></div>
-            <div className="pl-4 bg-red-900/30 border border-red-500/50 rounded px-1 flex items-center gap-2"><span className="text-purple-400">replicas</span><span className="text-slate-300">: </span><span className="text-red-400 font-bold">1</span><span className="bg-red-700/60 text-red-200 text-xs px-1.5 py-0.5 rounded font-sans ml-1">Bug 1：應為 3</span></div>
+            <div className="pl-4"><span className="text-purple-400">replicas</span><span className="text-slate-300">: </span><span className="text-yellow-300">1</span></div>
             <div className="pl-4"><span className="text-purple-400">selector</span><span className="text-slate-300">:</span></div>
             <div className="pl-6"><span className="text-purple-400">matchLabels</span><span className="text-slate-300">:</span></div>
             <div className="pl-8"><span className="text-yellow-300">app: api</span></div>
             <div className="pl-4"><span className="text-purple-400">template</span><span className="text-slate-300">:</span></div>
             <div className="pl-6"><span className="text-purple-400">metadata</span><span className="text-slate-300">:</span></div>
             <div className="pl-8"><span className="text-purple-400">labels</span><span className="text-slate-300">:</span></div>
-            <div className="pl-10 bg-red-900/30 border border-red-500/50 rounded px-1 flex items-center gap-2"><span className="text-red-400 font-bold">app: backend</span><span className="bg-red-700/60 text-red-200 text-xs px-1.5 py-0.5 rounded font-sans ml-1">Bug 2：應為 app: api（與 selector 一致）</span></div>
+            <div className="pl-10"><span className="text-yellow-300">app: backend</span></div>
             <div className="pl-6"><span className="text-purple-400">spec</span><span className="text-slate-300">:</span></div>
             <div className="pl-8"><span className="text-purple-400">containers</span><span className="text-slate-300">:</span></div>
             <div className="pl-8"><span className="text-slate-300">- </span><span className="text-purple-400">name</span><span className="text-slate-300">: api</span></div>

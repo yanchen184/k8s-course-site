@@ -433,6 +433,78 @@ kubeconfig 是 k3s 在 master 產生的連線設定檔，位置 /etc/rancher/k3s
 [▶ 下一頁]`,
   },
 
+  // ── 5-2（3/3）：常見踩坑排錯 ──
+  {
+    title: 'k3s 安裝：常見踩坑 & 修復指令',
+    subtitle: 'IP 衝突 / sudo kubectl 沒 kubeconfig / 舊節點殘留',
+    section: '5-2：k3s 安裝實作',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/30 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold text-sm mb-2">❌ 問題 1：兩台 VM IP 相同</p>
+          <p className="text-slate-300 text-xs mb-1">OVF 匯入後 MAC address 被複製 → DHCP 發同一個 IP</p>
+          <p className="text-yellow-400 text-xs font-semibold">修法：VMware → worker VM → Edit Settings → Network Adapter → Advanced → Generate（產生新 MAC）→ 重開機</p>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold text-sm mb-2">❌ 問題 2：sudo kubectl get nodes → connection refused :8080</p>
+          <p className="text-slate-300 text-xs mb-1">sudo 不繼承 export KUBECONFIG，kubectl 找不到 config 改連預設 localhost:8080</p>
+          <div className="bg-slate-900/50 p-2 rounded mt-1">
+            <code className="text-green-400 text-xs">sudo k3s kubectl get nodes  # 用這個取代 sudo kubectl</code>
+          </div>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold text-sm mb-2">❌ 問題 3：get nodes 看到多餘的舊節點（NotReady）</p>
+          <p className="text-slate-300 text-xs mb-1">之前測試留下的 node 殘留在 etcd 裡</p>
+          <div className="bg-slate-900/50 p-2 rounded mt-1">
+            <code className="text-green-400 text-xs">sudo k3s kubectl delete node &lt;舊節點名稱&gt;</code>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">✅ 正常狀態</p>
+          <div className="bg-slate-900/50 p-2 rounded mt-1 font-mono text-xs">
+            <p className="text-slate-400">$ sudo k3s kubectl get nodes</p>
+            <p className="text-slate-300">ubuntu-master &nbsp; Ready &nbsp; control-plane,master</p>
+            <p className="text-slate-300">ubuntu-worker &nbsp; Ready &nbsp; &lt;none&gt;</p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# 確認 k3s 服務狀態
+sudo systemctl status k3s
+
+# 正確的 kubectl 用法（master 上）
+sudo k3s kubectl get nodes
+
+# 清除殘留舊節點
+sudo k3s kubectl delete node <舊節點名稱>
+
+# worker 加入失敗時，在 worker 上確認 agent 狀態
+sudo systemctl status k3s-agent
+sudo journalctl -u k3s-agent -n 50`,
+    notes: `【常見問題總整理】
+
+問題 1：兩台 IP 一樣（OVF 複製 MAC）
+- 症狀：worker 加入後 kubectl get nodes 只有一台，或 SSH 連不上
+- 原因：VMware OVF 匯入時 MAC address 也被複製，DHCP 發同一個 IP
+- 修法：worker VM 關機 → Edit Settings → Network Adapter → Advanced → Generate 產生新 MAC → 開機
+
+問題 2：sudo kubectl get nodes → connection refused localhost:8080
+- 症狀：明明 k3s 有跑，kubectl 還是連不上
+- 原因：sudo 不繼承 export KUBECONFIG 設定的環境變數，kubectl 找不到 config，預設連 localhost:8080
+- 修法：改用 sudo k3s kubectl get nodes（k3s 自帶的 kubectl 知道 config 在哪）
+
+問題 3：get nodes 看到多餘 NotReady 節點
+- 症狀：節點列表有不認識的節點名稱，STATUS 是 NotReady
+- 原因：之前測試/重裝時舊節點資料殘留在 etcd 裡
+- 修法：sudo k3s kubectl delete node <名稱>
+
+[▶ 下一頁]`,
+  },
+
   // ============================================================
   // 5-3：擴縮容概念（2 張）
   // ============================================================

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>K8s 第五堂 — 複習筆記</title>
+  <title>K8s 第五堂 — 老師指令速查</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,7 +15,6 @@
       min-height: 100vh;
     }
 
-    /* ── Header ── */
     header {
       background: #1a1f2e;
       border-bottom: 1px solid #2d3748;
@@ -30,11 +29,25 @@
     header h1 {
       font-size: 1rem;
       font-weight: 600;
-      color: #63b3ed;
+      color: #f6ad55;
       white-space: nowrap;
     }
 
-    /* ── Tab bar ── */
+    .nav-links {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .nav-links a {
+      color: #63b3ed;
+      font-size: 0.78rem;
+      text-decoration: none;
+      padding: 4px 10px;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+    }
+    .nav-links a:hover { background: #1e2535; }
+
     .tabs {
       display: flex;
       gap: 6px;
@@ -54,25 +67,21 @@
     }
     .tab:hover { background: #1e2535; color: #e2e8f0; }
     .tab.active {
-      background: #2b4c7e;
-      border-color: #63b3ed;
-      color: #63b3ed;
+      background: #4a2c0a;
+      border-color: #f6ad55;
+      color: #f6ad55;
       font-weight: 600;
     }
 
-    /* ── Content ── */
     main {
       max-width: 860px;
       margin: 0 auto;
       padding: 32px 24px 80px;
     }
 
-    #content {
-      line-height: 1.75;
-    }
+    #content { line-height: 1.75; }
 
-    /* markdown styles */
-    #content h1 { font-size: 1.6rem; color: #63b3ed; margin: 0 0 8px; border-bottom: 1px solid #2d3748; padding-bottom: 8px; }
+    #content h1 { font-size: 1.6rem; color: #f6ad55; margin: 0 0 8px; border-bottom: 1px solid #2d3748; padding-bottom: 8px; }
     #content h2 { font-size: 1.2rem; color: #9ae6b4; margin: 32px 0 12px; }
     #content h3 { font-size: 1rem; color: #fbd38d; margin: 24px 0 8px; }
     #content h4 { font-size: 0.95rem; color: #e9d8fd; margin: 16px 0 6px; }
@@ -105,47 +114,29 @@
       line-height: 1.6;
     }
     #content blockquote {
-      border-left: 3px solid #63b3ed;
+      border-left: 3px solid #f6ad55;
       padding-left: 12px;
       margin: 12px 0;
       color: #94a3b8;
       font-style: italic;
     }
-    #content hr {
-      border: none;
-      border-top: 1px solid #2d3748;
-      margin: 24px 0;
-    }
-    #content table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 12px 0;
-      font-size: 0.9rem;
-    }
-    #content th {
-      background: #1a2235;
-      color: #63b3ed;
-      padding: 8px 12px;
-      text-align: left;
-      border: 1px solid #2d3748;
-    }
-    #content td {
-      padding: 7px 12px;
-      border: 1px solid #2d3748;
-      color: #cbd5e0;
-    }
+    #content hr { border: none; border-top: 1px solid #2d3748; margin: 24px 0; }
+    #content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.9rem; }
+    #content th { background: #1a2235; color: #f6ad55; padding: 8px 12px; text-align: left; border: 1px solid #2d3748; }
+    #content td { padding: 7px 12px; border: 1px solid #2d3748; color: #cbd5e0; }
     #content tr:nth-child(even) td { background: #141820; }
 
-    /* loading */
     .loading { color: #4a5568; text-align: center; padding: 60px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>K8s 第五堂複習</h1>
+  <h1>老師指令速查</h1>
   <nav class="tabs" id="tabs"></nav>
-  <a href="commands.html" style="margin-left:auto;color:#f6ad55;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #744210;border-radius:6px;white-space:nowrap;flex-shrink:0;">⌨️ 老師指令</a>
+  <div class="nav-links">
+    <a href="index.html">📖 複習筆記</a>
+  </div>
 </header>
 
 <main>
@@ -154,14 +145,13 @@
 
 <script>
   const DOCS = [
-    { label: 'Loop 1 回顧 + k3s',   file: '../docs/day5-loop1-review-k3s.md' },
-    { label: 'Loop 2 Deployment',    file: '../docs/day5-loop2-deployment.md' },
-    { label: 'Loop 3 滾動更新',      file: '../docs/day5-loop3-rolling-update.md' },
-    { label: 'Loop 4 自我修復 Labels', file: '../docs/day5-loop4-self-heal-labels.md' },
-    { label: 'Loop 5 Service DNS',   file: '../docs/day5-loop5-service-dns-namespace.md' },
-    { label: 'Loop 6 DaemonSet CronJob', file: '../docs/day5-loop6-daemonset-cronjob.md' },
-    { label: 'Loop 7 綜合實作',      file: '../docs/day5-loop7-final-practice.md' },
-    { label: 'Bonus 進階 YAML',      file: '../docs/day5-loop-bonus-advanced-yaml.md' },
+    { label: 'Loop 2 Deployment',      file: '../docs/loop2-commands.md' },
+    { label: 'Loop 3 滾動更新',        file: '../docs/loop3-commands.md' },
+    { label: 'Loop 4 自我修復 Labels', file: '../docs/loop4-commands.md' },
+    { label: 'Loop 5 ClusterIP',       file: '../docs/loop5-commands.md' },
+    { label: 'Loop 6 NodePort+DNS+NS', file: '../docs/loop6-commands.md' },
+    { label: 'Loop 7 DS+CronJob',      file: '../docs/loop7-commands.md' },
+    { label: 'Loop 8 綜合實作',        file: '../docs/loop8-commands.md' },
   ];
 
   const tabsEl = document.getElementById('tabs');

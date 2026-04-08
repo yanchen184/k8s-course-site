@@ -463,28 +463,40 @@ kubeconfig 是 k3s 在 master 產生的連線設定檔，位置 /etc/rancher/k3s
           </div>
         </div>
 
+        <div className="bg-blue-900/30 border border-blue-500/30 p-3 rounded-lg">
+          <p className="text-blue-400 font-semibold text-sm mb-1">💡 省力技巧：設定 alias，不用每次打 sudo k3s</p>
+          <div className="bg-slate-900/50 p-2 rounded mt-1 font-mono text-xs space-y-0.5">
+            <p className="text-green-400">echo "alias kubectl='sudo k3s kubectl'" &gt;&gt; ~/.bashrc</p>
+            <p className="text-green-400">source ~/.bashrc</p>
+            <p className="text-slate-400 mt-1"># 之後直接打 kubectl get nodes 就好</p>
+          </div>
+        </div>
+
         <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
           <p className="text-green-400 font-semibold text-sm">✅ 正常狀態</p>
           <div className="bg-slate-900/50 p-2 rounded mt-1 font-mono text-xs">
-            <p className="text-slate-400">$ sudo k3s kubectl get nodes</p>
+            <p className="text-slate-400">$ kubectl get nodes</p>
             <p className="text-slate-300">ubuntu-master &nbsp; Ready &nbsp; control-plane,master</p>
             <p className="text-slate-300">ubuntu-worker &nbsp; Ready &nbsp; &lt;none&gt;</p>
           </div>
         </div>
       </div>
     ),
-    code: `# 確認 k3s 服務狀態
-sudo systemctl status k3s
+    code: `# 設定 alias（一次，以後都用 kubectl 就好）
+echo "alias kubectl='sudo k3s kubectl'" >> ~/.bashrc
+source ~/.bashrc
 
-# 正確的 kubectl 用法（master 上）
-sudo k3s kubectl get nodes
+# 之後所有指令直接用 kubectl
+kubectl get nodes
+kubectl get pods -o wide
+kubectl apply -f xxx.yaml
 
 # 清除殘留舊節點
-sudo k3s kubectl delete node <舊節點名稱>
+kubectl delete node <舊節點名稱>
 
-# worker 加入失敗時，在 worker 上確認 agent 狀態
-sudo systemctl status k3s-agent
-sudo journalctl -u k3s-agent -n 50`,
+# 確認服務狀態
+sudo systemctl status k3s          # master
+sudo systemctl status k3s-agent    # worker`,
     notes: `【常見問題總整理】
 
 問題 1：兩台 IP 一樣（OVF 複製 MAC）
@@ -495,12 +507,17 @@ sudo journalctl -u k3s-agent -n 50`,
 問題 2：sudo kubectl get nodes → connection refused localhost:8080
 - 症狀：明明 k3s 有跑，kubectl 還是連不上
 - 原因：sudo 不繼承 export KUBECONFIG 設定的環境變數，kubectl 找不到 config，預設連 localhost:8080
-- 修法：改用 sudo k3s kubectl get nodes（k3s 自帶的 kubectl 知道 config 在哪）
+- 修法：改用 sudo k3s kubectl get nodes，或設定 alias（見下方）
+
+alias 設定（強烈建議在 master 上做一次）：
+  echo "alias kubectl='sudo k3s kubectl'" >> ~/.bashrc
+  source ~/.bashrc
+  設完之後所有指令直接打 kubectl 就好，不用每次 sudo k3s kubectl
 
 問題 3：get nodes 看到多餘 NotReady 節點
 - 症狀：節點列表有不認識的節點名稱，STATUS 是 NotReady
 - 原因：之前測試/重裝時舊節點資料殘留在 etcd 裡
-- 修法：sudo k3s kubectl delete node <名稱>
+- 修法：kubectl delete node <名稱>
 
 [▶ 下一頁]`,
   },

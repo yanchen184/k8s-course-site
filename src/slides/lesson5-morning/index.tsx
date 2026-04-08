@@ -860,10 +860,13 @@ alias 設定（強烈建議在 master 上做一次）：
             <span className="bg-yellow-900/40 text-yellow-300 text-xs px-2 py-0.5 rounded">apiVersion: apps/v1</span>
           </div>
           <div className="bg-slate-900/70 p-3 rounded text-xs font-mono leading-5">
+            <p><span className="text-slate-500"># nginx-deployment.yaml</span></p>
             <p><span className="text-yellow-300">apiVersion: apps/v1</span>  <span className="text-slate-500"># Pod/Service 用 v1；Deployment 用 apps/v1</span></p>
             <p><span className="text-slate-400">kind: Deployment</span></p>
             <p><span className="text-slate-400">metadata:</span></p>
             <p><span className="text-slate-400">&nbsp;&nbsp;name: nginx-deploy</span></p>
+            <p><span className="text-slate-400">&nbsp;&nbsp;labels:</span></p>
+            <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;app: nginx</span></p>
             <p><span className="text-slate-400">spec:</span></p>
             <p><span className="text-green-400">&nbsp;&nbsp;replicas: 3</span>  <span className="text-slate-500"># ① 維持幾個 Pod 副本（新欄位）</span></p>
             <p><span className="text-cyan-400">&nbsp;&nbsp;selector:</span>  <span className="text-slate-500"># ② 認領 Pod 的條件（新欄位）</span></p>
@@ -875,8 +878,10 @@ alias 設定（強烈建議在 master 上做一次）：
             <p><span className="text-purple-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;app: nginx</span>  <span className="text-red-400"># ← 必須和 ② selector 完全一致！</span></p>
             <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;spec:</span></p>
             <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;containers:</span></p>
-            <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- name: nginx</span></p>
+            <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- name: nginx</span>  <span className="text-slate-500"># set image 指令會用到這個名稱</span></p>
             <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;image: nginx:1.25</span></p>
+            <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ports:</span></p>
+            <p><span className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- containerPort: 80</span></p>
           </div>
         </div>
 

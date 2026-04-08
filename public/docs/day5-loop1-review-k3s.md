@@ -116,54 +116,46 @@
 
 ### ① 課程內容
 
-**安裝 Multipass**
+**環境說明**
 
-- macOS：透過 Homebrew 安裝（需先裝 Homebrew）
-- Windows：透過 Chocolatey 安裝（需先裝 Chocolatey），或從官網下載安裝檔
-- Linux：透過 snap 安裝（Ubuntu/Debian 預設有 snapd）
-- 安裝完成後可用 `multipass version` 驗證
+- 你已經有一台 Ubuntu VM（之前課程用的）→ 這台當 **master**
+- 老師提供的 OVF 檔匯入後開出第二台 Ubuntu → 這台當 **worker**
+- 兩台都在 VMware 裡跑，網路設定 NAT 或 Host-Only（能互連就好）
 
-**建立 3 台 VM**
+**匯入 OVF / 改 hostname**
 
-- 命名規範：k3s-master、k3s-worker1、k3s-worker2
-- 資源配置建議：2 CPU、2G RAM、10G Disk（最低需求，學習用）
-- VM 預設使用最新 LTS Ubuntu 映像
-- 第一次執行會下載映像，約 500MB，之後快取起來
+- VMware 匯入 OVF：File → Open → 選 .ovf 檔 → 開機
+- 兩台 VM 的 hostname 要不同，否則 k3s 叢集會認不清楚誰是誰
+  - master 叫 `k3s-master`，worker 叫 `k3s-worker`
+  - 改完 hostname 要重新登入才生效
+
+**查各台 VM 的 IP**
+
+- 兩台 IP 都要記下來，後面會用到
+- 用 `ip addr show` 或 `hostname -I` 查詢
 
 **在 master 安裝 k3s server**
 
 - 只要一行 curl 指令，腳本自動處理：下載二進位、設定 systemd service、產生 kubeconfig
 - 安裝完後 k3s 服務立即啟動，kubeconfig 自動寫入 `/etc/rancher/k3s/k3s.yaml`
-- 預設包含 Traefik ingress controller、local-path storage
 
 **取得 Join Token 和 Master IP**
 
 - **Token 位置**：`/var/lib/rancher/k3s/server/node-token`（只有 root 可讀）
 - **Token 用途**：worker 用來向 master 證明加入權限，類似 Docker Swarm 的 join token
-- **Master IP 查詢**：用 `multipass info` 取得 VM 的 IPv4 地址
 
 **Worker 加入叢集**
 
-- 加入指令和安裝指令相同（都是 `curl -sfL https://get.k3s.io | sh -`）
-- 差別在於加入時多設定兩個環境變數：
-  - `K3S_URL`：master 的 API Server 地址，格式 `https://<MASTER_IP>:6443`
+- 在 worker VM 上執行 curl 安裝，但多設定兩個環境變數：
+  - `K3S_URL`：master 的 API Server 地址，格式 `https://MASTER_IP:6443`
   - `K3S_TOKEN`：剛才取得的 node-token
-- k3s 偵測到這兩個環境變數，自動以 agent（worker）模式安裝，而非 server（master）模式
+- k3s 偵測到這兩個環境變數，自動以 agent（worker）模式安裝
 
-**驗證三節點**
+**驗證雙節點**
 
-- 在 master 上執行 `kubectl get nodes`
-- 正常狀態：3 個節點，STATUS 全部是 `Ready`
-- 剛加入的節點可能短暫顯示 `NotReady`，等 10-30 秒後自動變 Ready（kubelet 啟動、憑證交換需要時間）
-- ROLES 欄位：master 顯示 `control-plane,master`，worker 顯示 `<none>`
-
-**把 kubeconfig 複製到本機**
-
-- k3s 的 kubeconfig 預設在 master 的 `/etc/rancher/k3s/k3s.yaml`
-- 問題：這個檔案裡的 server IP 寫的是 `127.0.0.1`（master 自己看自己），複製到本機後連不到
-- 解法：用 `sed` 把 `127.0.0.1` 替換成 master 的實際 IP
-- `KUBECONFIG` 環境變數：告訴 kubectl 要讀哪個 config 檔（預設是 `~/.kube/config`）
-- 設定後在本機直接跑 `kubectl get nodes`，不用再 `multipass exec` 進去 master
+- 在 master 上執行 `sudo kubectl get nodes`
+- 正常狀態：2 個節點，STATUS 全部是 `Ready`
+- 剛加入的節點可能短暫顯示 `NotReady`，等 10-30 秒後自動變 Ready
 
 ---
 
@@ -171,73 +163,67 @@
 
 ---
 
-**安裝 Multipass**
+**Step 0：匯入 OVF（在 VMware 操作）**
 
-```bash
-# macOS
-brew install multipass
-
-# Windows
-choco install multipass
-
-# Linux
-sudo snap install multipass
-```
-
-- `brew` / `choco` / `snap`：各平台的套件管理工具
-- 安裝完畢可驗證：`multipass version`
-
-打完要看：
-```
-multipass   1.14.0+mac
-multipassd  1.14.0+mac
-```
-版本號依安裝時間不同，只要有輸出就代表安裝成功。
+1. VMware → File → Open → 選老師提供的 `.ovf` 檔
+2. 設定 VM 名稱（建議 `k3s-worker`），選存放位置
+3. 開機，等待開機完成
 
 ---
 
-**建立 VM**
+**Step 1：改 hostname**
 
+在 **master VM** 上執行：
 ```bash
-multipass launch --name k3s-master --cpus 2 --memory 2G --disk 10G
-multipass launch --name k3s-worker1 --cpus 2 --memory 2G --disk 10G
-multipass launch --name k3s-worker2 --cpus 2 --memory 2G --disk 10G
+sudo hostnamectl set-hostname k3s-master
 ```
 
-- `launch`：建立並啟動一台新 VM
-- `--name k3s-master`：VM 名稱，之後用這個名字操作這台 VM
-- `--cpus 2`：分配 2 顆虛擬 CPU
-- `--memory 2G`：分配 2 GB 記憶體
-- `--disk 10G`：分配 10 GB 虛擬硬碟
+在 **worker VM** 上執行：
+```bash
+sudo hostnamectl set-hostname k3s-worker
+```
+
+- `hostnamectl set-hostname`：修改系統 hostname，重新登入後生效
+- hostname 不同很重要：k3s 用 hostname 識別 node 名稱，兩台一樣會衝突
 
 打完要看：
+```bash
+hostname
 ```
-Launched: k3s-master
-```
-每台 VM 建立成功後各出現一行這樣的訊息。第一次執行會先下載 Ubuntu 映像，輸出如：
-```
-Retrieving image: 45% |████████████          |
-```
-耐心等待即可。
-
-異常狀況：
-- `insufficient memory`：主機實體記憶體不足，把 `--memory` 改成 `1G`
-- `Multipass daemon failed to start`：確認 Multipass 有沒有安裝完整，重新安裝
+輸出 `k3s-master` 或 `k3s-worker` 確認改成功。
 
 ---
 
-**在 master 安裝 k3s**
+**Step 2：查各台 IP**
 
+在每台 VM 上執行：
 ```bash
-multipass exec k3s-master -- bash -c "curl -sfL https://get.k3s.io | sh -"
+ip addr show | grep "inet " | grep -v 127.0.0.1
 ```
 
-- `multipass exec k3s-master`：在名為 k3s-master 的 VM 裡執行指令
-- `--`：分隔符，之後是要在 VM 內執行的指令
-- `bash -c "..."`：用 bash 執行後面的字串
+或更簡單：
+```bash
+hostname -I
+```
+
+打完要看：
+```
+192.168.x.x   # 記下這個 IP，master 的 IP 後面要用
+```
+
+> 老師提示：兩台 IP 都寫在白板上，學員對照自己的 IP 確認。
+
+---
+
+**Step 3：在 master 安裝 k3s（在 master VM 執行）**
+
+```bash
+curl -sfL https://get.k3s.io | sh -
+```
+
 - `curl -sfL https://get.k3s.io`：下載 k3s 安裝腳本
   - `-s`：silent，不顯示進度條
-  - `-f`：fail silently，HTTP 錯誤時不輸出錯誤頁面
+  - `-f`：HTTP 錯誤時不輸出錯誤頁面
   - `-L`：follow redirects
 - `| sh -`：把下載的腳本直接 pipe 給 sh 執行
 
@@ -245,197 +231,92 @@ multipass exec k3s-master -- bash -c "curl -sfL https://get.k3s.io | sh -"
 ```
 [INFO]  Finding release for channel stable
 [INFO]  Using v1.28.x+k3s1 as release
-[INFO]  Downloading hash ...
 [INFO]  Downloading binary k3s
-[INFO]  Verifying binary download
 [INFO]  Installing k3s to /usr/local/bin/k3s
 ...
 [INFO]  systemd: Starting k3s
 ```
-最後看到 `systemd: Starting k3s` 就代表安裝並啟動成功。
+看到 `systemd: Starting k3s` 就代表安裝並啟動成功。
 
-異常狀況：
-- 若網路超時，重跑同一行指令即可（安裝腳本是冪等的）
+異常：
+- 網路超時 → 重跑同一行指令（安裝腳本是冪等的）
 
 ---
 
-**取得 Join Token**
+**Step 4：取得 Join Token（在 master VM 執行）**
 
 ```bash
-TOKEN=$(multipass exec k3s-master -- sudo cat /var/lib/rancher/k3s/server/node-token)
+sudo cat /var/lib/rancher/k3s/server/node-token
 ```
 
-- `TOKEN=$(...)`：把括號內指令的輸出存到 shell 變數 `TOKEN`
-- `multipass exec k3s-master --`：進入 k3s-master VM
-- `sudo cat /var/lib/rancher/k3s/server/node-token`：讀取 token 檔案（需要 root 權限）
-  - `/var/lib/rancher/k3s/server/node-token`：k3s 安裝後自動產生的 token 檔案
+- `/var/lib/rancher/k3s/server/node-token`：k3s 安裝後自動產生的 token 檔案（需要 sudo）
 
 打完要看：
-```bash
-echo $TOKEN
-```
-輸出類似：
 ```
 K10abc123def456::server:789xyz...（一長串隨機字元）
 ```
-如果 `echo $TOKEN` 是空的，代表取得失敗，確認 k3s-master 安裝是否完成。
+把這串 token 複製起來，等一下 worker 要用。
 
 ---
 
-**取得 Master IP**
+**Step 5：Worker 加入叢集（在 worker VM 執行）**
+
+把 `MASTER_IP` 換成剛才查到的 master IP，`TOKEN` 換成剛才複製的 token：
 
 ```bash
-MASTER_IP=$(multipass info k3s-master | grep IPv4 | awk '{print $2}')
+curl -sfL https://get.k3s.io | \
+  K3S_URL=https://MASTER_IP:6443 \
+  K3S_TOKEN=你的TOKEN \
+  sh -
 ```
 
-- `multipass info k3s-master`：顯示 k3s-master VM 的詳細資訊
-- `grep IPv4`：過濾出包含 IPv4 的那行
-- `awk '{print $2}'`：取出第二個欄位（IP 地址本身）
-- 結果存到 `MASTER_IP` 變數
+- `K3S_URL=https://MASTER_IP:6443`：告訴腳本 master 的 API Server 位址（port 6443 是 K8s 預設）
+- `K3S_TOKEN=...`：加入叢集的憑證
+- k3s 腳本偵測到 `K3S_URL` 就自動以 agent（worker）模式安裝
 
 打完要看：
-```bash
-echo $MASTER_IP
 ```
-輸出類似：`192.168.64.3`（實際 IP 依環境不同）
-
----
-
-**Worker 加入叢集**
-
-```bash
-for i in 1 2; do
-  multipass exec k3s-worker$i -- bash -c \
-    "curl -sfL https://get.k3s.io | K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$TOKEN sh -"
-done
-```
-
-- `for i in 1 2; do ... done`：迴圈，依序對 worker1 和 worker2 執行
-- `K3S_URL=https://$MASTER_IP:6443`：環境變數，告訴安裝腳本 master 的 API Server 位址
-  - `6443`：K8s API Server 的預設 port
-- `K3S_TOKEN=$TOKEN`：環境變數，加入叢集的憑證
-- k3s 腳本偵測到 `K3S_URL` 就知道要裝 agent 模式（worker），不裝 server 模式
-
-打完要看（每台 worker 各一次）：
-```
-[INFO]  Finding release for channel stable
-[INFO]  Using v1.28.x+k3s1 as release
-...
 [INFO]  systemd: Starting k3s-agent
 ```
-注意：最後是 `k3s-agent`，而非 master 的 `k3s`，確認 worker 是以 agent 身份加入。
+注意最後是 `k3s-agent` 不是 `k3s`，確認 worker 以 agent 身份加入。
 
 ---
 
-**驗證三節點**
+**Step 6：驗證雙節點（在 master VM 執行）**
 
 ```bash
-multipass exec k3s-master -- sudo kubectl get nodes
+sudo kubectl get nodes
 ```
-
-- `sudo kubectl get nodes`：在 master 上查看叢集所有節點
-- k3s 的 kubectl 需要 sudo 才能讀取 kubeconfig（或指定 `--kubeconfig`）
 
 打完要看：
 ```
 NAME          STATUS   ROLES                  AGE   VERSION
 k3s-master    Ready    control-plane,master   5m    v1.28.x+k3s1
-k3s-worker1   Ready    <none>                 2m    v1.28.x+k3s1
-k3s-worker2   Ready    <none>                 1m    v1.28.x+k3s1
+k3s-worker    Ready    <none>                 1m    v1.28.x+k3s1
 ```
 
 欄位說明：
-- `NAME`：節點名稱（即 VM 名稱）
 - `STATUS`：`Ready` 代表可接受 Pod 調度；`NotReady` 代表 kubelet 尚未準備好
 - `ROLES`：`control-plane,master` 是主節點；`<none>` 是 worker 節點
-- `AGE`：節點加入叢集的時間
-- `VERSION`：該節點的 k3s / K8s 版本
 
 異常狀況：
-- 若 worker 顯示 `NotReady`：等待 30 秒再重查，kubelet 啟動和憑證交換需要時間
-- 若 worker 沒出現：確認 `K3S_URL` 和 `K3S_TOKEN` 設定是否正確
-
----
-
-**複製 kubeconfig 到本機**
-
-```bash
-# 複製 kubeconfig
-multipass exec k3s-master -- sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/k3s-config
-
-# 替換 IP（127.0.0.1 → master 實際 IP）
-sed -i "s/127.0.0.1/$MASTER_IP/g" ~/.kube/k3s-config
-
-# 設定環境變數，讓 kubectl 使用這個 config
-export KUBECONFIG=~/.kube/k3s-config
-```
-
-- `/etc/rancher/k3s/k3s.yaml`：k3s 的 kubeconfig 檔案位置，記錄連線資訊（server URL、憑證、token）
-- `> ~/.kube/k3s-config`：把輸出重導向到本機的 `~/.kube/k3s-config` 檔案
-- `sed -i "s/127.0.0.1/$MASTER_IP/g"`：
-  - `-i`：直接修改檔案（in-place）
-  - `s/舊值/新值/g`：把所有 `127.0.0.1` 替換成 master 的實際 IP
-  - 必須替換，否則本機的 kubectl 會嘗試連自己的 127.0.0.1，而非 VM
-- `export KUBECONFIG=~/.kube/k3s-config`：設定環境變數，kubectl 優先讀這個檔案（預設是 `~/.kube/config`）
-
-**最終驗證**
-
-```bash
-kubectl get nodes
-```
-
-打完要看：
-```
-NAME          STATUS   ROLES                  AGE   VERSION
-k3s-master    Ready    control-plane,master   10m   v1.28.x+k3s1
-k3s-worker1   Ready    <none>                 7m    v1.28.x+k3s1
-k3s-worker2   Ready    <none>                 6m    v1.28.x+k3s1
-```
-和剛才在 master 上看到的結果一樣，但這次是在本機直接執行 kubectl，不需要 `multipass exec`。
-
-異常狀況：
-- `Unable to connect to the server`：`sed` 替換失敗，確認 `echo $MASTER_IP` 有值
-- `certificate signed by unknown authority`：k3s 自簽憑證問題，嘗試加 `--insecure-skip-tls-verify` 或重新複製 kubeconfig
-
----
-
-**查看 VM 詳細資訊**
-
-```bash
-multipass info k3s-master
-```
-
-- `info`：顯示指定 VM 的詳細狀態
-- 常用欄位：Name、State（Running/Stopped）、IPv4、Memory（已用/總量）、Disk（已用/總量）
-
-打完要看：
-```
-Name:           k3s-master
-State:          Running
-IPv4:           192.168.64.3
-Release:        Ubuntu 22.04.3 LTS
-Image hash:     abc123...
-CPU(s):         2
-Load:           0.52 0.58 0.47
-Disk usage:     2.5GiB out of 9.5GiB
-Memory usage:   1.2GiB out of 1.9GiB
-Mounts:         --
-```
+- worker 顯示 `NotReady`：等 30 秒再重查，kubelet 啟動需要時間
+- worker 沒出現：確認 Token 和 Master IP 有沒有填錯
 
 ---
 
 ### ③ 題目
 
 1. worker 加入叢集時，`K3S_URL` 和 `K3S_TOKEN` 這兩個環境變數各代表什麼？缺少其中一個會發生什麼事？
-2. 為什麼把 kubeconfig 複製到本機後，必須用 `sed` 把 `127.0.0.1` 改成 master 的實際 IP？
-3. 操作題：執行完整的 k3s 安裝流程後，用 `kubectl get nodes` 驗證叢集狀態，並描述 ROLES 欄位中 master 和 worker 的差異。
+2. 為什麼兩台 VM 的 hostname 必須不同？如果一樣會怎樣？
+3. 操作題：執行完整流程後，用 `sudo kubectl get nodes` 驗證叢集狀態，說明 ROLES 欄位中 master 和 worker 的差異。
 
 ---
 
 ### ④ 解答
 
-1. `K3S_URL` 告訴安裝腳本 master API Server 的地址（`https://<IP>:6443`），讓 worker 知道要連哪裡；`K3S_TOKEN` 是加入叢集的身分憑證，讓 master 確認這台機器有權限加入。缺少 `K3S_URL` 時腳本會以 server（master）模式安裝；缺少 `K3S_TOKEN` 時 worker 無法通過 master 的認證，加入會失敗。
+1. `K3S_URL` 告訴安裝腳本 master API Server 的地址（`https://IP:6443`），讓 worker 知道要連哪裡；`K3S_TOKEN` 是加入叢集的身分憑證，讓 master 確認這台機器有權限加入。缺少 `K3S_URL` 時腳本會以 server（master）模式安裝，變成又多一台 master；缺少 `K3S_TOKEN` 時 worker 無法通過 master 的認證，加入失敗。
 
-2. kubeconfig 裡的 `server` 欄位記錄 API Server 地址。k3s 在 master 上產生這個檔案時，預設寫 `127.0.0.1`（因為 master 自己連自己用 localhost）。複製到本機後，本機的 `127.0.0.1` 是自己，不是 master VM，所以 kubectl 會連到本機的 6443 port（根本沒有服務），必須改成 master VM 的實際 IP。
+2. k3s 用 hostname 當作 node 名稱在叢集內識別。兩台 hostname 一樣時，第二台加入叢集後 k3s 會認為是同一個 node 重新連線，導致 node 狀態混亂（只顯示一個 node 或互相覆蓋）。
 
 3. master 節點的 ROLES 欄位顯示 `control-plane,master`，代表它是叢集的控制平面，負責管理和調度；worker 節點的 ROLES 顯示 `<none>`，代表純粹是執行 Pod 的工作節點，沒有特殊角色。

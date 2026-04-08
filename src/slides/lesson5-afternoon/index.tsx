@@ -62,6 +62,13 @@ export const slides: Slide[] = [
         </div>
       </div>
     ),
+    code: `# 現場 demo：Pod IP 會變
+kubectl get pods -o wide   # 記下某個 Pod 的 IP
+
+kubectl delete pod <pod名稱>   # 刪掉它
+
+kubectl get pods -o wide   # 新 Pod IP 不一樣了！
+# → 這就是「IP 會變」問題的直接體現`,
     notes: `【① 課程內容】
 Pod IP 兩個根本問題：
 1. Pod 重啟後 IP 會改變，無法寫死 IP 在程式裡
@@ -332,6 +339,19 @@ kubectl get endpoints httpd-svc → 確認 Endpoints 自動新增到 4 個
         </div>
       </div>
     ),
+    code: `# 現場 demo：排錯流程
+# Step 1：先看 Endpoints 是不是空的
+kubectl get endpoints nginx-svc
+# → ENDPOINTS 欄位是 <none> → selector 問題
+# → 有 IP:Port → 連接問題（看 targetPort）
+
+# Step 2：比對 selector vs Pod labels
+kubectl describe svc nginx-svc | grep Selector
+kubectl get pods --show-labels
+# → 找出不一致的地方
+
+# Step 3：看 Service 詳細
+kubectl describe svc nginx-svc`,
     notes: `【① 課程內容】
 ClusterIP Service 排錯流程總整理：Endpoints 空的 → selector 問題；Endpoints 有 IP 但連不上 → targetPort 問題。
 
@@ -1208,6 +1228,20 @@ type: ClusterIP 的 Service 完全沒有在 Node 上開放任何 Port，
         </div>
       </div>
     ),
+    code: `# 現場 demo：在 Pod 內用名字找服務
+# 進入 busybox Pod
+kubectl exec -it test-curl -- sh
+
+# 在 Pod 內執行：
+nslookup nginx-svc
+# → Server: CoreDNS IP
+# → Address: nginx-svc 的 ClusterIP
+
+# 短名稱（同 namespace）
+curl http://nginx-svc
+
+# 跨 namespace 要用 FQDN
+curl http://nginx-svc.default.svc.cluster.local`,
     notes: `【① 課程內容】
 CoreDNS 是什麼：
 - K8s 內建的 DNS 服務，以 Pod 形式跑在 kube-system namespace
@@ -1298,6 +1332,23 @@ FQDN 格式（完整網域名稱）：
         </div>
       </div>
     ),
+    code: `# 現場 demo：Namespace 操作
+# 看現有 namespace
+kubectl get namespaces
+
+# 建新 namespace
+kubectl create namespace dev
+
+# 在 dev namespace 建 Pod
+kubectl run test-pod --image=nginx -n dev
+
+# 比較：不同 namespace 互不干擾
+kubectl get pods           # default namespace
+kubectl get pods -n dev    # dev namespace
+kubectl get pods -A        # 全部 namespace
+
+# 刪 namespace（裡面的資源全部一起刪！）
+# kubectl delete namespace dev`,
     notes: `【① 課程內容】
 Namespace 的核心概念：
 - Namespace 是 K8s 的邏輯隔離單位（非網路隔離！）

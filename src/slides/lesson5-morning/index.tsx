@@ -477,6 +477,12 @@ kubeconfig 是 k3s 在 master 產生的連線設定檔，位置 /etc/rancher/k3s
         </div>
       </div>
     ),
+    code: `# 現場 demo：scale up，感受 Pod 立刻增加
+kubectl scale deployment nginx-deploy --replicas=5
+kubectl get pods -w
+# → 看到新 Pod 從 Pending → ContainerCreating → Running
+# → -o wide 確認分散在不同 Node
+kubectl get pods -o wide`,
     notes: `【① 課程內容】
 裸 Pod（naked Pod）沒有守護機制，刪了就沒了。Deployment 三層結構：Deployment → ReplicaSet（自動建立）→ Pod。第二層 ReplicaSet 永遠在監控 Pod 數量，少了就補，多了就刪；滾動更新時新舊 RS 並存讓服務不中斷；回滾時把舊 RS 的 replicas 從 0 改回目標數量。
 
@@ -551,6 +557,11 @@ apiVersion 差異：Pod/Service 用 v1；Deployment/ReplicaSet/DaemonSet/Statefu
         </div>
       </div>
     ),
+    code: `# 現場 demo：scale down，感受 Pod 立刻減少
+kubectl scale deployment nginx-deploy --replicas=2
+kubectl get pods -w
+# → 多餘的 Pod 被 Terminating → 消失
+# → 服務仍然運作，只是少了幾個副本`,
     notes: `【① 課程內容】
 縮容：流量退了，多餘的 Pod 佔著資源（雲端佔著費用），用 kubectl scale 縮回來。K8s 自動砍掉多的 Pod，你只需要說「我要幾個」。
 
@@ -1160,6 +1171,20 @@ kubectl rollout undo deployment/nginx-deploy --to-revision=1`,
         </div>
       </div>
     ),
+    code: `# 現場 demo：看 rollout history + 舊 RS 沒有消失
+kubectl rollout history deployment/nginx-deploy
+# → REVISION 1 / 2，記下版本號
+
+# 看舊 RS 還在（副本歸零但沒刪）
+kubectl get rs
+# → 舊 RS DESIRED=0 CURRENT=0，新 RS DESIRED=3
+
+# 回滾到上一版
+kubectl rollout undo deployment/nginx-deploy
+kubectl get pods -w   # 看切換過程
+
+# 精確回到指定版本
+kubectl rollout undo deployment/nginx-deploy --to-revision=1`,
     notes: `【① 課程內容】
 本張投影片重點：回滾原理 + 指令總覽 + Docker 對照。
 
@@ -1605,6 +1630,15 @@ kubectl rollout history deployment/night-api  → revision 3 會出現（每次 
         </div>
       </div>
     ),
+    code: `# 現場 demo：手動刪 Pod，看 K8s 自動補回來
+kubectl get pods   # 確認 3 個 Running
+
+kubectl delete pod <你的pod名稱>   # 刪一個
+
+kubectl get pods -w
+# → 馬上看到新 Pod 出現，AGE 是幾秒
+# → 舊 Pod Terminating，新 Pod Running
+# → 副本數永遠維持在 3`,
     notes: `【① 課程內容】
 自我修復（Self-Healing）是什麼：當 Pod 掛掉（崩潰、被手動刪除、節點故障），K8s 會自動補回來。不是魔法，是 ReplicaSet 的 Controller Loop 在背後持續運作。核心機制：「實際狀態 vs 期望狀態」的差異偵測與修正。
 

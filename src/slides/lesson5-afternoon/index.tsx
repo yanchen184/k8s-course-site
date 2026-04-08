@@ -1894,10 +1894,8 @@ spec:
         app: log-collector
     spec:
       containers:
-        - name: collector
-          image: busybox:1.36
-          command: ["sh", "-c",
-            "while true; do echo \\"[$(date)] collecting logs from $(hostname)\\"; sleep 30; done"]`,
+        - name: fluentd
+          image: fluent/fluentd:v1.16`,
     notes: `【① 課程內容】
 DaemonSet 確保每個 Node 上跑且只跑一個 Pod。Node 加入叢集 → 自動建 Pod；Node 移除 → Pod 自動清除。不需要手動管理副本數，Pod 數量永遠等於 Node 數量。
 
@@ -2022,17 +2020,20 @@ kind: CronJob
 metadata:
   name: hello-cron
 spec:
-  schedule: "*/1 * * * *"    # 每分鐘一次
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 60
       template:
         spec:
           containers:
             - name: hello
               image: busybox:1.36
-              command: ["sh", "-c",
-                "echo 'Hello from CronJob!' && date"]
-          restartPolicy: Never`,
+              command: ["sh", "-c", "date; echo Hello from CronJob"]
+          restartPolicy: OnFailure`,
     notes: `【① 課程內容】
 CronJob = 定時排程任務，跑完就結束（不像 Deployment 會一直跑）。等同於 Linux 的 crontab，只是在 K8s 上執行。
 
@@ -2479,16 +2480,105 @@ Q：用 kubectl get pods -o wide 比較 Deployment（replicas=Node數）和 Daem
         </div>
       </div>
     ),
-    code: `# 綜合實作 Step 1-5
-kubectl apply -f full-stack.yaml
-kubectl get all -n fullstack-demo
-kubectl get pods -o wide -n fullstack-demo
-
-# 驗證 ClusterIP 內部連線
-kubectl run test-curl -n fullstack-demo \
-  --image=curlimages/curl:latest --rm -it --restart=Never -- sh
-# 在 Pod 內：
-curl http://api-svc`,
+    code: `# full-stack.yaml
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fullstack-demo
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: fullstack-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+---
+# Frontend Service（NodePort）
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: fullstack-demo
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+---
+# API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: fullstack-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: httpd
+          image: httpd:2.4
+          ports:
+            - containerPort: 80
+---
+# API Service（ClusterIP）
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-svc
+  namespace: fullstack-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: api
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# DaemonSet（log-collector）
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+  namespace: fullstack-demo
+spec:
+  selector:
+    matchLabels:
+      app: log-collector
+  template:
+    metadata:
+      labels:
+        app: log-collector
+    spec:
+      containers:
+        - name: log-agent
+          image: busybox:1.36
+          command: ["sh", "-c", "while true; do echo 'collecting logs...'; sleep 60; done"]`,
     notes: `【① 課程內容】
 目標架構：外部瀏覽器 → NodePort（30080）→ frontend Deployment（nginx x2）→ ClusterIP → api Deployment（httpd x2）+ log-collector DaemonSet（每個 Node 各1個），全在 fullstack-demo Namespace 內。
 

@@ -1632,27 +1632,37 @@ Lab 設計邏輯回顧：Bug 1 selector/label 不一致（READY 永遠 0/3）；
 
         <div className="bg-slate-800/50 p-3 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2 text-sm">更新策略參數（replicas=3 範例）</p>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-600">
-                <th className="pb-1 pr-3 text-left">參數</th>
-                <th className="pb-1 pr-3 text-left">預設</th>
-                <th className="pb-1 text-left">效果</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-t border-slate-700">
-                <td className="py-1 pr-3 text-yellow-400 font-mono">maxSurge</td>
-                <td className="py-1 pr-3">25%</td>
-                <td className="py-1">最多超出 1 個 → 同時最多 4 個 Pod</td>
-              </tr>
-              <tr className="border-t border-slate-700">
-                <td className="py-1 pr-3 text-yellow-400 font-mono">maxUnavailable</td>
-                <td className="py-1 pr-3">25%</td>
-                <td className="py-1">最多允許 1 個不可用（無條件捨去）</td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-900/70 p-2 rounded text-xs font-mono leading-5">
+              <p className="text-slate-400">spec:</p>
+              <p className="text-slate-400">&nbsp;&nbsp;strategy:</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-yellow-300">type: RollingUpdate</span></p>
+              <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;rollingUpdate:</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">maxSurge: 1</span></p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">maxUnavailable: 0</span></p>
+            </div>
+            <table className="w-full text-xs self-start">
+              <thead>
+                <tr className="text-slate-400 border-b border-slate-600">
+                  <th className="pb-1 pr-3 text-left">參數</th>
+                  <th className="pb-1 pr-3 text-left">預設</th>
+                  <th className="pb-1 text-left">效果</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-300">
+                <tr className="border-t border-slate-700">
+                  <td className="py-1 pr-3 text-yellow-400 font-mono">maxSurge</td>
+                  <td className="py-1 pr-3">25%</td>
+                  <td className="py-1">最多超出 1 個 → 同時最多 4 個 Pod</td>
+                </tr>
+                <tr className="border-t border-slate-700">
+                  <td className="py-1 pr-3 text-yellow-400 font-mono">maxUnavailable</td>
+                  <td className="py-1 pr-3">25%</td>
+                  <td className="py-1">最多允許 1 個不可用（無條件捨去）</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="bg-amber-900/20 border border-amber-500/30 p-2 rounded text-xs text-slate-300">

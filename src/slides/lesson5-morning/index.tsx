@@ -817,7 +817,30 @@ alias 設定（強烈建議在 master 上做一次）：
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">背後機制（用第四堂架構串一遍）</p>
+          <p className="text-cyan-400 font-semibold mb-2">Deployment YAML — 三個新欄位</p>
+          <div className="bg-slate-900/70 p-3 rounded text-xs font-mono leading-5 overflow-x-auto">
+            <p className="text-slate-400">apiVersion: <span className="text-yellow-300">apps/v1</span>  <span className="text-slate-500"># 注意：不是 v1，是 apps/v1</span></p>
+            <p className="text-slate-400">kind: Deployment</p>
+            <p className="text-slate-400">metadata:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;name: nginx-deploy</p>
+            <p className="text-slate-400">spec:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;<span className="text-green-400">replicas: 3</span>  <span className="text-slate-500"># ① 維持幾個 Pod 副本</span></p>
+            <p className="text-slate-400">&nbsp;&nbsp;<span className="text-cyan-400">selector:</span>  <span className="text-slate-500"># ② 告訴 Deployment 它要管哪些 Pod</span></p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;matchLabels:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-cyan-400">app: nginx</span></p>
+            <p className="text-slate-400">&nbsp;&nbsp;<span className="text-purple-400">template:</span>  <span className="text-slate-500"># ③ Pod 的模板</span></p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;metadata:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;labels:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-purple-400">app: nginx</span>  <span className="text-red-400"># ← 必須和 selector 一致！</span></p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;spec:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;containers:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- name: nginx</p>
+            <p className="text-slate-400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;image: nginx:1.25</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">背後機制</p>
           <div className="flex items-center justify-center gap-1 text-xs flex-wrap">
             <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">kubectl scale</span>
             <span className="text-slate-500">→</span>

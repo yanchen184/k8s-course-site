@@ -1415,11 +1415,9 @@ kubectl rollout undo deployment/my-nginx`,
 題目：承接「帶做一遍」後，請說明以下情境：現有 revision 歷史是 1（nginx:1.25）、2（nginx:1.28）、3（nginx:9.9.9 壞版），現在想回到 nginx:1.25，應該執行什麼指令？為什麼不能直接用 rollout undo 不帶參數？
 
 解答：
-```bash
-kubectl rollout history deployment/nginx-deploy
-# 確認 revision 1 是 nginx:1.25
-kubectl rollout undo deployment/nginx-deploy --to-revision=1
-```
+  kubectl rollout history deployment/nginx-deploy
+  # 確認 revision 1 是 nginx:1.25
+  kubectl rollout undo deployment/nginx-deploy --to-revision=1
 原因：目前在 revision 3，rollout undo 不帶參數只回 revision 2（nginx:1.28），不是 revision 1（nginx:1.25）。必須用 --to-revision=1 才能精確指定。
 
 [▶ 下一頁]`,

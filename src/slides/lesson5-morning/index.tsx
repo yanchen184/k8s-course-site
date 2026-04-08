@@ -941,6 +941,17 @@ kubectl delete deployment api-service
         </div>
       </div>
     ),
+    code: `# 回頭操作 Loop 1：常見坑確認
+# 確認 Deployment 名稱（scale 的對象是 Deployment，不是 Pod）
+kubectl get deploy
+
+# Scale up
+kubectl scale deployment my-httpd --replicas=5
+kubectl get pods -o wide   # 看 Pod 分散到哪些 Node
+
+# Scale down
+kubectl scale deployment my-httpd --replicas=2
+kubectl get pods -w   # 看多餘 Pod Terminating`,
     notes: `【① 課程內容】
 本節為學生獨立練習後的帶做確認（對應 Lab 1 結束後）。老師帶大家走一遍擴縮容操作，確認每個步驟都做到，並點出兩個常見坑。
 
@@ -1461,6 +1472,20 @@ kubectl rollout undo deployment/my-nginx`,
         </div>
       </div>
     ),
+    code: `# 回頭操作 Loop 2：滾動更新完整流程
+# 確認目前版本
+kubectl rollout history deployment/nginx-deploy
+
+# 觸發更新
+kubectl set image deployment/nginx-deploy nginx=nginx:1.28
+kubectl rollout status deployment/nginx-deploy
+
+# 回滾到上一版
+kubectl rollout undo deployment/nginx-deploy
+
+# 回滾到指定版本
+kubectl rollout undo deployment/nginx-deploy --to-revision=1
+kubectl rollout history deployment/nginx-deploy`,
     notes: `【① 課程內容】
 本節目標：先帶做一遍滾動更新三指令（5 分鐘），再給學生做 Lab 2 情境題（15 分鐘）：版本事故，強制用 --to-revision 精確回滾。
 
@@ -2077,6 +2102,23 @@ kubectl get pods  → 回到 3 個
         </div>
       </div>
     ),
+    code: `# 上午完整指令速查
+# 擴縮容
+kubectl scale deployment nginx-deploy --replicas=5
+kubectl get pods -o wide
+
+# 滾動更新
+kubectl set image deployment/nginx-deploy nginx=nginx:1.28
+kubectl rollout status deployment/nginx-deploy
+kubectl rollout history deployment/nginx-deploy
+
+# 自我修復
+kubectl delete pod <pod-name>
+kubectl get pods -w   # 看自動補回
+
+# Labels
+kubectl get pods --show-labels
+kubectl get pods -l app=nginx`,
     notes: `【① 課程內容】
 上午回顧重點：
 - Deployment 完整生命週期：建立 → 更新（滾動）→ 失敗 → 回滾

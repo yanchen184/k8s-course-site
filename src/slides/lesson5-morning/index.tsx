@@ -1644,6 +1644,36 @@ Label vs Annotation 差別（常考）：
           </table>
           <p className="text-red-400 text-xs mt-2">三個沒對上 = Deployment 認不到 Pod / Service 導不到流量 → 最常見的配對錯誤</p>
         </div>
+
+        <div className="bg-purple-900/30 border border-purple-500/40 p-4 rounded-lg">
+          <p className="text-purple-400 font-semibold mb-2">真實場景：用 Label 做 GPU 排程</p>
+          <p className="text-slate-300 text-sm mb-3">公司叢集有些機器有 GPU、有些沒有。K8s 預設不知道哪台有 GPU，要自己貼標籤告訴它。</p>
+          <div className="space-y-2 text-sm">
+            <div className="bg-slate-900/50 p-2 rounded font-mono text-xs">
+              <p className="text-slate-500 mb-1"># 先幫有 GPU 的機器貼標籤（只需做一次）</p>
+              <p className="text-green-400">kubectl label node gpu-node-1 gpu=true</p>
+              <p className="text-green-400">kubectl label node gpu-node-2 gpu=true</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-900/50 p-2 rounded">
+                <p className="text-yellow-300 mb-1">Node 現況</p>
+                <p className="text-slate-300">gpu-node-1 → 🏷️ gpu=true</p>
+                <p className="text-slate-300">gpu-node-2 → 🏷️ gpu=true</p>
+                <p className="text-slate-400">cpu-node-1 → （沒貼）</p>
+                <p className="text-slate-400">cpu-node-2 → （沒貼）</p>
+              </div>
+              <div className="bg-slate-900/50 p-2 rounded">
+                <p className="text-yellow-300 mb-1">Deployment YAML</p>
+                <p className="text-slate-300">spec:</p>
+                <p className="text-slate-300 pl-2">template:</p>
+                <p className="text-slate-300 pl-4">spec:</p>
+                <p className="text-cyan-400 pl-6">nodeSelector:</p>
+                <p className="text-green-400 pl-8">gpu: "true"</p>
+              </div>
+            </div>
+            <p className="text-slate-400 text-xs">nodeSelector 的意思：「只把我的 Pod 排到有 gpu=true 標籤的機器上」</p>
+          </div>
+        </div>
       </div>
     ),
     code: `# 看 Pod 的 Labels
@@ -1656,7 +1686,10 @@ kubectl get pods -l app=nginx
 kubectl label pod <pod-name> env=test
 
 # 看篩選結果
-kubectl get pods -l env=test`,
+kubectl get pods -l env=test
+
+# 看所有 Node 及其 Label（確認機器名稱用這個）
+kubectl get nodes --show-labels`,
     notes: `【① 課程內容】
 本張重點：Labels 進階操作概念 + Selector 機制 + Label vs Annotation 對照。
 
@@ -1670,6 +1703,14 @@ Labels 三處位置黃金法則（Deployment selector / Pod template labels / Se
 - kubectl get pods --show-labels → 看所有 label
 - kubectl get pods -l app=nginx → 用 label 篩選
 - kubectl label pod <name> env=test → 手動加 label（只影響這個 Pod，不影響 Deployment）
+
+真實場景補充：Label 不只用在 Pod，也可以貼在 Node 上，搭配 nodeSelector 做 Pod 排程控制。
+典型用途：GPU 機器貼 gpu=true → Deployment 裡加 nodeSelector: gpu: "true" → Scheduler 只會把 Pod 排到有 GPU 的機器。
+操作說明：
+1. kubectl get nodes 先確認你的機器名稱（名字不是固定的，要看實際叢集）
+2. kubectl label node <node-name> gpu=true → 貼標籤
+3. Deployment YAML spec.template.spec 下加 nodeSelector: gpu: "true"
+→ 下次 Scheduler 安排新 Pod 時，只有有 gpu=true 的 Node 才是候選
 
 【② 指令講解】
 kubectl get pods --show-labels

@@ -42,6 +42,9 @@
   2. `kubectl describe pod <name>` → 看 Events 區塊，通常錯誤原因在這
   3. `kubectl logs <pod-name>` → 看容器內部的 stderr / stdout
 
+---
+> 📋 **翻頁** → 下一張：minikube 只有一個 Node — 看不出分散的效果
+
 **minikube 單節點的三大限制**
 
 - **限制 ①：Pod 不會分散到不同 Node**
@@ -134,6 +137,9 @@
 - 兩台 IP 都要記下來，後面會用到
 - 用 `ip addr show` 或 `hostname -I` 查詢
 
+---
+> 📋 **翻頁** → 下一張：k3s 安裝實作：VMware 建 VM + 安裝 k3s
+
 **在 master 安裝 k3s server**
 
 - 只要一行 curl 指令，腳本自動處理：下載二進位、設定 systemd service、產生 kubeconfig
@@ -150,6 +156,9 @@
   - `K3S_URL`：master 的 API Server 地址，格式 `https://MASTER_IP:6443`
   - `K3S_TOKEN`：剛才取得的 node-token
 - k3s 偵測到這兩個環境變數，自動以 agent（worker）模式安裝
+
+---
+> 📋 **翻頁** → 下一張：kubeconfig 設定 + 驗證 Pod 分散
 
 **驗證雙節點**
 

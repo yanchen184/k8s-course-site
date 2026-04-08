@@ -23,6 +23,9 @@
 > **複習**：Labels 三處位置（Deployment 本身 / selector / Pod template）已在 5-3 介紹過。
 > 本節重點是「進階操作」：用指令實際操控 label、觀察 K8s 如何反應。
 
+---
+> 📋 **翻頁** → 下一張：Labels + Selector：K8s 的認親機制
+
 **Labels 進階操作場景**
 - 用 `--show-labels` 看 Pod 上所有的 label
 - 用 `-l` 過濾，只操作特定 label 的資源
@@ -259,6 +262,9 @@ Pod Template:
 - Selector 和 Pod Template Labels 不一致 → 這是 bug，需要修復（通常只能刪掉重建 Deployment）
 
 ---
+
+---
+> 📋 **翻頁** → 下一張：Lab 3：除錯工程師
 
 ### ③ 題目（Lab 3：除錯工程師）
 

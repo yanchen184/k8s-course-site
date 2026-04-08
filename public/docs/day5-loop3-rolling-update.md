@@ -38,6 +38,9 @@
 - 範例：3 個副本時，maxSurge=1（最多 4 個同時存在），maxUnavailable=0（不允許任何一個不可用）
 - 可在 `spec.strategy.rollingUpdate` 區塊自訂
 
+---
+> 📋 **翻頁** → 下一張：回滾：一行指令退回上一版
+
 **回滾機制**
 - 出問題時：`kubectl rollout undo deployment/<name>`
 - 底層行為：舊 RS 副本數重新增加，新 RS 副本數縮減回 0
@@ -325,6 +328,9 @@ deployment.apps/nginx-deploy rolled back
 - `--to-revision=0` 效果等同 undo（回到上一版），不是第一版
 
 ---
+> 📋 **翻頁** → 下一張：學員實作：滾動更新 + 回滾練習
+
+---
 
 ### ③ 題目
 
@@ -366,6 +372,9 @@ deployment.apps/nginx-deploy rolled back
 （本節複習已學指令，無新指令，重點在組合應用與 Lab 2 情境。）
 
 ---
+
+---
+> 📋 **翻頁** → 下一張：Lab 2：版本事故（深夜 11 點）
 
 ### ③ 題目（Lab 2：版本事故）
 

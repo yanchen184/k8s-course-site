@@ -92,6 +92,9 @@ spec:
   ```
 - 取名建議：和映像名稱保持一致（nginx 容器叫 nginx），避免混淆
 
+---
+> 📋 **翻頁** → 下一張：縮容 + 水平 vs 垂直擴縮容
+
 **Docker 對照**
 
 | 功能 | Docker Compose | Kubernetes Deployment |
@@ -102,6 +105,7 @@ spec:
 | 滾動更新 | `docker service update --image ...` | `kubectl set image deployment/...` |
 
 ---
+> 📋 **翻頁** → 下一張：Labels 與 Selector：K8s 資源關聯的核心
 
 **Labels（標籤）與 Selector（選擇器）概念**
 
@@ -451,6 +455,7 @@ kubectl get pods
 K8s 會隨機終止 2 個 Pod，剩下 3 個 Running。被終止的 Pod 會短暫顯示 `Terminating` 後消失。
 
 ---
+> 📋 **翻頁** → 下一張：Lab 1：你被叫去救火
 
 ### ③ 題目
 

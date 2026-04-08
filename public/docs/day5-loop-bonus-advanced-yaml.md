@@ -165,6 +165,9 @@ kubectl delete pod oom-test
 3. `BestEffort`。Node 資源不足時，BestEffort 的 Pod **最先**被驅逐（evict）或 Kill，因為它被認為「對資源沒有承諾」。
 
 ---
+> 📋 **翻頁** → 下一張：Liveness & Readiness Probe
+
+---
 
 ## Bonus-2 Liveness & Readiness Probe（25 分鐘）
 
@@ -406,6 +409,9 @@ kubectl delete deployment probe-demo
 3. `0/1 Running` = 容器在跑，但 readinessProbe 失敗（或還沒通過）。影響：這個 Pod 的 IP 已從 Service 的 Endpoints 移除，Service 不會把流量導到這個 Pod，所以不影響其他健康 Pod 的服務。
 
 ---
+> 📋 **翻頁** → 下一張：環境變數與 ConfigMap 預覽
+
+---
 
 ## Bonus-3 環境變數與 ConfigMap 預覽（15 分鐘）
 
@@ -562,6 +568,9 @@ kubectl delete deployment env-demo
 1. 直接寫 `value`：非機密、不常變動的設定（如 feature flag 開關）；`ConfigMap`：應用設定（DB host、port、log level 等），可以推到 Git；`Secret`：機密資料（DB 密碼、API Key、憑證），不推到 Git，用 Vault 或 Sealed Secrets 管理。
 2. 直接寫 `value` 需要維護 **3 份** 幾乎一樣的 YAML（只有 DB_HOST 不同）。用 ConfigMap 的話，Deployment YAML **只需要一份**，針對不同環境建不同的 ConfigMap，deploy 時套用對應的 ConfigMap 即可。
 3. **不會立刻生效**。以 `env` 方式注入的環境變數在 Pod 啟動時就固定了，修改 ConfigMap 後需要重啟 Pod（`kubectl rollout restart deployment <name>`）才能拿到新值。若用 Volume 掛載 ConfigMap 的方式，修改後約 1 分鐘內 Pod 內的檔案會自動更新。
+
+---
+> 📋 **翻頁** → 下一張：備用堂小結
 
 ---
 

@@ -192,6 +192,181 @@ kubectl 下指令路徑：你 → apiserver → etcd（記錄期望） → sched
 [▶ 下一頁]`,
   },
 
+  // ── 5-1 YAML + Pod 核心概念 ──
+  {
+    title: 'YAML 四大必填欄位 + Pod 核心概念',
+    subtitle: 'apiVersion / kind / metadata / spec — Pod 是最小部署單位',
+    section: '5-1：回顧 + 為什麼需要多節點',
+    duration: '4',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">YAML 四大必填欄位</p>
+          <div className="space-y-2">
+            <div className="flex gap-3 items-start">
+              <span className="bg-blue-800/50 text-blue-300 px-2 py-0.5 rounded text-xs font-mono whitespace-nowrap">apiVersion</span>
+              <span className="text-slate-300 text-sm">API 群組版本（v1、apps/v1 等）</span>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="bg-blue-800/50 text-blue-300 px-2 py-0.5 rounded text-xs font-mono whitespace-nowrap">kind</span>
+              <span className="text-slate-300 text-sm">資源類型（Pod、Deployment、Service 等）</span>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="bg-blue-800/50 text-blue-300 px-2 py-0.5 rounded text-xs font-mono whitespace-nowrap">metadata</span>
+              <span className="text-slate-300 text-sm">資源的「身分證」（name、namespace、labels）</span>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="bg-blue-800/50 text-blue-300 px-2 py-0.5 rounded text-xs font-mono whitespace-nowrap">spec</span>
+              <span className="text-slate-300 text-sm">期望狀態（這個資源該長什麼樣）</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-purple-900/20 border border-purple-500/30 p-4 rounded-lg">
+          <p className="text-purple-400 font-semibold mb-3">Pod 核心概念</p>
+          <div className="space-y-2">
+            <div className="flex gap-2 items-start">
+              <span className="text-yellow-400 font-bold">①</span>
+              <span className="text-slate-300 text-sm">K8s <strong className="text-white">最小部署單位</strong>，不是容器本身</span>
+            </div>
+            <div className="flex gap-2 items-start">
+              <span className="text-yellow-400 font-bold">②</span>
+              <span className="text-slate-300 text-sm">一個 Pod 可以包多個容器（但通常一個），共享網路 namespace 和 Volume</span>
+            </div>
+            <div className="flex gap-2 items-start">
+              <span className="text-yellow-400 font-bold">③</span>
+              <span className="text-slate-300 text-sm">Pod 是「<strong className="text-red-400">臨時的</strong>」，沒有自我修復能力，刪了就沒了</span>
+            </div>
+          </div>
+          <div className="bg-slate-900/50 p-2 rounded mt-3 text-xs font-mono">
+            <p className="text-slate-400"># Pod 刪了就消失，要靠 Deployment 管理</p>
+            <p className="text-red-400">kubectl delete pod my-pod  # 直接消失，不會重建</p>
+            <p className="text-green-400">kubectl delete pod my-pod  # Deployment 管的 → 自動重建 ✓</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `【① 課程內容】
+YAML 四大必填欄位：
+- apiVersion：告訴 K8s 要用哪個 API 版本解析這份 YAML。Pod 用 v1，Deployment 用 apps/v1
+- kind：資源類型，K8s 用這個決定要建什麼東西
+- metadata：身分證，name 是必填，namespace 預設 default，labels 是之後 Selector 用的
+- spec：最複雜的部分，描述資源期望的狀態（容器名稱、image、port、環境變數等）
+
+Pod 核心概念：
+- 最小部署單位：你不直接管容器，你管 Pod；Pod 裡放容器
+- 共享網路：同一個 Pod 裡的容器用 localhost 就能互通，共用同一個 IP
+- 臨時性：Pod 沒有自我修復，刪了就沒了。這就是為什麼需要 Deployment 來管 Pod
+
+【③ 題目】
+1. YAML 的 spec 和 metadata 各自負責什麼？
+2. 為什麼直接用 kubectl delete pod 刪掉 Deployment 管的 Pod 後，Pod 會重建？
+
+【④ 解答】
+1. metadata 是「身分識別」（名字、namespace、標籤）；spec 是「期望狀態描述」（要跑什麼容器、幾個副本等）
+2. Deployment 底層有 ReplicaSet 控制器，controller-manager 持續監控實際 Pod 數量；少一個就補一個，這就是「自我修復」
+
+[▶ 下一頁]`,
+  },
+
+  // ── 5-1 kubectl 五大指令 + 排錯三板斧 ──
+  {
+    title: 'kubectl 五大指令 + 排錯三板斧',
+    subtitle: 'get / describe / logs / exec / delete — 三板斧解決九成問題',
+    section: '5-1：回顧 + 為什麼需要多節點',
+    duration: '4',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">kubectl 五大指令</p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex gap-3 items-center">
+              <span className="bg-slate-700 text-green-300 px-2 py-0.5 rounded font-mono w-20 text-center text-xs">get</span>
+              <span className="text-slate-300">查看資源列表（快速瀏覽）</span>
+            </div>
+            <div className="flex gap-3 items-center">
+              <span className="bg-slate-700 text-green-300 px-2 py-0.5 rounded font-mono w-20 text-center text-xs">describe</span>
+              <span className="text-slate-300">查看資源詳細資訊（<span className="text-yellow-400">Events 是排錯關鍵</span>）</span>
+            </div>
+            <div className="flex gap-3 items-center">
+              <span className="bg-slate-700 text-green-300 px-2 py-0.5 rounded font-mono w-20 text-center text-xs">logs</span>
+              <span className="text-slate-300">查看容器日誌</span>
+            </div>
+            <div className="flex gap-3 items-center">
+              <span className="bg-slate-700 text-green-300 px-2 py-0.5 rounded font-mono w-20 text-center text-xs">exec</span>
+              <span className="text-slate-300">進入容器執行指令</span>
+            </div>
+            <div className="flex gap-3 items-center">
+              <span className="bg-slate-700 text-green-300 px-2 py-0.5 rounded font-mono w-20 text-center text-xs">delete</span>
+              <span className="text-slate-300">刪除資源</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">排錯三板斧（按順序）</p>
+          <div className="space-y-2">
+            <div className="flex gap-3 items-start">
+              <span className="bg-red-800/50 text-red-300 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">① get</span>
+              <div>
+                <code className="text-green-400 text-xs">kubectl get pods</code>
+                <p className="text-slate-400 text-xs mt-0.5">看 STATUS：Running / Pending / CrashLoopBackOff / ImagePullBackOff</p>
+              </div>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="bg-red-800/50 text-red-300 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">② describe</span>
+              <div>
+                <code className="text-green-400 text-xs">kubectl describe pod &lt;name&gt;</code>
+                <p className="text-slate-400 text-xs mt-0.5">看 Events 區塊，通常錯誤原因在這</p>
+              </div>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="bg-red-800/50 text-red-300 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">③ logs</span>
+              <div>
+                <code className="text-green-400 text-xs">kubectl logs &lt;pod-name&gt;</code>
+                <p className="text-slate-400 text-xs mt-0.5">看容器內部 stderr / stdout（CrashLoopBackOff 必用）</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# 五大指令
+kubectl get pods
+kubectl get pods -o wide          # 含 NODE / IP 欄位
+kubectl describe pod <pod-name>   # 看 Events
+kubectl logs <pod-name>           # 容器日誌
+kubectl exec -it <pod-name> -- bash  # 進容器
+kubectl delete pod <pod-name>
+
+# 排錯三板斧
+kubectl get pods                  # ① 看 STATUS
+kubectl describe pod <pod-name>   # ② 看 Events
+kubectl logs <pod-name>           # ③ 看日誌`,
+    notes: `【① 課程內容】
+kubectl 五大指令快速複習：
+- get：列出資源，加 -o wide 看更多欄位（IP、Node）
+- describe：最詳細的資訊，Events 區塊記錄了 K8s 幫你做了什麼（拉 image、排程、啟動、失敗原因）
+- logs：容器的 stdout/stderr，程式裡的 console.log / print 都在這
+- exec：進到容器裡面執行指令，debug 神器（-it 是互動模式，-- bash 是要執行的指令）
+- delete：刪除資源
+
+排錯三板斧，為什麼要按這個順序：
+1. get 先看 STATUS，快速判斷問題大類：Pending（調度問題）/ CrashLoopBackOff（容器一直掛）/ ImagePullBackOff（拉 image 失敗）
+2. describe 看 Events，K8s 會把「發生了什麼事」記在 Events 裡，例如「找不到 image」、「資源不足」，通常答案就在這
+3. logs 看容器內部錯誤，適合 CrashLoopBackOff 這種容器有跑起來但一直掛掉的狀況
+
+【③ 題目】
+1. 三板斧的執行順序是什麼？為什麼要按這個順序？
+2. CrashLoopBackOff 和 ImagePullBackOff 各代表什麼問題？
+
+【④ 解答】
+1. get → describe → logs。先 get 快速分類，再 describe 找 Events 通常就有答案，最後 logs 看容器內部
+2. CrashLoopBackOff：容器啟動了但一直掛掉，K8s 重試多次後進入退避狀態 → 用 logs 看為什麼掛；ImagePullBackOff：拉 image 失敗（名稱打錯、私有 registry 沒認證）→ describe 的 Events 會說原因
+
+[▶ 下一頁]`,
+  },
+
   // ── 5-1（2/2）：minikube 的問題 + 為什麼需要多節點 + k3s 介紹 ──
   {
     title: 'minikube 只有一個 Node — 看不出分散的效果',

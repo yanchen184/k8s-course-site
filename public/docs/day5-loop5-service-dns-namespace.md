@@ -49,6 +49,33 @@
 - 兩者可以不同，例如 `port: 80` 轉發到 `targetPort: 8080`
 - 好處：呼叫方永遠連 port 80，不需知道 Pod 內部細節
 
+**Service YAML 三重點**
+
+| 欄位 | 說明 |
+|------|------|
+| `type` | ClusterIP（預設值，可省略）|
+| `selector` | `app: nginx` — 跟 Pod labels 一致 |
+| `ports` | `port: 80`（Service 監聽）/ `targetPort: 80`（轉發到 Pod）|
+
+```yaml
+# service-clusterip.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+spec:
+  type: ClusterIP        # 預設值，可省略
+  selector:
+    app: nginx           # 跟 Pod labels 一致
+  ports:
+    - port: 80           # Service 監聽的 Port
+      targetPort: 80     # 轉發到 Pod 的 Port
+```
+
+**黃金法則**
+
+Deployment selector = Pod template labels = Service selector — 三者要對上！
+
 **Docker 對照**
 
 | K8s 概念 | Docker 對照 |

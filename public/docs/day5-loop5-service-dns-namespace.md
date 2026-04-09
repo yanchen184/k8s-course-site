@@ -90,6 +90,16 @@ Deployment selector = Pod template labels = Service selector — 三者要對上
 
 ### ② 所有指令＋講解
 
+**指令 0：確認 Deployment 在跑**
+
+```bash
+kubectl get deployments
+```
+
+打完要看：`READY 3/3`，確認 nginx Deployment 正常運作後再建 Service。
+
+---
+
 **指令 1：套用 ClusterIP Service YAML**
 
 ```bash
@@ -200,6 +210,33 @@ curl http://nginx-svc
 異常：
 - `Could not resolve host`：DNS 有問題，確認 CoreDNS 在 kube-system 正常運作
 - `Connection refused`：targetPort 設錯，Pod 沒有在該 port 監聽
+
+---
+
+**指令 7：（在測試 Pod 內）用完整 FQDN 連 nginx**
+
+```bash
+curl http://nginx-svc.default.svc.cluster.local
+```
+
+打完要看：和短名稱一樣的 nginx 首頁 HTML。驗證兩種寫法等效。
+
+---
+
+**指令 8-10：驗證 Endpoints 自動更新**
+
+```bash
+# 8. 記下目前的 Endpoints
+kubectl get endpoints nginx-svc
+
+# 9. 刪掉一個 Pod
+kubectl delete pod <pod-name>
+
+# 10. 再看 Endpoints — IP 列表自動更新了
+kubectl get endpoints nginx-svc
+```
+
+打完要看：刪 Pod 前後 Endpoints 的 IP 不同，但數量仍是 3 個。證明 K8s 自動維護 Endpoints，Pod 換了 IP 也不影響 Service 連線。
 
 ---
 

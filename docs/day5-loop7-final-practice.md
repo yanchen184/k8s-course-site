@@ -39,6 +39,14 @@
 | fullstack-demo Namespace | Loop 6：Namespace 隔離 |
 | log-collector DaemonSet | Loop 7：每個 Node 跑一個 agent |
 
+**PPT 左邊顯示 10 步驟（Step 1-5）**
+
+1. `kubectl create namespace my-app`
+2. `kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app`
+3. `kubectl expose deployment nginx-deploy --port=80 -n my-app`
+4. 叢集內驗證：`kubectl run test --image=busybox:1.36 --rm -it --restart=Never -n my-app -- wget -qO- http://nginx-deploy`
+5. 建 NodePort Service（YAML，nodePort: 30080）`kubectl apply -f nodeport.yaml`
+
 **完整 YAML（full-stack.yaml）**
 
 ```yaml
@@ -297,9 +305,101 @@ Address 1: 10.96.100.10 api-svc.fullstack-demo.svc.cluster.local
 
 ---
 
+### ③ 題目
+
+1. 部署整個 fullstack-demo，從外部 curl Node:30080 看到 nginx 首頁，再從 frontend Pod exec 進去 curl api-svc 看到 httpd 的 'It works!'。
+
+2. 執行 `kubectl delete namespace fullstack-demo`，用 `kubectl get all -n fullstack-demo` 確認全部資源都清空了。
+
+---
+
+### ④ 解答
+
+**解答 1：**
+
+操作：
+```bash
+kubectl apply -f full-stack.yaml
+kubectl get all -n fullstack-demo    # 等所有 Pod Running
+kubectl get nodes -o wide            # 拿 Node IP
+curl http://<Node-IP>:30080          # 外部存取 frontend
+kubectl get pods -n fullstack-demo   # 找 frontend Pod 名稱
+kubectl exec -n fullstack-demo <frontend-pod-name> -- curl http://api-svc
+```
+
+驗收標準：
+- 外部 curl Node:30080 回傳 'Welcome to nginx!'
+- 叢集內 curl api-svc 回傳 'It works!'（httpd 的預設首頁）
+
+**解答 2：**
+
+操作：
+```bash
+kubectl delete namespace fullstack-demo
+# 等待 Terminating 完成（約 30 秒到 2 分鐘）
+kubectl get all -n fullstack-demo    # 確認清空
+kubectl get ns    # 確認 namespace 已消失
+```
+
+驗收標準：`kubectl get all -n fullstack-demo` 顯示 'No resources found'，`kubectl get ns` 不再有 fullstack-demo
+
+---
+
 ### 📄 第 27 張：綜合實作：擴縮容 → 更新 → 回滾 → 清理（5 min）
 
-**指令 7：確認 DaemonSet 狀態**
+### ① 課程內容
+
+**PPT 左邊顯示 10 步驟（Step 6-10）**
+
+6. 外部驗證：`curl http://<Node-IP>:30080`
+7. 擴縮容：`kubectl scale deployment frontend --replicas=5 -n fullstack-demo` → 縮回 2
+8. 滾動更新：`kubectl set image deployment/frontend nginx=nginx:1.28 -n fullstack-demo`
+9. 回滾：`kubectl rollout undo deployment/frontend -n fullstack-demo`
+10. 清理：`kubectl delete namespace fullstack-demo` -- 一行搞定
+
+---
+
+### ② 所有指令＋講解
+
+**指令 7：從外部 curl 驗證 NodePort**
+
+```bash
+curl http://<Node-IP>:30080
+```
+
+先取得 Node IP：`kubectl get nodes -o wide` 或 `multipass info k3s-worker1 | grep IPv4`
+
+打完要看：nginx 預設首頁 HTML（Welcome to nginx!）
+
+異常：Connection refused → nodePort 或 Node IP 填錯
+
+---
+
+**指令 8：從 frontend Pod 內 curl api-svc（驗證 ClusterIP + DNS）**
+
+```bash
+kubectl exec -it <frontend-pod-name> -n fullstack-demo -- curl http://api-svc
+```
+
+先取得 Pod 名稱：`kubectl get pods -n fullstack-demo | grep frontend`
+
+打完要看：Apache httpd 的預設首頁 "It works!"
+
+異常：Could not resolve host: api-svc → 確認兩個資源都在同一個 namespace
+
+---
+
+**指令 9：DNS 解析驗證**
+
+```bash
+kubectl run dns-final -n fullstack-demo --image=busybox:1.36 --rm -it --restart=Never -- nslookup api-svc
+```
+
+打完要看：Name: api-svc / Address 1: 10.96.x.x api-svc.fullstack-demo.svc.cluster.local
+
+---
+
+**指令 10：確認 DaemonSet 狀態**
 
 ```bash
 kubectl get ds -n fullstack-demo
@@ -315,7 +415,39 @@ log-collector   2         2         2       2            2           <none>     
 
 ---
 
-**指令 8：清理 fullstack-demo Namespace**
+**指令 11：擴縮容 frontend**
+
+```bash
+kubectl scale deployment frontend --replicas=5 -n fullstack-demo
+kubectl get pods -n fullstack-demo
+```
+
+打完要看：frontend Pod 從 2 個增加到 5 個，全部 Running。
+
+---
+
+**指令 12：滾動更新 frontend**
+
+```bash
+kubectl set image deployment/frontend nginx=nginx:1.28 -n fullstack-demo
+kubectl rollout status deployment/frontend -n fullstack-demo
+```
+
+打完要看：rollout status 顯示 `successfully rolled out`。
+
+---
+
+**指令 13：回滾 frontend**
+
+```bash
+kubectl rollout undo deployment/frontend -n fullstack-demo
+```
+
+打完要看：`deployment.apps/frontend rolled back`
+
+---
+
+**指令 14：清理 fullstack-demo Namespace**
 
 ```bash
 kubectl delete namespace fullstack-demo
@@ -328,34 +460,55 @@ namespace "fullstack-demo" deleted
 
 這一個指令會刪除 fullstack-demo 內所有資源（Deployment、Service、DaemonSet、所有 Pod）。
 
-注意：刪除 namespace 需要一點時間（30 秒到 2 分鐘），先顯示 `Terminating` 再變成刪除。
+注意：刪除 namespace 需要一點時間（30 秒到 2 分鐘），先顯示 `Terminating` 再變成刪除。高危操作：刪前務必確認 namespace 名稱正確。
 
 ---
 
-**指令 9：清理 default namespace 殘留資源**
+### ③ 題目
 
-```bash
-kubectl delete deployment nginx-deploy
-kubectl delete svc nginx-svc
-```
+1. 從 frontend Pod exec 進去，分別 curl `http://api-svc` 和 curl `http://api-svc.fullstack-demo.svc.cluster.local`，確認兩種都成功回傳 'It works!'。
 
-分別刪除今天練習留下的 Deployment 和 Service。
+2. 把 frontend Deployment 從 2 副本擴展到 5 副本，然後執行 `kubectl get endpoints frontend-svc -n fullstack-demo`，觀察 Endpoints 數量有沒有跟著增加。
+
+3. scale frontend 到 5 副本後，多連幾次 curl Node:30080，用 `kubectl logs` 分別看不同 frontend Pod，確認流量有被分散到不同 Pod。
 
 ---
 
-**指令 10：確認叢集清理乾淨**
+### ④ 解答
 
+**解答 1：**
+
+操作：
 ```bash
-kubectl get all
+kubectl get pods -n fullstack-demo | grep frontend    # 找 Pod 名稱
+kubectl exec -n fullstack-demo <frontend-pod> -- curl http://api-svc
+kubectl exec -n fullstack-demo <frontend-pod> -- curl http://api-svc.fullstack-demo.svc.cluster.local
 ```
 
-打完要看（乾淨的狀態）：
-```
-NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   5d
+驗收標準：兩個指令都回傳 'It works!'，驗證短名稱和 FQDN 等效
+
+**解答 2：**
+
+操作：
+```bash
+kubectl get ep frontend-svc -n fullstack-demo    # 記下目前 Endpoints 數量
+kubectl scale deployment frontend --replicas=5 -n fullstack-demo
+kubectl get pods -n fullstack-demo               # 等 Pod 都 Running
+kubectl get ep frontend-svc -n fullstack-demo    # 觀察 Endpoints 變化
 ```
 
-只剩 `kubernetes` 這個內建 Service，沒有其他資源。若還有殘留，逐一用 `kubectl delete` 清理。
+驗收標準：Endpoints 從 2 個 IP 增加到 5 個 IP，從外部 curl Node:30080 仍然成功
+
+**解答 3：**
+
+操作：
+```bash
+for i in 1 2 3 4 5; do curl -s http://<Node-IP>:30080 -o /dev/null -w '%{http_code}\n'; done
+kubectl logs <frontend-pod-1> -n fullstack-demo --tail=5
+kubectl logs <frontend-pod-2> -n fullstack-demo --tail=5
+```
+
+驗收標準：多個 Pod 的 logs 都有出現 access log，驗證流量有被分散
 
 ---
 
@@ -363,39 +516,53 @@ service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   5d
 
 > 📋 學生看 PPT 投影片，上面有完整 10 步驟和挑戰題。
 
+**必做：跟著 10 步驟完整做一遍**
+
+1. `kubectl create namespace my-app`
+2. `kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app`
+3. `kubectl expose deployment nginx-deploy --port=80 -n my-app`
+4. 測試 Pod curl 驗證（ClusterIP）
+5. 建 NodePort Service（30080）
+6. curl Node-IP:30080
+7. scale 3 → 5 → 3
+8. set image nginx:1.27 → 1.28
+9. rollout undo
+10. delete namespace my-app
+
+**挑戰 1：同時部署兩個服務**
+- nginx（app: frontend）+ httpd（app: api）
+- 各自 Deployment + ClusterIP + NodePort
+- nginx 用 30080，httpd 用 30081
+
+**挑戰 2：跨 Namespace DNS**
+- 從測試 Pod curl `frontend-svc.my-app.svc.cluster.local`
+- curl `api-svc.my-app.svc.cluster.local`
+
 ### ③ 題目
 
-1. 你執行 `kubectl exec -it frontend-pod -n fullstack-demo -- curl http://api-svc`，能成功嗎？如果把 api-svc 改名為 `backend-svc`，程式碼裡寫的 `http://api-svc` 還能用嗎？要怎麼修？
-
-2. 在 fullstack-demo namespace 的 Pod 裡，用 `curl http://api-svc.fullstack-demo.svc.cluster.local` 和 `curl http://api-svc` 結果一樣嗎？哪種比較好？
-
-3. 如果 frontend Deployment 從 2 個副本擴展到 5 個，NodePort 的行為會改變嗎？
+1. 依照今天學的四種 workload 類型，對以下每個情境動手建出正確的資源，用 `kubectl get` 確認狀態：
+   - 建 Deployment（replicas: 2）— 確認 2 個 Pod Running
+   - 建 DaemonSet — 確認 Pod 數 = Node 數
+   - 建 CronJob（每分鐘）— 等 1 分鐘確認有 Completed 的 Pod
 
 ---
 
 ### ④ 解答
 
 **解答 1：**
-能成功。frontend Pod 和 api-svc 在同一個 namespace（fullstack-demo），短名稱 `api-svc` 能被 CoreDNS 解析。
 
-如果把 api-svc 改名為 `backend-svc`：
-- 程式碼裡寫的 `http://api-svc` 就會解析失敗（`Could not resolve host`）
-- 必須更新程式碼（或 ConfigMap）改成 `http://backend-svc`
-- 這也是為什麼 Service 名稱要謹慎命名，改名代價很高
+操作：
+```bash
+kubectl apply -f deployment.yaml
+kubectl get pods    # 2 個 Running
+kubectl apply -f daemonset.yaml
+kubectl get pods -o wide -l app=log-collector    # 每個 Node 各一個
+kubectl apply -f cronjob.yaml
+# 等 1 分鐘
+kubectl get pods    # 看到 Completed 的 Pod
+```
 
-**解答 2：**
-結果一樣，FQDN 和短名稱最終解析到相同的 ClusterIP。
-
-短名稱（`http://api-svc`）比較好，理由：
-- 更簡潔，程式碼可讀性高
-- 如果未來搬移到不同叢集（`cluster.local` 不同），短名稱不受影響
-- 只有**跨 namespace** 才需要用長名稱
-
-**解答 3：**
-NodePort 行為不變，但流量分配的 Pod 變多了：
-- nodePort 30080 依然在每個 Node 上開放
-- Service 的 Endpoints 會更新，從 2 個 Pod IP 增加到 5 個 Pod IP
-- 每個請求仍然被負載均衡到其中一個 Pod，只是現在有 5 個 Pod 可以分流
+驗收標準：三種 workload 的 Pod 狀態符合預期（Running / Running / Completed）
 
 ---
 
@@ -405,75 +572,34 @@ NodePort 行為不變，但流量分配的 Pod 變多了：
 
 ### ① 課程內容
 
-**四個今日核心概念總覽**
+**今天的因果鏈**
 
-| K8s 概念 | 解決什麼問題 | Docker 對照 |
-|----------|------------|------------|
-| Service（ClusterIP）| Pod IP 會變 + 負載均衡 | Docker Compose service name |
-| Service（NodePort）| 從外部連進叢集 | `docker run -p 30080:80` |
-| CoreDNS | Service 自動有 DNS 名稱 | Docker Compose 內建 DNS |
-| Namespace | 邏輯隔離多環境/多團隊 | Docker Compose project name |
+第四堂 Deployment 只有一個 Node → **k3s 多節點**
+→ 流量變了要調整 → **擴縮容**
+→ 新版本要上線 → **滾動更新**
+→ 新版有 bug → **回滾**
+→ Pod 掛了 → **自我修復**
+→ K8s 怎麼認 Pod？ → **Labels + Selector**
+→ 外面連不到 → **ClusterIP Service**
+→ 外面也要連 → **NodePort**
+→ 用 IP 太麻煩 → **DNS 服務發現**
+→ 環境要隔離 → **Namespace**
+→ 每台 Node 都要跑一份 → **DaemonSet**
+→ 定時跑任務 → **CronJob**
+→ 全部串起來 → **完整服務上線流程**
 
-**三個永遠不要忘的原則**
+**今天新學的 kubectl 指令**
 
-1. **Service selector 必須和 Pod label 完全一致**
-   - Endpoints 顯示 `<none>` → 99% 是 label 對不上
-   - 大小寫、空格、拼字都要完全一樣
-
-2. **Namespace 是邏輯隔離，不是網路隔離**
-   - 不同 Namespace 的 Pod 預設可以互連
-   - 要真正隔離網路需要 NetworkPolicy
-
-3. **刪 Namespace 等於刪掉裡面所有東西**
-   - `kubectl delete namespace production` 是高危操作
-   - 刪前一定要確認，無法還原
-
-**完整 Docker → K8s 對照表（今日更新）**
-
-| Docker / Compose | K8s 對應 | 說明 |
-|-----------------|---------|------|
-| `docker run -p 8080:80` | Service NodePort | 對外暴露 port |
-| Compose service name（DNS）| Service ClusterIP + CoreDNS | 服務內部 DNS |
-| Compose `networks:` | Namespace + NetworkPolicy | 網路隔離 |
-| `docker run --restart=always` | Deployment | 持續跑的服務 |
-| `docker run --rm` | Job | 跑完刪除 |
-| `crontab` | CronJob | 定時排程 |
-| 在所有機器上 `docker run` | DaemonSet | 每台機器跑一個 |
-| `docker ps` | `kubectl get pods` | 查看執行中容器/Pod |
-| `docker logs` | `kubectl logs` | 查看日誌 |
-| `docker exec -it` | `kubectl exec -it` | 進入容器 |
-
-**今日新學的 kubectl 指令速查清單**
-
-```bash
-# Service
-kubectl get svc
-kubectl describe svc <name>
-kubectl get ep / kubectl get endpoints <name>
-
-# DNS 測試
-kubectl run test --image=busybox:1.36 --rm -it --restart=Never -- sh
-nslookup <service-name>     # 在 Pod 內
-
-# Namespace
-kubectl get ns
+```
+kubectl scale deployment <name> --replicas=N
+kubectl set image deployment/<name> <container>=<image>
+kubectl rollout status / history / undo
+kubectl get svc / endpoints
+kubectl run <name> --image=<img> --rm -it --restart=Never -- <cmd>
+kubectl expose deployment <name> --port=80
 kubectl create namespace <name>
-kubectl get pods -n <namespace>
-kubectl get all -A                            # 所有 namespace
-kubectl delete namespace <name>               # 危險！
-kubectl config set-context --current --namespace=<name>
-kubectl config view --minify | grep namespace
-
-# DaemonSet
-kubectl get ds
-kubectl describe ds <name>
-kubectl get pods -o wide                      # 看 Pod 在哪個 Node
-
-# CronJob
-kubectl get cj
-kubectl get jobs
-kubectl logs <pod-name>
-kubectl delete cronjob <name>
+kubectl get <resource> -n <namespace> / -A
+kubectl get daemonsets / cronjobs / jobs
 ```
 
 ---
@@ -541,6 +667,9 @@ kubectl exec -it <frontend-pod> -n fullstack-demo -- curl http://api-svc
 kubectl run dns-final -n fullstack-demo --image=busybox:1.36 --rm -it \
   --restart=Never -- nslookup api-svc
 kubectl get ds -n fullstack-demo
+kubectl scale deployment frontend --replicas=5 -n fullstack-demo
+kubectl set image deployment/frontend nginx=nginx:1.28 -n fullstack-demo
+kubectl rollout undo deployment/frontend -n fullstack-demo
 kubectl delete namespace fullstack-demo
 kubectl delete deployment nginx-deploy
 kubectl delete svc nginx-svc
@@ -549,42 +678,11 @@ kubectl get all                                   # 確認乾淨
 
 ---
 
-### 📄 第 30 張：回家作業 + 下堂課預告（5 min）
-
-**反思問題（下堂課回答）**
-
-今天用 NodePort 讓外部連進服務，但有兩個問題還沒解決：
-
-> **問題 1：怎麼讓使用者用 `https://myapp.com` 連服務，而不是 `http://192.168.1.1:30080`？**
-
-線索：NodePort 只能用 IP + port，沒辦法用網域名稱和 HTTPS。下堂課會介紹 **Ingress** 和 **IngressController**。
-
-> **問題 2：資料庫密碼、API Token 直接寫在 YAML 裡推到 Git，怎麼辦？**
-
-線索：現在的 YAML 如果有 `password: mypassword` 推到 GitHub，就等於公開密碼。下堂課會介紹 **ConfigMap**（非敏感設定）和 **Secret**（敏感資料加密）。
-
----
-
-**第六堂課預告**
-
-| 主題 | 解決的問題 | 對應 Docker 概念 |
-|------|-----------|----------------|
-| ConfigMap | 設定檔從程式碼分離（env、config file）| `docker run -e` / `--env-file` |
-| Secret | 敏感資料加密儲存（密碼、token、cert）| Docker secrets |
-| Ingress | 網域名稱路由 + HTTPS | Nginx reverse proxy / Traefik |
-| IngressController | 實作 Ingress 規則的元件 | Nginx container |
-| Persistent Volume | 讓 Pod 重啟後資料不消失 | `docker run -v` |
-| PersistentVolumeClaim | Pod 申請儲存空間的方式 | Volume mount |
-
----
-
 ### ③ 題目
 
-1. 今天學了四種 workload（Deployment、DaemonSet、CronJob、Job）。請說明各自適合什麼場景？
+1. 建 dev 和 prod 兩個 Namespace，各部署一個 nginx（不同版本：1.26 vs 1.27），從測試 Pod 用 FQDN 分別 curl 兩個，確認兩個 Namespace 的服務互不影響。
 
-2. 你要幫公司部署三個環境（dev、staging、prod）在同一個 K8s 叢集。你會怎麼用 Namespace 規劃？有什麼要注意的？
-
-3. CoreDNS 掛掉了（`kubectl get pods -n kube-system` 看到 CoreDNS 是 `Error`），叢集裡的 Service 連線會有什麼影響？
+2. 把 CoreDNS scale 到 0 個副本，然後分別試 curl `http://nginx-svc`（名稱，預期失敗）和 curl `http://<ClusterIP>`（IP 直連，預期成功），對比兩種結果，最後記得把 CoreDNS scale 回來。
 
 ---
 
@@ -592,39 +690,298 @@ kubectl get all                                   # 確認乾淨
 
 **解答 1：**
 
-| Workload | 適合場景 |
-|----------|---------|
-| Deployment | 長期執行的無狀態服務（API server、Web server、Frontend）|
-| DaemonSet | 每個 Node 都需要的 agent（日誌、監控、網路插件）|
-| CronJob | 定時排程任務（備份、清理、報表）|
-| Job | 一次性任務，跑完即結束（資料遷移、批次處理）|
-
-**解答 2：**
-規劃方式：
+操作：
 ```bash
 kubectl create namespace dev
-kubectl create namespace staging
 kubectl create namespace prod
+kubectl create deployment nginx --image=nginx:1.26 -n dev
+kubectl expose deployment nginx --port=80 -n dev
+kubectl create deployment nginx --image=nginx:1.27 -n prod
+kubectl expose deployment nginx --port=80 -n prod
+kubectl run test --image=busybox:1.36 --rm -it --restart=Never -- sh
+# 在 Pod 內：
+wget -qO- http://nginx.dev.svc.cluster.local    # dev 版本
+wget -qO- http://nginx.prod.svc.cluster.local   # prod 版本
 ```
 
-注意事項：
-1. **資源隔離**：不同 namespace 的資源不共用名稱，但 ClusterRole 和 PersistentVolume 是全域的
-2. **網路不隔離**：要阻止 dev 的 Pod 連到 prod，需要設 NetworkPolicy
-3. **危險操作**：`kubectl delete namespace prod` 會刪掉 prod 所有資源，操作前務必確認
-4. **RBAC**：可以針對不同 namespace 設定不同人員的權限（下堂課後進階主題）
-5. **資源限制**：可以用 ResourceQuota 限制各 namespace 的 CPU/Memory 使用量
+驗收標準：兩個都成功回傳 nginx 首頁，兩個環境共存不衝突
+
+**解答 2：**
+
+操作：
+```bash
+kubectl get svc nginx-svc    # 先記下 ClusterIP
+kubectl scale deployment coredns -n kube-system --replicas=0
+kubectl run test --image=curlimages/curl --rm -it --restart=Never -- sh
+# 在 Pod 內：
+curl http://nginx-svc         # 預期失敗
+curl http://<ClusterIP>       # 預期成功
+exit
+kubectl scale deployment coredns -n kube-system --replicas=2
+```
+
+驗收標準：名稱失敗（Name resolution）、IP 直連成功；最後 CoreDNS 恢復 2 個副本
+
+---
+
+### 📄 第 30 張：回家作業 + 下堂課預告（5 min）
+
+### ① 課程內容
+
+**Docker → K8s 對照表（更新版）**
+
+| Docker / Compose | K8s 對應 | 哪堂課 |
+|-----------------|---------|-------|
+| docker run | Pod | 第四堂 |
+| compose up --scale web=3 | Deployment replicas: 3 | 第五堂 |
+| -p 8080:80 | Service（NodePort / ClusterIP）| 第五堂 |
+| Docker network DNS | Service + CoreDNS | 第五堂 |
+| 不同 Compose 專案 | Namespace | 第五堂 |
+| crontab | CronJob | 第五堂 |
+| Nginx 反向代理 | Ingress | 下一堂 |
+| docker volume | PV / PVC | 下一堂 |
+
+**回家作業**
+
+1. **從零做一遍完整鏈路**，不看筆記
+2. 在兩個 Namespace 各部署一個服務，跨 Namespace curl
+3. 建 DaemonSet + CronJob，觀察行為
+
+**下堂課預告**
+
+| 主題 | 解決的問題 |
+|------|-----------|
+| Ingress | 192.168.64.3:30080 太醜了 → 用域名路由 |
+| ConfigMap | 設定寫死在 Image → 抽出來 |
+| Secret | 密碼不能明文 → 管敏感資訊 |
+| PV / PVC | Pod 掛了資料消失 → 持久化 |
+
+---
+
+### ③ 題目
+
+1. 從零不看筆記完整跑一遍：kubectl create namespace my-app → 建 Deployment → expose → 測試 Pod curl → NodePort → curl Node-IP:30080 → scale 3→5→3 → set image → rollout undo → delete namespace
+
+2. 在 team-a 和 team-b 兩個 Namespace 各部署一個 Service，從 default namespace 的 busybox 分別用 FQDN 連到兩個 Service，確認都成功
+
+3. 建 DaemonSet + CronJob，用 `kubectl get pods -o wide` 確認 DaemonSet 每個 Node 各一個；等 1 分鐘用 `kubectl get jobs` 確認 CronJob 觸發，用 `kubectl logs` 看到輸出
+
+---
+
+### ④ 解答
+
+**解答 1：**
+
+操作：
+```bash
+kubectl create namespace my-app
+kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app
+kubectl expose deployment nginx-deploy --port=80 -n my-app
+kubectl run test --image=busybox:1.36 --rm -it --restart=Never -n my-app -- wget -qO- http://nginx-deploy
+kubectl apply -f nodeport.yaml    # nodePort: 30080, namespace: my-app
+curl http://<Node-IP>:30080
+kubectl scale deployment nginx-deploy --replicas=5 -n my-app
+kubectl scale deployment nginx-deploy --replicas=3 -n my-app
+kubectl set image deployment/nginx-deploy nginx=nginx:1.28 -n my-app
+kubectl rollout undo deployment/nginx-deploy -n my-app
+kubectl delete namespace my-app
+```
+
+驗收：`kubectl get namespace` 不再有 my-app
+
+**解答 2：**
+
+操作：
+```bash
+kubectl create namespace team-a
+kubectl create namespace team-b
+kubectl create deployment nginx --image=nginx:1.27 -n team-a
+kubectl expose deployment nginx --port=80 -n team-a
+kubectl create deployment nginx --image=nginx:1.27 -n team-b
+kubectl expose deployment nginx --port=80 -n team-b
+kubectl run test --image=busybox:1.36 --rm -it --restart=Never -- sh
+# 在 Pod 內：
+wget -qO- http://nginx.team-a.svc.cluster.local
+wget -qO- http://nginx.team-b.svc.cluster.local
+```
+
+驗收：兩個 wget 都回傳對應的首頁
 
 **解答 3：**
-CoreDNS 掛掉後：
-- **已建立連線不影響**：已經建立的 TCP 連線繼續正常（DNS 只在建立連線時查詢一次）
-- **新的 Service 名稱解析失敗**：任何用 Service 名稱建立新連線的請求都會失敗（`Could not resolve host`）
-- **IP 直連還能用**：如果知道 ClusterIP，直接用 IP 連線仍然可以
-- **新 Pod 啟動可能受影響**：Pod 啟動時若需要解析 DNS（例如 init container），也會失敗
 
-這就是為什麼 K8s 預設跑**兩個** CoreDNS Pod（高可用），確保其中一個掛掉時服務不中斷。
+操作：
+```bash
+kubectl apply -f daemonset.yaml
+kubectl get pods -o wide -l app=log-collector    # 每個 Node 各一個
+kubectl apply -f cronjob.yaml
+# 等 1 分鐘
+kubectl get jobs    # 確認 CronJob 觸發
+kubectl logs <job-pod-name>    # 看到輸出
+```
+
+驗收：三種 workload 狀態符合預期（DaemonSet Running / CronJob Completed）
 
 ---
 
 ### 📄 第 31 張：Lab 8：從零建完整 Web 服務架構（20 min）
 
 > 📋 學生看 PPT 投影片（Lab 8：從零建完整 Web 服務架構），上面有完整任務清單和驗收標準。
+
+### ① 課程內容
+
+**情境說明**
+
+你需要從零建立一個完整的 web 服務架構，包含對外服務、內部通訊，以及定時健康檢查。
+
+**任務清單**
+
+1. 建立 nginx Deployment（3 副本）
+2. 建 ClusterIP Service，讓叢集內部可以連
+3. 建 NodePort Service（port 30088），讓外部可以連
+4. 建 CronJob 每分鐘 curl nginx 做 health check
+5. 驗證：`kubectl get all` 看到所有資源正常
+
+**驗收標準**
+
+- 3 個 nginx Pod 全部 Running
+- 從測試 Pod curl nginx-svc 成功（ClusterIP）
+- curl Node-IP:30088 看到 nginx 歡迎頁（NodePort）
+- CronJob Pod 狀態 Completed，logs 有 Health check OK
+
+**Lab 參考 YAML**
+
+```yaml
+# nginx-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-web
+  template:
+    metadata:
+      labels:
+        app: nginx-web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+---
+# nginx-clusterip.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-web
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# nginx-nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: nginx-web
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30088
+---
+# health-check-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: health-check
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 60
+      template:
+        spec:
+          containers:
+            - name: checker
+              image: busybox:1.36
+              command: ["sh", "-c",
+                "wget -qO- http://nginx-svc && echo Health check OK"]
+          restartPolicy: OnFailure
+```
+
+**驗收指令**
+
+```bash
+kubectl get all
+kubectl run test --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://nginx-svc
+curl http://<Node-IP>:30088
+kubectl get jobs    # 等 1 分鐘後
+kubectl logs <health-check-pod-name>
+# 清理：kubectl delete deployment nginx-web && kubectl delete svc nginx-svc nginx-nodeport && kubectl delete cronjob health-check
+```
+
+---
+
+### ③ 題目
+
+1. 在所有資源跑起來後，執行 `kubectl run dns-check --image=busybox:1.36 --rm -it --restart=Never -- nslookup nginx-svc`，確認 CronJob 的 Pod 能解析到 nginx-svc 的 ClusterIP。
+
+2. 修改 health-check CronJob 的 schedule 為 `*/2 * * * *`（每兩分鐘），apply 更新，觀察新 Job 觸發的間隔確實變長了。
+
+3. 故意把 nginx-svc 的 selector 改錯（selector app: nginx-broken），apply 讓 Endpoints 變成空的，等 1 分鐘看 CronJob 的 log 顯示什麼 error，再修好 selector，確認下一次 CronJob 執行成功。
+
+---
+
+### ④ 解答
+
+**解答 1：**
+
+操作：
+```bash
+kubectl run dns-check --image=busybox:1.36 --rm -it --restart=Never -- nslookup nginx-svc
+# 在輸出中確認 Address 欄位有 ClusterIP
+```
+
+驗收標準：nslookup 回傳 nginx-svc 對應的 ClusterIP，驗證 CronJob Pod 能用短名稱找到 Service
+
+**解答 2：**
+
+操作：
+```bash
+# 把 schedule 改成 '*/2 * * * *'
+kubectl apply -f health-check-cronjob.yaml
+kubectl get cronjobs    # 確認 SCHEDULE 更新
+# 等 2 分鐘
+kubectl get jobs        # 觀察新 Job 出現的時間間隔
+```
+
+驗收標準：`kubectl get jobs` 顯示新 Job 之間的 LAST SCHEDULE 間隔約 2 分鐘
+
+**解答 3：**
+
+操作：
+```bash
+# 改錯 selector 後 apply
+kubectl apply -f nginx-clusterip.yaml
+kubectl get ep nginx-svc    # 確認變成 none
+# 等 1 分鐘
+kubectl get pods    # 找最新的 health-check Pod
+kubectl logs <health-check-pod>    # 看 error 訊息
+# 修好 selector 後 apply
+kubectl apply -f nginx-clusterip.yaml
+kubectl get ep nginx-svc    # 確認 Endpoints 恢復
+# 等 1 分鐘
+kubectl logs <next-health-check-pod>    # 確認成功
+```
+
+驗收標準：錯誤的 log 顯示連線失敗，修好後的 log 顯示 'Health check OK'

@@ -250,31 +250,52 @@ kubectl get endpoints nginx-svc
 
 ### ③ 題目
 
-1. 你建了一個 Service，`kubectl get ep` 顯示 `<none>`，最可能的原因是什麼？要怎麼除錯？
+1. 我幫你準備了一個 Service YAML，selector 故意打錯成 `app: my-nginx`（但 Pod label 是 `app: nginx`）。
+   操作：
+   - `kubectl apply -f broken-clusterip.yaml`
+   - `kubectl get ep nginx-svc`（確認 Endpoints 是 `<none>`）
+   - `kubectl get pods --show-labels`（找出 Pod 實際 label）
+   - `kubectl describe svc nginx-svc`（找出 selector 哪裡錯了）
+   - 修正 selector 後重新 apply
+   - `kubectl get ep nginx-svc`（驗收：Endpoints 出現 Pod IP）
+   驗收標準：Endpoints 欄位從 `<none>` 變成有 Pod IP:80
 
-2. Service 的 `port: 80` 和 `targetPort: 8080` 分別是給誰用的？
+2. 把 Service YAML 的 targetPort 故意改成 81（nginx 只監聽 80），apply 後進測試 Pod `curl http://nginx-svc`，觀察 error 訊息跟 selector 打錯的 error 有什麼不同。
+   操作：
+   - 修改 service-clusterip.yaml 的 `targetPort: 81`
+   - `kubectl apply -f service-clusterip.yaml`
+   - `kubectl get ep nginx-svc`（Endpoints 有 IP，selector 對了）
+   - `kubectl run test-curl --image=curlimages/curl --rm -it --restart=Never -- sh`
+   - `curl http://nginx-svc`（觀察 error）
+   驗收標準：看到 `Connection refused`（不是 Could not resolve host），因為 selector 對了但 Pod 沒在 81 監聽。改回 `targetPort: 80` 後 curl 成功。
 
-3. 為什麼 ClusterIP 從你的筆電直接 `curl http://10.96.123.45` 會失敗？
+3. 進入測試 Pod 執行 `curl http://nginx-svc`，截圖確認看到 `Welcome to nginx!` 字樣。
+   操作：
+   - `kubectl run test-curl --image=curlimages/curl --rm -it --restart=Never -- sh`
+   - 在 Pod 內：`curl http://nginx-svc`
+   - `exit`
+   驗收標準：輸出包含 `Welcome to nginx!`
 
 ---
 
 ### ④ 解答
 
 **解答 1：**
-最可能原因是 Service 的 `selector` 和 Pod 的 `labels` 不一致（例如 label 打錯、多了空格）。
+最可能原因是 Service 的 `selector` 和 Pod 的 `labels` 不一致（`app: my-nginx` vs `app: nginx`）。
 除錯步驟：
 ```bash
 kubectl get pods --show-labels            # 確認 Pod 實際有哪些 label
 kubectl describe svc nginx-svc            # 確認 Service 的 Selector 是什麼
 ```
-比對兩者是否完全一致。
+比對兩者是否完全一致，修正 selector 後重新 apply，Endpoints 就會出現 Pod IP。
 
 **解答 2：**
-- `port: 80`：給「呼叫方（其他 Pod）」連的，連 Service 的 80 port
-- `targetPort: 8080`：給「應用程式本身」監聽，流量最終轉到 Pod 的 8080
+- Endpoints 有 IP（selector 對了），但 curl 會出現 `Connection refused`
+- 因為 nginx 實際監聽 port 80，targetPort 設成 81 沒人接
+- 跟 selector 打錯的 error 不同：selector 錯 → Endpoints 空 → `Connection refused`（或 timeout）；targetPort 錯 → Endpoints 有 IP 但連不上 → `Connection refused`
 
 **解答 3：**
-ClusterIP 是叢集內部虛擬 IP，只存在 K8s 叢集的 overlay 網路內。你的筆電和叢集網路不通，封包無法路由到 ClusterIP。要從外部存取，需要 NodePort 或 LoadBalancer。
+進入測試 Pod 後執行 `curl http://nginx-svc`，看到包含 `Welcome to nginx!` 的 HTML 即為成功。
 
 ---
 
@@ -910,40 +931,62 @@ kubectl config set-context --current --namespace=default
 
 ### ③ 題目
 
-1. 你在 `dev` namespace 建了一個 Service 叫 `api-svc`。從 `staging` namespace 的 Pod 要連這個 Service，URL 要怎麼寫？
+1. 進入 busybox Pod，分別用短名稱和 FQDN 執行 wget，確認兩種都能得到 nginx 首頁。
+   操作：
+   - `kubectl run test-dns --image=busybox:1.36 --rm -it --restart=Never -- sh`
+   - 在 Pod 內：`wget -qO- http://nginx-svc`（短名稱，同 namespace）
+   - 在 Pod 內：`wget -qO- http://nginx-svc.default.svc.cluster.local`（完整 FQDN）
+   - `exit`
+   驗收標準：兩個指令都回傳 nginx 首頁 HTML
 
-2. 你執行了 `kubectl delete namespace production`，會刪除哪些東西？
+2. 建一個 dev namespace，在裡面建 nginx Deployment + Service，然後從 default namespace 的 busybox 用短名稱連它（會失敗），再用 FQDN 連（成功）——親眼看到兩種不同結果。
+   操作：
+   - `kubectl create namespace dev`
+   - `kubectl create deployment nginx --image=nginx:1.27 -n dev`
+   - `kubectl expose deployment nginx --port=80 -n dev`
+   - `kubectl run test-cross --image=busybox:1.36 --rm -it --restart=Never -- sh`
+   - 在 Pod 內：`wget -qO- http://nginx.dev`（先試短名稱 → 失敗）
+   - 在 Pod 內：`wget -qO- http://nginx.dev.svc.cluster.local`（再試 FQDN → 成功）
+   驗收標準：短名稱失敗（could not resolve host），FQDN 成功（回傳 nginx 首頁）
 
-3. 為什麼在 Pod 內用 `nginx-svc` 短名稱能找到 Service，但用 `ping nginx-svc` 在你自己的筆電上卻找不到？
+3. 在 staging namespace 建一個 Service，然後真的執行 `kubectl delete namespace staging`，觀察裡面的 Deployment 和 Pod 也一起消失了。
+   操作：
+   - `kubectl create namespace staging`
+   - `kubectl create deployment web --image=nginx:1.27 --replicas=2 -n staging`
+   - `kubectl get all -n staging`（記下有哪些資源）
+   - `kubectl delete namespace staging`
+   - `kubectl get all -n staging`（應該看不到任何東西，或 namespace not found）
+   驗收標準：delete namespace 之後，`kubectl get all -n staging` 顯示 `No resources found` 或報錯 namespace 不存在
 
 4. 如果把 CoreDNS Pod 刪掉（replicas 設為 0），`curl <ClusterIP>` 會通嗎？`curl <Service名稱>` 會通嗎？為什麼？
+   操作：
+   - `kubectl get svc nginx-svc`（先記下 ClusterIP）
+   - `kubectl scale deployment coredns -n kube-system --replicas=0`
+   - `kubectl run test --image=curlimages/curl --rm -it --restart=Never -- sh`
+   - `curl http://nginx-svc`（預期失敗）
+   - `curl http://<ClusterIP>`（預期成功）
+   - `exit`
+   - `kubectl scale deployment coredns -n kube-system --replicas=2`（恢復！）
 
 ---
 
 ### ④ 解答
 
 **解答 1：**
-```
-http://api-svc.dev.svc.cluster.local
-```
-跨 namespace 必須用完整 FQDN 或含 namespace 的名稱（`api-svc.dev` 也可以，依 search domain 補全）。短名稱 `api-svc` 只在同一個 namespace 有效。
+兩個指令都回傳 nginx 首頁 HTML，驗證短名稱和 FQDN 在同一個 namespace 內都能正常工作。短名稱能用是因為 Pod 的 `/etc/resolv.conf` 有 `search default.svc.cluster.local ...` 自動補全。
 
 **解答 2：**
-所有在 `production` namespace 內的資源全部刪除，包括：
-- 所有 Deployment（及其管理的 ReplicaSet、Pod）
-- 所有 Service
-- 所有 ConfigMap、Secret
-- 所有 PersistentVolumeClaim（PV 本身根據 reclaim policy 決定）
-- Namespace 本身
+- 短名稱 `wget -qO- http://nginx.dev` 失敗：`could not resolve host`
+- FQDN `wget -qO- http://nginx.dev.svc.cluster.local` 成功：回傳 nginx 首頁
+- 原因：default namespace 的 Pod search domain 是 `default.svc.cluster.local`，不會自動補上 `dev` namespace，所以短名稱找不到。跨 namespace 必須用 FQDN。
 
 **解答 3：**
-Pod 內的 `/etc/resolv.conf` 由 K8s 自動注入，指向 CoreDNS，並設定 `search default.svc.cluster.local ...`，所以短名稱能被解析。
-你的筆電 DNS 設定指向家用路由器或 8.8.8.8，不知道 K8s 叢集內部的 DNS，所以找不到。
+`kubectl delete namespace staging` 會刪除該 namespace 內所有資源：Deployment、ReplicaSet、Pod、Service 全部一起消失。驗證方式是 `kubectl get all -n staging` 顯示 `No resources found` 或報錯 namespace 不存在。
 
 **解答 4：**
 - `curl <ClusterIP>` 會通。流量轉發由 Node 上的 kube-proxy（iptables/IPVS）處理，不需要 DNS。
-- `curl <Service名稱>` 會失敗。沒有 CoreDNS 把名稱翻成 IP，程式報 `Temporary failure in name resolution`。
-- 教學意義：DNS 解析（名字→IP）和網路轉發（IP→Pod）是兩套完全獨立的機制。
+- `curl <Service名稱>` 會失敗。沒有 CoreDNS 把名稱翻成 IP，程式報 `Name resolution failed`。
+- DNS 解析和網路轉發是兩套獨立機制。
 
 ---
 

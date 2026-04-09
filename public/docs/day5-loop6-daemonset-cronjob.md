@@ -75,6 +75,41 @@ spec:
 - 最接近的是：在每台機器上都執行 `docker run -d fluentd`（但要手動）
 - DaemonSet 是把「每台機器都要跑」這件事自動化
 
+### ③ 題目
+
+**Q1：** 部署 DaemonSet，用 kubectl get pods -o wide 確認每個 Node 都有一個 Pod，Pod 數量等於 kubectl get nodes 的數量。
+
+**Q2：** 試著用 kubectl scale daemonset log-collector --replicas=0，看 K8s 的反應（error 訊息）。
+
+**Q3：** 試著把 daemonset.yaml 裡加上 replicas: 0 後重新 apply，觀察 K8s 的處理結果。
+
+### ④ 解答
+
+**A1：**
+```bash
+kubectl apply -f daemonset.yaml
+kubectl get nodes                           # 記下 Node 數量
+kubectl get pods -o wide -l app=log-collector   # 對比 NODE 欄位
+```
+驗收標準：pods -o wide 中 NODE 欄位每個 Node 名稱各出現一次，Pod 總數 = kubectl get nodes 的數量
+
+**A2：**
+```bash
+kubectl scale daemonset log-collector --replicas=0
+# 觀察終端機的回應
+kubectl get pods -l app=log-collector      # 確認 Pod 數量有沒有改變
+```
+驗收標準：看到 'cannot scale a DaemonSet' 或類似 error，Pod 數量不變（DaemonSet 不支援手動 scale）
+
+**A3：**
+```bash
+# 在 daemonset.yaml 的 spec 下加一行 replicas: 0
+kubectl apply -f daemonset.yaml
+kubectl get daemonsets    # 觀察 DESIRED 欄位有沒有變
+kubectl get pods -l app=log-collector
+```
+驗收標準：DESIRED 仍等於 Node 數量（K8s 忽略 DaemonSet 裡的 replicas 欄位）
+
 ---
 
 ### 📄 第 21 張：CronJob -- 定時跑任務（7 min）
@@ -175,6 +210,47 @@ spec:
 | Job | `docker run --rm`（跑完刪除）|
 | `restartPolicy: OnFailure` | Docker restart policy `on-failure` |
 
+### ③ 題目
+
+**Q1：** 部署 CronJob（schedule: '*/1 * * * *'），等 1 分鐘後用 kubectl get jobs 確認有 Job 建立，再用 kubectl logs 看輸出。
+
+**Q2：** 修改 CronJob 的 schedule 為 '*/2 * * * *'，重新 apply 後等 2 分鐘，用 kubectl get jobs 確認 Job 觸發間隔真的變長了。
+
+**Q3：** 在 CronJob 的 jobTemplate.spec 加入 ttlSecondsAfterFinished: 30，apply 後等 Job 跑完，觀察 30 秒後 Pod 自動消失。
+
+### ④ 解答
+
+**A1：**
+```bash
+kubectl apply -f cronjob.yaml    # schedule: '*/1 * * * *'
+kubectl get cronjobs             # 確認 SCHEDULE 欄位正確
+# 等 1 分鐘...
+kubectl get jobs                 # 看到 hello-cron-xxxxx，COMPLETIONS 1/1
+kubectl get pods                 # 找到 STATUS: Completed 的 Pod
+kubectl logs <pod-name>          # 看輸出內容
+```
+驗收標準：kubectl get jobs 有記錄，kubectl logs 看到 'Hello from CronJob!' + 時間戳
+
+**A2：**
+```bash
+# 把 cronjob.yaml 的 schedule 改成 '*/2 * * * *'
+kubectl apply -f cronjob.yaml
+kubectl get jobs    # 觀察 LAST SCHEDULE 和 Job 出現的時間間隔
+# 等 2 分鐘後再執行一次
+kubectl get jobs
+```
+驗收標準：兩次 kubectl get jobs 之間新增的 Job 間隔約 2 分鐘
+
+**A3：**
+```bash
+# 在 cronjob.yaml 的 jobTemplate.spec 下加 ttlSecondsAfterFinished: 30
+kubectl apply -f cronjob.yaml
+kubectl get pods    # 等 Job 跑完後看到 Completed
+# 等 30 秒...
+kubectl get pods    # Pod 應該自動消失了
+```
+驗收標準：Completed 狀態的 Pod 在 30 秒後自動被清除
+
 ---
 
 ### 📄 第 22 張：Lab：DaemonSet + CronJob 實作（8 min）
@@ -257,6 +333,28 @@ log-collector-def34   1/1     Running   0          1m    10.244.2.6   k3s-worker
 ```
 
 **重點：每個 Node 名稱應該只出現一次**，若同一個 Node 有兩個 DaemonSet Pod，代表有問題。
+
+---
+
+**DaemonSet 指令 5：查看 DaemonSet Pod 的日誌**
+
+```bash
+kubectl logs <pod-name>
+```
+
+例如：
+```bash
+kubectl logs log-collector-abc12
+```
+
+打完要看：
+```
+2026-04-05 10:00:00 collecting logs from log-collector-abc12
+2026-04-05 10:00:30 collecting logs from log-collector-abc12
+```
+
+- DaemonSet Pod 每 30 秒印一行日誌
+- 確認 Pod 有在正常運作
 
 ---
 
@@ -386,70 +484,30 @@ cronjob.batch "hello-cron" deleted
 
 ### ③ 題目
 
-**DaemonSet 題目**
+**常見坑 Q1：** 讓學生看到 CronJob Pod 的 Completed 狀態，執行 kubectl logs 確認它正常跑完（而不是掛掉）。
 
-1. DaemonSet YAML 不需要寫 `replicas`，那 K8s 怎麼決定要跑幾個 Pod？
-
-2. 你有一個叢集有 5 個 Node，部署了一個 DaemonSet。後來又加入 2 個新 Node，不做任何操作，最後 DaemonSet 應該有幾個 Pod？
-
-3. 你想讓 DaemonSet 只跑在 label 是 `disk=ssd` 的 Node 上，YAML 需要加什麼？（提示：`nodeSelector`）
-
-**CronJob 題目**
-
-1. CronJob 的 `schedule: "0 9 * * 1-5"` 代表什麼時候執行？
-
-2. 你的 CronJob 每 5 分鐘跑一次，但每次都要跑 10 分鐘才能完成。預設的 `concurrencyPolicy: Allow` 會造成什麼問題？要改成什麼比較好？
-
-3. 你發現叢集裡累積了大量 `Completed` 狀態的 Pod，怎麼用 YAML 設定讓 Job 跑完後 120 秒自動清理？
+**常見坑 Q2：** 複製 Deployment YAML，改 kind 為 DaemonSet 但故意保留 replicas: 3，apply 後觀察 DESIRED 欄位是不是還是 Node 數量（而非 3）。
 
 ---
 
 ### ④ 解答
 
-**DaemonSet 解答 1：**
-DaemonSet controller 持續監控叢集中的 Node 數量。K8s 有幾個 Node，DaemonSet 就會在每個 Node 建立一個 Pod。Node 加入時自動建，Node 離開時自動刪，不需要人工介入。
-
-**DaemonSet 解答 2：**
-最終有 **7 個 Pod**。原本 5 個 Node 各 1 個（5 個 Pod），新加入 2 個 Node 後，DaemonSet controller 自動在新 Node 上建立 Pod，總計 7 個。
-
-**DaemonSet 解答 3：**
-在 YAML 的 `spec.template.spec` 加入 `nodeSelector`：
-
-```yaml
-spec:
-  template:
-    spec:
-      nodeSelector:
-        disk: ssd
-      containers:
-        - name: fluentd
-          image: fluent/fluentd:v1.16
+**常見坑 A1：**
+```bash
+kubectl get pods    # 找到 STATUS: Completed 的 Pod
+kubectl logs <completed-pod-name>    # 看輸出確認有正確執行
+kubectl describe pod <completed-pod-name>    # 看 State 欄位
 ```
+驗收標準：kubectl logs 有正確輸出（而非空白），describe 顯示 'Reason: Completed'（不是 Error）
 
-這樣 DaemonSet 只會在有 `disk=ssd` label 的 Node 上建 Pod。
-
-**CronJob 解答 1：**
-每週一到週五（`1-5` 代表 Monday 到 Friday）早上 9 點整（`0 9`）執行。`*` 代表每天每月，`1-5` 限制只在週一到週五。
-
-**CronJob 解答 2：**
-`Allow` 允許多個 Job 同時跑。5 分鐘觸發一次，每次跑 10 分鐘，代表還沒跑完就觸發下一次。隨著時間累積，叢集裡會有越來越多 Job 同時在跑，消耗大量資源。
-
-建議改成：
-- `Forbid`：上次沒跑完就跳過這次（適合「跑完才重要，錯過沒關係」的場景）
-- `Replace`：殺掉上次，改跑最新的（適合「只要最新一次結果」的場景）
-
-**CronJob 解答 3：**
-在 Job spec 加入 `ttlSecondsAfterFinished`：
-
-```yaml
-jobTemplate:
-  spec:
-    ttlSecondsAfterFinished: 120   # 跑完 120 秒後自動刪 Job 和 Pod
-    template:
-      ...
+**常見坑 A2：**
+```bash
+# 建一個保留 replicas: 3 的 DaemonSet YAML
+kubectl apply -f daemonset-with-replicas.yaml
+kubectl get daemonsets    # 看 DESIRED 欄位
+kubectl get nodes         # 對比 Node 數量
 ```
-
-設定後，Job 完成（不論成功或失敗）120 秒後，K8s 自動刪除 Job 及其 Pod。
+驗收標準：DESIRED 等於 Node 數量（不是 3），驗證 K8s 忽略 DaemonSet 裡的 replicas 欄位
 
 ---
 

@@ -1,8 +1,8 @@
-# Day 5 5-18 到 5-19：DaemonSet + CronJob
+# Day 5 5-15 到 5-16：DaemonSet + CronJob
 
 ---
 
-## 5-18 DaemonSet（25 分鐘）
+## 5-15 DaemonSet（25 分鐘）
 
 ### ① 課程內容
 
@@ -192,7 +192,7 @@ spec:
 
 ---
 
-## 5-19 CronJob（25 分鐘）
+## 5-16 CronJob（25 分鐘）
 
 ### ① 課程內容
 

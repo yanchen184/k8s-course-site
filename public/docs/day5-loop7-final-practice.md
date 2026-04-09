@@ -4,6 +4,8 @@
 
 ## 5-17 綜合實作（45 分鐘）
 
+### 📄 第 26 張：綜合實作：從零串完整鏈路（7 min）
+
 ### ① 課程內容
 
 **目標架構說明**
@@ -295,6 +297,8 @@ Address 1: 10.96.100.10 api-svc.fullstack-demo.svc.cluster.local
 
 ---
 
+### 📄 第 27 張：綜合實作：擴縮容 → 更新 → 回滾 → 清理（5 min）
+
 **指令 7：確認 DaemonSet 狀態**
 
 ```bash
@@ -355,6 +359,10 @@ service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   5d
 
 ---
 
+### 📄 第 28 張：學員自由練習（15 min）
+
+> 📋 學生看 PPT 投影片，上面有完整 10 步驟和挑戰題。
+
 ### ③ 題目
 
 1. 你執行 `kubectl exec -it frontend-pod -n fullstack-demo -- curl http://api-svc`，能成功嗎？如果把 api-svc 改名為 `backend-svc`，程式碼裡寫的 `http://api-svc` 還能用嗎？要怎麼修？
@@ -392,6 +400,8 @@ NodePort 行為不變，但流量分配的 Pod 變多了：
 ---
 
 ## 5-18 今日總結（15 分鐘）
+
+### 📄 第 29 張：第五堂總結：因果鏈回顧（7 min）
 
 ### ① 課程內容
 
@@ -468,33 +478,6 @@ kubectl delete cronjob <name>
 
 ---
 
-**反思問題（下堂課回答）**
-
-今天用 NodePort 讓外部連進服務，但有兩個問題還沒解決：
-
-> **問題 1：怎麼讓使用者用 `https://myapp.com` 連服務，而不是 `http://192.168.1.1:30080`？**
-
-線索：NodePort 只能用 IP + port，沒辦法用網域名稱和 HTTPS。下堂課會介紹 **Ingress** 和 **IngressController**。
-
-> **問題 2：資料庫密碼、API Token 直接寫在 YAML 裡推到 Git，怎麼辦？**
-
-線索：現在的 YAML 如果有 `password: mypassword` 推到 GitHub，就等於公開密碼。下堂課會介紹 **ConfigMap**（非敏感設定）和 **Secret**（敏感資料加密）。
-
----
-
-**第六堂課預告**
-
-| 主題 | 解決的問題 | 對應 Docker 概念 |
-|------|-----------|----------------|
-| ConfigMap | 設定檔從程式碼分離（env、config file）| `docker run -e` / `--env-file` |
-| Secret | 敏感資料加密儲存（密碼、token、cert）| Docker secrets |
-| Ingress | 網域名稱路由 + HTTPS | Nginx reverse proxy / Traefik |
-| IngressController | 實作 Ingress 規則的元件 | Nginx container |
-| Persistent Volume | 讓 Pod 重啟後資料不消失 | `docker run -v` |
-| PersistentVolumeClaim | Pod 申請儲存空間的方式 | Volume mount |
-
----
-
 ### ② 所有指令＋講解
 
 （本節為複習整理，指令詳見各 Loop 的② 區塊）
@@ -566,6 +549,35 @@ kubectl get all                                   # 確認乾淨
 
 ---
 
+### 📄 第 30 張：回家作業 + 下堂課預告（5 min）
+
+**反思問題（下堂課回答）**
+
+今天用 NodePort 讓外部連進服務，但有兩個問題還沒解決：
+
+> **問題 1：怎麼讓使用者用 `https://myapp.com` 連服務，而不是 `http://192.168.1.1:30080`？**
+
+線索：NodePort 只能用 IP + port，沒辦法用網域名稱和 HTTPS。下堂課會介紹 **Ingress** 和 **IngressController**。
+
+> **問題 2：資料庫密碼、API Token 直接寫在 YAML 裡推到 Git，怎麼辦？**
+
+線索：現在的 YAML 如果有 `password: mypassword` 推到 GitHub，就等於公開密碼。下堂課會介紹 **ConfigMap**（非敏感設定）和 **Secret**（敏感資料加密）。
+
+---
+
+**第六堂課預告**
+
+| 主題 | 解決的問題 | 對應 Docker 概念 |
+|------|-----------|----------------|
+| ConfigMap | 設定檔從程式碼分離（env、config file）| `docker run -e` / `--env-file` |
+| Secret | 敏感資料加密儲存（密碼、token、cert）| Docker secrets |
+| Ingress | 網域名稱路由 + HTTPS | Nginx reverse proxy / Traefik |
+| IngressController | 實作 Ingress 規則的元件 | Nginx container |
+| Persistent Volume | 讓 Pod 重啟後資料不消失 | `docker run -v` |
+| PersistentVolumeClaim | Pod 申請儲存空間的方式 | Volume mount |
+
+---
+
 ### ③ 題目
 
 1. 今天學了四種 workload（Deployment、DaemonSet、CronJob、Job）。請說明各自適合什麼場景？
@@ -610,3 +622,9 @@ CoreDNS 掛掉後：
 - **新 Pod 啟動可能受影響**：Pod 啟動時若需要解析 DNS（例如 init container），也會失敗
 
 這就是為什麼 K8s 預設跑**兩個** CoreDNS Pod（高可用），確保其中一個掛掉時服務不中斷。
+
+---
+
+### 📄 第 31 張：Lab 8：從零建完整 Web 服務架構（20 min）
+
+> 📋 學生看 PPT 投影片（Lab 8：從零建完整 Web 服務架構），上面有完整任務清單和驗收標準。

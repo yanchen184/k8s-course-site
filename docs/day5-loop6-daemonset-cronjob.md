@@ -2,7 +2,9 @@
 
 ---
 
-## 5-15 DaemonSet（25 分鐘）
+## 5-15 DaemonSet + CronJob
+
+### 📄 第 20 張：DaemonSet -- 每個 Node 都跑一份（8 min）
 
 ### ① 課程內容
 
@@ -75,126 +77,7 @@ spec:
 
 ---
 
-### ② 所有指令＋講解
-
-**指令 1：套用 DaemonSet YAML**
-
-```bash
-kubectl apply -f daemonset.yaml
-```
-
-打完要看：
-```
-daemonset.apps/log-collector created
-```
-
-異常：
-- `error: DaemonSets "log-collector" is invalid: spec.template.spec.containers[0].image`: image 名稱錯誤，確認 image tag 格式
-
----
-
-**指令 2：列出所有 DaemonSet**
-
-```bash
-kubectl get daemonsets
-# 縮寫
-kubectl get ds
-```
-
-打完要看：
-```
-NAME            DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-log-collector   2         2         2       2            2           <none>          30s
-```
-
-重點欄位：
-- `DESIRED`：應有幾個 Pod（等於 Node 數）
-- `CURRENT`：目前已建立幾個
-- `READY`：幾個已就緒
-- `NODE SELECTOR`：如果有限制只跑在特定 Node 會顯示在這
-
-若 `DESIRED != READY`，代表有 Pod 還在啟動或出問題。
-
----
-
-**指令 3：查看 DaemonSet 詳細資訊**
-
-```bash
-kubectl describe daemonset log-collector
-```
-
-打完要看（關鍵欄位）：
-```
-Selector:       app=log-collector
-Node-Selector:  <none>
-Desired Number of Nodes Scheduled: 2
-Current Number of Nodes Scheduled: 2
-Number of Nodes Scheduled with Up-to-date Pods: 2
-Number of Nodes Scheduled with Available Pods: 2
-```
-
-若有 Pod 失敗，在 `Events` 區塊會顯示錯誤訊息。
-
----
-
-**指令 4：查看 Pod 分布在哪些 Node**
-
-```bash
-kubectl get pods -o wide
-```
-
-- `-o wide`：顯示額外欄位，包含 `NODE`（Pod 跑在哪個 Node）
-
-打完要看：
-```
-NAME                  READY   STATUS    RESTARTS   AGE   IP           NODE
-log-collector-abc12   1/1     Running   0          1m    10.244.1.5   k3s-worker1
-log-collector-def34   1/1     Running   0          1m    10.244.2.6   k3s-worker2
-```
-
-**重點：每個 Node 名稱應該只出現一次**，若同一個 Node 有兩個 DaemonSet Pod，代表有問題。
-
----
-
-### ③ 題目
-
-1. DaemonSet YAML 不需要寫 `replicas`，那 K8s 怎麼決定要跑幾個 Pod？
-
-2. 你有一個叢集有 5 個 Node，部署了一個 DaemonSet。後來又加入 2 個新 Node，不做任何操作，最後 DaemonSet 應該有幾個 Pod？
-
-3. 你想讓 DaemonSet 只跑在 label 是 `disk=ssd` 的 Node 上，YAML 需要加什麼？（提示：`nodeSelector`）
-
----
-
-### ④ 解答
-
-**解答 1：**
-DaemonSet controller 持續監控叢集中的 Node 數量。K8s 有幾個 Node，DaemonSet 就會在每個 Node 建立一個 Pod。Node 加入時自動建，Node 離開時自動刪，不需要人工介入。
-
-**解答 2：**
-最終有 **7 個 Pod**。原本 5 個 Node 各 1 個（5 個 Pod），新加入 2 個 Node 後，DaemonSet controller 自動在新 Node 上建立 Pod，總計 7 個。
-
-**解答 3：**
-在 YAML 的 `spec.template.spec` 加入 `nodeSelector`：
-
-```yaml
-spec:
-  template:
-    spec:
-      nodeSelector:
-        disk: ssd
-      containers:
-        - name: fluentd
-          image: fluent/fluentd:v1.16
-```
-
-這樣 DaemonSet 只會在有 `disk=ssd` label 的 Node 上建 Pod。
-
----
-
-## 5-16 CronJob（25 分鐘）
-
-### ① 課程內容
+### 📄 第 21 張：CronJob -- 定時跑任務（7 min）
 
 **CronJob 的核心概念**
 
@@ -294,9 +177,90 @@ spec:
 
 ---
 
+### 📄 第 22 張：Lab：DaemonSet + CronJob 實作（8 min）
+
 ### ② 所有指令＋講解
 
-**指令 1：套用 CronJob YAML**
+**DaemonSet 指令 1：套用 DaemonSet YAML**
+
+```bash
+kubectl apply -f daemonset.yaml
+```
+
+打完要看：
+```
+daemonset.apps/log-collector created
+```
+
+異常：
+- `error: DaemonSets "log-collector" is invalid: spec.template.spec.containers[0].image`: image 名稱錯誤，確認 image tag 格式
+
+---
+
+**DaemonSet 指令 2：列出所有 DaemonSet**
+
+```bash
+kubectl get daemonsets
+# 縮寫
+kubectl get ds
+```
+
+打完要看：
+```
+NAME            DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+log-collector   2         2         2       2            2           <none>          30s
+```
+
+重點欄位：
+- `DESIRED`：應有幾個 Pod（等於 Node 數）
+- `CURRENT`：目前已建立幾個
+- `READY`：幾個已就緒
+- `NODE SELECTOR`：如果有限制只跑在特定 Node 會顯示在這
+
+若 `DESIRED != READY`，代表有 Pod 還在啟動或出問題。
+
+---
+
+**DaemonSet 指令 3：查看 DaemonSet 詳細資訊**
+
+```bash
+kubectl describe daemonset log-collector
+```
+
+打完要看（關鍵欄位）：
+```
+Selector:       app=log-collector
+Node-Selector:  <none>
+Desired Number of Nodes Scheduled: 2
+Current Number of Nodes Scheduled: 2
+Number of Nodes Scheduled with Up-to-date Pods: 2
+Number of Nodes Scheduled with Available Pods: 2
+```
+
+若有 Pod 失敗，在 `Events` 區塊會顯示錯誤訊息。
+
+---
+
+**DaemonSet 指令 4：查看 Pod 分布在哪些 Node**
+
+```bash
+kubectl get pods -o wide
+```
+
+- `-o wide`：顯示額外欄位，包含 `NODE`（Pod 跑在哪個 Node）
+
+打完要看：
+```
+NAME                  READY   STATUS    RESTARTS   AGE   IP           NODE
+log-collector-abc12   1/1     Running   0          1m    10.244.1.5   k3s-worker1
+log-collector-def34   1/1     Running   0          1m    10.244.2.6   k3s-worker2
+```
+
+**重點：每個 Node 名稱應該只出現一次**，若同一個 Node 有兩個 DaemonSet Pod，代表有問題。
+
+---
+
+**CronJob 指令 1：套用 CronJob YAML**
 
 ```bash
 kubectl apply -f cronjob.yaml
@@ -309,7 +273,7 @@ cronjob.batch/hello-cron created
 
 ---
 
-**指令 2：列出 CronJob**
+**CronJob 指令 2：列出 CronJob**
 
 ```bash
 kubectl get cronjobs
@@ -331,7 +295,7 @@ hello-cron   */1 * * * *   False     0        <none>          10s
 
 ---
 
-**指令 3：等 1 分鐘後查看 Job 是否建立**
+**CronJob 指令 3：等 1 分鐘後查看 Job 是否建立**
 
 ```bash
 kubectl get jobs
@@ -351,7 +315,7 @@ hello-cron-1234567890   1/1           5s         90s
 
 ---
 
-**指令 4：查看 CronJob 產生的 Pod**
+**CronJob 指令 4：查看 CronJob 產生的 Pod**
 
 ```bash
 kubectl get pods
@@ -372,7 +336,7 @@ hello-cron-1234567890-xyz12   0/1     Completed   0          2m
 
 ---
 
-**指令 5：查看 CronJob Pod 的輸出**
+**CronJob 指令 5：查看 CronJob Pod 的輸出**
 
 ```bash
 kubectl logs <job-pod-name>
@@ -394,7 +358,7 @@ Hello from CronJob
 
 ---
 
-**指令 6：刪除 CronJob**
+**CronJob 指令 6：刪除 CronJob**
 
 ```bash
 kubectl delete cronjob hello-cron
@@ -412,7 +376,25 @@ cronjob.batch "hello-cron" deleted
 
 ---
 
+### 📄 第 23 張：學員實作：DaemonSet + CronJob（10 min）
+
+> 📋 學生看 PPT 投影片，上面有完整說明。
+
+---
+
+### 📄 第 24 張：DaemonSet + CronJob 常見坑（5 min）
+
 ### ③ 題目
+
+**DaemonSet 題目**
+
+1. DaemonSet YAML 不需要寫 `replicas`，那 K8s 怎麼決定要跑幾個 Pod？
+
+2. 你有一個叢集有 5 個 Node，部署了一個 DaemonSet。後來又加入 2 個新 Node，不做任何操作，最後 DaemonSet 應該有幾個 Pod？
+
+3. 你想讓 DaemonSet 只跑在 label 是 `disk=ssd` 的 Node 上，YAML 需要加什麼？（提示：`nodeSelector`）
+
+**CronJob 題目**
 
 1. CronJob 的 `schedule: "0 9 * * 1-5"` 代表什麼時候執行？
 
@@ -424,17 +406,39 @@ cronjob.batch "hello-cron" deleted
 
 ### ④ 解答
 
-**解答 1：**
+**DaemonSet 解答 1：**
+DaemonSet controller 持續監控叢集中的 Node 數量。K8s 有幾個 Node，DaemonSet 就會在每個 Node 建立一個 Pod。Node 加入時自動建，Node 離開時自動刪，不需要人工介入。
+
+**DaemonSet 解答 2：**
+最終有 **7 個 Pod**。原本 5 個 Node 各 1 個（5 個 Pod），新加入 2 個 Node 後，DaemonSet controller 自動在新 Node 上建立 Pod，總計 7 個。
+
+**DaemonSet 解答 3：**
+在 YAML 的 `spec.template.spec` 加入 `nodeSelector`：
+
+```yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        disk: ssd
+      containers:
+        - name: fluentd
+          image: fluent/fluentd:v1.16
+```
+
+這樣 DaemonSet 只會在有 `disk=ssd` label 的 Node 上建 Pod。
+
+**CronJob 解答 1：**
 每週一到週五（`1-5` 代表 Monday 到 Friday）早上 9 點整（`0 9`）執行。`*` 代表每天每月，`1-5` 限制只在週一到週五。
 
-**解答 2：**
+**CronJob 解答 2：**
 `Allow` 允許多個 Job 同時跑。5 分鐘觸發一次，每次跑 10 分鐘，代表還沒跑完就觸發下一次。隨著時間累積，叢集裡會有越來越多 Job 同時在跑，消耗大量資源。
 
 建議改成：
 - `Forbid`：上次沒跑完就跳過這次（適合「跑完才重要，錯過沒關係」的場景）
 - `Replace`：殺掉上次，改跑最新的（適合「只要最新一次結果」的場景）
 
-**解答 3：**
+**CronJob 解答 3：**
 在 Job spec 加入 `ttlSecondsAfterFinished`：
 
 ```yaml
@@ -446,3 +450,9 @@ jobTemplate:
 ```
 
 設定後，Job 完成（不論成功或失敗）120 秒後，K8s 自動刪除 Job 及其 Pod。
+
+---
+
+### 📄 第 25 張：Lab 7：日誌收集工具部署情境（15 min）
+
+> 📋 學生看 PPT 投影片（Lab 7：日誌收集工具部署情境），上面有完整 YAML 和任務說明。

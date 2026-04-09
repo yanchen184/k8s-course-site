@@ -368,76 +368,77 @@ kubectl logs <frontend-pod-2> -n fullstack-demo --tail=5
 
 ---
 
-### 📄 第 30 張：學員練習：從零做一遍（15 min）
+### 📄 第 30 張：學員練習：你是新來的 K8s 工程師（20 min）
+
+> 📋 學生看 PPT 投影片，上面有完整情境和任務說明。
 
 ### ① 課程內容
 
-學員自由練習時間。從零獨立完成完整 10 步驟鏈路，再挑戰進階題。
+**情境**：你剛加入一間新創公司，主管交給你以下部署任務。所有資源建在 `my-app` namespace。
 
-**必做：跟著 10 步驟完整做一遍**
+**任務 1：部署雙服務架構（必做）**
 
-1. `kubectl create namespace my-app`
-2. `kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app`
-3. `kubectl expose deployment nginx-deploy --port=80 -n my-app`
-4. 測試 Pod curl 驗證（ClusterIP）
-5. 建 NodePort Service（30080）
-6. curl Node-IP:30080
-7. scale 3 → 5 → 3
-8. set image nginx:1.27 → 1.28
-9. rollout undo
-10. delete namespace my-app
+- **前端**：nginx:1.27，3 副本，外部要能用瀏覽器打開（NodePort 30080）
+- **後端 API**：httpd:2.4，2 副本，只有前端能連到就好（ClusterIP）
+- 驗收：curl Node-IP:30080 看到 nginx，從前端 Pod curl api-svc 看到 It works!
 
-**挑戰 1：同時部署兩個服務**
+**任務 2：版本更新 + 回滾（必做）**
 
-- nginx（app: frontend）+ httpd（app: api）
-- 各自 Deployment + ClusterIP + NodePort
-- nginx 用 30080，httpd 用 30081
+- PM 說前端要從 nginx:1.27 更新到 nginx:1.28
+- 更新完發現 1.28 有 bug，立刻回滾到 1.27
+- 驗收：rollout history 看到版本紀錄
 
-**挑戰 2：跨 Namespace DNS**
+**任務 3：運維需求（挑戰）**
 
-- 從測試 Pod curl `frontend-svc.my-app.svc.cluster.local`
-- curl `api-svc.my-app.svc.cluster.local`
+- 運維說每台 Node 都要裝日誌收集器 → DaemonSet
+- PM 說每分鐘要 health check 前端服務 → CronJob curl api-svc
+- 驗收：DaemonSet Pod 數 = Node 數，CronJob logs 看到成功
 
-### ② 指令講解
+清理：`kubectl delete namespace my-app`
 
-完整 10 步驟流程（不看筆記完成）：
+### ② 參考指令（答案）
 
-1. `kubectl create namespace my-app`
-2. `kubectl create deployment nginx-deploy --image=nginx:1.27 --replicas=3 -n my-app`
-3. `kubectl expose deployment nginx-deploy --port=80 -n my-app`
-4. `kubectl run test --image=busybox:1.36 --rm -it --restart=Never -n my-app -- wget -qO- http://nginx-deploy`
-5. `kubectl apply -f nodeport.yaml`（nodePort: 30080，namespace: my-app）
-6. `curl http://[Node-IP]:30080`
-7. `kubectl scale deployment nginx-deploy --replicas=5 -n my-app` → 縮回 3
-8. `kubectl set image deployment/nginx-deploy nginx=nginx:1.28 -n my-app`
-9. `kubectl rollout undo deployment/nginx-deploy -n my-app`
-10. `kubectl delete namespace my-app`
-
-挑戰指令：
+**任務 1：**
 
 ```bash
-kubectl run cross-test --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://frontend-svc.my-app.svc.cluster.local
+kubectl create namespace my-app
+kubectl create deployment frontend --image=nginx:1.27 --replicas=3 -n my-app
+kubectl expose deployment frontend --port=80 --type=NodePort --name=frontend-svc -n my-app
+kubectl create deployment api --image=httpd:2.4 --replicas=2 -n my-app
+kubectl expose deployment api --port=80 --name=api-svc -n my-app
+kubectl get nodes -o wide
+curl http://<Node-IP>:30080
+kubectl exec -n my-app <frontend-pod> -- curl http://api-svc
 ```
-→ 用途：跨 Namespace DNS 驗證
 
-### ③④ 題目 + 解答
+**任務 2：**
 
-依照今天學的四種 workload 類型，對以下每個情境動手建出正確的資源，用 kubectl get 確認狀態：
-1. 建 Deployment（replicas: 2）— 確認 2 個 Pod Running
-2. 建 DaemonSet — 確認 Pod 數 = Node 數
-3. 建 CronJob（每分鐘）— 等 1 分鐘確認有 Completed 的 Pod
-
-操作：
 ```bash
-kubectl apply -f deployment.yaml
-kubectl get pods    # 2 個 Running
+kubectl set image deployment/frontend nginx=nginx:1.28 -n my-app
+kubectl rollout status deployment/frontend -n my-app
+kubectl rollout undo deployment/frontend -n my-app
+kubectl rollout history deployment/frontend -n my-app
+```
+
+**任務 3：**
+
+```bash
+# DaemonSet（改 namespace: my-app）
 kubectl apply -f daemonset.yaml
-kubectl get pods -o wide -l app=log-collector    # 每個 Node 各一個
+kubectl get ds -n my-app
+kubectl get pods -o wide -n my-app -l app=log-collector
+
+# CronJob（改 namespace: my-app，command 改 curl api-svc）
 kubectl apply -f cronjob.yaml
-# 等 1 分鐘
-kubectl get pods    # 看到 Completed 的 Pod
+kubectl get jobs -n my-app
+kubectl logs <job-pod> -n my-app
 ```
-驗收標準：三種 workload 的 Pod 狀態符合預期（Running / Running / Completed）
+
+**清理：**
+
+```bash
+kubectl delete namespace my-app
+```
 
 ---
 
@@ -726,7 +727,7 @@ kubectl scale deployment coredns -n kube-system --replicas=2
 
 ---
 
-### 📄 第 33 張：回家作業 + 下堂課預告（5 min）
+### 📄 第 33 張：Docker 對照表 + 下堂課預告（5 min）
 
 ### ① 課程內容
 
@@ -743,12 +744,6 @@ kubectl scale deployment coredns -n kube-system --replicas=2
 | Nginx 反向代理 | Ingress | 下一堂 |
 | docker volume | PV / PVC | 下一堂 |
 
-**回家作業**
-
-1. **從零做一遍完整鏈路**，不看筆記
-2. 在兩個 Namespace 各部署一個服務，跨 Namespace curl
-3. 建 DaemonSet + CronJob，觀察行為
-
 **下堂課預告**
 
 - 192.168.64.3:30080 太醜了 → **Ingress** 用域名路由
@@ -762,16 +757,4 @@ kubectl scale deployment coredns -n kube-system --replicas=2
 
 ### ③④ 題目 + 解答
 
-回家作業三個操作題：
-
-**1.** 從零不看筆記完整跑一遍：kubectl create namespace my-app → 建 Deployment → expose → 測試 Pod curl → NodePort → curl Node-IP:30080 → scale 3→5→3 → set image → rollout undo → delete namespace
-
-驗收：`kubectl get namespace` 不再有 my-app
-
-**2.** 在 team-a 和 team-b 兩個 Namespace 各部署一個 Service，從 default namespace 的 busybox 分別用 FQDN 連到兩個 Service，確認都成功
-
-驗收：兩個 wget 都回傳對應的首頁
-
-**3.** 建 DaemonSet + CronJob，用 `kubectl get pods -o wide` 確認 DaemonSet 每個 Node 各一個；等 1 分鐘用 `kubectl get jobs` 確認 CronJob 觸發，用 `kubectl logs` 看到輸出
-
-驗收：三種 workload 狀態符合預期（DaemonSet Running / CronJob Completed）
+（無）

@@ -1445,7 +1445,7 @@ scale 對象是 Deployment，不是 Pod。kubectl edit deployment 也能改 repl
               <li>存成 <code className="text-green-400">api-service.yaml</code> → apply</li>
               <li>用指令觀察發生什麼事</li>
               <li>找出兩個 bug，說明原因</li>
-              <li>修好 → 重新 apply → READY <strong className="text-white">3/3</strong></li>
+              <li>修好 → 重新 apply → Pod 正常 Running</li>
               <li>scale 到 <strong className="text-white">5</strong> → -o wide 看 NODE 分散</li>
             </ol>
           </div>
@@ -1478,9 +1478,7 @@ scale 對象是 Deployment，不是 Pod。kubectl edit deployment 也能改 repl
         {/* 驗收條件 */}
         <div className="bg-slate-800/50 p-2 rounded text-xs">
           <span className="text-cyan-400 font-semibold">驗收：</span>
-          <span className="text-slate-300">kubectl get deploy → </span>
-          <code className="text-green-400">READY 3/3</code>
-          <span className="text-slate-300"> → scale 5 → </span>
+          <span className="text-slate-300">Pod 正常 Running → scale 5 → </span>
           <code className="text-green-400">kubectl get pods -o wide</code>
           <span className="text-slate-300"> → NODE 欄位出現不同節點名稱</span>
         </div>
@@ -1515,7 +1513,7 @@ kubectl describe deployment api-service
 kubectl apply -f api-service.yaml
 
 # ── Step 3：驗收 + 擴容 ──
-kubectl get deploy          # READY: 3/3
+kubectl get deploy          # READY 正常了嗎？
 kubectl scale deployment api-service --replicas=5
 kubectl get pods -o wide    # 確認 NODE 分散`,
     notes: `【③ 題目（Lab 1：你被叫去救火）】

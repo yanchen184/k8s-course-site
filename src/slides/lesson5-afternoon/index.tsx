@@ -1139,8 +1139,8 @@ kubectl exec [pod] -- ss -tlnp 或 netstat -tlnp → 確認容器實際監聽的
       </div>
     ),
     code: `# 現場 demo：在 Pod 內用名字找服務
-# 進入 busybox Pod
-kubectl exec -it test-curl -- sh
+# 建測試 Pod 進入叢集
+kubectl run test-curl --image=curlimages/curl --rm -it --restart=Never -- sh
 
 # 在 Pod 內執行：
 nslookup nginx-svc
@@ -1651,6 +1651,20 @@ kubectl config set-context --current --namespace=default
   kubectl delete namespace staging
   kubectl get all -n staging        # 應該看不到任何東西（或 namespace not found）
 驗收標準：delete namespace 之後，kubectl get all -n staging 顯示 'No resources found' 或報錯 namespace 不存在
+
+題目 4：如果把 CoreDNS Pod 刪掉（replicas 設為 0），curl <ClusterIP> 會通嗎？curl <Service名稱> 會通嗎？為什麼？
+操作：
+  kubectl get svc nginx-svc    # 先記下 ClusterIP
+  kubectl scale deployment coredns -n kube-system --replicas=0
+  kubectl run test --image=curlimages/curl --rm -it --restart=Never -- sh
+  curl http://nginx-svc         # 預期失敗
+  curl http://<ClusterIP>       # 預期成功
+  exit
+  kubectl scale deployment coredns -n kube-system --replicas=2    # 恢復！
+解答：
+- curl <ClusterIP> 會通。流量轉發由 kube-proxy（iptables/IPVS）處理，不需要 DNS。
+- curl <Service名稱> 會失敗。沒有 CoreDNS 把名稱翻成 IP，報 Name resolution failed。
+- DNS 解析和網路轉發是兩套獨立機制。
 [▶ 下一頁]`,
   },
 

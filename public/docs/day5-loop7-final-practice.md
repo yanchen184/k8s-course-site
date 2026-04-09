@@ -1,8 +1,8 @@
-# Day 5 Loop 8：綜合實作 + 今日總結
+# Day 5 5-20 到 5-21：綜合實作 + 今日總結
 
 ---
 
-## Loop 8-A 綜合實作（45 分鐘）
+## 5-20 綜合實作（45 分鐘）
 
 ### ① 課程內容
 
@@ -139,9 +139,6 @@ spec:
           image: busybox:1.36
           command: ["sh", "-c", "while true; do echo 'collecting logs...'; sleep 60; done"]
 ```
-
----
-> 📋 **翻頁** → 下一張：綜合實作：擴縮容 → 更新 → 回滾 → 清理
 
 ---
 
@@ -357,9 +354,6 @@ service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   5d
 只剩 `kubernetes` 這個內建 Service，沒有其他資源。若還有殘留，逐一用 `kubectl delete` 清理。
 
 ---
-> 📋 **翻頁** → 下一張：學員自由練習
-
----
 
 ### ③ 題目
 
@@ -396,11 +390,8 @@ NodePort 行為不變，但流量分配的 Pod 變多了：
 - 每個請求仍然被負載均衡到其中一個 Pod，只是現在有 5 個 Pod 可以分流
 
 ---
-> 📋 **翻頁** → 下一張：第五堂總結：因果鏈回顧
 
----
-
-## Loop 8-B 今日總結（15 分鐘）
+## 5-21 今日總結（15 分鐘）
 
 ### ① 課程內容
 
@@ -474,9 +465,6 @@ kubectl get jobs
 kubectl logs <pod-name>
 kubectl delete cronjob <name>
 ```
-
----
-> 📋 **翻頁** → 下一張：回家作業 + 下堂課預告
 
 ---
 
@@ -622,7 +610,3 @@ CoreDNS 掛掉後：
 - **新 Pod 啟動可能受影響**：Pod 啟動時若需要解析 DNS（例如 init container），也會失敗
 
 這就是為什麼 K8s 預設跑**兩個** CoreDNS Pod（高可用），確保其中一個掛掉時服務不中斷。
-
----
-> 📋 **翻頁** → 下一張：Lab 8：從零建完整 Web 服務架構
-

@@ -1,8 +1,8 @@
-# Day 5 Loop 7：DaemonSet + CronJob
+# Day 5 5-18 到 5-19：DaemonSet + CronJob
 
 ---
 
-## Loop 7-A DaemonSet（25 分鐘）
+## 5-18 DaemonSet（25 分鐘）
 
 ### ① 課程內容
 
@@ -72,9 +72,6 @@ spec:
 - Docker 沒有直接對應的概念
 - 最接近的是：在每台機器上都執行 `docker run -d fluentd`（但要手動）
 - DaemonSet 是把「每台機器都要跑」這件事自動化
-
----
-> 📋 **翻頁** → 下一張：Lab：DaemonSet + CronJob 實作
 
 ---
 
@@ -158,9 +155,6 @@ log-collector-def34   1/1     Running   0          1m    10.244.2.6   k3s-worker
 **重點：每個 Node 名稱應該只出現一次**，若同一個 Node 有兩個 DaemonSet Pod，代表有問題。
 
 ---
-> 📋 **翻頁** → 下一張：學員實作：DaemonSet + CronJob
-
----
 
 ### ③ 題目
 
@@ -169,9 +163,6 @@ log-collector-def34   1/1     Running   0          1m    10.244.2.6   k3s-worker
 2. 你有一個叢集有 5 個 Node，部署了一個 DaemonSet。後來又加入 2 個新 Node，不做任何操作，最後 DaemonSet 應該有幾個 Pod？
 
 3. 你想讓 DaemonSet 只跑在 label 是 `disk=ssd` 的 Node 上，YAML 需要加什麼？（提示：`nodeSelector`）
-
----
-> 📋 **翻頁** → 下一張：DaemonSet + CronJob 常見坑
 
 ---
 
@@ -200,11 +191,8 @@ spec:
 這樣 DaemonSet 只會在有 `disk=ssd` label 的 Node 上建 Pod。
 
 ---
-> 📋 **翻頁** → 下一張：CronJob -- 定時跑任務
 
----
-
-## Loop 7-B CronJob（25 分鐘）
+## 5-19 CronJob（25 分鐘）
 
 ### ① 課程內容
 
@@ -458,7 +446,3 @@ jobTemplate:
 ```
 
 設定後，Job 完成（不論成功或失敗）120 秒後，K8s 自動刪除 Job 及其 Pod。
-
----
-> 📋 **翻頁** → 下一張：Lab 7：日誌收集工具部署情境
-

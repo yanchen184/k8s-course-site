@@ -1,8 +1,8 @@
-# Day 5 Loop 7：DaemonSet + CronJob
+# Day 5 5-18 到 5-19：DaemonSet + CronJob
 
 ---
 
-## Loop 7-A DaemonSet（25 分鐘）
+## 5-18 DaemonSet（25 分鐘）
 
 ### ① 課程內容
 
@@ -192,7 +192,7 @@ spec:
 
 ---
 
-## Loop 7-B CronJob（25 分鐘）
+## 5-19 CronJob（25 分鐘）
 
 ### ① 課程內容
 

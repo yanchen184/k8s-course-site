@@ -818,7 +818,7 @@ port-forward vs NodePort 的差異：
           <p className="text-cyan-400 font-semibold mb-2">挑戰：兩條路都通</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
             <li>同時保留 ClusterIP 和 NodePort 兩個 Service</li>
-            <li>從 busybox Pod 用 <code className="text-green-400">nginx-svc</code> 連（走 ClusterIP）</li>
+            <li>從測試 Pod 用 <code className="text-green-400">nginx-svc</code> 連（走 ClusterIP）</li>
             <li>從外面用 <code className="text-green-400">Node-IP:30080</code> 連（走 NodePort）</li>
             <li>驗證兩條路都通</li>
           </ul>
@@ -912,28 +912,26 @@ Loop 4-5 小結：
 - LoadBalancer：雲端負載均衡器，生產環境用這個（或 Ingress）
 
 【③④ 題目 + 解答】
-題目 1：建一個 NodePort Service（nodePort: 30080），用 kubectl get nodes -o wide 拿到 Node IP，從你自己的電腦 curl http://Node-IP:30080，確認看到 nginx 歡迎頁。
+題目 1：一個 NodePort Service 的 YAML 寫了 nodePort: 29999，套用後會發生什麼事？
 操作：
-  kubectl apply -f service-nodeport.yaml    # nodePort: 30080
-  kubectl get nodes -o wide                 # 記下 INTERNAL-IP
-  curl http://<Node-IP>:30080               # 從你的電腦執行（不是在叢集內）
-驗收標準：輸出包含 'Welcome to nginx!'
+  # 在 service-nodeport.yaml 把 nodePort 改成 29999
+  kubectl apply -f service-nodeport.yaml
+  # 觀察終端機的 error 訊息
+解答：套用失敗，K8s 會拒絕。NodePort 的合法範圍是 30000-32767，29999 超出範圍，會出現 validation error。
 
-題目 2：如果你的環境有多個 Node，用第二個 Node 的 IP 也 curl 看看（http://Node2-IP:30080），確認多 Node 都能連到。
+題目 2：你有 3 個 Node（IP 分別是 192.168.1.1、192.168.1.2、192.168.1.3），其中只有 Node 1 上有 nginx Pod，nodePort 是 30080。請問 curl http://192.168.1.2:30080 能成功嗎？
 操作：
   kubectl get nodes -o wide    # 找到所有 Node 的 IP
   curl http://<Node1-IP>:30080
   curl http://<Node2-IP>:30080
-驗收標準：兩個 Node IP 都回傳 'Welcome to nginx!'，驗證 NodePort 在每個 Node 都開放
+解答：能成功。NodePort 會在每個 Node 上開 30080，即使該 Node 沒有 Pod，kube-proxy 也會把流量轉發到有 Pod 的 Node 上。
 
-題目 3：建一個 LoadBalancer 類型的 Service，apply 後執行 kubectl get svc，觀察 EXTERNAL-IP 欄位的值，等 30 秒再看一次，記錄你看到的狀態。
+題目 3：為什麼 LoadBalancer Service 在 multipass 環境 EXTERNAL-IP 會一直是 pending？
 操作：
   # 把 service-nodeport.yaml 裡的 type 改成 LoadBalancer
   kubectl apply -f service-loadbalancer.yaml
   kubectl get svc    # 觀察 EXTERNAL-IP 欄位
-  # 等 30 秒後再執行一次
-  kubectl get svc
-驗收標準：看到 EXTERNAL-IP 欄位顯示 'pending'（在 multipass 環境這是正常現象）
+解答：LoadBalancer 需要雲端或 bare-metal LB controller（如 MetalLB）來分配外部 IP。multipass 是本機 VM 環境，沒有這個 controller，所以 K8s 一直在等外部 IP 分配，永遠顯示 pending。
 [▶ 下一頁]`,
   },
 
@@ -948,9 +946,9 @@ Loop 4-5 小結：
         <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
           <p className="text-amber-400 font-semibold mb-2">情境說明</p>
           <p className="text-slate-300 text-sm">
-            老闆說從外面連不到你的服務，你部署了一個 nginx 和 Service，
-            但 <code className="text-red-400">curl http://Node-IP:30888</code> 完全沒反應。
-            這個 YAML 裡藏了兩個 bug，請找出並修復。
+            老闆說要從外面連到你的 nginx 服務，你寫了一個 Service YAML，
+            但 <code className="text-red-400">kubectl get svc</code> 看起來怪怪的，外面怎麼都連不到。
+            這個 YAML 裡藏了兩個 bug，請找出並修復（目標：curl Node-IP:30888 看到 nginx）。
           </p>
         </div>
 
@@ -1005,7 +1003,7 @@ spec:
   ports:
   - port: 80
     targetPort: 8080      # BUG 2：nginx 實際監聽 80，這裡寫 8080 沒人接
-    nodePort: 30888
+    # 修復時要加上 nodePort: 30888
 ---
 # 診斷指令
 kubectl get svc web-svc          # 看 TYPE 和 PORT(S)
@@ -1014,16 +1012,17 @@ kubectl get nodes -o wide        # 拿 Node IP
 curl http://[Node-IP]:30888      # 測試（會失敗）
 
 # 修復提示
-# Bug 1：把 type: ClusterIP 改成 type: NodePort
+# Bug 1：把 type: ClusterIP 改成 type: NodePort，加上 nodePort: 30888
 # Bug 2：把 targetPort 改成 80（nginx 預設監聽 80）
 
 # 修復後
 kubectl apply -f lab5-buggy.yaml
 curl http://[Node-IP]:30888      # 應該成功`,
     notes: `【① 課程內容】
-Lab 5 情境：NodePort Service 外部無法存取，包含兩個常見 bug：
-Bug 1：type 設成 ClusterIP 而非 NodePort → 根本沒開外部 Port
-Bug 2：targetPort 和容器實際監聽 Port 不一致 → 流量無法到達容器
+Lab 5 情境：老闆要從外面連 nginx，但 Service YAML 有兩個 bug：
+Bug 1：type 設成 ClusterIP 而非 NodePort，也沒寫 nodePort → 根本沒開外部 Port
+Bug 2：targetPort 寫 8080 但 nginx 監聽 80 → 流量無法到達容器
+修復：type 改 NodePort、加 nodePort: 30888、targetPort 改 80
 
 【② 指令講解】
 指令 1：kubectl apply -f lab5-buggy.yaml

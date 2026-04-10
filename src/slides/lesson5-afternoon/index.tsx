@@ -227,6 +227,11 @@ port vs targetPort：
 實作 ClusterIP Service 的完整流程：apply → get svc → get endpoints → 進 Pod 驗證連線 → 驗證 Endpoints 自動更新。
 
 【② 指令講解】
+環境確認（下午開始前先做）：
+kubectl get deploy → 確認 nginx-deploy 在跑（READY 3/3）
+若不在，執行 kubectl apply -f nginx-deployment.yaml 重建
+kubectl scale deployment nginx-deploy --replicas=3（確保 3 個 Pod）
+
 指令 1：kubectl apply -f service-clusterip.yaml
 用途：宣告式套用 Service YAML
 參數說明：apply 宣告式套用；-f 指定 YAML 檔路徑

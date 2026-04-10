@@ -2142,27 +2142,50 @@ Q3：在 CronJob 的 jobTemplate.spec 加入 ttlSecondsAfterFinished: 30，apply
     section: '5-15：DaemonSet + CronJob',
     duration: '8',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">DaemonSet 操作</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">DaemonSet 操作 + 輸出</p>
+          <ol className="text-slate-300 text-xs space-y-1 list-decimal list-inside">
             <li><code className="text-green-400">kubectl apply -f daemonset.yaml</code></li>
-            <li><code className="text-green-400">kubectl get daemonsets</code> -- DESIRED = Node 數量</li>
-            <li><code className="text-green-400">kubectl get pods -o wide -l app=log-collector</code> -- 每個 Node 一個</li>
-            <li><code className="text-green-400">kubectl logs &lt;pod-name&gt;</code> -- 每 30 秒印一行</li>
+            <li><code className="text-green-400">kubectl get daemonsets</code></li>
+            <li><code className="text-green-400">kubectl get pods -o wide -l app=log-collector</code></li>
           </ol>
+          <div className="bg-slate-900/70 p-2 rounded text-xs font-mono mt-2">
+            <p className="text-slate-500 mb-0.5">$ kubectl get daemonsets</p>
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DESIRED &nbsp;CURRENT &nbsp;READY</p>
+            <p className="text-green-300">log-collector &nbsp;2 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2</p>
+            <p className="text-slate-500 mt-1 mb-0.5">$ kubectl get pods -o wide -l app=log-collector</p>
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS &nbsp;&nbsp;NODE</p>
+            <p className="text-slate-300">log-collector-abc12 &nbsp;&nbsp;&nbsp;Running &nbsp;k3s-master</p>
+            <p className="text-slate-300">log-collector-def34 &nbsp;&nbsp;&nbsp;Running &nbsp;k3s-worker</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">DESIRED = 2 = Node 數量，每個 Node 各一個 &mdash; 這就是 DaemonSet</p>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">CronJob 操作</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">CronJob 操作 + 輸出</p>
+          <ol className="text-slate-300 text-xs space-y-1 list-decimal list-inside">
             <li><code className="text-green-400">kubectl apply -f cronjob.yaml</code></li>
-            <li><code className="text-green-400">kubectl get cronjobs</code> -- 看 SCHEDULE</li>
-            <li>等一分鐘...</li>
-            <li><code className="text-green-400">kubectl get jobs</code> -- 看到 Job，COMPLETIONS 1/1</li>
-            <li><code className="text-green-400">kubectl get pods</code> -- 狀態是 <code className="text-cyan-400">Completed</code>（不是 Running！）</li>
-            <li><code className="text-green-400">kubectl logs &lt;pod-name&gt;</code> -- Hello from CronJob! + 時間戳</li>
+            <li><code className="text-green-400">kubectl get cronjobs</code> &mdash; 看 SCHEDULE</li>
+            <li>等一分鐘 &rarr; <code className="text-green-400">kubectl get jobs</code> + <code className="text-green-400">kubectl get pods</code></li>
           </ol>
+          <div className="bg-slate-900/70 p-2 rounded text-xs font-mono mt-2">
+            <p className="text-slate-500 mb-0.5">$ kubectl get cronjobs</p>
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SCHEDULE &nbsp;&nbsp;&nbsp;&nbsp;SUSPEND &nbsp;LAST SCHEDULE</p>
+            <p className="text-green-300">hello-cron &nbsp;*/1 * * * * &nbsp;False &nbsp;&nbsp;&nbsp;30s</p>
+            <p className="text-slate-500 mt-1 mb-0.5">$ kubectl get jobs</p>
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMPLETIONS &nbsp;DURATION</p>
+            <p className="text-green-300">hello-cron-xxxxx &nbsp;1/1 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3s</p>
+            <p className="text-slate-500 mt-1 mb-0.5">$ kubectl get pods</p>
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS</p>
+            <p className="text-cyan-300">hello-cron-xxxxx-abc &nbsp;&nbsp;&nbsp;Completed &nbsp;<span className="text-yellow-300">&larr; 正常！不是 Running</span></p>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">Completed = 任務跑完正常結束，不是錯誤</p>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/40 p-2 rounded text-xs text-slate-300">
+          <span className="text-amber-400 font-bold">CronJob 三層結構：</span>
+          CronJob &rarr; Job &rarr; Pod &mdash; 每次觸發建一個新 Job，Job 建一個 Pod，跑完就 Completed
         </div>
       </div>
     ),
@@ -2247,24 +2270,75 @@ K8s 預設會保留最近三個成功的 Job 和一個失敗的 Job，更早的�
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>建 DaemonSet -- 確認每個 Node 都有 Pod</li>
-            <li>建 CronJob -- 等一兩分鐘看到 Job 和 Completed 的 Pod</li>
-            <li>kubectl logs 看 CronJob 的輸出</li>
+          <p className="text-cyan-400 font-semibold mb-2">必做（三件事）</p>
+          <ol className="text-slate-300 text-sm space-y-1.5 list-decimal list-inside">
+            <li>
+              <strong className="text-white">DaemonSet</strong>：<code className="text-green-400">kubectl apply -f daemonset.yaml</code>
+              <br/><span className="text-slate-400 text-xs ml-5">&rarr; get daemonsets 確認 DESIRED = Node 數 &rarr; get pods -o wide 確認每個 Node 各一個</span>
+            </li>
+            <li>
+              <strong className="text-white">CronJob</strong>：<code className="text-green-400">kubectl apply -f cronjob.yaml</code>
+              <br/><span className="text-slate-400 text-xs ml-5">&rarr; 等一分鐘 &rarr; get jobs 看到 COMPLETIONS 1/1 &rarr; get pods 看到 Completed</span>
+            </li>
+            <li>
+              <strong className="text-white">看日誌</strong>：<code className="text-green-400">kubectl logs &lt;pod-name&gt;</code>
+              <br/><span className="text-slate-400 text-xs ml-5">&rarr; DaemonSet：每 30 秒一行 collecting logs &rarr; CronJob：Hello from CronJob! + 時間</span>
+            </li>
           </ol>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">挑戰</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>改 CronJob schedule 為 <code className="text-green-400">"*/2 * * * *"</code>（每兩分鐘）</li>
-            <li>觀察 Job 出現的間隔是不是真的變成兩分鐘</li>
+          <p className="text-cyan-400 font-semibold mb-2">挑戰（兩個觀察實驗）</p>
+          <ol className="text-slate-300 text-sm space-y-1.5 list-decimal list-inside">
+            <li>
+              <strong className="text-white">改 schedule</strong>：把 CronJob schedule 改成 <code className="text-green-400">"*/2 * * * *"</code>
+              <br/><span className="text-slate-400 text-xs ml-5">&rarr; apply 後等 2 分鐘，get jobs 確認間隔真的變長了</span>
+            </li>
+            <li>
+              <strong className="text-white">DaemonSet vs Deployment 分布</strong>：建一個 <code className="text-green-400">replicas=2</code> 的 Deployment
+              <br/><span className="text-slate-400 text-xs ml-5">&rarr; get pods -o wide 比較：Deployment 有沒有可能兩個 Pod 擠在同一個 Node？DaemonSet 呢？</span>
+            </li>
+          </ol>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">驗收</p>
+          <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+            <li><code className="text-green-400">kubectl get ds</code> &rarr; DESIRED = READY = Node 數</li>
+            <li><code className="text-green-400">kubectl get jobs</code> &rarr; 至少一個 COMPLETIONS 1/1</li>
+            <li><code className="text-green-400">kubectl logs</code> &rarr; 兩邊都有正確輸出</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `學員實作時間。必做：照著剛才的步驟建 DaemonSet，確認每個 Node 都有 Pod。建 CronJob，等一兩分鐘看到 Job 和 Completed 的 Pod，看一下 logs。挑戰：把 CronJob 的 schedule 改成 "*/2 * * * *"，每兩分鐘一次，觀察 Job 出現的間隔是不是真的變成兩分鐘。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    notes: `【① 課程內容】
+學員練習時間：自行建立 DaemonSet 和 CronJob，完成三個驗證。
+
+【② 指令講解】
+必做：
+kubectl apply -f daemonset.yaml → kubectl get daemonsets → 確認 DESIRED = Node 數
+kubectl get pods -o wide -l app=log-collector → 每個 Node 各一個 Pod
+kubectl logs <daemonset-pod> → 看到 collecting logs 輸出
+
+kubectl apply -f cronjob.yaml → kubectl get cronjobs → 看 SCHEDULE
+等一分鐘 → kubectl get jobs → COMPLETIONS 1/1
+kubectl get pods → 看到 STATUS: Completed
+kubectl logs <cronjob-pod> → Hello from CronJob! + 時間戳
+
+挑戰 1：
+修改 cronjob.yaml 的 schedule 為 "*/2 * * * *" → apply → 等 2 分鐘
+kubectl get jobs → 確認兩個 Job 之間間隔約 2 分鐘
+
+挑戰 2：
+kubectl create deployment test-deploy --image=busybox:1.36 --replicas=2 -- sh -c 'sleep 3600'
+kubectl get pods -o wide -l app=test-deploy → 觀察 NODE 欄位
+→ Deployment 的兩個 Pod 可能擠在同一個 Node
+→ DaemonSet 保證每個 Node 各一個
+清理：kubectl delete deployment test-deploy
+
+【③④ 題目 + 解答】
+（無，Lab 在後面）
+[▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
   // ── 5-23 回頭操作 ──

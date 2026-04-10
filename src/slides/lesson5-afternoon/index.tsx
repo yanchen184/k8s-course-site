@@ -261,6 +261,24 @@ kubectl scale deployment nginx-deploy --replicas=3（確保 3 個 Pod）
 用途：用完整 FQDN 驗證連線（和短名稱效果相同）
 打完要看：同樣是 nginx 首頁 HTML
 
+FQDN 每一段的意思：
+  nginx-svc          → Service 名稱（metadata.name）
+  default            → Namespace 名稱（這個 Service 在哪個 Namespace）
+  svc                → 固定值，代表這是 Service 資源
+  cluster.local      → 叢集的 DNS 域名（預設值，幾乎不會改）
+  完整格式：<service-name>.<namespace>.svc.cluster.local
+
+為什麼短名稱 nginx-svc 也能通？
+  Pod 啟動時，K8s 自動在 /etc/resolv.conf 寫入 search domain：
+    search default.svc.cluster.local svc.cluster.local cluster.local
+  所以 curl http://nginx-svc 會被自動補成 nginx-svc.default.svc.cluster.local
+  驗證：在測試 Pod 內執行 cat /etc/resolv.conf 就能看到
+
+什麼時候必須用 FQDN？
+  同一個 Namespace 內 → 短名稱就夠（nginx-svc）
+  跨 Namespace → 短名稱找不到，必須至少寫到 namespace（nginx-svc.dev）
+  最保險 → 完整 FQDN（nginx-svc.dev.svc.cluster.local），5-14 Namespace 會詳細教
+
 指令 7：kubectl describe svc nginx-svc
 用途：查看 Service 詳細資訊（Selector、Endpoints、Port 等）
 打完要看：Selector: app=nginx，Endpoints 列出 Pod IP

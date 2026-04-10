@@ -221,6 +221,29 @@ curl http://nginx-svc.default.svc.cluster.local
 
 打完要看：和短名稱一樣的 nginx 首頁 HTML。驗證兩種寫法等效。
 
+**FQDN 每一段的意思：**
+
+```
+nginx-svc  .  default  .  svc  .  cluster.local
+    ↑            ↑         ↑          ↑
+Service 名稱  Namespace  固定值    叢集域名（預設）
+```
+
+完整格式：`<service-name>.<namespace>.svc.cluster.local`
+
+**為什麼短名稱 `nginx-svc` 也能通？**
+- Pod 啟動時，K8s 自動在 `/etc/resolv.conf` 寫入 search domain：
+  ```
+  search default.svc.cluster.local svc.cluster.local cluster.local
+  ```
+- DNS 查詢 `nginx-svc` 時，系統自動補成 `nginx-svc.default.svc.cluster.local`
+- 驗證：在測試 Pod 內執行 `cat /etc/resolv.conf` 就能看到
+
+**什麼時候必須用 FQDN？**
+- 同一個 Namespace 內 → 短名稱就夠（`nginx-svc`）
+- 跨 Namespace → 短名稱找不到，必須至少寫到 namespace（`nginx-svc.dev`）
+- 最保險 → 完整 FQDN（`nginx-svc.dev.svc.cluster.local`），5-14 Namespace 會詳細教
+
 ---
 
 **指令 8-10：驗證 Endpoints 自動更新**

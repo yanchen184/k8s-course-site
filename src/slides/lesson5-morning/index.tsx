@@ -1383,10 +1383,9 @@ kubectl get pods              # 多的 Pod Terminating，剩 3 個 Running`,
 scale 對象是 Deployment，不是 Pod。kubectl edit deployment 也能改 replicas，但容易手誤，生產環境建議用 kubectl scale，更安全明確。
 
 【② 指令講解】
-1. 清掉重建
-   kubectl delete deployment my-nginx
-   kubectl create deployment my-nginx --image=nginx --replicas=3
-   打完要看：deployment.apps/my-nginx created
+1. 套用 Deployment YAML
+   kubectl apply -f nginx-deployment.yaml
+   打完要看：deployment.apps/nginx-deploy created
 
 2. 查看三層結構
    kubectl get deployments  → READY: 3/3，UP-TO-DATE: 3，AVAILABLE: 3
@@ -1398,16 +1397,16 @@ scale 對象是 Deployment，不是 Pod。kubectl edit deployment 也能改 repl
    打完要看：一個 ContainerCreating 的新 Pod 出現，幾秒後 Running，總數恢復 3
 
 4. 擴容
-   kubectl scale deployment my-nginx --replicas=5
+   kubectl scale deployment nginx-deploy --replicas=5
    kubectl get pods -o wide  → 多兩個 Pod，NODE 有分散
    kubectl get deploy        → READY: 5/5
 
 5. 縮容
-   kubectl scale deployment my-nginx --replicas=2
-   kubectl get pods          → 三個 Terminating，最後剩兩個 Running
+   kubectl scale deployment nginx-deploy --replicas=3
+   kubectl get pods          → 兩個 Terminating，最後剩三個 Running
 
 異常排查：
-- READY 一直 0/3：kubectl describe deployment my-nginx 看 Events
+- READY 一直 0/3：kubectl describe deployment nginx-deploy 看 Events
 - AVAILABLE 小於 READY：Pod 跑起來但健康檢查失敗
 
 【③④ 題目 + 解答】
@@ -1596,9 +1595,9 @@ kubectl delete deployment api-service
           <p className="text-cyan-400 font-semibold mb-2">帶做一遍</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
             <li><code className="text-green-400">kubectl get deploy</code> → 確認 Deployment 存在</li>
-            <li><code className="text-green-400">kubectl scale deployment my-httpd --replicas=5</code></li>
+            <li><code className="text-green-400">kubectl scale deployment nginx-deploy --replicas=5</code></li>
             <li><code className="text-green-400">kubectl get pods -o wide</code> → 確認分散</li>
-            <li><code className="text-green-400">kubectl scale deployment my-httpd --replicas=1</code></li>
+            <li><code className="text-green-400">kubectl scale deployment nginx-deploy --replicas=3</code></li>
           </ol>
         </div>
 
@@ -1629,8 +1628,8 @@ kubectl delete deployment api-service
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">探索建議</p>
-          <p className="text-slate-300 text-sm"><code className="text-green-400">kubectl describe deployment my-httpd</code> → Events 區塊會記錄每次 scale 的紀錄</p>
-          <p className="text-slate-400 text-xs mt-1">例如：Scaled up replica set my-httpd-xxxxx to 5 / Scaled down ... to 1</p>
+          <p className="text-slate-300 text-sm"><code className="text-green-400">kubectl describe deployment nginx-deploy</code> → Events 區塊會記錄每次 scale 的紀錄</p>
+          <p className="text-slate-400 text-xs mt-1">例如：Scaled up replica set nginx-deploy-xxxxx to 5 / Scaled down ... to 1</p>
         </div>
       </div>
     ),
@@ -1639,11 +1638,11 @@ kubectl delete deployment api-service
 kubectl get deploy
 
 # Scale up
-kubectl scale deployment my-httpd --replicas=5
+kubectl scale deployment nginx-deploy --replicas=5
 kubectl get pods -o wide   # 看 Pod 分散到哪些 Node
 
 # Scale down
-kubectl scale deployment my-httpd --replicas=1
+kubectl scale deployment nginx-deploy --replicas=3
 kubectl get pods -w   # 看多餘 Pod Terminating`,
     notes: `【① 課程內容】
 本節為學生獨立練習後的帶做確認（對應 Lab 1 結束後）。老師帶大家走一遍擴縮容操作，確認每個步驟都做到，並點出兩個常見坑。
@@ -1655,20 +1654,20 @@ Lab 設計邏輯回顧：Bug 1 selector/label 不一致（READY 永遠 0/3）；
 【② 指令講解（帶做一遍）】
 1. 確認 Deployment 存在
    kubectl get deploy
-   打完要看：my-httpd，READY 2/2（或你 Lab 用的 api-service）
+   打完要看：nginx-deploy，READY 3/3
 
 2. 擴容
-   kubectl scale deployment my-httpd --replicas=5
+   kubectl scale deployment nginx-deploy --replicas=5
    kubectl get pods -o wide
    打完要看：5 個 Pod Running，NODE 欄位有不同 Node 名稱
 
 3. 縮容
-   kubectl scale deployment my-httpd --replicas=1
+   kubectl scale deployment nginx-deploy --replicas=3
    kubectl get pods
-   打完要看：剩 1 個 Running，其他 Terminating → 消失
+   打完要看：剩 3 個 Running，多的 Terminating → 消失
 
 4. 探索 Events
-   kubectl describe deployment my-httpd
+   kubectl describe deployment nginx-deploy
    打完要看 Events 區塊：Scaled up replica set ... to 5 / Scaled down ... to 1
 
 【③④ 題目 + 解答（兩個常見坑）】

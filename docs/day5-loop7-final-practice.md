@@ -4,7 +4,7 @@
 
 ## 5-17 綜合實作（45 分鐘）
 
-### 📄 第 26 張：綜合實作：情境 + 目標架構（5 min）
+### 📄 5-17 第 1 張：綜合實作：情境 + 目標架構（5 min）
 
 ### ① 課程內容
 
@@ -146,7 +146,7 @@ spec:
 
 ---
 
-### 📄 第 27 張：綜合實作 Step 1-3：建環境（7 min）
+### 📄 5-17 第 2 張：綜合實作 Step 1-3：建環境（7 min）
 
 ### ① 課程內容
 
@@ -209,7 +209,7 @@ frontend/api 分散不同 Node，log-collector 每 Node 各一個。
 
 ---
 
-### 📄 第 28 張：綜合實作 Step 4-6：驗證連線（7 min）
+### 📄 5-17 第 3 張：綜合實作 Step 4-6：驗證連線（7 min）
 
 ### ① 課程內容
 
@@ -267,7 +267,7 @@ kubectl run dns-check -n fullstack-demo --image=busybox:1.36 \
 
 ---
 
-### 📄 第 29 張：綜合實作 Step 7-10：生命周期（7 min）
+### 📄 5-17 第 4 張：綜合實作 Step 7-10：生命周期（7 min）
 
 ### ① 課程內容
 
@@ -368,7 +368,7 @@ kubectl logs <frontend-pod-2> -n fullstack-demo --tail=5
 
 ---
 
-### 📄 第 30 張：學員練習：你是新來的 K8s 工程師（20 min）
+### 📄 5-17 第 5 張：學員練習：你是新來的 K8s 工程師（20 min）
 
 > 📋 學生看 PPT 投影片，上面有完整情境和任務說明。
 
@@ -442,7 +442,7 @@ kubectl delete namespace my-app
 
 ---
 
-### 📄 第 31 張：Lab 8：從零建完整 Web 服務架構（20 min）
+### 📄 5-17 第 6 張：Lab 8：從零建完整 Web 服務架構（20 min）
 
 ### ① 課程內容
 
@@ -631,7 +631,7 @@ kubectl logs <next-health-check-pod>    # 確認成功
 
 ## 5-18 今日總結（15 分鐘）
 
-### 📄 第 32 張：第五堂總結：因果鏈回顧（7 min）
+### 📄 5-17 第 7 張：第五堂總結：因果鏈回顧（7 min）
 
 ### ① 課程內容
 
@@ -727,7 +727,7 @@ kubectl scale deployment coredns -n kube-system --replicas=2
 
 ---
 
-### 📄 第 33 張：Docker 對照表 + 下堂課預告（5 min）
+### 📄 5-17 第 8 張：Docker 對照表 + 下堂課預告（5 min）
 
 ### ① 課程內容
 

@@ -4,7 +4,7 @@
 
 ## 5-15 DaemonSet + CronJob
 
-### 📄 第 20 張：DaemonSet -- 每個 Node 都跑一份（8 min）
+### 📄 5-15 第 1 張：DaemonSet -- 每個 Node 都跑一份（8 min）
 
 ### ① 課程內容
 
@@ -112,7 +112,7 @@ kubectl get pods -l app=log-collector
 
 ---
 
-### 📄 第 21 張：CronJob -- 定時跑任務（7 min）
+### 📄 5-15 第 2 張：CronJob -- 定時跑任務（7 min）
 
 **CronJob 的核心概念**
 
@@ -253,7 +253,7 @@ kubectl get pods    # Pod 應該自動消失了
 
 ---
 
-### 📄 第 22 張：Lab：DaemonSet + CronJob 實作（8 min）
+### 📄 5-15 第 3 張：Lab：DaemonSet + CronJob 實作（8 min）
 
 ### ② 所有指令＋講解
 
@@ -474,13 +474,13 @@ cronjob.batch "hello-cron" deleted
 
 ---
 
-### 📄 第 23 張：學員實作：DaemonSet + CronJob（10 min）
+### 📄 5-15 第 4 張：學員實作：DaemonSet + CronJob（10 min）
 
 > 📋 學生看 PPT 投影片，上面有完整說明。
 
 ---
 
-### 📄 第 24 張：DaemonSet + CronJob 常見坑（5 min）
+### 📄 5-15 第 5 張：DaemonSet + CronJob 常見坑（5 min）
 
 ### ③ 題目
 
@@ -511,6 +511,6 @@ kubectl get nodes         # 對比 Node 數量
 
 ---
 
-### 📄 第 25 張：Lab 7：日誌收集工具部署情境（15 min）
+### 📄 5-15 第 6 張：Lab 7：日誌收集工具部署情境（15 min）
 
 > 📋 學生看 PPT 投影片（Lab 7：日誌收集工具部署情境），上面有完整 YAML 和任務說明。

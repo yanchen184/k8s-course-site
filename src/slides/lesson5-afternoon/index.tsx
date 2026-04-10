@@ -3335,4 +3335,447 @@ docker exec -it → kubectl exec -it
   },
 
 
+  // ============================================================
+  // Bonus：進階 YAML（進度超前時加碼，不計入正課）
+  // ============================================================
+
+  // ── Bonus-1（1/2）：Resource Requests & Limits 概念 ──
+  {
+    title: 'Bonus：Resource Requests & Limits',
+    subtitle: '沒設 Resource = 讓 Pod 吃到飽，Node 遲早爆',
+    section: 'Bonus：進階 YAML',
+    duration: '10',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">沒設 Resource 的三個問題</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>一個 Pod 記憶體洩漏 &rarr; 整個 Node 的其他 Pod 全部 OOM Kill</li>
+            <li>Scheduler 不知道 Pod 需要多少資源 &rarr; 排程亂放</li>
+            <li>Node 資源不足時，沒設 Resource 的 Pod <strong className="text-white">最先被驅逐</strong></li>
+          </ol>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">requests vs limits</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-2 w-24">欄位</th>
+                <th className="text-left py-2">意義</th>
+                <th className="text-left py-2">超過怎辦</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 text-cyan-400 font-semibold">requests</td>
+                <td className="py-2">最少需要多少（Scheduler 排程依據）</td>
+                <td className="py-2">不限制</td>
+              </tr>
+              <tr>
+                <td className="py-2 text-amber-400 font-semibold">limits</td>
+                <td className="py-2">最多能用多少</td>
+                <td className="py-2">CPU 節流｜記憶體 OOM Kill</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-sm mb-2">CPU 單位</p>
+            <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+              <li><code className="text-green-400">1</code> = 1 vCPU = 1000m</li>
+              <li><code className="text-green-400">500m</code> = 0.5 vCPU</li>
+              <li>超過 limits &rarr; <strong className="text-amber-300">throttle</strong>（變慢，不 Kill）</li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-sm mb-2">記憶體單位</p>
+            <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+              <li><code className="text-green-400">Mi</code> = Mebibyte（慣用）</li>
+              <li><code className="text-green-400">Gi</code> = Gibibyte</li>
+              <li>超過 limits &rarr; <strong className="text-red-400">OOM Kill</strong>（直接砍）</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">QoS Class（K8s 自動分類）</p>
+          <div className="flex gap-2 text-xs">
+            <span className="bg-green-900/40 border border-green-500/40 px-2 py-1 rounded text-green-300">Guaranteed（requests=limits）</span>
+            <span className="bg-amber-900/40 border border-amber-500/40 px-2 py-1 rounded text-amber-300">Burstable（requests&lt;limits）</span>
+            <span className="bg-red-900/40 border border-red-500/40 px-2 py-1 rounded text-red-300">BestEffort（沒設）</span>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">Node 資源不足時：BestEffort 先被驅逐 &rarr; Burstable &rarr; Guaranteed 最後</p>
+        </div>
+      </div>
+    ),
+    code: `# Resource 設定範例
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: "100m"       # 最少 0.1 vCPU（Scheduler 排程依據）
+          memory: "128Mi"   # 最少 128 MB
+        limits:
+          cpu: "500m"       # 最多 0.5 vCPU（超過 throttle）
+          memory: "256Mi"   # 最多 256 MB（超過 OOM Kill）
+
+# Docker 對照
+# docker run --memory="256m" --cpus="0.5"  ← 只有 limits
+# Docker 沒有 requests 概念（單機不需要排程）`,
+    notes: \`【① 課程內容】
+為什麼需要 Resource：沒設的話一個 Pod 可以吃掉整個 Node 資源，記憶體洩漏會連累其他 Pod 全部 OOM Kill。Scheduler 也無法正確排程。
+
+requests vs limits：
+- requests：Pod「最少需要」多少資源，Scheduler 拿來選 Node（Node 可用資源 ≥ requests 才放）
+- limits：Pod「最多能用」多少資源，CPU 超過 throttle（變慢），記憶體超過 OOM Kill（直接砍）
+
+CPU 單位：1 = 1 vCPU = 1000m，500m = 0.5 vCPU。超過 limits 只 throttle 不 Kill。
+記憶體單位：Mi = Mebibyte（慣用），Gi = Gibibyte。超過 limits 直接 OOM Kill。
+
+QoS Class：
+- Guaranteed（requests == limits）→ 最不會被 Kill
+- Burstable（requests < limits）→ 中等
+- BestEffort（完全沒設）→ 最先被驅逐
+
+Docker 對照：docker run --memory --cpus 對應 limits。Docker 沒有 requests 概念。
+
+【② 指令講解】
+（本張為概念說明，操作在下一張）
+
+【③④ 題目 + 解答】
+（無）
+[▶ 下一頁]\`,
+  },
+
+  // ── Bonus-1（2/2）：Resource 實作 + OOM Kill 觀察 ──
+  {
+    title: 'Bonus 實作：Resource + OOM Kill 觀察',
+    subtitle: 'describe 看資源設定 → 故意 OOM → 看 RESTARTS 飆升',
+    section: 'Bonus：進階 YAML',
+    duration: '10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">操作流程</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li><code className="text-green-400">kubectl describe pod &lt;name&gt;</code> &mdash; 看 Limits / Requests 欄位</li>
+            <li><code className="text-green-400">kubectl describe node k3s-worker1</code> &mdash; 看 Allocated resources</li>
+            <li><code className="text-green-400">kubectl describe pod &lt;name&gt; | grep QoS</code> &mdash; 看 QoS Class</li>
+            <li>apply OOM 測試 Pod &mdash; 觀察 OOMKilled + RESTARTS</li>
+          </ol>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">Node 資源狀況範例</p>
+          <div className="bg-slate-900/70 p-2 rounded text-xs font-mono">
+            <p className="text-slate-500">$ kubectl describe node k3s-worker1</p>
+            <p className="text-slate-400 mt-1">Allocated resources:</p>
+            <p className="text-slate-400">&nbsp;&nbsp;Resource &nbsp;&nbsp;Requests &nbsp;&nbsp;&nbsp;&nbsp;Limits</p>
+            <p className="text-slate-300">&nbsp;&nbsp;cpu &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;350m (17%) &nbsp;&nbsp;1500m (75%)</p>
+            <p className="text-slate-300">&nbsp;&nbsp;memory &nbsp;&nbsp;&nbsp;360Mi (18%) &nbsp;768Mi (38%)</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2 text-sm">OOM Kill 實際輸出</p>
+          <div className="bg-slate-900/70 p-2 rounded text-xs font-mono">
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;READY &nbsp;STATUS &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RESTARTS</p>
+            <p className="text-red-300">oom-test &nbsp;0/1 &nbsp;&nbsp;OOMKilled &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0</p>
+            <p className="text-red-300">oom-test &nbsp;0/1 &nbsp;&nbsp;CrashLoopBackOff &nbsp;1</p>
+            <p className="text-red-300">oom-test &nbsp;0/1 &nbsp;&nbsp;OOMKilled &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">記憶體超過 limits &rarr; OOM Kill &rarr; K8s 重啟 &rarr; 又超過 &rarr; 又 Kill &rarr; CrashLoopBackOff</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">③④ 快問快答</p>
+          <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+            <li>RESTARTS 從 0 飆到 5，怎麼判斷是 OOM？ &rarr; <code className="text-green-400">describe pod</code> 看 Last State: OOMKilled</li>
+            <li>Scheduler 根據 requests 還是 limits 排程？ &rarr; <strong className="text-white">requests</strong></li>
+            <li>沒設 Resource 的 Pod QoS 是什麼？ &rarr; BestEffort，最先被驅逐</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    code: \`# 查看 Pod 的 Resource 設定
+kubectl describe pod <pod-name>
+# → 看 Containers 區塊的 Limits / Requests
+
+# 查看 Node 資源使用狀況
+kubectl describe node k3s-worker1
+# → 看 Allocated resources 區塊
+
+# 查看 QoS Class
+kubectl describe pod <pod-name> | grep QoS
+# → Guaranteed / Burstable / BestEffort
+
+# OOM Kill 實驗
+kubectl apply -f oom-test.yaml
+kubectl get pods -w
+# → OOMKilled → CrashLoopBackOff → RESTARTS 飆升
+kubectl delete pod oom-test\`,
+    notes: \`【① 課程內容】
+本張為 Resource 實作：查看 Pod 資源設定、Node 資源狀況、QoS Class，以及故意觸發 OOM Kill 觀察行為。
+
+【② 指令講解】
+查看 Pod Resource：kubectl describe pod <name>
+→ 看 Containers 區塊的 Limits / Requests 欄位
+→ 若沒設定，這兩個欄位不顯示
+
+查看 Node 資源：kubectl describe node k3s-worker1
+→ 看 Allocated resources 區塊
+→ Requests 百分比不應超過 100%；Limits 可以 overcommit
+
+查看 QoS：kubectl describe pod <name> | grep QoS
+→ Guaranteed / Burstable / BestEffort
+
+OOM Kill 實驗：
+kubectl apply -f oom-test.yaml → kubectl get pods -w
+→ 打完要看：OOMKilled → CrashLoopBackOff → RESTARTS 持續增加
+→ kubectl delete pod oom-test 清理
+
+【③④ 題目 + 解答】
+Q1：RESTARTS 從 0 飆到 5，怎麼判斷是 OOM？
+A1：kubectl describe pod → Last State 區塊看 Reason: OOMKilled
+
+Q2：requests.cpu: 100m 和 limits.cpu: 500m 代表什麼？Scheduler 根據哪個排程？
+A2：100m = 最少 0.1 vCPU（Scheduler 依據）；500m = 最多 0.5 vCPU。Scheduler 根據 requests。
+
+Q3：沒設 Resource 的 Pod QoS 是什麼？Node 資源不足時誰先被 Kill？
+A3：BestEffort，最先被驅逐。
+
+[▶ 下一頁]\`,
+  },
+
+  // ── Bonus-2（1/2）：Liveness & Readiness Probe 概念 ──
+  {
+    title: 'Bonus：Liveness & Readiness Probe',
+    subtitle: 'Running ≠ 正常服務，K8s 需要主動問',
+    section: 'Bonus：進階 YAML',
+    duration: '12',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">STATUS: Running ≠ 正常</p>
+          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
+            <li>容器跑著但應用程式<strong className="text-white">死鎖</strong>（deadlock）</li>
+            <li>啟動中還沒準備好接流量</li>
+            <li>記憶體洩漏導致無回應</li>
+          </ul>
+          <p className="text-slate-400 text-xs mt-2">K8s 需要一個機制「主動問」應用程式是否健康</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">三種 Probe</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-2 w-32">Probe</th>
+                <th className="text-left py-2">問什麼</th>
+                <th className="text-left py-2">失敗動作</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 text-red-400 font-semibold">liveness</td>
+                <td className="py-2">你還活著嗎？</td>
+                <td className="py-2"><strong className="text-red-300">重啟容器</strong>（RESTARTS +1）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 text-amber-400 font-semibold">readiness</td>
+                <td className="py-2">準備好接流量了嗎？</td>
+                <td className="py-2"><strong className="text-amber-300">從 Endpoints 移除</strong>（不重啟）</td>
+              </tr>
+              <tr>
+                <td className="py-2 text-blue-400 font-semibold">startup</td>
+                <td className="py-2">啟動完成了嗎？</td>
+                <td className="py-2">保護 liveness 不誤判（慢啟動用）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-sm mb-2">三種檢查方式</p>
+            <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+              <li><code className="text-green-400">httpGet</code> &mdash; HTTP GET 回 2xx/3xx</li>
+              <li><code className="text-green-400">exec</code> &mdash; 執行指令，exit 0</li>
+              <li><code className="text-green-400">tcpSocket</code> &mdash; TCP 連得上</li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-sm mb-2">重要參數</p>
+            <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+              <li><code className="text-green-400">initialDelaySeconds</code> &mdash; 等幾秒才開始</li>
+              <li><code className="text-green-400">periodSeconds</code> &mdash; 每隔幾秒檢查</li>
+              <li><code className="text-green-400">failureThreshold</code> &mdash; 連續幾次失敗才觸發</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold text-sm">liveness vs readiness 關鍵差別</p>
+          <p className="text-slate-300 text-xs mt-1">liveness 失敗 = <strong className="text-red-400">重啟</strong>（解決死鎖）｜readiness 失敗 = <strong className="text-amber-400">暫時不給流量</strong>（不重啟，等恢復）</p>
+          <p className="text-slate-400 text-xs mt-1">Docker 對照：docker run --health-cmd 對應 liveness 的 exec 方式。Docker 沒有 readiness 概念。</p>
+        </div>
+      </div>
+    ),
+    code: \`# livenessProbe 範例（httpGet）
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 15   # 等 15 秒再開始
+  periodSeconds: 10         # 每 10 秒檢查
+  failureThreshold: 3       # 連續 3 次失敗才重啟
+
+# readinessProbe 範例（httpGet）
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+
+# livenessProbe 範例（exec）
+livenessProbe:
+  exec:
+    command:
+      - cat
+      - /tmp/healthy     # 檔案存在 = 健康
+  initialDelaySeconds: 5
+  periodSeconds: 5\`,
+    notes: \`【① 課程內容】
+Running ≠ 正常：容器跑著但應用程式可能死鎖、還在啟動、記憶體洩漏無回應。K8s 用 Probe 主動檢查。
+
+三種 Probe：
+- livenessProbe：你還活著嗎？失敗 → 重啟容器（RESTARTS +1）
+- readinessProbe：準備好接流量了嗎？失敗 → 從 Service Endpoints 移除（不重啟）
+- startupProbe：啟動完成了嗎？啟動期間保護 liveness 不誤判
+
+三種檢查方式：httpGet（HTTP 2xx/3xx）、exec（exit 0）、tcpSocket（TCP 連得上）
+
+重要參數：initialDelaySeconds（等幾秒才開始）、periodSeconds（檢查間隔）、failureThreshold（連續幾次失敗才觸發）
+
+liveness vs readiness 關鍵差別：
+- liveness 失敗 → 重啟（解決死鎖/卡死）
+- readiness 失敗 → 暫時不給流量（不重啟，適合啟動中或暫時忙碌）
+- 兩個可以同時設，職責不同
+
+Docker 對照：docker run --health-cmd 對應 liveness exec。Docker 沒有 readiness 概念。
+
+【② 指令講解】
+（本張為概念說明，操作在下一張）
+
+【③④ 題目 + 解答】
+（無）
+[▶ 下一頁]\`,
+  },
+
+  // ── Bonus-2（2/2）：Probe 實作 + 失敗觀察 ──
+  {
+    title: 'Bonus 實作：Probe 失敗觀察',
+    subtitle: 'readiness 失敗 → READY 0/1 | liveness 失敗 → RESTARTS 飆升',
+    section: 'Bonus：進階 YAML',
+    duration: '13',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">操作流程</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>apply 正常的 probe-demo（liveness + readiness 都設 /）</li>
+            <li><code className="text-green-400">kubectl describe pod</code> 看 Liveness / Readiness 欄位</li>
+            <li>改 readinessProbe path 為 /not-exist &rarr; 觀察 READY 0/1</li>
+            <li>改 livenessProbe 為 exit 1 &rarr; 觀察 RESTARTS 飆升</li>
+          </ol>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/30 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2 text-sm">readiness 失敗 — 不接流量但不重啟</p>
+          <div className="bg-slate-900/70 p-2 rounded text-xs font-mono">
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;READY &nbsp;STATUS &nbsp;&nbsp;RESTARTS</p>
+            <p className="text-amber-300">probe-demo-xxx-yyy &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0/1 &nbsp;&nbsp;Running &nbsp;0</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">READY 0/1 + STATUS Running = readiness 失敗，Pod 從 Endpoints 移除</p>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2 text-sm">liveness 失敗 — 不斷重啟</p>
+          <div className="bg-slate-900/70 p-2 rounded text-xs font-mono">
+            <p className="text-slate-400">NAME &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;READY &nbsp;STATUS &nbsp;&nbsp;RESTARTS</p>
+            <p className="text-slate-300">probe-demo-xxx-yyy &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1/1 &nbsp;&nbsp;Running &nbsp;0</p>
+            <p className="text-red-300">probe-demo-xxx-yyy &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1/1 &nbsp;&nbsp;Running &nbsp;1 &nbsp;&larr; RESTARTS!</p>
+            <p className="text-red-300">probe-demo-xxx-yyy &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1/1 &nbsp;&nbsp;Running &nbsp;2</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">Events 會顯示 "Liveness probe failed" + "Container will be restarted"</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">③④ 快問快答</p>
+          <ul className="text-slate-300 text-xs space-y-1 list-disc list-inside">
+            <li>READY 0/1 + Running = ? &rarr; readiness 失敗，不接流量但沒重啟</li>
+            <li>Spring Boot 啟動 60 秒但 initialDelaySeconds 只設 10 &rarr; 永遠起不來（一直被 liveness Kill）</li>
+            <li>liveness 和 readiness 都失敗 &rarr; liveness 先觸發重啟，readiness 同時移出 Endpoints</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    code: \`# 正常版：liveness + readiness 都檢查 nginx 首頁
+kubectl apply -f probe-demo.yaml
+kubectl describe pod <pod-name>
+# → Liveness: http-get http://:80/ delay=10s period=10s
+# → Readiness: http-get http://:80/ delay=5s period=5s
+
+# readiness 失敗實驗：改 path 為 /not-exist（404）
+kubectl apply -f probe-demo-broken.yaml
+kubectl get pods -w
+# → READY 0/1，STATUS Running，RESTARTS 0
+
+# liveness 失敗實驗：exec exit 1（永遠失敗）
+kubectl apply -f probe-demo-liveness-fail.yaml
+kubectl get pods -w
+# → RESTARTS 不斷增加 → CrashLoopBackOff
+
+# 清理
+kubectl delete deployment probe-demo\`,
+    notes: \`【① 課程內容】
+本張為 Probe 實作：部署帶 Probe 的 Deployment，觀察正常和失敗時的行為差異。
+
+【② 指令講解】
+部署正常版：kubectl apply -f probe-demo.yaml
+→ kubectl describe pod 看 Liveness / Readiness 欄位
+→ 打完要看：Liveness: http-get http://:80/ delay=10s；Readiness: http-get http://:80/ delay=5s
+
+readiness 失敗實驗：kubectl apply -f probe-demo-broken.yaml
+→ kubectl get pods -w
+→ 打完要看：READY 0/1，STATUS Running，RESTARTS 0
+→ 重點：Pod 還活著但不接流量，Service Endpoints 變空
+
+liveness 失敗實驗：kubectl apply -f probe-demo-liveness-fail.yaml
+→ kubectl get pods -w
+→ 打完要看：等約 30 秒後 RESTARTS 開始增加
+→ kubectl describe pod | grep Events → 看到 "Liveness probe failed" + "Container will be restarted"
+
+清理：kubectl delete deployment probe-demo
+
+【③④ 題目 + 解答】
+Q1：liveness 和 readiness 同時設定，各自失敗時有什麼不同？
+A1：liveness 失敗 → 重啟容器（RESTARTS +1）；readiness 失敗 → 從 Endpoints 移除（不重啟）
+
+Q2：Spring Boot 啟動要 60 秒，livenessProbe initialDelaySeconds 只設 10，會怎樣？
+A2：應用還在啟動 → liveness 失敗 → 重啟 → 又在啟動 → 又失敗 → CrashLoopBackOff 永遠起不來。解法：initialDelaySeconds 設 70+ 或用 startupProbe。
+
+Q3：READY 0/1 + STATUS Running 代表什麼？對 Service 有什麼影響？
+A3：readiness 失敗，Pod 從 Endpoints 移除，Service 不轉發流量到這個 Pod，但不影響其他健康 Pod。
+
+[▶ Bonus 結束]\`,
+  },
+
 ]

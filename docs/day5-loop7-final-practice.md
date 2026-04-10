@@ -470,7 +470,7 @@ kubectl delete namespace my-app
 **完整 YAML**
 
 ```yaml
-# nginx-deployment.yaml
+# nginx-web-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -540,7 +540,7 @@ spec:
 
 ### ② 指令講解
 
-**kubectl apply -f nginx-deployment.yaml**
+**kubectl apply -f nginx-web-deployment.yaml**
 
 - 打完要看：`deployment.apps/nginx-web created`
 

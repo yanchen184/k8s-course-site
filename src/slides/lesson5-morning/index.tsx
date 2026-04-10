@@ -1643,7 +1643,7 @@ kubectl scale deployment my-httpd --replicas=5
 kubectl get pods -o wide   # 看 Pod 分散到哪些 Node
 
 # Scale down
-kubectl scale deployment my-httpd --replicas=2
+kubectl scale deployment my-httpd --replicas=1
 kubectl get pods -w   # 看多餘 Pod Terminating`,
     notes: `【① 課程內容】
 本節為學生獨立練習後的帶做確認（對應 Lab 1 結束後）。老師帶大家走一遍擴縮容操作，確認每個步驟都做到，並點出兩個常見坑。
@@ -1955,7 +1955,13 @@ kubectl rollout undo deployment/nginx-deploy --to-revision=1`,
 Docker 對照：Docker Compose docker-compose up -d = 砍舊建新，中間有空窗期。K8s 的滾動更新是生產環境標配。
 
 【② 指令講解】
-（本節為概念補充，詳細指令逐步說明在 5-7 實作。）
+現場 demo（不用學生跟做，老師示範即可）：
+1. kubectl rollout history deployment/nginx-deploy → 看到 REVISION 欄位
+2. kubectl get rs → 看舊 RS 還在（DESIRED=0 但沒刪）
+3. kubectl rollout undo deployment/nginx-deploy → 回滾上一版，watch Pod 切換
+4. kubectl rollout undo deployment/nginx-deploy --to-revision=1 → 精確回滾
+
+（詳細指令逐步說明在 5-7 實作。）
 
 【③④ 題目 + 解答】
 題目 1【rollout undo 觀察】：假設目前 nginx-deploy 跑的是 nginx:1.27，執行 'kubectl rollout undo deployment/nginx-deploy'，在另一個 terminal 同時觀察 'kubectl get rs -w'，說出 undo 後舊 RS 和新 RS 的 DESIRED 數字如何變化。完成後執行 'kubectl describe deployment nginx-deploy | grep Image' 確認 image 版本。
@@ -2153,7 +2159,7 @@ kubectl rollout history deployment/nginx-deploy   # 找正確 revision
 kubectl rollout undo deployment/nginx-deploy --to-revision=1
 kubectl get pods              # 確認全 Running`,
     notes: `【① 課程內容】
-本張為學員實作題目頁。必做題完整流程：建 nginx:1.26 Deployment replicas:3 → set image 更新到 1.27 → rollout status 看更新過程 → get rs 確認兩個 ReplicaSet → rollout undo 回滾 → describe | grep Image 確認回到 1.26。
+本張為學員實作題目頁。必做題完整流程：建 nginx:1.26 Deployment replicas:3 → set image 更新到 1.28 → rollout status 看更新過程 → get rs 確認兩個 ReplicaSet → rollout undo 回滾 → describe | grep Image 確認回到 1.26。
 
 挑戰題：故意用不存在的版本 nginx:99.99，觀察 ImagePullBackOff，注意舊 Pod 還活著（滾動更新的安全機制），再用 rollout undo 救回來。實際工作常見：打錯 Image tag → rollout undo 一行搞定。
 
@@ -2191,10 +2197,11 @@ kubectl get pods              # 確認全 Running`,
     content: (
       <div className="space-y-3">
         <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2 text-sm">帶做一遍（四個指令）</p>
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">帶做一遍（五個指令）</p>
           <ol className="text-slate-300 text-xs space-y-1 list-decimal list-inside">
             <li><code className="text-green-400">kubectl set image deployment/nginx-deploy nginx=nginx:1.28</code> — 觸發更新</li>
             <li><code className="text-green-400">kubectl rollout status deployment/nginx-deploy</code> — 看進度</li>
+            <li><code className="text-green-400">kubectl rollout undo deployment/nginx-deploy</code> — 回滾上一版</li>
             <li><code className="text-green-400">kubectl rollout history deployment/nginx-deploy</code> — 查歷史，記下 revision 號</li>
             <li><code className="text-green-400">kubectl rollout undo deployment/nginx-deploy --to-revision=1</code> — 精確回滾</li>
           </ol>
@@ -2494,7 +2501,12 @@ Label vs Annotation 差別（常考）：
 - Annotation：不能被 selector 選取；適合長文字/JSON/說明；典型用途是 change-cause、CI/CD 資訊
 
 【② 指令講解】
-（本節為概念課，指令集中在 5-10 實作。）
+現場 demo（老師示範，不用學生跟做）：
+1. kubectl get pods → 確認 3 個 Running
+2. kubectl delete pod <其中一個 Pod 名稱> → 刪一個
+3. kubectl get pods -w → 馬上看到新 Pod ContainerCreating → Running，副本數恢復 3
+
+（完整 Labels 操作指令在 5-10 實作。）
 
 【③④ 題目 + 解答】
 題目 1【計時自我修復】：確認 nginx-deploy 有 3 個 Pod 在跑。執行以下操作並計時：

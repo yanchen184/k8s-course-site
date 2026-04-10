@@ -252,6 +252,19 @@ port vs targetPort：
 打完要看：nginx 預設首頁 HTML，包含 Welcome to nginx!
 異常：Could not resolve host → CoreDNS 問題；Connection refused → targetPort 設錯
 
+指令 6（在 Pod 內）：curl http://nginx-svc.default.svc.cluster.local
+用途：用完整 FQDN 驗證連線（和短名稱效果相同）
+打完要看：同樣是 nginx 首頁 HTML
+
+指令 7：kubectl describe svc nginx-svc
+用途：查看 Service 詳細資訊（Selector、Endpoints、Port 等）
+打完要看：Selector: app=nginx，Endpoints 列出 Pod IP
+
+驗證 Endpoints 自動更新：
+指令 8：kubectl get endpoints nginx-svc（記下三個 IP）
+指令 9：kubectl delete pod <其中一個 Pod 名稱>（刪一個 Pod）
+指令 10：kubectl get endpoints nginx-svc（IP 列表自動更新，新 Pod IP 取代舊的）
+
 【③④ 題目 + 解答】
 （無，Lab 在下一張）
 [▶ 下一頁]`,
@@ -790,6 +803,9 @@ LoadBalancer 在本地環境的限制：
 port-forward vs NodePort 的差異：
 - port-forward：開發除錯臨時使用，終端機關掉就消失
 - NodePort：持續存在直到刪除 Service，適合測試環境長期對外
+
+清理：kubectl delete svc nginx-nodeport
+→ 打完要看：service "nginx-nodeport" deleted
 
 【③④ 題目 + 解答】
 （無，Lab 在下一張）
@@ -2953,7 +2969,7 @@ kubectl logs <job-pod> -n my-app
         </div>
       </div>
     ),
-    code: `# nginx-deployment.yaml
+    code: `# nginx-web-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -3031,7 +3047,7 @@ spec:
 本節為 Loop 8 的學生情境 Lab。完整整合今日所學：Deployment、ClusterIP、NodePort、CronJob。情境是從零建一個完整的 web 服務架構，包含外部存取和定時健康檢查。
 
 【② 指令講解】
-kubectl apply -f nginx-deployment.yaml
+kubectl apply -f nginx-web-deployment.yaml
 → 打完要看：deployment.apps/nginx-web created
 
 kubectl apply -f nginx-clusterip.yaml

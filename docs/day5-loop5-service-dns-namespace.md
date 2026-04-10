@@ -798,7 +798,7 @@ staging           Active   5s
 **指令 8：在指定 Namespace 建立 Deployment**
 
 ```bash
-kubectl create deployment nginx-dev --image=nginx:1.27 -n dev
+kubectl create deployment nginx-deploy --image=nginx:1.27 -n dev
 ```
 
 - `-n dev`：在 dev namespace 建立
@@ -806,7 +806,7 @@ kubectl create deployment nginx-dev --image=nginx:1.27 -n dev
 
 打完要看：
 ```
-deployment.apps/nginx-dev created
+deployment.apps/nginx-deploy created
 ```
 
 ---
@@ -820,7 +820,7 @@ kubectl get pods -n dev
 打完要看：
 ```
 NAME                         READY   STATUS    RESTARTS   AGE
-nginx-dev-7d8f9b4c5-xyzab   1/1     Running   0          30s
+nginx-deploy-7d8f9b4c5-xyzab   1/1     Running   0          30s
 ```
 
 ---
@@ -840,12 +840,12 @@ kubectl get deployments -A
 **指令 11：在指定 Namespace expose Service**
 
 ```bash
-kubectl expose deployment nginx-dev --port=80 --type=ClusterIP -n dev
+kubectl expose deployment nginx-deploy --port=80 -n dev
 ```
 
 打完要看：
 ```
-service/nginx-dev exposed
+service/nginx-deploy exposed
 ```
 
 ---
@@ -853,12 +853,12 @@ service/nginx-dev exposed
 **指令 12：跨 Namespace 存取（用 FQDN）**
 
 ```bash
-kubectl run cross-test --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-dev.dev.svc.cluster.local
+kubectl run cross-test --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://nginx-deploy.dev.svc.cluster.local
 ```
 
 - 這個指令會在 default namespace 啟動 Pod
-- 然後連 dev namespace 的 nginx-dev Service
-- 必須用 FQDN（`nginx-dev.dev.svc.cluster.local`）
+- 然後連 dev namespace 的 nginx-deploy Service
+- 必須用 FQDN（`nginx-deploy.dev.svc.cluster.local`）
 
 打完要看：nginx 首頁 HTML（代表跨 namespace 連線成功）
 

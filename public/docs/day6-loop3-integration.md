@@ -8,36 +8,26 @@
 
 📄 6-8 第 1 張
 
-**這節在做什麼**
+前兩個 Loop 學了三件事：Ingress 路由、ConfigMap 設定、Secret 密碼。這節把它們串在一起，不學新東西，純整合。
 
-前面兩個 Loop 學了三件事：
-- **Ingress**：讓使用者用域名連進來，路徑路由（/、/api）
-- **ConfigMap**：把設定從 Image 裡面抽出來，掛到 Pod
-- **Secret**：把密碼加密儲存，不寫死在 YAML
+目標架構：一個 Namespace 裡，Nginx 前端 + httpd API + MySQL，只有一個 Ingress 入口，所有 Service 都用 ClusterIP。
 
-這三個概念分開學的。這節要把它們串起來，不學新東西，純整合。
+---
 
-**目標架構**
-
-```
-使用者
-  │
-  ↓
-Ingress（myapp.local）
-  ├── /      → frontend-svc → Nginx Pod（ConfigMap: 自訂首頁 index.html）
-  └── /api   → api-svc      → httpd Pod（ConfigMap: API 設定）
-                                   │
-                                   ↓
-                              mysql-svc → MySQL Pod（Secret: 密碼、ConfigMap: DB 名）
-```
-
-- 外面只看到一個入口（Ingress）
-- Service 全部用 ClusterIP，因為有 Ingress 幫你做對外路由，不需要每個 Service 都開 NodePort
-- 資料流：使用者 → Ingress → Service → Pod → Pod（MySQL）
+### ② 所有指令＋講解
 
 📄 6-8 第 2 張
 
-**九個步驟（為什麼這樣排順序）**
+**確認目前叢集是乾淨的**
+
+```bash
+kubectl get all
+kubectl get all -n my-app 2>/dev/null || echo "my-app namespace 不存在，環境乾淨"
+```
+
+先確認之前的資源已清理完畢。
+
+**九個步驟的順序邏輯**
 
 ```
 Step 1：kubectl create namespace my-app
@@ -51,25 +41,23 @@ Step 8：修改 /etc/hosts
 Step 9：curl 驗證
 ```
 
-**順序的原因：**
+**為什麼這樣排順序：**
 
 | 步驟 | 為什麼要在這個位置 |
 |------|------------------|
 | Step 1 先建 Namespace | 其他資源都要指定 `-n my-app`，Namespace 不存在就報錯 |
 | Step 2 Secret 在 MySQL 前 | MySQL Deployment 的 `envFrom` 引用 Secret，Secret 不存在 Pod 會起不來 |
-| Step 3 ConfigMap 在 MySQL 前 | 同理，MySQL 的 MYSQL_DATABASE 從 ConfigMap 讀，要先建 |
-| Step 4-6 Deployment 在 Ingress 前 | Ingress 的 backend 指定 Service 名稱，Service 要先存在 |
+| Step 3 ConfigMap 在 MySQL 前 | MySQL 的 MYSQL_DATABASE 從 ConfigMap 讀，要先建 |
+| Step 4-6 Deployment 在 Ingress 前 | Ingress backend 指定 Service 名稱，Service 要先存在 |
 | Step 7 Ingress 最後建 | 所有後端服務都準備好才建入口 |
-| Step 8-9 驗證 | 全部建好才能測試 |
+
+📄 6-8 第 3 張
 
 **關鍵設計決策：為什麼 Service 都用 ClusterIP？**
 
-- 上一堂學 Service 時，用 NodePort 是因為「直接讓外面連進來」
-- 現在有 Ingress 了，外面進來的流量由 Ingress 接管，Ingress 再轉給 ClusterIP Service
-- ClusterIP 不開 NodePort，叢集外面連不到，更安全
-- 一個入口（Ingress）管所有流量，不用記一堆不同的 Port
-
-📄 6-8 第 3 張
+- 有 Ingress 了，外部流量由 Ingress 接管，再轉給 ClusterIP Service
+- ClusterIP 叢集外面連不到，更安全
+- 一個入口（Ingress）管所有流量，不用記一堆 NodePort
 
 **MySQL 持久化先不做**
 
@@ -77,21 +65,25 @@ Step 9：curl 驗證
 
 ---
 
-### ② 所有指令＋講解
+### ③ QA
 
-（本節以引導說明為主，指令集中在 6-9 示範。）
+**Q：為什麼要建 Namespace？直接用 default 不行嗎？**
+
+A：可以，但不建議。Namespace 是邏輯隔離的邊界，不同專案、不同環境（dev/staging/prod）可以放在不同 Namespace。最大的好處是清理方便：`kubectl delete namespace my-app` 一行指令刪掉 Namespace 裡的所有資源，不需要逐一刪。
+
+**Q：建資源的順序為什麼重要？**
+
+A：K8s 不會自動等你依賴的資源建好再繼續。如果 Deployment 引用的 Secret 或 ConfigMap 不存在，Pod 啟動時會報 `CreateContainerConfigError`。順序：Namespace → Secret → ConfigMap → Deployment/Service → Ingress。
 
 ---
 
-### ③ 題目
+### ④ 學員實作
 
-（本節無練習題）
+無（本節是架構引導說明）
 
----
+### ⑤ 學員實作解答
 
-### ④ 解答
-
-（本節無）
+無
 
 ---
 
@@ -101,15 +93,11 @@ Step 9：curl 驗證
 
 📄 6-9 第 1 張
 
-**示範流程**
-
 老師照九個步驟帶做，學員觀看。每個步驟說明指令後確認輸出正確再繼續。
 
 ---
 
 ### ② 所有指令＋講解
-
----
 
 **Step 1：建 Namespace**
 
@@ -119,8 +107,8 @@ Step 9：curl 驗證
 kubectl create namespace my-app
 ```
 
-- `create namespace`：建立一個新的 Namespace（不用 YAML，直接指令建就好）
-- `my-app`：Namespace 的名稱，接下來所有資源都要加 `-n my-app`
+- `create namespace`：直接建 Namespace，不需要 YAML
+- `my-app`：接下來所有資源都要加 `-n my-app`
 
 預期輸出：
 ```
@@ -139,8 +127,7 @@ NAME     STATUS   AGE
 my-app   Active   5s
 ```
 
-欄位說明：
-- `STATUS: Active`：Namespace 正常運作中（`Terminating` 代表正在刪除中）
+- `STATUS: Active`：Namespace 正常（`Terminating` 代表正在刪除中）
 
 ---
 
@@ -154,9 +141,9 @@ kubectl create secret generic mysql-secret \
   -n my-app
 ```
 
-- `create secret generic`：建立通用類型的 Secret（generic 是最常用的類型，存任意 key-value）
-- `mysql-secret`：Secret 的名稱，後面 Deployment 的 `envFrom` 會引用這個名稱
-- `--from-literal=MYSQL_ROOT_PASSWORD=rootpassword123`：直接從指令列輸入 key=value（不需要先建檔案）
+- `create secret generic`：建立通用類型 Secret（generic 存任意 key-value，最常用）
+- `mysql-secret`：名稱，後面 MySQL Deployment 的 `envFrom` 會引用這個名稱
+- `--from-literal=MYSQL_ROOT_PASSWORD=rootpassword123`：直接從指令列輸入 key=value
 - `-n my-app`：建在 my-app Namespace 裡
 
 預期輸出：
@@ -176,9 +163,8 @@ NAME           TYPE     DATA   AGE
 mysql-secret   Opaque   1      8s
 ```
 
-欄位說明：
-- `TYPE: Opaque`：通用 Secret 的類型（Kubernetes 內建的 TLS、Service Account 用不同 TYPE）
-- `DATA: 1`：這個 Secret 裡有 1 筆 key-value 資料
+- `TYPE: Opaque`：通用 Secret 的類型
+- `DATA: 1`：這個 Secret 裡有 1 筆 key-value
 
 ---
 
@@ -194,12 +180,16 @@ kubectl create configmap mysql-config \
   -n my-app
 ```
 
-- `mysql-config`：ConfigMap 的名稱
-- `--from-literal=MYSQL_DATABASE=myappdb`：MySQL 啟動時會讀這個環境變數，自動建 `myappdb` 資料庫
+- `mysql-config`：名稱
+- `MYSQL_DATABASE=myappdb`：MySQL 啟動時讀這個變數，自動建 `myappdb` 資料庫
 
-Nginx 前端用的（YAML 方式，因為 value 是整個 HTML 檔案）：
+Nginx 前端用的（value 是整個 HTML，用 YAML 方式）：
 
-先建立 `configmap-frontend.yaml`：
+```bash
+kubectl apply -f configmap-frontend.yaml
+```
+
+`configmap-frontend.yaml` 內容：
 
 ```yaml
 apiVersion: v1
@@ -218,16 +208,8 @@ data:
     </html>
 ```
 
-說明：
 - `data` 底下的 key 是 `index.html`，value 是整個 HTML 內容
 - `|`（pipe）：YAML 的多行字串語法，保留換行符號
-- 後面 Deployment 會把這個 ConfigMap 的 `index.html` key 掛到 Nginx 的 `/usr/share/nginx/html/index.html`
-
-套用：
-
-```bash
-kubectl apply -f configmap-frontend.yaml
-```
 
 預期輸出：
 ```
@@ -256,59 +238,26 @@ frontend-config    1      10s
 
 📄 6-9 第 5 張
 
-建立 `mysql-deploy.yaml`：
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mysql-deploy
-  namespace: my-app
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mysql
-  template:
-    metadata:
-      labels:
-        app: mysql
-    spec:
-      containers:
-      - name: mysql
-        image: mysql:8.0
-        ports:
-        - containerPort: 3306
-        envFrom:
-        - secretRef:
-            name: mysql-secret       # 引用 Secret，MYSQL_ROOT_PASSWORD 注入為環境變數
-        - configMapRef:
-            name: mysql-config       # 引用 ConfigMap，MYSQL_DATABASE 注入為環境變數
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql-svc
-  namespace: my-app
-spec:
-  selector:
-    app: mysql
-  ports:
-  - port: 3306
-    targetPort: 3306
-  type: ClusterIP              # 只給叢集內部用，不對外開放
-```
-
-說明關鍵設計：
-- `envFrom`：整個 Secret 或 ConfigMap 裡的所有 key 都注入為環境變數（比 `env.valueFrom` 一個一個指定更方便）
-- `secretRef` 和 `configMapRef` 可以同時列多個，K8s 會把它們合併注入
-- `type: ClusterIP`：只有叢集內的 Pod 可以透過 `mysql-svc:3306` 連到 MySQL
-
-套用：
-
 ```bash
 kubectl apply -f mysql-deploy.yaml -n my-app
 ```
+
+`mysql-deploy.yaml` 關鍵部分：
+
+```yaml
+spec:
+  containers:
+  - name: mysql
+    image: mysql:8.0
+    envFrom:
+    - secretRef:
+        name: mysql-secret       # MYSQL_ROOT_PASSWORD 注入為環境變數
+    - configMapRef:
+        name: mysql-config       # MYSQL_DATABASE 注入為環境變數
+```
+
+- `envFrom`：把整個 Secret 或 ConfigMap 裡的所有 key 都注入為環境變數（比 `env.valueFrom` 一個一個指定更方便）
+- `secretRef` 和 `configMapRef` 可以同時列多個，K8s 合併注入
 
 預期輸出：
 ```
@@ -324,14 +273,14 @@ kubectl get pods -n my-app -w
 
 - `-w`（watch）：持續監看，Pod 狀態有變化就更新輸出；按 `Ctrl+C` 停止
 
-預期輸出（等待過程）：
+預期（等待過程）：
 ```
 NAME                            READY   STATUS              RESTARTS   AGE
 mysql-deploy-6b8f9d7c4-xk9p2   0/1     ContainerCreating   0          5s
 mysql-deploy-6b8f9d7c4-xk9p2   1/1     Running             0          18s
 ```
 
-看到 `Running` 才繼續下一步，MySQL 需要幾秒初始化。
+看到 `Running` 才繼續，MySQL 需要幾秒初始化。
 
 ---
 
@@ -339,62 +288,27 @@ mysql-deploy-6b8f9d7c4-xk9p2   1/1     Running             0          18s
 
 📄 6-9 第 6 張
 
-建立 `frontend-deploy.yaml`：
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: frontend-deploy
-  namespace: my-app
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: frontend
-  template:
-    metadata:
-      labels:
-        app: frontend
-    spec:
-      containers:
-      - name: nginx
-        image: nginx:1.25
-        ports:
-        - containerPort: 80
-        volumeMounts:
-        - name: frontend-html
-          mountPath: /usr/share/nginx/html/index.html  # 掛到這個路徑
-          subPath: index.html                           # 只掛 ConfigMap 裡的這個 key
-      volumes:
-      - name: frontend-html
-        configMap:
-          name: frontend-config                        # 從這個 ConfigMap 讀資料
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend-svc
-  namespace: my-app
-spec:
-  selector:
-    app: frontend
-  ports:
-  - port: 80
-    targetPort: 80
-  type: ClusterIP
-```
-
-說明 `subPath` 的用途：
-- 不加 `subPath`：整個 ConfigMap 的 key 都會以「檔案名稱」掛到 `mountPath` 這個「目錄」，Nginx 原本在 `/usr/share/nginx/html/` 的其他檔案會消失
-- 加 `subPath: index.html`：只把 `index.html` 這一個 key 掛到指定路徑的「檔案」，不影響目錄裡其他檔案
-- 記住：掛整個目錄就不用 subPath；掛單一檔案一定要加 subPath
-
-套用：
-
 ```bash
 kubectl apply -f frontend-deploy.yaml -n my-app
 ```
+
+`frontend-deploy.yaml` 關鍵部分：
+
+```yaml
+volumeMounts:
+- name: frontend-html
+  mountPath: /usr/share/nginx/html/index.html  # 掛到這個路徑
+  subPath: index.html                           # 只掛 ConfigMap 裡的這個 key
+volumes:
+- name: frontend-html
+  configMap:
+    name: frontend-config
+```
+
+**`subPath` 的用途**：
+- 不加 `subPath`：整個 ConfigMap 的 key 都掛到 `mountPath` 這個「目錄」，Nginx 原本的其他檔案會消失
+- 加 `subPath: index.html`：只把 `index.html` 這一個 key 掛到指定「檔案」路徑，不影響目錄裡其他檔案
+- 規則：掛整個目錄不用 subPath；掛單一檔案一定要加 subPath
 
 預期輸出：
 ```
@@ -407,46 +321,6 @@ service/frontend-svc created
 **Step 6：部署 httpd API**
 
 📄 6-9 第 7 張
-
-建立 `api-deploy.yaml`：
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: api-deploy
-  namespace: my-app
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: api
-  template:
-    metadata:
-      labels:
-        app: api
-    spec:
-      containers:
-      - name: httpd
-        image: httpd:2.4
-        ports:
-        - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: api-svc
-  namespace: my-app
-spec:
-  selector:
-    app: api
-  ports:
-  - port: 80
-    targetPort: 80
-  type: ClusterIP
-```
-
-套用：
 
 ```bash
 kubectl apply -f api-deploy.yaml -n my-app
@@ -478,7 +352,11 @@ api-deploy-7c4b9d8f3-mn5s2        1/1     Running   0          15s
 
 📄 6-9 第 8 張
 
-建立 `app-ingress.yaml`：
+```bash
+kubectl apply -f app-ingress.yaml -n my-app
+```
+
+`app-ingress.yaml` 內容：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -487,38 +365,30 @@ metadata:
   name: app-ingress
   namespace: my-app
 spec:
-  ingressClassName: traefik        # k3s 預設的 Ingress Controller 是 Traefik
+  ingressClassName: traefik
   rules:
-  - host: myapp.local              # 這個 Ingress 處理 host 為 myapp.local 的請求
+  - host: myapp.local
     http:
       paths:
       - path: /
-        pathType: Prefix           # Prefix：/、/abc、/anything 都匹配
+        pathType: Prefix
         backend:
           service:
-            name: frontend-svc    # 轉給前端 Service
+            name: frontend-svc
             port:
               number: 80
       - path: /api
-        pathType: Prefix           # /api、/api/users、/api/v1/... 都匹配
+        pathType: Prefix
         backend:
           service:
-            name: api-svc         # 轉給 API Service
+            name: api-svc
             port:
               number: 80
 ```
 
-說明：
-- `ingressClassName: traefik`：指定用哪個 Ingress Controller 來處理這個 Ingress（k3s 內建 Traefik，所以填 traefik）
-- `host: myapp.local`：只處理 HTTP Host header 是 `myapp.local` 的請求，其他 host 不理
-- `pathType: Prefix`：路徑前綴匹配，`/api/users` 也會被 `/api` 規則匹配到
-- **路由順序**：Ingress 會先匹配更長的路徑，`/api` 比 `/` 更具體，所以 `/api/...` 走 api-svc，其他都走 frontend-svc
-
-套用：
-
-```bash
-kubectl apply -f app-ingress.yaml -n my-app
-```
+- `ingressClassName: traefik`：k3s 內建 Traefik，填 traefik
+- `host: myapp.local`：只處理 HTTP Host header 是 `myapp.local` 的請求
+- **路由順序**：Ingress 先匹配更長的路徑，`/api` 比 `/` 具體，所以 `/api/...` 走 api-svc，其他都走 frontend-svc
 
 預期輸出：
 ```
@@ -537,18 +407,13 @@ NAME          CLASS     HOSTS         ADDRESS        PORTS   AGE
 app-ingress   traefik   myapp.local   192.168.1.10   80      20s
 ```
 
-欄位說明：
-- `CLASS`：使用的 Ingress Controller（traefik）
-- `HOSTS`：這個 Ingress 處理哪個域名的請求
-- `ADDRESS`：Ingress Controller 所在的 Node IP（流量進來的入口）
-
 確認路由規則：
 
 ```bash
 kubectl describe ingress app-ingress -n my-app
 ```
 
-預期輸出（關鍵部分）：
+看 Rules 區塊：
 ```
 Rules:
   Host         Path   Backends
@@ -558,7 +423,7 @@ Rules:
                /api   api-svc:80 (10.42.2.6:80)
 ```
 
-`(10.42.x.x:80)` 是實際的 Pod IP，確認 Ingress 已經解析到後端 Pod 了。
+括號裡有 Pod IP → Service 正確找到後端 Pod。
 
 ---
 
@@ -566,37 +431,25 @@ Rules:
 
 📄 6-9 第 9 張
 
-先拿 Node IP（Ingress Controller 跑在哪個 Node 就用哪個 IP）：
+先拿 Node IP：
 
 ```bash
 kubectl get nodes -o wide
 ```
 
-預期輸出：
-```
-NAME         STATUS   ROLES                  AGE   VERSION   INTERNAL-IP    EXTERNAL-IP
-k3s-master   Ready    control-plane,master   2d    v1.28.5   192.168.1.10   <none>
-k3s-worker1  Ready    <none>                 2d    v1.28.5   192.168.1.11   <none>
-k3s-worker2  Ready    <none>                 2d    v1.28.5   192.168.1.12   <none>
-```
-
-欄位說明：
-- `INTERNAL-IP`：Node 在區域網路的 IP，用這個
-- k3s 的 Traefik Ingress Controller 預設在所有 Node 上監聽，用 Master 的 IP 就可以
-
-把 myapp.local 這個假域名對應到 Node IP，加到本機的 /etc/hosts（讓你的電腦知道 myapp.local 要去哪裡）：
+記下 `INTERNAL-IP`，然後加到 /etc/hosts：
 
 ```bash
 sudo sh -c 'echo "192.168.1.10 myapp.local" >> /etc/hosts'
 ```
 
-- `sudo sh -c '...'`：因為直接用 `sudo echo >> /etc/hosts` 會沒有寫入權限（重新導向是 shell 做的，不是 sudo 做的），所以用 `sh -c` 讓整個指令在有 sudo 權限的 shell 裡執行
 - 把 `192.168.1.10` 換成你的實際 Node IP
+- 用 `sudo sh -c '...'` 是因為直接用 `sudo echo >> /etc/hosts` 的重新導向沒有 sudo 權限
 
 確認加進去了：
 
 ```bash
-cat /etc/hosts | grep myapp
+grep myapp.local /etc/hosts
 ```
 
 預期輸出：
@@ -627,7 +480,7 @@ curl http://myapp.local
 </html>
 ```
 
-如果看到這個，代表：Ingress 路由正確 → frontend-svc 正確 → frontend Pod 正確 → ConfigMap 的 index.html 正確掛載。
+看到這個代表：Ingress 路由正確 → frontend-svc 正確 → frontend Pod 正確 → ConfigMap 的 index.html 正確掛載。
 
 驗證 API：
 
@@ -640,19 +493,16 @@ curl http://myapp.local/api
 <html><body><h1>It works!</h1></body></html>
 ```
 
-這是 httpd 的預設首頁，代表 `/api` 路由正確打到 api-svc。
-
-驗證 MySQL 有跑起來（從 MySQL Pod 內部執行 mysql 指令）：
+驗證 MySQL（從 Pod 內部執行）：
 
 ```bash
 kubectl exec -it deployment/mysql-deploy -n my-app -- \
   mysql -u root -prootpassword123 -e "SHOW DATABASES;"
 ```
 
-- `exec -it`：進入 Pod 執行互動式指令（`-i` 保持 stdin 開啟，`-t` 分配 TTY）
+- `exec -it`：進入 Pod 執行互動式指令
 - `deployment/mysql-deploy`：指定目標（也可以直接用 Pod 名稱）
 - `--`：分隔 kubectl 參數和要執行的指令
-- `mysql -u root -prootpassword123`：用 root 帳號連 MySQL（`-p` 後面不留空格直接接密碼）
 - `-e "SHOW DATABASES;"`：執行這行 SQL 後退出（非互動式）
 
 預期輸出：
@@ -661,7 +511,7 @@ kubectl exec -it deployment/mysql-deploy -n my-app -- \
 | Database           |
 +--------------------+
 | information_schema |
-| myappdb            |      ← 這個是 ConfigMap 裡 MYSQL_DATABASE 的值
+| myappdb            |      ← ConfigMap 裡 MYSQL_DATABASE 的值
 | mysql              |
 | performance_schema |
 | sys                |
@@ -672,52 +522,63 @@ kubectl exec -it deployment/mysql-deploy -n my-app -- \
 
 ---
 
-### ③ 題目
+### ③ QA
+
+**Q：`envFrom` 和 `env.valueFrom` 有什麼差？**
+
+A：`envFrom` 把整個 ConfigMap 或 Secret 裡的所有 key 都注入為環境變數，一次搞定。`env.valueFrom` 要一個一個指定 key，適合只需要引用特定幾個 key 的場景。資源少的時候 `valueFrom` 更精確，資源多的時候 `envFrom` 更方便。
+
+**Q：為什麼 `kubectl exec` 的指令要加 `--`？**
+
+A：`--` 是 kubectl 的參數分隔符號，前面是 kubectl 的參數（`-it`、`-n my-app`），後面是要在容器裡執行的指令（`mysql -u root ...`）。沒有 `--` 的話，kubectl 不知道哪裡開始是容器指令，特別是容器指令有 `-` 開頭的 flag 時，kubectl 會誤解析。
+
+---
+
+### ④ 學員實作
 
 📄 6-9 第 11 張
 
-**必做：完整架構實作**
-
 按照九個步驟，在 `my-app` Namespace 裡建出完整架構：
 
-任務清單：
 1. 建 Namespace `my-app`
-2. 建 Secret `mysql-secret`（MYSQL_ROOT_PASSWORD 自己決定，但要記住）
-3. 建 ConfigMap `mysql-config`（MYSQL_DATABASE=`mydb`，改成自己的資料庫名稱）
-4. 建 ConfigMap `frontend-config`（index.html 改成自己的姓名，例如 `<h1>Andy's App</h1>`）
+2. 建 Secret `mysql-secret`（`MYSQL_ROOT_PASSWORD` 自己決定，要記住）
+3. 建 ConfigMap `mysql-config`（`MYSQL_DATABASE=mydb`，改成自己的資料庫名稱）
+4. 建 ConfigMap `frontend-config`（index.html 改成自己的名字，例如 `<h1>Andy's App</h1>`）
 5. 部署 MySQL + Service
 6. 部署 Nginx 前端 + Service
 7. 部署 httpd API + Service
 8. 建 Ingress（host 用 `myapp.local`）
 9. 修改 /etc/hosts
-10. `curl http://myapp.local` 看到自己的姓名 ✓
+10. `curl http://myapp.local` 看到自己的名字 ✓
 11. `curl http://myapp.local/api` 看到 "It works!" ✓
-12. `kubectl exec` 進 MySQL Pod，執行 `SHOW DATABASES;`，確認自己設定的資料庫名稱有出現 ✓
+12. `kubectl exec` 進 MySQL Pod，`SHOW DATABASES;` 確認自己設定的資料庫名稱有出現 ✓
 
 **挑戰：加第三個服務**
 
-在 Ingress 加 `/admin` 路徑，導向一個新的 Deployment（image 自選，例如 `nginx:1.25`）：
-1. 建 `admin-deploy` Deployment 和 `admin-svc` Service
-2. 在 `app-ingress` 的 rules 裡加 `/admin` 路徑
-3. `kubectl apply -f app-ingress.yaml` 更新 Ingress（不用重建，apply 會更新）
-4. `curl http://myapp.local/admin` 看到 admin 服務的回應
+在 Ingress 加 `/admin` 路徑，導向新的 Deployment（image 自選，例如 `nginx:1.25`）：
+
+1. 建 `admin-deploy` Deployment 和 `admin-svc` Service（`namespace: my-app`）
+2. 在 `app-ingress.yaml` 的 rules 裡加 `/admin` 路徑
+3. `kubectl apply -f app-ingress.yaml -n my-app`（apply 會更新，不用重建）
+4. `curl http://myapp.local/admin` 看到 admin 服務的回應 ✓
 
 ---
 
-### ④ 解答
+### ⑤ 學員實作解答
 
 📄 6-9 第 12 張
 
-**必做解答（Step 3 的 ConfigMap 差異舉例）**
+**必做解答**
 
-ConfigMap `mysql-config`：
+Step 3 的 ConfigMap 差異（改資料庫名稱和前端內容）：
+
 ```bash
 kubectl create configmap mysql-config \
   --from-literal=MYSQL_DATABASE=mydb \
   -n my-app
 ```
 
-ConfigMap `frontend-config`（改過的首頁）：
+`configmap-frontend.yaml` 中改 HTML 內容：
 ```yaml
 data:
   index.html: |
@@ -732,23 +593,16 @@ data:
 
 驗收指令：
 ```bash
-# 前端有姓名
-curl http://myapp.local
-
-# API 有回應
-curl http://myapp.local/api
-
-# MySQL 有自訂資料庫名稱
+curl http://myapp.local                                           # 前端有姓名
+curl http://myapp.local/api                                       # API 有回應
 kubectl exec -it deployment/mysql-deploy -n my-app -- \
-  mysql -u root -p<你的密碼> -e "SHOW DATABASES;"
+  mysql -u root -p<你的密碼> -e "SHOW DATABASES;"                 # MySQL 有自訂資料庫名稱
 ```
 
----
+**挑戰解答（加 /admin）**
 
-**挑戰解答（加 /admin 路徑）**
-
-建 `admin-deploy.yaml`：
 ```yaml
+# admin-deploy.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -784,7 +638,7 @@ spec:
   type: ClusterIP
 ```
 
-更新 `app-ingress.yaml`（在 `paths` 裡加一段）：
+在 `app-ingress.yaml` 的 `paths` 裡加：
 ```yaml
       - path: /admin
         pathType: Prefix
@@ -799,10 +653,6 @@ spec:
 ```bash
 kubectl apply -f admin-deploy.yaml -n my-app
 kubectl apply -f app-ingress.yaml -n my-app
-```
-
-驗收：
-```bash
 curl http://myapp.local/admin    # → nginx 預設頁面
 ```
 
@@ -814,48 +664,11 @@ curl http://myapp.local/admin    # → nginx 預設頁面
 
 📄 6-10 第 1 張
 
-**帶做：確認整個架構的全局狀態**
-
-用一個指令看 `my-app` Namespace 裡所有資源：
-
-**三個常見踩坑**
-
-1. **忘記加 `-n my-app`**
-   - 現象：`kubectl get pods` 看到空的，以為沒建成功，其實是在 default namespace 看
-   - 解法：每個指令都加 `-n my-app`，或建完後養成習慣先查 `kubectl get all -n my-app`
-
-2. **ConfigMap 的 index.html 忘記加 `subPath`**
-   - 現象：curl myapp.local 看不到自訂首頁，或看到 404
-   - 原因：沒有 `subPath` 會把整個 ConfigMap 掛成目錄，覆蓋掉 Nginx 原本的 html 目錄，Nginx 設定裡其他必要的檔案不見了
-   - 解法：確認 `volumeMounts` 裡有 `subPath: index.html`
-
-3. **Ingress 的 host 和 /etc/hosts 對不上**
-   - 現象：curl myapp.local 連不到，或回應 404
-   - 原因：Ingress YAML 裡寫 `host: myapp.local`，但 /etc/hosts 寫的是 `myapp.local.` 或拼錯字，Ingress Controller 比對 Host header 失敗
-   - 解法：兩邊字串必須完全一樣，包括大小寫
-
-📄 6-10 第 2 張
-
-**清理**
-
-```bash
-kubectl delete namespace my-app
-```
-
-- 刪掉 Namespace 會連帶刪除裡面的所有資源（Deployment、Service、Ingress、ConfigMap、Secret、Pod 全部一次清掉）
-- 這是 K8s Namespace 最大的好處之一：清理很乾淨，不用逐一刪除
-
-**銜接下午**
-
-> Ingress + ConfigMap + Secret 串起來了，整個架構可以跑。但你有沒有發現一個問題：MySQL 的資料存在哪裡？存在 Pod 裡面。Pod 一重啟，資料全部消失。
-
-> 下午要解決這個問題：PV（PersistentVolume）和 PVC（PersistentVolumeClaim）——讓資料存在叢集裡，Pod 重啟也不怕。
+確認整個架構的全局狀態，排查三個常見坑，清理環境，銜接下午的 PV/PVC。
 
 ---
 
 ### ② 所有指令＋講解
-
----
 
 **查看 Namespace 全局狀態**
 
@@ -863,10 +676,7 @@ kubectl delete namespace my-app
 kubectl get all -n my-app
 ```
 
-- `get all`：列出這個 Namespace 裡所有主要資源（Pod、Service、Deployment、ReplicaSet）
-- `-n my-app`：指定 Namespace
-
-預期輸出：
+預期輸出（三個 Pod 都 Running）：
 ```
 NAME                                   READY   STATUS    RESTARTS   AGE
 pod/api-deploy-7c4b9d8f3-mn5s2        1/1     Running   0          8m
@@ -877,16 +687,6 @@ NAME                   TYPE        CLUSTER-IP      PORT(S)    AGE
 service/api-svc        ClusterIP   10.96.45.231    80/TCP     8m
 service/frontend-svc   ClusterIP   10.96.102.15    80/TCP     9m
 service/mysql-svc      ClusterIP   10.96.200.88    3306/TCP   12m
-
-NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/api-deploy         1/1     1            1           8m
-deployment.apps/frontend-deploy    1/1     1            1           9m
-deployment.apps/mysql-deploy       1/1     1            1           12m
-
-NAME                                         DESIRED   CURRENT   READY   AGE
-replicaset.apps/api-deploy-7c4b9d8f3        1         1         1       8m
-replicaset.apps/frontend-deploy-5d9f8c6b4   1         1         1       9m
-replicaset.apps/mysql-deploy-6b8f9d7c4      1         1         1       12m
 ```
 
 注意：`get all` 不包含 Ingress、ConfigMap、Secret，要單獨查：
@@ -909,9 +709,31 @@ NAME                  TYPE     DATA   AGE
 secret/mysql-secret   Opaque   1      13m
 ```
 
-看到三個 Pod Running、三個 Service ClusterIP、一個 Ingress、兩個自建 ConfigMap、一個 Secret，架構完整。
+三個常見坑：
 
----
+**坑 1：忘記加 `-n my-app`**
+
+```bash
+kubectl get pods    # 看到空的，以為沒建成功，其實是在 default namespace 看
+kubectl get pods -n my-app    # 正確
+```
+
+**坑 2：ConfigMap 的 index.html 忘記加 subPath**
+
+```bash
+kubectl describe pod -n my-app | grep -A5 "Mounts:"    # 看掛載方式
+```
+
+沒加 `subPath` 的現象：curl myapp.local 看到 403 或看不到自訂頁面，因為整個 Nginx html 目錄被 ConfigMap 目錄覆蓋了。
+
+**坑 3：Ingress 的 host 和 /etc/hosts 對不上**
+
+```bash
+grep myapp /etc/hosts    # 確認 /etc/hosts 裡的域名和 Ingress YAML 的 host 完全一樣
+kubectl get ingress -n my-app    # 確認 HOSTS 欄位
+```
+
+兩邊字串必須完全一樣，包括大小寫。
 
 **清理 Namespace**
 
@@ -924,18 +746,9 @@ kubectl delete namespace my-app
 namespace "my-app" deleted
 ```
 
-這一行指令會刪掉 Namespace 裡的所有資源。過幾秒後可以確認：
+這一行指令會刪掉 Namespace 裡的所有資源（Pod、Service、Deployment、Ingress、ConfigMap、Secret 全部一次清）。
 
-```bash
-kubectl get all -n my-app
-```
-
-預期輸出：
-```
-No resources found in my-app namespace.
-```
-
-或直接確認 Namespace 不存在：
+確認清乾淨：
 
 ```bash
 kubectl get namespace my-app
@@ -948,12 +761,37 @@ Error from server (NotFound): namespaces "my-app" not found
 
 ---
 
-### ③ 題目
+### ③ QA
 
-（本節無新題目）
+**Q：`kubectl delete namespace my-app` 和 `kubectl delete -f *.yaml` 差在哪？**
+
+A：`delete namespace` 刪掉整個 Namespace 和裡面所有資源，一行搞定，最乾淨。`delete -f` 刪除 YAML 裡定義的資源，需要你把每個 YAML 都列出來。如果資源都在同一個 Namespace 而且整個 Namespace 都要清掉，用 `delete namespace` 更快。如果只要刪部分資源，用 `delete -f`。
 
 ---
 
-### ④ 解答
+### ④ 學員實作
 
-（本節無新解答）
+確認自己的環境清乾淨：
+
+```bash
+kubectl get namespace my-app
+kubectl get all
+```
+
+確認 `my-app` Namespace 不存在，`get all` 只剩 `service/kubernetes`。
+
+---
+
+### ⑤ 學員實作解答
+
+若 Namespace 還存在：
+```bash
+kubectl delete namespace my-app
+```
+
+若 my-app 不存在但有殘留資源在 default namespace：
+```bash
+kubectl delete deployment mysql-deploy frontend-deploy api-deploy
+kubectl delete svc mysql-svc frontend-svc api-svc
+kubectl delete ingress app-ingress
+```

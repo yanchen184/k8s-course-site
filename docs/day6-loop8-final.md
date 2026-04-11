@@ -91,7 +91,7 @@ MySQL 是有狀態的服務，資料不能消失，所以不用 Deployment，用
 - StatefulSet（MySQL）的 Pod 序號
 - 三個 Service
 - Ingress 規則
-- PVC 列表（mysql-0-data-mysql-0、mysql-0-data-mysql-1）
+- PVC 列表（mysql-data-mysql-0、mysql-data-mysql-1）
 
 你用了十幾個 YAML 建起來的系統，在 Rancher 裡面幾個點就看完。這就是為什麼生產環境要用 GUI 監控，不是因為 CLI 不夠強，而是 GUI 讓你一眼看到全局。
 

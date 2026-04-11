@@ -873,7 +873,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mysql-secret
+  name: mysql-sts-secret
 type: Opaque
 stringData:
   MYSQL_ROOT_PASSWORD: rootpass123
@@ -898,7 +898,7 @@ spec:
           image: mysql:8.0
           envFrom:
             - secretRef:
-                name: mysql-secret
+                name: mysql-sts-secret
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql

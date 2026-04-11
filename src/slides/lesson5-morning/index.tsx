@@ -2919,78 +2919,75 @@ kubectl get pods  → 回到 3 個
   // ============================================================
 
   {
-    title: '回頭操作 Loop 3 + 上午總結',
-    subtitle: '三個 Loop：擴縮容 → 滾動更新 → 自我修復 + Labels',
-    section: '5-11：回頭操作 + 上午總結',
+    title: 'Deployment 精華：它到底幫你做了什麼？',
+    subtitle: '你只管說「我要什麼」，Deployment 負責「怎麼做到」',
+    section: '5-11：上午總結',
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">上午三個 Loop 總結</p>
-          <table className="w-full text-xs mb-1">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-400 border-b border-slate-600">
-                <th className="pb-1 pr-3">Loop</th>
-                <th className="pb-1 pr-3">學了什麼</th>
-                <th className="pb-1">核心指令</th>
+                <th className="pb-2 pr-3 w-28">它幫你做</th>
+                <th className="pb-2 pr-3">效果</th>
+                <th className="pb-2">怎麼實現的</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
-              <tr className="border-t border-slate-700">
-                <td className="py-1 pr-3 text-cyan-400 font-bold">1</td>
-                <td className="py-1 pr-3">擴縮容</td>
-                <td className="py-1"><code className="text-green-400">kubectl scale</code></td>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-3 text-cyan-400 font-semibold">維持副本數</td>
+                <td className="py-2 pr-3">少了自動補，多了自動砍</td>
+                <td className="py-2 text-xs text-slate-400">ReplicaSet 持續監控，reconciliation loop 偵測差距立刻補</td>
               </tr>
-              <tr className="border-t border-slate-700">
-                <td className="py-1 pr-3 text-cyan-400 font-bold">2</td>
-                <td className="py-1 pr-3">滾動更新 + 回滾</td>
-                <td className="py-1"><code className="text-green-400">set image / rollout undo</code></td>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-3 text-cyan-400 font-semibold">分散部署</td>
+                <td className="py-2 pr-3">Pod 自動分到不同 Node</td>
+                <td className="py-2 text-xs text-slate-400">Scheduler 根據 Node 資源狀況決定放哪台</td>
               </tr>
-              <tr className="border-t border-slate-700">
-                <td className="py-1 pr-3 text-cyan-400 font-bold">3</td>
-                <td className="py-1 pr-3">自我修復 + Labels</td>
-                <td className="py-1"><code className="text-green-400">--show-labels / -l / label</code></td>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-3 text-cyan-400 font-semibold">滾動更新</td>
+                <td className="py-2 pr-3"><code className="text-green-400">set image</code> 一行，零停機</td>
+                <td className="py-2 text-xs text-slate-400">建新 RS（0&rarr;N），縮舊 RS（N&rarr;0），蹺蹺板替換</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-3 text-cyan-400 font-semibold">一鍵回滾</td>
+                <td className="py-2 pr-3"><code className="text-green-400">rollout undo</code>，秒級恢復</td>
+                <td className="py-2 text-xs text-slate-400">舊 RS 沒刪（副本歸零但保留），回滾 = 重新擴容舊 RS</td>
+              </tr>
+              <tr>
+                <td className="py-2 pr-3 text-cyan-400 font-semibold">版本歷史</td>
+                <td className="py-2 pr-3"><code className="text-green-400">rollout history</code> 隨時查</td>
+                <td className="py-2 text-xs text-slate-400">每次更新產生新 revision，預設保留 10 個 RS</td>
               </tr>
             </tbody>
           </table>
-          <div className="mt-2 text-xs text-slate-400 space-y-0.5">
-            <p className="text-slate-300 font-semibold">三個 Loop 的關聯</p>
-            <p><span className="text-cyan-400">Deployment（三層結構）</span> → spec.replicas / selector / template 定義期望</p>
-            <p><span className="text-cyan-400">ReplicaSet（蹺蹺板）</span> → 實現擴縮容與滾動更新（新舊 RS 一升一降）</p>
-            <p><span className="text-cyan-400">Labels / Selector（認親機制）</span> → Deployment 靠 label 認 Pod、觸發自我修復</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">底層：三層結構</p>
+          <div className="flex items-center justify-center gap-3 text-sm">
+            <div className="bg-cyan-900/40 border border-cyan-500/50 px-4 py-2 rounded-lg text-center">
+              <p className="text-cyan-400 font-bold">Deployment</p>
+              <p className="text-slate-400 text-[10px]">定義期望狀態</p>
+            </div>
+            <span className="text-slate-400 font-bold text-lg">&rarr;</span>
+            <div className="bg-purple-900/40 border border-purple-500/50 px-4 py-2 rounded-lg text-center">
+              <p className="text-purple-400 font-bold">ReplicaSet</p>
+              <p className="text-slate-400 text-[10px]">維持數量 + 版本管理</p>
+            </div>
+            <span className="text-slate-400 font-bold text-lg">&rarr;</span>
+            <div className="bg-green-900/40 border border-green-500/50 px-4 py-2 rounded-lg text-center">
+              <p className="text-green-400 font-bold">Pod</p>
+              <p className="text-slate-400 text-[10px]">實際跑容器</p>
+            </div>
           </div>
         </div>
 
         <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">上午小測驗（5 題，全部操作題）</p>
-          <div className="space-y-1.5 text-xs text-slate-300">
-            <div className="flex gap-2">
-              <span className="text-amber-400 font-bold shrink-0">Q1</span>
-              <span>建 nginx:1.25 Deployment → 更新到 1.28 → 貼出 <code className="text-green-400">rollout status</code> 的完整輸出（要看到 successfully rolled out）</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-amber-400 font-bold shrink-0">Q2</span>
-              <span>對同一個 Deployment 連跑兩次 <code className="text-green-400">rollout undo</code>，每次都執行 <code className="text-green-400">describe | grep Image</code>，說出最後的 image 是什麼</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-amber-400 font-bold shrink-0">Q3</span>
-              <span>把以下 YAML apply 到叢集，觀察症狀，說出報什麼錯，修好讓 READY 變 2/2：<br /><code className="text-red-400">selector: app=web / template labels: app=website</code></span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-amber-400 font-bold shrink-0">Q4</span>
-              <span>執行 <code className="text-green-400">kubectl delete pod -l app=nginx</code>，計時幾秒後 <code className="text-green-400">kubectl get pods</code> 再次看到全部 Running</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-amber-400 font-bold shrink-0">Q5</span>
-              <span>執行 <code className="text-green-400">kubectl get pods --show-labels</code> 找出 <code className="text-green-400">pod-template-hash</code>，對某個 Pod 用 <code className="text-green-400">--overwrite</code> 改掉它，觀察 Pod 總數變化</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg">
-          <p className="text-blue-400 font-semibold mb-1">下午預告</p>
-          <p className="text-slate-300 text-sm">Pod 跑起來、Deployment 管得好 → 但外面的人怎麼連進來？</p>
-          <p className="text-slate-300 text-sm">Pod IP 會變、叢集外連不到 → 下午主角：<strong className="text-white">Service</strong></p>
+          <p className="text-amber-400 font-semibold text-sm">串起來的關鍵：Labels + Selector</p>
+          <p className="text-slate-300 text-xs mt-1">Deployment selector = Pod template labels = Service selector &mdash; 三者對上，整個系統才會動</p>
+          <p className="text-slate-400 text-xs mt-1">改掉 Pod 的 label &rarr; 脫離管理（孤兒化）｜selector 打錯 &rarr; Endpoints 空、連不上</p>
         </div>
       </div>
     ),
@@ -3016,77 +3013,29 @@ kubectl label pod <pod-name> env=test
 kubectl label pod <pod-name> app=isolated --overwrite
 kubectl delete pod -l app=nginx   # 批次刪`,
     notes: `【① 課程內容】
-上午回顧重點：
-- Deployment 完整生命週期：建立 → 更新（滾動）→ 失敗 → 回滾
-- ReplicaSet 的角色：滾動更新的蹺蹺板、自我修復的執行者
-- Labels 三處位置：Deployment 本身 / selector / Pod template，三者關係
-- Selector 是 K8s 資源關聯的核心機制
+上午總結：Deployment 到底幫你做了什麼？
 
-本節操作：帶做一遍 Loop 3 操作 → 上午小測驗 → 對照解答確認理解 → 提問與補充說明。
+五件事：
+1. 維持副本數 — 你說要 3 個，少了自動補（自我修復），多了自動砍
+   → 實現方式：ReplicaSet 持續監控 Pod 數量，reconciliation loop 偵測差距後立刻補上
+2. 分散部署 — Pod 自動分配到不同 Node
+   → 實現方式：Scheduler 根據 Node 資源狀況決定放哪台，kubectl get pods -o wide 看 NODE 欄位
+3. 滾動更新 — set image 一行指令，零停機
+   → 實現方式：Deployment 建新 RS，新 RS 副本 0→N，舊 RS 副本 N→0，蹺蹺板式替換
+4. 一鍵回滾 — rollout undo，秒級恢復
+   → 實現方式：舊 RS 沒有刪除（副本歸零但物件保留），回滾 = 把舊 RS 重新擴容
+5. 版本歷史 — 預設保留 10 個 RS，rollout history 隨時查
+   → 實現方式：每次更新產生新的 revision，revisionHistoryLimit 控制保留數量
+
+底層機制就是三層結構：
+  Deployment（你定義期望）→ ReplicaSet（維持數量 + 版本管理）→ Pod（實際跑容器）
+
+一句話：你只管說「我要什麼」，Deployment 負責「怎麼做到」。
 
 【② 指令講解】
-（本節為複習段，以問答為主，無新指令。）
+（本節為總結，無新指令。）
 
-【③④ 題目 + 解答（上午小測驗，共 5 題，全操作）】
-第 1 題：nginx:1.25 → nginx:1.28 完整流程 + 貼出 rollout status 輸出
-準備：kubectl create deployment quiz-deploy --image=nginx:1.25 --replicas=3
-操作：
-  kubectl set image deployment/quiz-deploy nginx=nginx:1.28
-  kubectl rollout status deployment/quiz-deploy
-  （貼出輸出）
-  kubectl describe deployment quiz-deploy | grep Image
-預期 rollout status 輸出：
-  Waiting for deployment "quiz-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
-  Waiting for deployment "quiz-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
-  deployment "quiz-deploy" successfully rolled out
-預期 grep Image 輸出：Image: nginx:1.28
-
-第 2 題：rollout undo 連跑兩次 + 每次確認 image
-  kubectl rollout undo deployment/quiz-deploy
-  kubectl describe deployment quiz-deploy | grep Image
-  （預期：Image: nginx:1.25）
-  kubectl rollout undo deployment/quiz-deploy
-  kubectl describe deployment quiz-deploy | grep Image
-  （預期：Image: nginx:1.28）
-解釋：兩次 undo 在 1.25 和 1.28 之間來回切換，因為每次 undo 都會產生新的 revision，所以 "上一版" 的定義會改變。
-
-第 3 題：YAML bug 操作題
-把以下 YAML 存成 quiz3.yaml 並 apply：
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: quiz3
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
-        app: web
-    template:
-      metadata:
-        labels:
-          app: website
-      spec:
-        containers:
-        - name: nginx
-          image: nginx:1.25
-預期報錯：The Deployment "quiz3" is invalid: spec.template.metadata.labels: Invalid value...selector does not match template labels
-修正：把 template labels 的 app: website 改成 app: web
-驗收：kubectl get deploy quiz3 → READY: 2/2
-清理：kubectl delete deployment quiz3
-
-第 4 題：批次刪 Pod + 計時
-  kubectl get pods -l app=nginx（確認有幾個）
-  時間點 A：kubectl delete pod -l app=nginx
-  時間點 B：kubectl get pods 看到全部 Running
-預期：15-30 秒內，新 Pod 的 AGE 只有幾秒，NAME 的 suffix 和舊 Pod 不同。
-
-第 5 題：改 pod-template-hash 觀察孤兒
-  kubectl get pods --show-labels（找到 pod-template-hash 的值，例如 abc12345）
-  kubectl label pod <某個pod名> pod-template-hash=tampered --overwrite
-  kubectl get pods（觀察總數）
-預期：Pod 總數從 3 變 4（被改掉的那個脫離 RS 成孤兒，Deployment 補新的），READY 仍是 3/3。
-清理：kubectl delete pod -l pod-template-hash=tampered
-
-[▶ 下一頁]`,
+【③④ 題目 + 解答】
+（無）`,
   },
 ]

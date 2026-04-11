@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>K8s 第五堂 — 複習筆記</title>
+  <title>K8s 第六堂 — 複習筆記</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -143,10 +143,9 @@
 <body>
 
 <header>
-  <h1>K8s 第五堂複習</h1>
+  <h1>K8s 第六堂複習</h1>
   <nav class="tabs" id="tabs"></nav>
-  <a href="commands.html" style="color:#f6ad55;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #744210;border-radius:6px;white-space:nowrap;">⌨️ 老師指令</a>
-  <a href="day6.html" style="margin-left:auto;color:#9ae6b4;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #276749;border-radius:6px;white-space:nowrap;flex-shrink:0;">第六堂 →</a>
+  <a href="index.html" style="margin-left:auto;color:#f6ad55;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #744210;border-radius:6px;white-space:nowrap;flex-shrink:0;">← 第五堂</a>
 </header>
 
 <main>
@@ -155,15 +154,15 @@
 
 <script>
   const DOCS = [
-    { label: 'Loop 1 回顧 + k3s',   file: '../docs/day5-loop1-review-k3s.md' },
-    { label: 'Loop 2 Deployment',    file: '../docs/day5-loop2-deployment.md' },
-    { label: 'Loop 3 滾動更新',      file: '../docs/day5-loop3-rolling-update.md' },
-    { label: 'Loop 4 自我修復 Labels', file: '../docs/day5-loop4-self-heal-labels.md' },
-    { label: '5-12 ClusterIP/NodePort/DNS/NS', file: '../docs/day5-loop5-service-dns-namespace.md' },
-    { label: '5-15 DaemonSet + CronJob', file: '../docs/day5-loop6-daemonset-cronjob.md' },
-    { label: '5-17 綜合實作',        file: '../docs/day5-loop7-final-practice.md' },
-    { label: 'Bonus 進階 YAML',      file: '../docs/day5-loop-bonus-advanced-yaml.md' },
-    { label: '📋 投影片地圖',        file: '../docs/day5-slide-map.md' },
+    { label: 'Loop 1 Ingress',              file: '../docs/day6-loop1-ingress.md' },
+    { label: 'Loop 2 ConfigMap + Secret',   file: '../docs/day6-loop2-configmap-secret.md' },
+    { label: 'Loop 3 整合實作',             file: '../docs/day6-loop3-integration.md' },
+    { label: 'Loop 4 PV + PVC',             file: '../docs/day6-loop4-pv-pvc.md' },
+    { label: 'Loop 5 StatefulSet',          file: '../docs/day6-loop5-statefulset.md' },
+    { label: 'Loop 6 Helm',                 file: '../docs/day6-loop6-helm.md' },
+    { label: 'Loop 7 Rancher',              file: '../docs/day6-loop7-rancher.md' },
+    { label: 'Loop 8 綜合 + 總結',          file: '../docs/day6-loop8-final.md' },
+    { label: '📋 投影片地圖',               file: '../docs/day6-slide-map.md' },
   ];
 
   const tabsEl = document.getElementById('tabs');

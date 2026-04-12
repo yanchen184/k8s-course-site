@@ -472,35 +472,35 @@ Alice 還在！
 
   // ── 6-12 學員實作 ──
   {
-    title: '學員實作：PV + PVC 資料持久化',
-    subtitle: 'Loop 4 練習題',
+    title: '學員實作：PV + PVC 故障診斷',
+    subtitle: 'Loop 4 練習題 — 找出 broken-pv-pvc.yaml 的三個 bug',
     section: 'Loop 4：PV + PVC',
     duration: '10',
     content: (
       <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做：PV + PVC + MySQL → 驗證資料持久化</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>手寫 PV YAML（hostPath，2Gi，storageClassName: manual）</li>
-            <li>手寫 PVC YAML（1Gi，storageClassName: manual）</li>
-            <li>MySQL Deployment 掛載 PVC</li>
-            <li>進 MySQL 建 testdb、插入資料</li>
-            <li><code className="text-green-400">kubectl delete pod -l app=mysql</code></li>
-            <li>新 Pod 起來 → 驗證資料還在</li>
-          </ol>
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">必做：故障診斷題</p>
+          <p className="text-slate-300 text-sm mb-2">以下 YAML 有三個錯誤，找出來並修好，讓 PostgreSQL 正常啟動並持久化資料</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-0.5">
+            <p><span className="text-slate-500">accessModes:</span></p>
+            <p className="text-red-400">{'  - ReadWriteMany        # 錯誤一'}</p>
+            <p><span className="text-slate-500">storageClassName:</span> <span className="text-red-400">fast   # 錯誤二</span></p>
+            <p><span className="text-slate-500">storage:</span> <span className="text-red-400">2Gi    # 錯誤三（超過 PV 容量）</span></p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">修好後：kubectl get pv,pvc → 兩個都是 Bound</p>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">挑戰：觀察 PVC Pending</p>
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
+          <p className="text-yellow-400 font-semibold mb-2">挑戰題</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>PV 已被第一個 PVC 佔走（一個 PV 只能綁一個 PVC）</li>
-            <li>再建第二個 PVC → 觀察一直 Pending</li>
-            <li>思考：如果有 100 個微服務，手動建 100 個 PV？</li>
+            <li>local-pv 已被 local-pvc 綁定的情況下，再建 local-pvc2（1Gi）</li>
+            <li><code className="text-yellow-300">kubectl get pvc</code> 看 local-pvc2 的 STATUS</li>
+            <li>說明：為什麼是這個狀態？</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `接下來是大家的實作時間。必做題：自己手寫 PV + PVC 的 YAML，部署一個 MySQL Pod，進去寫資料，砍 Pod，驗證資料還在。挑戰題：建好 PV 之後，再建第二個 PVC，但 PV 已經被第一個 PVC 佔走了。觀察第二個 PVC 的狀態，你會看到它一直 Pending，因為沒有 PV 可以配對了。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    notes: `接下來是大家的實作時間。必做題：打開 broken-pv-pvc.yaml，這個 YAML 有三個錯誤，你要找出來並修好，讓 PostgreSQL 可以正常啟動並持久化資料。線索在 YAML 裡，仔細看 accessModes、storageClassName、還有容量。修好之後 kubectl apply，然後 kubectl get pv,pvc，兩個都要是 Bound 才算成功。挑戰題：在 local-pv 已經被 local-pvc 綁定的情況下，再建一個 local-pvc2，requests 1Gi。觀察 kubectl get pvc，local-pvc2 的 STATUS 是什麼，說明為什麼。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
   // ── 6-13 回頭操作 Loop 4 ──
@@ -1056,35 +1056,33 @@ testdb 還在。因為新的 mysql-0 掛載的還是 mysql-data-mysql-0 這個 P
 
   // ── 6-15 學員實作 ──
   {
-    title: '學員實作：StatefulSet MySQL',
-    subtitle: 'Loop 5 練習題',
+    title: '學員實作：StatefulSet Redis 快取叢集',
+    subtitle: 'Loop 5 練習題 — 自己寫 Redis StatefulSet（不給模板）',
     section: 'Loop 5：StorageClass + StatefulSet',
     duration: '10',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做：StatefulSet MySQL → 有序部署 + 資料持久化</p>
+          <p className="text-cyan-400 font-semibold mb-2">必做：場景任務題</p>
+          <p className="text-slate-400 text-xs mb-2">部署 Redis 快取叢集，每個 Pod 要有固定名稱、有序啟動、各自獨立的 500Mi 儲存</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>部署 statefulset-mysql.yaml</li>
-            <li><code className="text-green-400">kubectl get pods -w</code> 觀察有序啟動</li>
+            <li>自己寫 StatefulSet YAML（image: redis:7，2 個副本，serviceName 自訂）</li>
+            <li><code className="text-green-400">kubectl get pods</code> 看到 <code className="text-green-400">redis-0</code> 和 <code className="text-green-400">redis-1</code></li>
             <li><code className="text-green-400">kubectl get pvc</code> 看到兩個獨立 PVC</li>
-            <li>進 mysql-0 建 testdb</li>
-            <li>砍 mysql-0 → 驗證資料還在</li>
+            <li>刪 <code className="text-green-400">redis-0</code>，確認重建後名稱還是 <code className="text-green-400">redis-0</code></li>
           </ol>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">挑戰：觀察有序縮容</p>
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
+          <p className="text-yellow-400 font-semibold mb-2">挑戰：有序擴縮容驗證</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li><code className="text-green-400">kubectl scale statefulset mysql --replicas=3</code></li>
-            <li>mysql-2 最後建</li>
-            <li>scale 回 2 → mysql-2 先被刪</li>
-            <li>有序建立，反序刪除</li>
+            <li>Scale 到 3，用 <code className="text-yellow-300">-w</code> 看 mysql-2 最後才建</li>
+            <li>Scale 回 1，確認刪除順序：mysql-2 先刪還是 mysql-1 先刪？</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `接下來是大家的實作時間。必做題：自己部署 StatefulSet MySQL，觀察有序啟動，砍 Pod 驗證資料持久化。挑戰題：用 kubectl scale statefulset mysql --replicas=3 把副本數加到 3。你會看到 mysql-2 最後才建。然後 scale 回 2，mysql-2 會先被刪，mysql-0 和 mysql-1 留著。有序建立，反序刪除。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    notes: `接下來是大家的實作時間。必做題：你的團隊要部署 Redis 快取叢集，要求每個 Pod 有固定名稱、有序啟動、各自獨立的 500Mi 儲存。自己寫一個 StatefulSet YAML，image 用 redis:7，2 個副本，volumeClaimTemplates 每個 500Mi。驗收三點：kubectl get pods 要看到 redis-0 和 redis-1，kubectl get pvc 要看到兩個獨立的 PVC，刪掉 redis-0 之後重建的 Pod 名稱還是 redis-0。注意：這題不給模板，要自己寫。挑戰題：scale 到 3，觀察 mysql-2 最後才建；scale 回 1，記錄刪除順序。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
   // ── 6-16 回頭操作 Loop 5 ──
@@ -1549,35 +1547,36 @@ helm uninstall my-redis2
 
   // ── 6-18 學員實作 ──
   {
-    title: '學員實作：Helm 安裝 MySQL + Redis',
+    title: '學員實作：Helm upgrade 陷阱 + 多環境部署',
     subtitle: 'Loop 6 練習題',
     section: 'Loop 6：Helm',
     duration: '10',
     content: (
       <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做：Helm 安裝 + 驗證 + 清理</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>安裝 Helm + 加入 Bitnami 倉庫</li>
-            <li><code className="text-green-400">helm install my-mysql bitnami/mysql --set auth.rootPassword=my-secret</code></li>
-            <li><code className="text-green-400">helm install my-redis bitnami/redis --set auth.password=myredis123</code></li>
-            <li><code className="text-green-400">kubectl get pods</code> -- 確認都在跑</li>
-            <li><code className="text-green-400">helm list</code> -- 看到兩個 Release</li>
-            <li><code className="text-green-400">helm uninstall my-mysql && helm uninstall my-redis</code></li>
-          </ol>
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">必做 1：預測結果</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p>helm install my-mysql bitnami/mysql \</p>
+            <p>{'  '}--set auth.rootPassword=pass123</p>
+            <p className="text-yellow-300 mt-1">helm upgrade my-mysql bitnami/mysql \</p>
+            <p className="text-yellow-300">{'  '}--set secondary.replicaCount=1</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">upgrade 沒帶 rootPassword → 會發生什麼？怎麼避免？</p>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">挑戰：自訂 values.yaml</p>
+          <p className="text-cyan-400 font-semibold mb-2">必做 2：dev + prod 兩套 Redis</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>建 my-redis-values.yaml 修改 replicas 和密碼</li>
-            <li><code className="text-green-400">helm install my-redis2 bitnami/redis -f my-redis-values.yaml</code></li>
-            <li>驗證 replicas 數量跟你設的一致</li>
+            <li>dev-redis-values.yaml（1 副本）</li>
+            <li>prod-redis-values.yaml（3 副本 + 密碼）</li>
+            <li><code className="text-green-400">helm install dev-redis bitnami/redis -f dev-redis-values.yaml</code></li>
+            <li><code className="text-green-400">helm install prod-redis bitnami/redis -f prod-redis-values.yaml</code></li>
+            <li><code className="text-green-400">helm list</code> 看到兩個 Release 互不干擾</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `接下來是大家的實作時間。必做題：用 Helm 安裝一個 MySQL 和一個 Redis，驗證它們在跑，然後 helm uninstall 清掉。挑戰題：建一個自訂的 values.yaml，修改 replicas 數量和密碼，用 -f 安裝。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    notes: `接下來是大家的實作時間。必做第一題：先執行 helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123，然後執行 helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1，注意 upgrade 這行沒有帶 rootPassword。預測會發生什麼事？答案：密碼會被重置成 Helm 自動產生的 random 值，原有連線全斷。避免方法：用 --reuse-values。第二題：自己寫兩個 values.yaml，一個 dev 一個 prod，分別裝兩個 Release 的 Redis，確認 helm list 看到兩個互不干擾。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
   // ── 6-19 回頭操作 Loop 6 ──

@@ -522,31 +522,32 @@ curl http://api.myapp.local
 
   // ── 6-3（學員實作）──
   {
-    title: '學員實作：Ingress Path + Host Routing',
-    subtitle: '必做：path routing / 挑戰：host routing + 第三個服務',
+    title: '學員實作：在現有 Ingress 加新路由',
+    subtitle: '必做：加 /shop 路由 / 挑戰：host routing 加 admin 服務',
     section: '6-3：Ingress 實作',
     duration: '10',
     content: (
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">必做題</p>
+          <p className="text-slate-400 text-xs mb-2">公司要加一個新服務 shop-deploy（image: httpd:2.4）</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>部署兩個服務（nginx + httpd）+ ClusterIP Service</li>
-            <li>建 path routing Ingress：<code className="text-green-400">/</code> → frontend，<code className="text-green-400">/api</code> → api</li>
-            <li>用 curl 驗證兩個路徑</li>
+            <li>建 ClusterIP Service <code className="text-green-400">shop-svc</code>，port 8080，targetPort 80</li>
+            <li>在現有 <code className="text-green-400">app-ingress</code> 加路由：<code className="text-green-400">/shop</code> → shop-svc:8080</li>
+            <li><code className="text-green-400">curl http://&lt;NODE-IP&gt;/shop</code> 看到 It works!</li>
           </ul>
         </div>
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
           <p className="text-yellow-400 font-semibold mb-2">挑戰題</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>改成 host routing + 修改 /etc/hosts</li>
-            <li>加第三個服務：tomcat image → <code className="text-yellow-300">admin.myapp.local</code></li>
-            <li>/etc/hosts 也要加上 admin.myapp.local</li>
+            <li>在 host routing 加第三個服務：域名 <code className="text-yellow-300">admin.myapp.local</code></li>
+            <li>後端：admin-deploy（image: tomcat:10.1）+ admin-svc（port 8080）</li>
+            <li>/etc/hosts 加入，<code className="text-yellow-300">curl http://admin.myapp.local</code> 驗證</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `學員實作時間。必做題：照著剛才的步驟，部署兩個服務加上 path routing 的 Ingress，用 curl 驗證斜線到 nginx、斜線 api 到 httpd。挑戰題：改成 host routing，再加一個第三個服務，比如用 tomcat image 做一個 admin 服務，admin.myapp.local 導到它。記得 /etc/hosts 也要加上 admin.myapp.local。
+    notes: `學員實作時間。必做題：公司說要加一個購物服務。部署 shop-deploy，image 用 httpd:2.4，建一個 ClusterIP Service 叫 shop-svc，port 8080，targetPort 80。然後在現有的 app-ingress 裡加一條 /shop 的路由，指向 shop-svc:8080。最後 curl http://<NODE-IP>/shop 看到 It works! 就對了。注意：這裡是在「現有 Ingress 加路由」，不是重新建一個新的 Ingress。挑戰題：在 host routing 再加一個 admin.myapp.local，用 tomcat:10.1，記得 /etc/hosts 也要加。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
   },
@@ -1020,20 +1021,21 @@ kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123 -e "
 
   // ── 6-6（學員實作）──
   {
-    title: '學員實作：ConfigMap + Secret + MySQL',
-    subtitle: '必做：MySQL 用 Secret 設密碼 / 挑戰：Volume 掛載熱更新',
+    title: '學員實作：Secret + ConfigMap 注入 Redis',
+    subtitle: '必做：busybox 驗證兩個環境變數都注入成功',
     section: '6-6：ConfigMap + Secret 實作',
     duration: '10',
     content: (
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">必做題</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>建 ConfigMap：MYSQL_DATABASE=testdb</li>
-            <li>建 Secret：MYSQL_ROOT_PASSWORD</li>
-            <li>部署 MySQL Pod → envFrom 引用兩個</li>
-            <li>進 MySQL 確認 testdb 存在</li>
-          </ul>
+          <p className="text-slate-400 text-xs mb-2">部署 Redis 服務，敏感設定用 Secret，一般設定用 ConfigMap</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>建 <code className="text-green-400">redis-secret</code>：REDIS_PASSWORD=my-redis-pw</li>
+            <li>建 <code className="text-green-400">redis-config</code>：REDIS_MAXMEMORY=256mb</li>
+            <li>Deployment（image: busybox:1.36，command: env &amp;&amp; sleep 3600）用 envFrom 引用兩者</li>
+            <li><code className="text-green-400">kubectl exec</code> 進 Pod，<code className="text-green-400">env | grep REDIS</code> 確認兩個都在</li>
+          </ol>
         </div>
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
           <p className="text-yellow-400 font-semibold mb-2">挑戰題</p>
@@ -1045,7 +1047,7 @@ kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123 -e "
         </div>
       </div>
     ),
-    notes: `學員實作時間。必做題：建一個 ConfigMap 存 MYSQL_DATABASE 等於 testdb，建一個 Secret 存 MYSQL_ROOT_PASSWORD，然後部署 MySQL Pod 用 envFrom 引用這兩個，進 MySQL 確認 testdb 存在。挑戰題：用 Volume 掛載方式自訂一個 nginx.conf，然後修改 ConfigMap，等 30 到 60 秒觀察檔案是否自動更新。
+    notes: `學員實作時間。必做題：你要部署一個 Redis 服務。先用 kubectl create secret generic redis-secret --from-literal=REDIS_PASSWORD=my-redis-pw 建 Secret，再用 kubectl create configmap redis-config --from-literal=REDIS_MAXMEMORY=256mb 建 ConfigMap。然後自己寫一個 Deployment，image 用 busybox:1.36，command 是 sh -c env && sleep 3600，用 envFrom 同時引用這兩個。驗收：kubectl exec 進 Pod，env | grep REDIS 要看到兩行。挑戰題：用 Volume 掛載方式自訂一個 nginx.conf，修改 ConfigMap，等 30 到 60 秒觀察檔案是否自動更新。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
   },

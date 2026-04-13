@@ -134,21 +134,23 @@ Pod Running 但服務卡死了，K8s 不知道 → 所以學了 **Probe**：live
 
 **方向一：考 CKA**
 
-CKA 全名 Certified Kubernetes Administrator，CNCF 官方認證，業界認可度非常高。很多 DevOps 職缺會明確要求有 CKA。
+CKA 全名 Certified Kubernetes Administrator，CNCF 官方認證，業界認可度非常高。CKA 考的是叢集管理和故障排除能力。很多 DevOps 職缺會明確要求有 CKA。
 
 考試形式是線上實作，不是選擇題。給你一個真實的 K8s 叢集，兩個小時做完 15 到 20 題。考試可以查 K8s 官方文件，不需要死背指令，重要的是你知道怎麼找、怎麼用。
 
-我們四堂課的內容大概涵蓋了 CKA 60% 左右的知識點。還需要額外學的包括：用 kubeadm 從零搭建叢集、etcd 備份和還原、Taint 和 Toleration、Node Affinity、PodDisruptionBudget、更深入的網路除錯。
+我們四堂課的內容大概涵蓋了 CKA 60% 左右的知識點。還需要額外學的包括：用 kubeadm 從零搭建叢集（kubeadm 是官方提供的安裝工具，用來初始化 control plane 和加入 worker node）、etcd 備份和還原（etcd 是 K8s 的分散式鍵值資料庫，存所有叢集狀態，像是 Pod 資訊、設定等等，是叢集的「記憶」）、Taint 和 Toleration（Taint 是給 Node 打污點標記，表示「不是特別允許的 Pod 不能排到這台」；Toleration 是 Pod 聲明「我可以接受這個污點」才能排上去，常用在 GPU Node 只讓需要 GPU 的 Pod 使用）、Node Affinity（讓 Pod 偏好或必須排到有特定 label 的 Node，比 nodeSelector 更有彈性）、PodDisruptionBudget、更深入的網路除錯。
 
-如果角色偏開發不是運維，可以考 **CKAD**（Certified Kubernetes Application Developer）。偏安全可以考 **CKS**（Certified Kubernetes Security Specialist）。
+如果角色偏開發不是運維，可以考 **CKAD**（Certified Kubernetes Application Developer），考的是 Pod、Deployment、Service 這些應用層面的操作。偏安全可以考 **CKS**（Certified Kubernetes Security Specialist），考的是 RBAC、NetworkPolicy、Image 安全掃描這些安全相關的知識。
 
 ---
 
 **方向二：Service Mesh — Istio**
 
-我們學了 Service 做基本的流量轉發。但如果你的微服務架構更複雜，需要做流量控制、熔斷、鏈路追蹤，就需要 Service Mesh。
+我們學了 Service 做基本的流量轉發。但如果你的微服務架構更複雜，需要做流量控制、熔斷、鏈路追蹤，就需要 Service Mesh。Service Mesh 是微服務架構下的網路管理層，它不需要改應用程式本身，就能幫你做這些事情。
 
-最知名的是 **Istio**。它在每個 Pod 旁邊放一個 Sidecar Proxy，攔截所有進出的流量做管控。還記得第四堂學的 Sidecar 模式嗎？Istio 就是 Sidecar 的極致應用。
+什麼是熔斷？熔斷（Circuit Breaker）就是當某個服務一直失敗，自動「斷路」停止繼續呼叫它，避免錯誤像骨牌一樣擴散到整個系統。鏈路追蹤（Distributed Tracing）則是追蹤一個請求從入口到各個微服務的完整路徑，找出哪一段最慢或出錯。
+
+最知名的是 **Istio**。它在每個 Pod 旁邊放一個 Sidecar Proxy，攔截所有進出的流量做管控。Sidecar 是一個設計模式：把輔助功能放在主容器旁邊的第二個容器裡，主容器跑應用，Sidecar 跑網路代理，兩者在同一個 Pod 裡共享網路。還記得第四堂學的 Sidecar 模式嗎？Istio 就是 Sidecar 的極致應用。
 
 ---
 
@@ -156,7 +158,9 @@ CKA 全名 Certified Kubernetes Administrator，CNCF 官方認證，業界認可
 
 我們目前都是手動 `kubectl apply` 部署的。但在企業環境裡，你不會讓人手動操作生產環境。
 
-GitOps 的做法：把所有 YAML 放在 Git 倉庫裡，用 **ArgoCD** 監控倉庫。你 `git push` 更新 YAML，ArgoCD 自動幫你 apply 到叢集上。整個部署流程是自動化的，而且有完整的版本歷史和回滾能力。
+GitOps 是一種部署方式：Git 倉庫是唯一的事實來源，所有變更都透過 git commit。好處是可以 audit（誰改了什麼）、rollback（git revert）、review（PR 流程），全部都有跡可查。
+
+具體做法是把所有 YAML 放在 Git 倉庫裡，用 **ArgoCD** 監控倉庫。ArgoCD 是 GitOps 工具，它會持續監控 Git 倉庫，發現 YAML 有變更就自動 apply 到叢集。你 `git push` 更新 YAML，ArgoCD 自動幫你 apply 到叢集上。整個部署流程是自動化的，而且有完整的版本歷史和回滾能力。
 
 ---
 

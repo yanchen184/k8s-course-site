@@ -8,7 +8,47 @@
 
 📄 6-14 第 1 張
 
-這節介紹為什麼靜態佈建不夠用、StorageClass 如何實現動態佈建，以及 Deployment 跑資料庫的根本限制，引入 StatefulSet 三個保證與 Headless Service 的概念。
+好，這節我們來講一個很多人會踩到的坑——用 Deployment 跑資料庫。
+
+你現在用 Deployment 跑 MySQL，看起來能跑，對不對？Pod 起來了、PVC 掛上去了、資料也寫進去了。但如果今天我叫你 scale 一下：
+
+```bash
+kubectl scale deployment mysql --replicas=3
+```
+
+三個 MySQL 副本就這樣建起來了。然後問題來了——這三個 Pod，每個都有自己的記憶體狀態，你寫進 Pod A 的資料，Pod B 看不到。
+
+更嚴重的是：如果這三個 Pod 共用同一個 PVC，三個 MySQL 同時寫同一份資料，資料就直接壞掉了，這叫做「寫入衝突」。
+
+所以根本問題是：**Deployment 是為無狀態應用設計的**。你的 API Server 重啟不會有問題，因為它不存資料。但資料庫有狀態，它不能用 Deployment 來跑。
+
+---
+
+📄 6-14 第 2 張
+
+那 StatefulSet 怎麼解決這個問題？它給你三個保證。
+
+**第一個：固定名字。** Deployment 建出的 Pod 名稱帶 random hash，像 `mysql-7d9f5b8c4d-abc12`，你根本不知道誰是主庫誰是從庫。StatefulSet 不一樣，Pod 名字有序號：`mysql-0`、`mysql-1`、`mysql-2`。Pod 被刪掉重建，名字還是一樣。
+
+**第二個：有序啟動。** Deployment 是所有 Pod 同時建起來的。StatefulSet 不一樣，`mysql-0` Ready 了，才會建 `mysql-1`；`mysql-1` Ready 了，才建 `mysql-2`。這樣主庫一定比從庫先起來。
+
+**第三個：獨立 PVC。** StatefulSet 會自動幫每個 Pod 建自己的 PVC：`mysql-0` 用 `data-mysql-0`，`mysql-1` 用 `data-mysql-1`，互不干擾，不會搶同一塊磁碟。
+
+還有一個配套：**Headless Service**。普通 Service 做負載均衡，你連進去不知道打到哪個 Pod。Headless Service 設定 `clusterIP: None`，讓每個 Pod 有自己的 DNS：`mysql-0.mysql-svc`、`mysql-1.mysql-svc`，這樣你才能指定「寫去 mysql-0、讀 mysql-1」。
+
+---
+
+📄 6-14 第 3 張
+
+今天的目標很具體：用 StatefulSet 跑一個 MySQL，然後驗證三件事。
+
+第一，Pod 名字是 `mysql-0`，不是 random hash。第二，它有自己獨立的 PVC，你沒有手動建，StatefulSet 自動幫你建的。第三，把 Pod 刪掉重建，資料還在。
+
+另外這節還會帶到 **StorageClass**。StorageClass 是動態佈建的機制——以前我們手動建 PV，現在只要建 PVC，StorageClass 的 provisioner 自動幫你建 PV。k3s 預設用 `local-path`，雲上 AWS 用 `gp2`、GCP 用 `standard`。
+
+不過今天的重點是 StatefulSet，StorageClass 帶過去就好，知道它的作用就夠了。
+
+我們先確認一下叢集有沒有 StorageClass：
 
 ---
 

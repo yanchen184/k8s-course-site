@@ -16,25 +16,47 @@ env:
     value: "my-secret-password"
 ```
 
-有三個問題：第一，密碼推到 Git，全世界都看到。第二，dev 和 prod 的設定不一樣，你要 build 兩個 Image。第三，改個 log level 就要重 build Image，太浪費。
+這樣寫有三個問題。
 
-K8s 的解法是：**把設定和程式碼分開**。程式碼打進 Image，設定存在 ConfigMap 或 Secret，部署時注入進去。
+第一，**安全問題**。密碼寫死在 YAML，YAML 推到 Git，全世界都看得到。你可能說「我設 private repo」，但 CI log、同事的電腦、staging 環境——洩漏的機會非常多。
 
-- **ConfigMap**：一般設定（DB host、log level、API URL）
-- **Secret**：敏感資訊（密碼、API key）
+第二，**改設定太麻煩**。你換了 DB 密碼，要改 YAML，重新 `kubectl apply`，Pod 重建。如果密碼是寫在 Image 裡面的 config file，那更麻煩——要重新 build Image、push、再 deploy，光這樣就半小時不見了。
 
-好，直接開始做。
+第三，**多環境問題**。dev 的 DB_HOST 是 `db.dev.internal`，prod 是 `db.prod.internal`。設定寫死，你就得維護兩份 YAML 或兩個 Image。
+
+K8s 的解法是把設定和程式碼分開。程式碼打進 Image，設定存在獨立的物件——**ConfigMap** 或 **Secret**，部署時再注入進去。Image 不用換，設定改了 apply 一下就好。
 
 ---
 
 📄 6-5 第 2 張
 
-**這節做四件事**
+**ConfigMap 跟 Secret 有什麼差？**
 
-1. ConfigMap 環境變數注入（改了要重啟）
-2. ConfigMap Volume 掛載（改了 30 秒自動更新）
-3. Secret 建立與 Base64 觀察
-4. MySQL 同時用 Secret + ConfigMap
+很多人第一次接觸會搞混。其實他們的用法幾乎一樣，差別只在「存什麼」和「K8s 怎麼保護它」。
+
+| | ConfigMap | Secret |
+|:---|:---|:---|
+| 適合存什麼 | 一般設定（DB_HOST、LOG_LEVEL、API_URL、PORT）| 敏感資料（密碼、API Key、Token、憑證）|
+| 儲存方式 | 明文 | Base64 編碼（不是加密！）|
+| 存取控制 | 一般 RBAC | RBAC + 可設定 etcd 加密 + 更嚴格的存取限制 |
+| 看得到值嗎 | `kubectl describe` 直接看到 | `kubectl describe` 只顯示大小，不顯示值 |
+
+這裡要特別說一件事：**Base64 不是加密**。你一秒就可以解回明文。Secret 的安全性靠的是 RBAC——K8s 透過存取控制決定誰能 `get secret`，不是靠 Base64 保密。所以 Secret 跟 ConfigMap 的根本差異是「K8s 的存取控制機制不一樣」，而不是「加密了所以安全」。
+
+用法上，兩個都可以用環境變數注入，也都可以掛載成檔案，結構幾乎一樣。
+
+---
+
+📄 6-5 第 3 張
+
+**今天做四件事**
+
+1. ConfigMap 環境變數注入（改了要重啟，不會自動更新）
+2. ConfigMap Volume 掛載（改了 30 秒自動更新，但程式要自己 reload）
+3. Secret 建立與 Base64 觀察（親眼看到 Base64 有多不安全）
+4. MySQL 整合：同時用 Secret 管密碼 + ConfigMap 管設定
+
+把密碼從 YAML 裡抽出來進 Secret，把設定從 YAML 抽出來進 ConfigMap。這是 K8s 最標準的做法，不管什麼專案都用得上。好，開始做。
 
 ---
 

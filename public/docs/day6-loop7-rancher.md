@@ -6,7 +6,54 @@
 
 ### ① 課程內容
 
-管多個叢集用 kubectl 切 context 很痛苦，一不小心就打在 prod 上。Rancher 是 SUSE 出的 K8s 叢集管理平台，Web GUI 同時管多個叢集，不用切 context。今天把 k3s 叢集 import 進 Rancher 來管。
+📄 6-20 第 1 張
+
+先想一個情境。你現在管一個叢集，用 kubectl 就夠了：
+
+```bash
+kubectl get nodes
+kubectl get pods
+```
+
+感覺還好，對不對？但如果你今天管三個叢集——dev、staging、prod——每次操作之前要先切 context：
+
+```bash
+kubectl config use-context prod
+```
+
+問題是，你切完之後有沒有視覺上的提醒告訴你「你現在在 prod」？沒有。終端機就是一個黑色視窗，context 是文字，你不一定每次都記得看。
+
+然後你打了一個刪除指令，才發現，刪的是 prod 的 Pod。這種事情真的會發生。
+
+kubectl 是 CLI，它天生就沒有「你現在在哪個叢集」這個視覺保護。這就是為什麼管多個叢集，我們需要 GUI 的叢集管理工具。
+
+---
+
+📄 6-20 第 2 張
+
+Rancher 是 SUSE 出的 K8s 叢集管理平台，Web GUI，免費開源。
+
+它有幾個核心功能：
+
+第一，**多叢集管理**。把多個叢集 import 進來，在同一個介面統一管，你永遠看得到你現在操作的是哪個叢集，不會切錯。
+
+第二，**Pod / Deployment 的 GUI 操作**。看 Pod 狀態、改 replicas、查 logs，全部用滑鼠，不用打指令。特別適合有人問你「這個 Pod 怎麼了」的時候，直接點開給他看。
+
+第三，**Kubectl Shell**。在瀏覽器裡開一個 terminal，直接打 kubectl，不用裝本機環境。這對臨時要處理問題的人很方便。
+
+部署方式要注意：Rancher 本身是跑在 Docker 容器裡，不是安裝在 K8s 裡面。它是一個獨立的管理平台，用 Docker 啟動一個容器就好。
+
+---
+
+📄 6-20 第 3 張
+
+今天我們做四件事。
+
+第一，用一行 Docker 指令把 Rancher 跑起來。第二，瀏覽器打開 Rancher GUI，完成初始設定。第三，把我們的 k3s 叢集 import 進 Rancher。第四，用 GUI 觀察 Pod、看 logs、試試 kubectl shell。
+
+整個流程做完，你就知道什麼情況下要用 CLI、什麼情況下用 GUI 比較快。這兩個不是互斥的，是互補的。
+
+我們開始吧。
 
 ---
 

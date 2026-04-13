@@ -57,7 +57,7 @@ Ingress 是兩個東西，要分清楚。
 kubectl get pods -n kube-system | grep traefik
 ```
 
-- `-n kube-system`：K8s 系統元件都跑在這個 namespace
+- `-n kube-system`：namespace 是 K8s 用來隔離資源的空間，就像資料夾。系統元件都跑在 `kube-system` 這個 namespace，你自己建的資源預設在 `default`
 - `| grep traefik`：篩出 Traefik Pod
 
 預期輸出：
@@ -183,11 +183,13 @@ rules:
           ...
 ```
 
+這裡的 `host:` 欄位對應的是 HTTP 請求裡的 Host header。瀏覽器打一個域名時，會自動在請求裡帶上 `Host: www.myapp.local`，Ingress Controller 就靠這個欄位判斷要走哪條規則。等一下用 curl 測試時，如果不是透過 `/etc/hosts` 解析，就要手動加 `-H "Host: www.myapp.local"` 才會被正確路由。
+
 ```bash
 kubectl apply -f ingress-host.yaml
 ```
 
-模擬 DNS（正式環境在 DNS 服務商設定，本地用 `/etc/hosts`）：
+`/etc/hosts` 是 Linux 的本機 DNS 覆蓋檔。系統在查 DNS 之前，會先查這個檔案。你在裡面加一行 `IP 域名`，這台機器就會把這個域名解析成你指定的 IP，不影響其他機器，只有這台有效。正式環境在 DNS 服務商設定，本地測試用 `/etc/hosts` 模擬：
 
 ```bash
 sudo sh -c 'echo "192.168.64.10 www.myapp.local api.myapp.local" >> /etc/hosts'

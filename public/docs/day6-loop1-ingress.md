@@ -18,7 +18,15 @@ NodePort 給你的是 30000–32767 這個範圍，沒辦法用標準 port。所
 
 這個問題，Docker 時代用 Nginx 反向代理來解。K8s 的等價解法叫 **Ingress**。
 
-Ingress 是兩個東西：一張路由地圖（YAML），還有一個讀地圖的 Pod 叫 **Ingress Controller**。我們用 k3s，**Traefik** 已經裝好了。
+Ingress 是兩個東西，要分清楚。
+
+第一個是 **Ingress YAML**，就是一份路由規則：`/api` 導去哪個 Service、`www.myapp.local` 導去哪個 Service。這份 YAML 本身只是設定，不會做任何事。
+
+第二個是 **Ingress Controller**，一個真正跑在叢集裡的 Pod，持續監聽 80/443。每次有請求進來，它就查你寫的那份 YAML，決定流量要轉去哪個 Service。
+
+規則表本身不會接電話，要有 Controller 拿著表才有用。
+
+常見的 Ingress Controller 有 Nginx、Traefik、HAProxy，標準 K8s 不內建，要自己裝。k3s 預設幫你裝好 **Traefik**，所以我們直接用，不用額外設定。
 
 好，直接開始做。
 

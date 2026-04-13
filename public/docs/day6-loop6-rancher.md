@@ -223,6 +223,13 @@ docker run -d --restart=unless-stopped \
 - `-p 80:80 -p 443:443`：把主機的 80 和 443 對應到 Rancher 容器（Rancher Web 介面）
 - `--privileged`：Rancher 需要特殊權限才能管理叢集資源
 
+預期輸出：
+```
+a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678
+```
+
+（只會印出一行 container ID，代表容器已在背景啟動）
+
 等幾十秒讓 Rancher 初始化。
 
 > **如果 Port 衝突（k3s 的 Traefik 佔了 80 和 443）**：
@@ -421,7 +428,12 @@ A：`kubectl exec -it <pod-name> -- /bin/sh`（或 `/bin/bash`，看容器裡有
 kubectl 確認：
 ```bash
 kubectl get deploy <deployment-name>
-# READY 欄位應顯示 4/4
+```
+
+預期輸出：
+```
+NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
+<deployment-name>     4/4     4            4           5m
 ```
 
 **挑戰題解答：**

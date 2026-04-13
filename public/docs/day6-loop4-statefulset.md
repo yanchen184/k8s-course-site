@@ -410,10 +410,12 @@ kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "CREATE DATABASE test
 - `exec -it mysql-0`：直接指定 Pod 名稱（StatefulSet 的好處，不用記 random hash）
 - `-e "CREATE DATABASE testdb;"`：非互動模式執行 SQL 後立刻退出
 
-有這個 Warning 是正常的：
+預期輸出：
 ```
 mysql: [Warning] Using a password on the command line interface can be insecure.
 ```
+
+Warning 後面沒有其他輸出代表成功（SQL 執行完就退出）。
 
 ---
 
@@ -500,6 +502,11 @@ mysql-2   1/1     Running             0          20s
 kubectl scale statefulset mysql --replicas=2
 ```
 
+預期輸出：
+```
+statefulset.apps/mysql scaled
+```
+
 立刻 watch：
 ```bash
 kubectl get pods -w
@@ -513,6 +520,11 @@ mysql-2   1/1     Terminating   0          2m     ← mysql-2 先被刪（反序
 縮容後 PVC `mysql-data-mysql-2` **不會自動刪除**，需要手動清：
 ```bash
 kubectl delete pvc mysql-data-mysql-2
+```
+
+預期輸出：
+```
+persistentvolumeclaim "mysql-data-mysql-2" deleted
 ```
 
 ---
@@ -602,24 +614,114 @@ spec:
 
 ```bash
 kubectl apply -f redis-statefulset.yaml
+```
+
+預期輸出：
+```
+service/redis-headless created
+statefulset.apps/redis created
+```
+
+```bash
 kubectl get pods -w           # 觀察有序啟動
+```
+
+預期輸出：
+```
+NAME      READY   STATUS              RESTARTS   AGE
+redis-0   0/1     ContainerCreating   0          1s
+redis-0   1/1     Running             0          10s
+redis-1   0/1     Pending             0          0s
+redis-1   0/1     ContainerCreating   0          1s
+redis-1   1/1     Running             0          12s
+```
+
+```bash
 kubectl get pvc               # 確認兩個獨立 PVC
+```
+
+預期輸出：
+```
+NAME                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+redis-data-redis-0  Bound    pvc-c3d4e5f6-...                           500Mi      RWO            local-path     1m
+redis-data-redis-1  Bound    pvc-d4e5f6a7-...                           500Mi      RWO            local-path     30s
+```
+
+```bash
 kubectl delete pod redis-0    # 砍掉 redis-0
+```
+
+預期輸出：
+```
+pod "redis-0" deleted
+```
+
+```bash
 kubectl get pods -w           # 等重建，確認名稱還是 redis-0
+```
+
+預期輸出：
+```
+NAME      READY   STATUS              RESTARTS   AGE
+redis-0   0/1     ContainerCreating   0          1s
+redis-0   1/1     Running             0          10s
 ```
 
 **挑戰題**
 
 ```bash
 kubectl scale statefulset mysql --replicas=3
+```
+
+預期輸出：
+```
+statefulset.apps/mysql scaled
+```
+
+```bash
 kubectl get pods -w    # mysql-2 最後建
+```
+
+預期輸出：
+```
+NAME      READY   STATUS              RESTARTS   AGE
+mysql-0   1/1     Running             0          15m
+mysql-1   1/1     Running             0          14m
+mysql-2   0/1     Pending             0          0s
+mysql-2   0/1     ContainerCreating   0          1s
+mysql-2   1/1     Running             0          20s
+```
+
+```bash
 kubectl scale statefulset mysql --replicas=1
+```
+
+預期輸出：
+```
+statefulset.apps/mysql scaled
+```
+
+```bash
 kubectl get pods -w    # mysql-2 先 Terminating，然後 mysql-1，mysql-0 不受影響
+```
+
+預期輸出：
+```
+NAME      READY   STATUS        RESTARTS   AGE
+mysql-2   1/1     Terminating   0          3m
+mysql-1   1/1     Terminating   0          14m
+mysql-0   1/1     Running       0          15m
 ```
 
 縮容到 1 後手動清多餘的 PVC：
 ```bash
 kubectl delete pvc mysql-data-mysql-1 mysql-data-mysql-2
+```
+
+預期輸出：
+```
+persistentvolumeclaim "mysql-data-mysql-1" deleted
+persistentvolumeclaim "mysql-data-mysql-2" deleted
 ```
 
 ---
@@ -628,10 +730,49 @@ kubectl delete pvc mysql-data-mysql-1 mysql-data-mysql-2
 
 ```bash
 kubectl delete statefulset mysql
+```
+
+預期輸出：
+```
+statefulset.apps "mysql" deleted
+```
+
+```bash
 kubectl delete svc mysql-headless
+```
+
+預期輸出：
+```
+service "mysql-headless" deleted
+```
+
+```bash
 kubectl delete secret mysql-secret
+```
+
+預期輸出：
+```
+secret "mysql-secret" deleted
+```
+
+```bash
 kubectl delete pvc mysql-data-mysql-0 mysql-data-mysql-1
+```
+
+預期輸出：
+```
+persistentvolumeclaim "mysql-data-mysql-0" deleted
+persistentvolumeclaim "mysql-data-mysql-1" deleted
+```
+
+```bash
 kubectl get all    # 確認清乾淨
+```
+
+預期輸出：
+```
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.43.0.1    <none>        443/TCP   10d
 ```
 
 ---

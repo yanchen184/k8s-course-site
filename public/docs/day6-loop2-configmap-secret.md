@@ -175,12 +175,25 @@ LOG_LEVEL=info
 kubectl rollout restart deployment/app-with-config
 ```
 
+預期輸出：
+```
+deployment.apps/app-with-config restarted
+```
+
 - `rollout restart`：觸發滾動重啟，新 Pod 啟動時才讀到更新後的 ConfigMap
 
 等新 Pod 跑起來：
 
 ```bash
 kubectl get pods -w
+```
+
+預期輸出：
+```
+NAME                               READY   STATUS        RESTARTS   AGE
+app-with-config-7d9f5b8c4d-abc12   1/1     Terminating   0          2m
+app-with-config-8f6c9d7e5b-xyz99   0/1     Pending       0          2s
+app-with-config-8f6c9d7e5b-xyz99   1/1     Running       0          5s
 ```
 
 看到新 Pod `Running` 後按 Ctrl+C，再查：
@@ -254,13 +267,30 @@ service/nginx-custom-svc created
 kubectl get pods -l app=nginx-custom
 ```
 
+預期輸出：
+```
+NAME                            READY   STATUS    RESTARTS   AGE
+nginx-custom-6b8d7f9c5f-xk7pq   1/1     Running   0          20s
+```
+
 確認設定檔有掛進去：
 
 ```bash
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 ```
 
-預期輸出：看到 `Hello from ConfigMap` 和 `OK`。
+預期輸出：
+```
+server {
+  listen 80;
+  location / {
+    return 200 'Hello from ConfigMap\n';
+  }
+  location /healthz {
+    return 200 'OK\n';
+  }
+}
+```
 
 用 port-forward 測試：
 
@@ -285,16 +315,42 @@ kubectl edit configmap nginx-config
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 ```
 
+預期輸出：
+```
+server {
+  listen 80;
+  location / {
+    return 200 'Hello from ConfigMap\n';
+  }
+  location /healthz {
+    return 200 'HEALTHY\n';
+  }
+}
+```
+
 檔案已更新（看到 `HEALTHY`）。但 curl 還是舊的：
 
 ```bash
 curl http://localhost:8080/healthz
 ```
 
+預期輸出：
+```
+OK
+```
+
 還是 `OK`！Volume 自動更新的是「**檔案內容**」，Nginx 程式本身不知道設定改了。要讓設定生效：
 
 ```bash
 kubectl exec deploy/nginx-custom -- nginx -s reload
+```
+
+預期輸出：
+```
+2024/01/01 00:00:00 [notice] 1#1: signal process started
+```
+
+```bash
 curl http://localhost:8080/healthz
 ```
 
@@ -306,6 +362,11 @@ curl http://localhost:8080/healthz
 kill %1
 ```
 
+預期輸出：
+```
+[1]  + terminated  kubectl port-forward svc/nginx-custom-svc 8080:80
+```
+
 ---
 
 **Step 3：建立 Secret，觀察 Base64**
@@ -314,6 +375,11 @@ kill %1
 kubectl create secret generic db-cred \
   --from-literal=username=admin \
   --from-literal=password=my-secret-pw
+```
+
+預期輸出：
+```
+secret/db-cred created
 ```
 
 - `create secret generic`：建立 Opaque 類型的 Secret
@@ -422,6 +488,13 @@ service/mysql-svc created
 kubectl get pods -l app=mysql -w
 ```
 
+預期輸出：
+```
+NAME                            READY   STATUS              RESTARTS   AGE
+mysql-deploy-6c9f8b7d5e-pq4wt   0/1     ContainerCreating   0          5s
+mysql-deploy-6c9f8b7d5e-pq4wt   1/1     Running             0          20s
+```
+
 看到 `1/1 Running` 後按 Ctrl+C。
 
 進 MySQL 確認 database 建立：
@@ -502,9 +575,21 @@ A：`data` 欄位的值必須是 Base64 字串；`stringData` 欄位直接寫明
 ```bash
 kubectl create secret generic redis-secret \
   --from-literal=REDIS_PASSWORD=my-redis-pw
+```
 
+預期輸出：
+```
+secret/redis-secret created
+```
+
+```bash
 kubectl create configmap redis-config \
   --from-literal=REDIS_MAXMEMORY=256mb
+```
+
+預期輸出：
+```
+configmap/redis-config created
 ```
 
 Deployment YAML：
@@ -537,7 +622,24 @@ spec:
 
 ```bash
 kubectl apply -f redis-deploy.yaml
+```
+
+預期輸出：
+```
+deployment.apps/redis-deploy created
+```
+
+```bash
 kubectl get pods -l app=redis -w    # 等 Running
+```
+
+預期輸出：
+```
+NAME                            READY   STATUS    RESTARTS   AGE
+redis-deploy-5d8f7b9c4e-mn3qr   1/1     Running   0          10s
+```
+
+```bash
 kubectl exec deployment/redis-deploy -- env | grep REDIS
 ```
 
@@ -556,14 +658,37 @@ REDIS_MAXMEMORY=256mb
 kubectl delete deployment nginx-custom
 kubectl delete svc nginx-custom-svc
 kubectl delete configmap nginx-config
+```
 
+預期輸出：
+```
+deployment.apps "nginx-custom" deleted
+service "nginx-custom-svc" deleted
+configmap "nginx-config" deleted
+```
+
+```bash
 # busybox 相關：清掉
 kubectl delete deployment app-with-config
 kubectl delete configmap app-config
+```
 
+預期輸出：
+```
+deployment.apps "app-with-config" deleted
+configmap "app-config" deleted
+```
+
+```bash
 # MySQL：先不清！6-11 PV/PVC 那個 Loop 直接用這個 mysql-deploy 做實驗
 # 等一下的目標就是讓你親眼看到「沒有 PVC 的 MySQL，Pod 重建後資料消失」
 kubectl get pods    # 確認 mysql-deploy 還在跑
+```
+
+預期輸出：
+```
+NAME                            READY   STATUS    RESTARTS   AGE
+mysql-deploy-6c9f8b7d5e-pq4wt   1/1     Running   0          5m
 ```
 
 這個 `mysql-deploy` 故意留著。它沒有掛 PVC，資料寫在容器自己的 filesystem 裡。6-11 概念節會直接用它做「資料消失實驗」——先進去寫資料，砍 Pod，進來看資料不見了，這就是為什麼需要 PV/PVC。

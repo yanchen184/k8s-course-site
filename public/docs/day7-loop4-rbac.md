@@ -69,6 +69,10 @@ RBAC 有四個物件，兩兩一對：
 
 **Role：定義能做什麼**
 
+`verbs` 是「動作」，定義這個 Role 允許對資源做什麼操作。常見的有：`get`（讀單一資源）、`list`（列出全部）、`watch`（監聽變化）、`create`、`update`、`patch`、`delete`。只讀角色給 get、list、watch 就夠了；讀寫角色再加上其他的。
+
+`apiGroups` 指定資源所屬的 API 群組。空字串 `""` 代表 core group，包含 Pod、Service、ConfigMap、Secret 這些基本資源。`apps` 群組包含 Deployment、StatefulSet；`networking.k8s.io` 群組包含 Ingress。
+
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -262,11 +266,11 @@ A：常見的 verbs 有 `get`（查單個）、`list`（列出全部）、`watch
 
 **Q：`kubectl --as` 是真的模擬那個身份嗎？會有安全問題嗎？**
 
-A：`--as` 是利用 K8s 的 Impersonation 功能，需要你自己有 `impersonate` 這個權限。叢集 admin 預設有這個權限，所以你在本地環境可以用。但在生產環境，你不會把 impersonate 權限給一般使用者，所以不會有安全問題。這個功能主要用來測試和排錯，確認某個 ServiceAccount 的權限是否如預期。
+A：`--as` 是模擬身份（Impersonation），讓你用另一個 ServiceAccount 或 User 的權限執行指令，測試 RBAC 設定是否正確。它是利用 K8s 的 Impersonation 功能，需要你自己有 `impersonate` 這個權限。叢集 admin 預設有這個權限，所以你在本地環境可以用。但在生產環境，你不會把 impersonate 權限給一般使用者，所以不會有安全問題。這個功能主要用來測試和排錯，確認某個 ServiceAccount 的權限是否如預期。
 
 **Q：ServiceAccount 和一般的使用者帳號有什麼不同？**
 
-A：ServiceAccount 是給 Pod（程式）用的，存在 K8s 裡面，有 Token 可以驗證身份。一般使用者帳號（User）是給人用的，K8s 本身不管理 User，通常整合外部的身份驗證系統，比如 OIDC、LDAP 或者用 kubeconfig 裡的 certificate。在我們的課程環境，`kubectl --as` 模擬的是 ServiceAccount，因為 ServiceAccount 最好測試。
+A：ServiceAccount 是給 Pod（程式）用的，存在 K8s 裡面，有 Token 可以驗證身份。一般使用者帳號（User）是給人用的，K8s 本身不管理 User，通常整合外部的身份驗證系統，比如 OIDC（OpenID Connect，身份驗證協議，可以整合 Google、GitHub 等帳號登入 K8s）、LDAP（Lightweight Directory Access Protocol，企業常用的目錄服務，如 Active Directory）或者用 kubeconfig 裡的 certificate。在我們的課程環境，`kubectl --as` 模擬的是 ServiceAccount，因為 ServiceAccount 最好測試。
 
 ---
 

@@ -58,7 +58,7 @@ requests 是你告訴 K8s：我的 Pod 至少需要這麼多資源。K8s 的 Sch
 
 超過天花板會怎樣？CPU 和記憶體不一樣：
 
-- **CPU 超過 limits**：K8s 限速（CPU throttling）。你的程式變慢，API 回應從 100ms 變 500ms，但服務還在，不會被殺。
+- **CPU 超過 limits**：K8s 限速（CPU throttling）。CPU throttling 的意思是 K8s 不會殺你的 Pod，而是暫停它的 CPU 執行時間，讓程式變慢。你的 API 回應從 100ms 變 500ms，但服務還在，不會被殺。跟記憶體不同，記憶體超了直接殺，CPU 超了只是限速。
 - **記憶體超過 limits**：K8s 直接殺掉容器。為什麼不像 CPU 一樣限速？因為記憶體不能排隊等，你要寫第 129MB 的資料但只給你 128MB，沒辦法「等一下再寫」。這個狀態叫 **OOMKilled**（Out of Memory Killed）。
 
 ---
@@ -112,13 +112,13 @@ resources:
 
 **QoS 三個等級**
 
-K8s 會根據你怎麼設 requests 和 limits，給每個 Pod 一個 QoS（Quality of Service）等級。**當 Node 資源不夠的時候，QoS 決定誰先被犧牲。**
+K8s 會根據你怎麼設 requests 和 limits，給每個 Pod 一個 QoS 等級。QoS 全名是 Quality of Service，服務品質等級。這個等級不是你手動設的，是 K8s 根據你的 requests/limits 設定自動算出來的。**當 Node 資源不夠的時候，QoS 決定誰先被犧牲。**
 
 | QoS | 條件 | 被殺優先順序 |
 |:----|:-----|:------------|
-| Guaranteed | requests = limits（兩者都設且相等） | 最後被殺 |
-| Burstable | 有設 requests，但 requests < limits | 中間 |
-| BestEffort | 完全沒設 requests 和 limits | **最先被殺** |
+| Guaranteed | requests = limits（兩者都設且相等） | 最高優先，最後被殺 |
+| Burstable | 有設 requests，但 requests < limits，或只設其中一個 | 中等優先 |
+| BestEffort | 完全沒設 requests 和 limits | 最低優先，**最先被殺** |
 
 **生產環境建議**：
 - 至少要設 requests，讓 Pod 是 Burstable 而不是 BestEffort
@@ -215,7 +215,7 @@ oom-demo   0/1     CrashLoopBackOff  1  10s
 5. 重啟後 stress 又嘗試吃 256MB，又被殺，又重啟
 6. 幾次之後變成 `CrashLoopBackOff`
 
-**CrashLoopBackOff** 代表 K8s 發現這個容器一直 crash，開始用退避策略：第一次等 10 秒，第二次等 20 秒，第三次等 40 秒，越等越久，避免無效重啟浪費資源。
+**CrashLoopBackOff** 表示 Pod 陷入了「啟動 → crash → 重啟」的無限循環。BackOff 是退避的意思，K8s 發現這個容器一直 crash，開始用退避策略：第一次等 10 秒，第二次等 20 秒，第三次等 40 秒，越等越久，避免無效重啟浪費資源。
 
 按 `Ctrl+C` 停止 watch。
 
@@ -237,7 +237,7 @@ Last State:  Terminated
 ```
 
 - **OOMKilled**：確認是記憶體超限被殺
-- **Exit Code 137**：代表被 SIGKILL 信號殺掉，128 + 9 = 137，9 是 SIGKILL
+- **Exit Code 137**：代表被 SIGKILL 信號殺掉，128 + 9 = 137，9 是 SIGKILL。SIGKILL 是 Linux 的第 9 號信號，強制終止程序，程式無法捕捉或忽略，收到就立刻死。相對的，SIGTERM 是第 15 號信號，程式可以捕捉它來做 graceful shutdown（優雅關閉），把手上的事情做完再退出。OOMKilled 用的是 SIGKILL，不給你善後的機會。
 
 再看 Events：
 

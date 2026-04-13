@@ -469,42 +469,66 @@ traefik-xxx         1/1  Running  ← Ingress Controller`}</pre>
           <p className="text-slate-400 text-xs mt-1">svclb-traefik = Klipper Load Balancer，用 DaemonSet 把 Node 80/443 接給 Traefik</p>
         </div>
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 2-3：部署 + Path-based 測試</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>一個 YAML 建好兩個 Deployment + Service + Ingress</li>
-            <li>注意是 <strong className="text-green-400">ClusterIP</strong> 不是 NodePort</li>
-            <li><code className="text-green-400">kubectl get ingress</code> → 等 ADDRESS 出現才能測試</li>
-            <li><code className="text-green-400">curl NODE-IP/</code> → Nginx 歡迎頁</li>
-            <li><code className="text-green-400">curl NODE-IP/api</code> → httpd It works!</li>
-          </ul>
+          <p className="text-cyan-400 font-semibold mb-2">Step 2：部署</p>
+          <pre className="text-xs font-mono text-slate-300 bg-slate-900 p-2 rounded">{`deployment.apps/frontend-deploy created
+service/frontend-svc created
+deployment.apps/api-deploy created
+service/api-svc created
+ingress.networking.k8s.io/app-ingress created`}</pre>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">Step 3：確認狀態</p>
+          <pre className="text-xs font-mono text-slate-300 bg-slate-900 p-2 rounded">{`# kubectl get svc
+NAME           TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)
+api-svc        ClusterIP   10.43.x.x     <none>        3000/TCP
+frontend-svc   ClusterIP   10.43.x.x     <none>        80/TCP
+
+# kubectl get ingress
+NAME          CLASS     HOSTS   ADDRESS          PORTS
+app-ingress   traefik   *       192.168.64.10    80`}</pre>
+          <p className="text-slate-400 text-xs mt-1">ADDRESS 空白 → 等幾秒。兩個 Service 都是 ClusterIP — 有 Ingress 就不需要 NodePort</p>
         </div>
 
         <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
-          <p className="text-slate-400 text-xs font-semibold mb-1">kubectl get ingress 預期輸出</p>
-          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`NAME          CLASS     HOSTS   ADDRESS          PORTS
-app-ingress   traefik   *       192.168.64.10    80`}</pre>
-          <p className="text-slate-500 text-xs mt-1">ADDRESS 空白 → Traefik 還沒分配，等幾秒</p>
+          <p className="text-slate-400 text-xs font-semibold mb-1">Step 4：curl 驗證</p>
+          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`curl http://<NODE-IP>/     → Welcome to nginx!
+curl http://<NODE-IP>/api  → API Server Response`}</pre>
         </div>
       </div>
     ),
-    code: `# Step 1：確認 Ingress Controller（k3s 會看到兩種 Pod）
+    code: `# Step 1：確認 Controller
 kubectl get pods -n kube-system | grep traefik
-# svclb-traefik-xxx   2/2  Running  ← Klipper Load Balancer
-# traefik-xxx         1/1  Running  ← Traefik Controller
+# svclb-traefik-xxx   2/2  Running  ← Klipper LB
+# traefik-xxx         1/1  Running  ← Ingress Controller
 
-# 確認 Traefik 取得 EXTERNAL-IP（就是 VM 的 IP）
 kubectl get svc -n kube-system | grep traefik
+# traefik  LoadBalancer  10.43.x.x  192.168.64.10  80:xxx/TCP
 
-# Step 2：部署應用 + path-based Ingress
+# Step 2：部署
 kubectl apply -f ingress-basic.yaml
-kubectl get deployments
-kubectl get svc
-kubectl get ingress
-kubectl describe ingress app-ingress
+# deployment.apps/frontend-deploy created
+# service/frontend-svc created
+# deployment.apps/api-deploy created
+# service/api-svc created
+# ingress.networking.k8s.io/app-ingress created
 
-# Step 3：測試 path routing
-kubectl get nodes -o wide   # 看 INTERNAL-IP
-curl http://<NODE-IP>/      # → Nginx 歡迎頁
+# Step 3：確認
+kubectl get svc
+# frontend-svc  ClusterIP  10.43.x.x  <none>  80/TCP
+# api-svc       ClusterIP  10.43.x.x  <none>  3000/TCP
+
+kubectl get ingress
+# NAME         CLASS    HOSTS  ADDRESS        PORTS
+# app-ingress  traefik  *      192.168.64.10  80
+
+kubectl describe ingress app-ingress
+# Rules: * / → frontend-svc:80 (Pod IP)
+#          /api → api-svc:3000 (Pod IP)
+
+# Step 4：測試
+kubectl get nodes -o wide   # 看 INTERNAL-IP 欄位
+curl http://<NODE-IP>/      # → Welcome to nginx! (HTML)
 curl http://<NODE-IP>/api   # → API Server Response`,
     notes: `好，概念講完，動手做。請大家打開終端機。
 
@@ -558,43 +582,58 @@ curl http://192.168.1.100/api
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 4：Host-based routing</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>Ingress YAML 加 <code className="text-green-400">host</code> 欄位</li>
-            <li>修改 <code className="text-green-400">/etc/hosts</code> 模擬 DNS</li>
-            <li><code className="text-green-400">curl www.myapp.local</code> → Nginx</li>
-            <li><code className="text-green-400">curl api.myapp.local</code> → httpd</li>
-          </ul>
+          <p className="text-cyan-400 font-semibold mb-2">Step 5：Host-based routing</p>
+          <pre className="text-xs font-mono text-slate-300 bg-slate-900 p-2 rounded">{`kubectl apply -f ingress-host.yaml
+# → ingress.networking.k8s.io/app-ingress configured
+
+grep myapp.local /etc/hosts
+# → 192.168.64.10 www.myapp.local api.myapp.local`}</pre>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">curl 驗證</p>
+          <pre className="text-xs font-mono bg-slate-900 p-2 rounded">{`curl http://www.myapp.local
+# → Welcome to nginx! (HTML)
+
+curl http://api.myapp.local
+# → API Server Response`}</pre>
         </div>
 
         <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
-          <p className="text-yellow-400 text-xs font-semibold mb-1">/etc/hosts 追加注意</p>
-          <pre className="text-slate-300 text-xs font-mono">{`sudo sh -c 'echo "NODE-IP www.myapp.local api.myapp.local" >> /etc/hosts'
-grep myapp.local /etc/hosts   # 確認加進去了`}</pre>
-          <p className="text-red-400 text-xs mt-1">⚠ 用 <code>{'>>'}</code>（追加），絕對不能用 <code>{'>'}</code>（會覆蓋整個 /etc/hosts）</p>
+          <p className="text-red-400 text-xs font-semibold mb-1">⚠ /etc/hosts 用 {'>>'} 追加，絕對不能用 {'>'}</p>
+          <p className="text-slate-400 text-xs">{'>'} 會覆蓋整個 /etc/hosts，系統所有 DNS 解析會壞掉</p>
         </div>
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">最常見的三個坑</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li><strong className="text-red-300">/etc/hosts 忘記改</strong> → Could not resolve host</li>
-            <li><strong className="text-red-300">ingressClassName 寫錯</strong> → k3s 要寫 traefik 不是 nginx</li>
-            <li><strong className="text-red-300">pathType 沒加</strong> → 必填欄位，漏了直接報錯</li>
-          </ul>
+
+        <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold text-sm mb-1">排錯：ENDPOINTS {'<none>'} → label 不符</p>
+          <pre className="text-xs font-mono text-slate-300 bg-slate-900 p-2 rounded">{`kubectl get endpoints
+# api-svc       10.42.x.x:5678   ← 有 Pod IP = 正常
+# frontend-svc  <none>           ← 沒有 = selector 對不上`}</pre>
         </div>
       </div>
     ),
-    code: `# Step 4：改成 host-based
+    code: `# Step 5：host-based routing
 kubectl apply -f ingress-host.yaml
-# 注意：>> 追加，絕對不能用 >（會覆蓋整個 /etc/hosts）
-sudo sh -c 'echo "<NODE-IP> www.myapp.local api.myapp.local" >> /etc/hosts'
-grep myapp.local /etc/hosts       # 確認加進去了
-curl http://www.myapp.local       # → Nginx
-curl http://api.myapp.local       # → httpd
+# ingress.networking.k8s.io/app-ingress configured
 
-# 排錯流程
-kubectl describe ingress app-ingress-host  # 看 Events
-kubectl get endpoints                      # 確認 Service 有後端 Pod
-kubectl logs -n kube-system <traefik-pod>  # Controller 日誌`,
+# ⚠ >> 追加，絕對不能用 >
+sudo sh -c 'echo "<NODE-IP> www.myapp.local api.myapp.local" >> /etc/hosts'
+
+grep myapp.local /etc/hosts
+# 192.168.64.10 www.myapp.local api.myapp.local
+
+curl http://www.myapp.local
+# → Welcome to nginx! (HTML)
+
+curl http://api.myapp.local
+# → API Server Response
+
+# 排錯
+kubectl describe ingress app-ingress   # 看 Events
+kubectl get endpoints
+# api-svc      10.42.x.x:5678   ← 有值 = 正常
+# frontend-svc <none>           ← 沒值 = selector 對不上
+kubectl logs -n kube-system <traefik-pod>`,
     notes: `好，path-based 做完了，來做 host-based。
 
 我另外準備了一個 ingress-host.yaml，差別在 rules 裡面多了 host 欄位。第一條規則 host 是 www.myapp.local，path 斜線導到 frontend-svc。第二條規則 host 是 api.myapp.local，path 斜線導到 api-svc。

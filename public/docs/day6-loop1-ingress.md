@@ -180,10 +180,28 @@ ingress.networking.k8s.io/app-ingress created
 
 ```bash
 kubectl get deployments
+```
+
+預期輸出：
+```
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+api-deploy         1/1     1            1           30s
+frontend-deploy    1/1     1            1           30s
+```
+
+```bash
 kubectl get svc
 ```
 
-兩個 Service 要是 `ClusterIP`，`EXTERNAL-IP <none>` 是正常的。
+預期輸出：
+```
+NAME           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+api-svc        ClusterIP   10.43.x.x       <none>        3000/TCP   30s
+frontend-svc   ClusterIP   10.43.x.x       <none>        80/TCP     30s
+kubernetes     ClusterIP   10.43.0.1       <none>        443/TCP    2d
+```
+
+兩個 Service 都是 `ClusterIP`，`EXTERNAL-IP <none>` 是正常的——有 Ingress 了，不需要 NodePort。
 
 ```bash
 kubectl get ingress
@@ -203,19 +221,57 @@ app-ingress   traefik   *       192.168.64.10   80      1m
 kubectl describe ingress app-ingress
 ```
 
-看 `Rules` 區塊裡 `Backends` 括號有 Pod IP → Service 正確找到後端 Pod。
+預期輸出（重點看 Rules 區塊）：
+```
+Name:             app-ingress
+Namespace:        default
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *
+              /      frontend-svc:80 (10.42.x.x:80)
+              /api   api-svc:3000 (10.42.x.x:5678)
+```
+
+`Backends` 括號裡有 Pod IP → Service 正確找到後端 Pod。括號是空的 → `kubectl get endpoints` 確認 label 有沒有對上。
 
 ---
 
 **Step 4：驗證 Path-based Routing**
 
 ```bash
-kubectl get nodes -o wide    # 看 INTERNAL-IP
-curl http://<NODE-IP>/       # → Nginx 歡迎頁
-curl http://<NODE-IP>/api    # → API Server
+kubectl get nodes -o wide
 ```
 
-> k3d 環境：NODE-IP 是 Docker 內部 IP，需改用 `localhost:8080`（k3d 預設 port mapping）
+預期輸出：
+```
+NAME     STATUS   ROLES                  AGE   VERSION   INTERNAL-IP      ...
+k3s-01   Ready    control-plane,master   2d    v1.28.x   192.168.64.10    ...
+```
+
+看 `INTERNAL-IP`，這就是 NODE-IP。
+
+```bash
+curl http://<NODE-IP>/
+```
+
+預期輸出（節錄）：
+```html
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+...
+```
+
+```bash
+curl http://<NODE-IP>/api
+```
+
+預期輸出：
+```
+API Server Response
+```
 
 ---
 
@@ -243,18 +299,47 @@ rules:
 kubectl apply -f ingress-host.yaml
 ```
 
+預期輸出：
+```
+ingress.networking.k8s.io/app-ingress configured
+```
+
 `/etc/hosts` 是 Linux 的本機 DNS 覆蓋檔。系統在查 DNS 之前，會先查這個檔案。你在裡面加一行 `IP 域名`，這台機器就會把這個域名解析成你指定的 IP，不影響其他機器，只有這台有效。正式環境在 DNS 服務商設定，本地測試用 `/etc/hosts` 模擬：
 
 ```bash
 sudo sh -c 'echo "192.168.64.10 www.myapp.local api.myapp.local" >> /etc/hosts'
-grep myapp.local /etc/hosts    # 確認加進去了
 ```
 
 注意：用 `>>` 追加，絕對不要用 `>`（會覆蓋整個 /etc/hosts）。
 
 ```bash
-curl http://www.myapp.local    # → Nginx 歡迎頁
-curl http://api.myapp.local    # → It works!
+grep myapp.local /etc/hosts
+```
+
+預期輸出：
+```
+192.168.64.10 www.myapp.local api.myapp.local
+```
+
+```bash
+curl http://www.myapp.local
+```
+
+預期輸出（節錄）：
+```html
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+```
+
+```bash
+curl http://api.myapp.local
+```
+
+預期輸出：
+```
+API Server Response
 ```
 
 ---
@@ -262,8 +347,26 @@ curl http://api.myapp.local    # → It works!
 **排錯**
 
 ```bash
-kubectl describe ingress app-ingress    # 看 Events + Backends
-kubectl get endpoints                   # ENDPOINTS <none> → label 不符
+kubectl describe ingress app-ingress
+```
+
+看 `Events` 欄位，有錯誤會顯示在這裡。
+
+```bash
+kubectl get endpoints
+```
+
+預期輸出（正常）：
+```
+NAME           ENDPOINTS           AGE
+api-svc        10.42.x.x:5678      5m
+frontend-svc   10.42.x.x:80        5m
+kubernetes     192.168.64.10:6443  2d
+```
+
+`ENDPOINTS <none>` → label 不符，Service 的 selector 對不上 Pod 的 label。
+
+```bash
 kubectl logs -n kube-system <traefik-pod>
 ```
 

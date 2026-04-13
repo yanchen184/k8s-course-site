@@ -57,6 +57,49 @@ Rancher 是 SUSE 出的 K8s 叢集管理平台，Web GUI，免費開源。
 
 ---
 
+📄 6-20 第 4 張
+
+補充一個你以後會用到的概念。
+
+我們課程用的是 k3s，這是 SUSE 出的輕量版 K8s，安裝快、資源少，很適合學習和邊緣裝置。
+
+但真實公司，特別是銀行、政府、需要稽核的環境，用的是 **RKE2**。同樣是 SUSE 出的，但是企業版。
+
+兩個的差別：
+
+| | k3s | RKE2 |
+|---|---|---|
+| 定位 | 輕量、學習 | 企業、生產環境 |
+| 安全合規 | 無 | FIPS 140-2、CIS Benchmark |
+| 預設 Ingress | Traefik | Nginx |
+| kubectl 指令 | 完全一樣 | 完全一樣 |
+
+kubectl 指令完全一樣，只是底層發行版不同。
+
+安裝方式也很接近。k3s 一行：
+
+```bash
+curl -sfL https://get.k3s.io | sh -
+```
+
+RKE2 也是 curl 腳本，多一個 systemctl：
+
+```bash
+# Master node
+curl -sfL https://get.rke2.io | sh -
+systemctl enable rke2-server --now
+
+# Worker node 加入（/etc/rancher/rke2/config.yaml 設定 server + token）
+curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE="agent" sh -
+systemctl enable rke2-agent --now
+```
+
+建好之後，一樣 import 進 Rancher。Rancher 管 k3s 或 RKE2 的操作完全一樣，介面長得也一樣。
+
+所以今天你學會用 Rancher 管 k3s，到公司換成 RKE2，不用重學。
+
+---
+
 ## 6-21 Rancher 實作（~12 min）
 
 ### ② 所有指令＋講解

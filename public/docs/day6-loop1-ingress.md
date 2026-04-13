@@ -12,6 +12,10 @@
 
 我們要的是 `https://myapp.com`，標準的 80/443，用域名不用記 IP。
 
+先說清楚今天練什麼、不練什麼。
+
+Ingress 解決的是**叢集內部的路由問題**：一個 IP 進來，怎麼分給不同的 Service。「全世界的人打網址連進來」需要額外兩件事：公網 IP（雲端或自建機房），和真實域名（去 DNS 商買）。這兩件事不在今天範圍。今天練的是地基，有了這個，之後接公網 IP 才有意義。
+
 80 和 443 是 HTTP/HTTPS 的標準 port。瀏覽器的規則是：你打 `http://myapp.com`，瀏覽器自動連 port 80；你打 `https://myapp.com`，自動連 port 443。這兩個 port 不用寫出來，瀏覽器知道預設就是這個。
 
 NodePort 給你的是 30000–32767 這個範圍，沒辦法用標準 port。所以用戶要記一個奇怪的網址：`http://192.168.1.100:30080`。這不是正常網站該有的樣子。
@@ -244,6 +248,12 @@ A：`Prefix` 前綴匹配，`/api` 可以匹配 `/api`、`/api/users`、`/api/v1
 **Q：k3s 和 minikube 的 Ingress Controller 有什麼不同？**
 
 A：k3s 預設內建 Traefik，`ingressClassName` 要填 `traefik`，不需要額外安裝。minikube 預設沒有，要 `minikube addons enable ingress` 啟用 Nginx Ingress Controller，`ingressClassName` 填 `nginx`。
+
+**Q：練習用 `/etc/hosts`，正式環境怎麼讓全世界的人連進來？**
+
+A：三件事。第一，買真實域名，在 DNS 商後台加一筆 A Record 指向你叢集的公網 IP。第二，取得公網 IP——雲端建 LoadBalancer 型 Service 平台會自動給；地端要設路由器 Port Forwarding 或裝 MetalLB。第三，Ingress Controller 的角色沒變，還是同一個 Traefik，只是現在接的是來自世界各地的真實請求，不是你自己的 curl。
+
+`/etc/hosts` 就是在自己門牌貼一張貼紙寫「總統府」，只有你自己信。DNS 是去戶政事務所登記，全世界的 GPS 才會找到你。
 
 ---
 

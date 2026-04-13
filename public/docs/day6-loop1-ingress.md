@@ -38,9 +38,9 @@ Ingress 是兩個東西，要分清楚。
 
 ```
 使用者輸入 http://<NODE-IP>/       → 前端（nginx）
-使用者輸入 http://<NODE-IP>/api    → API（httpd）
+使用者輸入 http://<NODE-IP>/api    → API（http-echo）
 使用者輸入 http://www.myapp.local  → 前端（nginx）
-使用者輸入 http://api.myapp.local  → API（httpd）
+使用者輸入 http://api.myapp.local  → API（http-echo）
 ```
 
 一個 IP、標準 80 Port，用路徑或域名區分不同服務。NodePort 再見。
@@ -98,6 +98,8 @@ spec:
                 port:
                   number: 3000
 ```
+
+> API 後端用 `hashicorp/http-echo`，這個 image 會直接回傳你指定的文字，不需要額外設定路徑，適合教學示範。啟動時加 `-text="API Server"` 引數，任何路徑都回同一個字串。
 
 **`apiVersion: networking.k8s.io/v1`** — Ingress 不是 `apps/v1`。記住這個表格：
 
@@ -160,8 +162,10 @@ kubectl describe ingress app-ingress
 ```bash
 kubectl get nodes -o wide    # 看 INTERNAL-IP
 curl http://<NODE-IP>/       # → Nginx 歡迎頁
-curl http://<NODE-IP>/api    # → It works!
+curl http://<NODE-IP>/api    # → API Server
 ```
+
+> k3d 環境：NODE-IP 是 Docker 內部 IP，需改用 `localhost:8080`（k3d 預設 port mapping）
 
 ---
 

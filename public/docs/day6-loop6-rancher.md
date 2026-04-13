@@ -1,4 +1,4 @@
-# Day 6 Loop 7 — Rancher 叢集管理 GUI
+# Day 6 Loop 6 — Rancher 叢集管理 GUI
 
 ---
 

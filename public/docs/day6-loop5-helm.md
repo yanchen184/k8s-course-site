@@ -1,4 +1,4 @@
-# Day 6 Loop 6 — Helm 套件管理
+# Day 6 Loop 5 — Helm 套件管理
 
 ---
 

@@ -1,4 +1,4 @@
-# Day 6 Loop 4 — PV + PVC 持久化儲存
+# Day 6 Loop 3 — PV + PVC 持久化儲存
 
 ---
 

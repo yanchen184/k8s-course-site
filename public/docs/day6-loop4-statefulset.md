@@ -1,4 +1,4 @@
-# Day 6 Loop 5 — StorageClass + StatefulSet
+# Day 6 Loop 4 — StorageClass + StatefulSet
 
 ---
 

@@ -61,42 +61,96 @@ Rancher 是 SUSE 出的 K8s 叢集管理平台，Web GUI，免費開源。
 
 補充一個你以後會用到的概念。
 
-我們課程用的是 k3s，這是 SUSE 出的輕量版 K8s，安裝快、資源少，很適合學習和邊緣裝置。
+你在這門課前面可能用過 minikube，我們課程本身用的是 k3s，真實公司用的是 RKE2。三個都是 K8s，但定位完全不一樣。
 
-但真實公司，特別是銀行、政府、需要稽核的環境，用的是 **RKE2**。同樣是 SUSE 出的，但是企業版。
+| | minikube | k3s | RKE2 |
+|---|---|---|---|
+| 用途 | 本機開發測試 | 輕量生產 / 邊緣 | 企業生產 |
+| 跑在哪 | 單台筆電（VM） | 真實伺服器 | 真實伺服器 |
+| 多節點 | 不行 | 可以 | 可以 |
+| 安全合規 | 無 | 無 | FIPS 140-2、CIS Benchmark |
+| 預設 Ingress | 要手動 enable | Traefik | Nginx |
+| 適合場景 | 學習、本機測試 | 小公司 / 課程 | 銀行 / 政府 / 稽核環境 |
 
-兩個的差別：
+minikube 不上生產，跑在筆電上練習用。k3s 和 RKE2 都是真實伺服器，差別在有沒有合規需求。
 
-| | k3s | RKE2 |
-|---|---|---|
-| 定位 | 輕量、學習 | 企業、生產環境 |
-| 安全合規 | 無 | FIPS 140-2、CIS Benchmark |
-| 預設 Ingress | Traefik | Nginx |
-| kubectl 指令 | 完全一樣 | 完全一樣 |
+---
 
-kubectl 指令完全一樣，只是底層發行版不同。
+📄 6-20 第 5 張
 
-安裝方式也很接近。k3s 一行：
+指令差異在哪裡？
 
+**kubectl 本身完全一樣**，不管是 minikube、k3s 還是 RKE2，kubectl 指令零差異。差的是這幾個地方：
+
+kubeconfig 位置：
+```bash
+# minikube — 自動設定，不用管
+minikube start
+
+# k3s
+/etc/rancher/k3s/k3s.yaml
+
+# RKE2
+/etc/rancher/rke2/rke2.yaml
+```
+
+啟動 / 停止方式：
+```bash
+# minikube
+minikube start
+minikube stop
+
+# k3s
+systemctl start k3s
+systemctl stop k3s
+
+# RKE2
+systemctl start rke2-server
+systemctl stop rke2-server
+```
+
+k3s 有自己的 kubectl 捷徑，不用另外裝：
+```bash
+k3s kubectl get nodes   # 等同 kubectl
+```
+
+minikube 要手動開功能，k3s / RKE2 預設就有：
+```bash
+minikube addons enable ingress   # k3s/RKE2 不需要這行
+```
+
+換環境只要換 kubeconfig，kubectl 指令一個字都不用改。
+
+---
+
+📄 6-20 第 6 張
+
+安裝方式：
+
+k3s，一行搞定：
 ```bash
 curl -sfL https://get.k3s.io | sh -
 ```
 
-RKE2 也是 curl 腳本，多一個 systemctl：
-
+RKE2，Master node：
 ```bash
-# Master node
 curl -sfL https://get.rke2.io | sh -
 systemctl enable rke2-server --now
+```
 
-# Worker node 加入（/etc/rancher/rke2/config.yaml 設定 server + token）
+RKE2，Worker node 加入：
+```bash
+# 先在 master 拿 token
+cat /var/lib/rancher/rke2/server/node-token
+
+# worker 執行（config.yaml 設 server + token）
 curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE="agent" sh -
 systemctl enable rke2-agent --now
 ```
 
-建好之後，一樣 import 進 Rancher。Rancher 管 k3s 或 RKE2 的操作完全一樣，介面長得也一樣。
+建好之後，一樣 import 進 Rancher。Rancher 管 k3s 或 RKE2 操作完全一樣，介面長得也一樣。
 
-所以今天你學會用 Rancher 管 k3s，到公司換成 RKE2，不用重學。
+今天你學會用 Rancher 管 k3s，到公司換成 RKE2，不用重學。
 
 ---
 

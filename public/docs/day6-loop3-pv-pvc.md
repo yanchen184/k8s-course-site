@@ -57,7 +57,7 @@ ERROR 1049 (42000): Unknown database 'testdb'
 
 **為什麼消失？**
 
-容器有自己的 filesystem，叫做 overlay filesystem。這個 filesystem 跟容器同生同死。容器刪了，裡面寫的所有東西也跟著刪。
+容器有自己的 filesystem，叫做 overlay filesystem。它的原理是把多層 image 疊在一起，形成一個虛擬的檔案系統，你寫入的資料會放在最上面那一層（writable layer）。容器刪了，那層就不見了，底下的 image 層不受影響，但你寫的東西也跟著沒了。所以這個 filesystem 跟容器同生同死。
 
 你在 Docker 時代也碰過這個問題。`docker run mysql`，容器刪掉，資料就沒了。所以當時的解法是加 `-v`：
 
@@ -205,6 +205,9 @@ spec:
   storageClassName: manual              # 手動配對用，要跟 PVC 一樣
   hostPath:
     path: /tmp/k8s-pv-data              # 學習用：直接用 Node 的本機路徑
+    # hostPath 就是把 Node 本機的某個目錄掛進 Pod
+    # 學習環境用，因為我們只有一台 Node
+    # 正式環境不用 hostPath，改用 NFS、雲端硬碟（AWS EBS、GCP PD）等
 ---
 # PVC：開發者申請使用儲存空間
 apiVersion: v1

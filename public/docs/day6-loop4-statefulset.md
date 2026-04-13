@@ -34,7 +34,7 @@ kubectl scale deployment mysql --replicas=3
 
 **第三個：獨立 PVC。** StatefulSet 會自動幫每個 Pod 建自己的 PVC：`mysql-0` 用 `data-mysql-0`，`mysql-1` 用 `data-mysql-1`，互不干擾，不會搶同一塊磁碟。
 
-還有一個配套：**Headless Service**。普通 Service 做負載均衡，你連進去不知道打到哪個 Pod。Headless Service 設定 `clusterIP: None`，讓每個 Pod 有自己的 DNS：`mysql-0.mysql-svc`、`mysql-1.mysql-svc`，這樣你才能指定「寫去 mysql-0、讀 mysql-1」。
+還有一個配套：**Headless Service**。普通 Service（有 ClusterIP）會給一個虛擬 IP，流量打進去會 round-robin 到其中一個 Pod，你不知道打到誰。Headless Service 設定 `clusterIP: None`，不給虛擬 IP，改成讓每個 Pod 有自己獨立的 DNS 名稱：`mysql-0.mysql-svc`、`mysql-1.mysql-svc`。叫「Headless」就是因為沒有那個「頭」——也就是 ClusterIP。StatefulSet 需要它，因為每個 Pod 有固定身份（mysql-0、mysql-1），你要能用 DNS 直接找到特定的 Pod，這樣才能指定「寫去 mysql-0、讀 mysql-1」。
 
 ---
 
@@ -64,7 +64,11 @@ NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE
 local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  10d
 ```
 
-有看到 `local-path (default)` 就可以繼續。如果空的（`No resources found`），代表叢集沒有 StorageClass，PVC 會一直 Pending。
+有看到 `local-path (default)` 就可以繼續。
+
+注意那個 `WaitForFirstConsumer`：預設的 volumeBindingMode 是 `Immediate`，PVC 一建立就馬上去綁 PV，但這時候還不知道 Pod 會跑在哪個 Node。`WaitForFirstConsumer` 是等到 Pod 真正被排程到某個 Node 之後才綁 PV，確保 PV 和 Pod 在同一個 Node 上。多 Node 環境這很重要，不然 Pod 跑到 Node A 但 PV 在 Node B，就掛不上去了。
+
+如果空的（`No resources found`），代表叢集沒有 StorageClass，PVC 會一直 Pending。
 
 ---
 
@@ -148,13 +152,13 @@ mysql-2
 Pod 被砍掉重建，名字還是一樣。你永遠知道 mysql-0 是主庫。
 
 **② 獨立儲存**
-StatefulSet 用 `volumeClaimTemplates` 自動為每個 Pod 建獨立的 PVC：
+StatefulSet 用 `volumeClaimTemplates` 自動為每個 Pod 建獨立的 PVC。跟 Deployment 不同——Deployment 的所有 Pod 共用同一個 PVC，但 StatefulSet 用 `volumeClaimTemplates` 讓每個 Pod 自動建立自己的 PVC：
 ```
 mysql-data-mysql-0   ← mysql-0 專用
 mysql-data-mysql-1   ← mysql-1 專用
 mysql-data-mysql-2   ← mysql-2 專用
 ```
-三個 Pod 各自寫自己的磁碟，互不干擾。
+三個 Pod 各自寫自己的磁碟，互不干擾。Pod 重建後會掛回原本的 PVC，資料不會跑到別的 Pod。
 
 **③ 有序生命週期**
 - 啟動：0 → 1 → 2（前一個 Ready 才建下一個）
@@ -187,6 +191,8 @@ mysql-2.mysql-headless.default.svc.cluster.local
 ```
 
 DNS 格式：`<pod名稱>.<service名稱>.<namespace>.svc.cluster.local`
+
+這是 K8s 內部 DNS 的格式，StatefulSet 配 Headless Service 才有的。拿 `mysql-0.mysql-headless.default.svc.cluster.local` 來說：`mysql-0` 是 Pod 名稱、`mysql-headless` 是 Service 名稱、`default` 是 namespace、`svc.cluster.local` 是固定後綴。普通 Pod 沒有這種固定 DNS，只有 StatefulSet 搭配 Headless Service 的 Pod 才有。
 
 ---
 

@@ -317,6 +317,24 @@ PV 有兩個重要的屬性要知道。第一個是 AccessMode，存取模式。
           </table>
         </div>
 
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-xs mb-2">storageClassName 三種寫法</p>
+          <div className="font-mono text-xs space-y-1">
+            <div className="flex gap-2">
+              <span className="text-green-400 w-48">storageClassName: manual</span>
+              <span className="text-slate-400">自訂名稱，靜態配對（本節用法）</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-green-400 w-48">storageClassName: local-path</span>
+              <span className="text-slate-400">指定 StorageClass，動態建 PV</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-green-400 w-48">storageClassName: ""</span>
+              <span className="text-slate-400 text-red-300">空字串 = 強制靜態，不用任何 StorageClass</span>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
           <p className="text-amber-400 font-semibold text-sm">配對關鍵</p>
           <p className="text-slate-300 text-xs mt-1">storageClassName 一致 + accessModes 一致 + PV 容量 &ge; PVC 需求</p>
@@ -397,6 +415,36 @@ apiVersion 是 v1，kind 是 PersistentVolume，metadata 裡面 name 叫 local-p
           <p className="text-cyan-400 font-semibold mb-2">Deployment 掛 PVC 的寫法</p>
           <p className="text-slate-300 text-xs">volumes 引用 PVC，volumeMounts 掛到 /var/lib/mysql</p>
         </div>
+
+        <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
+          <p className="text-slate-400 text-xs font-semibold mb-1">kubectl get pv,pvc 預期輸出</p>
+          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`NAME         CAPACITY  ACCESS MODES  STATUS  CLAIM
+local-pv     2Gi       RWO           Bound   default/local-pvc
+
+NAME        STATUS  VOLUME    CAPACITY
+local-pvc   Bound   local-pv  2Gi`}</pre>
+          <p className="text-slate-500 text-xs mt-1">PVC 顯示的容量是 PV 的容量（2Gi），不是你申請的 1Gi</p>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
+          <p className="text-red-400 text-xs font-semibold mb-1">PVC 一直 Pending？三個原因</p>
+          <table className="w-full text-xs">
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-1 pr-2 text-red-400">storageClassName 不一致</td>
+                <td className="py-1">PV 和 PVC 要完全相同</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1 pr-2 text-red-400">accessModes 不匹配</td>
+                <td className="py-1">PVC 要 RWX 但 PV 只有 RWO</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-2 text-red-400">容量不夠</td>
+                <td className="py-1">PVC 申請 5Gi 但 PV 只有 2Gi</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     ),
     code: `# Deployment 掛載 PVC（差異部分）
@@ -470,7 +518,7 @@ Alice 還在！
 這就是 PV/PVC 存在的意義。Docker 的 Volume 做的是一模一樣的事情，只是 K8s 把它拆成 PV 和 PVC 兩層，做了職責分離。 [▶ 下一頁]`,
   },
 
-  // ── 6-12 學員實作 ──
+  // ── 6-13 學員實作 ──
   {
     title: '學員實作：PV + PVC 故障診斷',
     subtitle: 'Loop 4 練習題 — 找出 broken-pv-pvc.yaml 的三個 bug',
@@ -487,7 +535,8 @@ Alice 還在！
             <p><span className="text-slate-500">storageClassName:</span> <span className="text-red-400">fast   # 錯誤二</span></p>
             <p><span className="text-slate-500">storage:</span> <span className="text-red-400">2Gi    # 錯誤三（超過 PV 容量）</span></p>
           </div>
-          <p className="text-slate-400 text-xs mt-2">修好後：kubectl get pv,pvc → 兩個都是 Bound</p>
+          <p className="text-slate-400 text-xs mt-2">題目 YAML 只有 PV + PVC，需要自己再加 PostgreSQL Deployment 掛 pg-pvc</p>
+          <p className="text-slate-400 text-xs">修好後：kubectl get pv,pvc → 兩個都是 Bound</p>
         </div>
 
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
@@ -503,21 +552,25 @@ Alice 還在！
     notes: `接下來是大家的實作時間。必做題：打開 broken-pv-pvc.yaml，這個 YAML 有三個錯誤，你要找出來並修好，讓 PostgreSQL 可以正常啟動並持久化資料。線索在 YAML 裡，仔細看 accessModes、storageClassName、還有容量。修好之後 kubectl apply，然後 kubectl get pv,pvc，兩個都要是 Bound 才算成功。挑戰題：在 local-pv 已經被 local-pvc 綁定的情況下，再建一個 local-pvc2，requests 1Gi。觀察 kubectl get pvc，local-pvc2 的 STATUS 是什麼，說明為什麼。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
-  // ── 6-13 回頭操作 Loop 4 ──
+  // ── 6-13 學員實作解答 ──
   {
-    title: 'PV/PVC 排錯 + 常見坑',
+    title: '解答：PV/PVC 故障診斷 + 常見坑',
     subtitle: '回頭操作 Loop 4',
     section: 'Loop 4：PV + PVC',
     duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">確認狀態</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl get pv,pvc</code> -- 兩個都是 Bound</li>
-            <li>MySQL Pod 是 Running 狀態</li>
-            <li>砍 Pod 後資料還在</li>
-          </ol>
+          <p className="text-cyan-400 font-semibold mb-2">故障診斷題解答（broken-pv-pvc.yaml 的三個 bug）</p>
+          <div className="font-mono text-xs bg-slate-900 p-3 rounded space-y-1 text-slate-300">
+            <p className="text-slate-500"># 錯誤一：accessModes 不匹配</p>
+            <p><span className="text-red-400">accessModes: [ReadWriteMany]</span>  <span className="text-slate-500">→</span>  <span className="text-green-400">ReadWriteOnce</span></p>
+            <p className="text-slate-500 mt-1"># 錯誤二：storageClassName 不一致</p>
+            <p><span className="text-red-400">storageClassName: fast</span>  <span className="text-slate-500">→</span>  <span className="text-green-400">manual</span></p>
+            <p className="text-slate-500 mt-1"># 錯誤三：容量超過 PV</p>
+            <p><span className="text-red-400">storage: 2Gi（PV 只有 1Gi）</span>  <span className="text-slate-500">→</span>  <span className="text-green-400">1Gi</span></p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">修好後 kubectl apply -f answers/broken-pv-pvc-fixed.yaml，PVC 應該變 Bound</p>
         </div>
 
         <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
@@ -631,8 +684,10 @@ Alice 還在！
 
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">k3s 內建 local-path StorageClass</p>
-          <p className="text-slate-300 text-sm"><code className="text-green-400">kubectl get storageclass</code> → local-path (default)</p>
-          <p className="text-slate-400 text-xs mt-1">PVC 沒指定 storageClassName 就自動用 default</p>
+          <pre className="text-green-400 text-xs font-mono mt-1">{`NAME                   PROVISIONER
+local-path (default)   rancher.io/local-path`}</pre>
+          <p className="text-slate-400 text-xs mt-2">有看到 <code className="text-green-400">local-path (default)</code> 才能繼續</p>
+          <p className="text-red-400 text-xs mt-1">空的 → k3s 沒裝好，PVC 會一直 Pending</p>
         </div>
       </div>
     ),
@@ -1054,7 +1109,7 @@ testdb 還在。因為新的 mysql-0 掛載的還是 mysql-data-mysql-0 這個 P
 我再跟大家對比一下 Deployment。如果你用 Deployment 跑 MySQL 然後砍 Pod，新 Pod 的名字會變，而且掛載的是同一個 PVC。如果你有多個副本，所有 Pod 都搶同一塊儲存。StatefulSet 每個 Pod 有自己的 PVC，資料完全隔離。 [▶ 下一頁]`,
   },
 
-  // ── 6-15 學員實作 ──
+  // ── 6-16 學員實作 ──
   {
     title: '學員實作：StatefulSet Redis 快取叢集',
     subtitle: 'Loop 5 練習題 — 自己寫 Redis StatefulSet（不給模板）',
@@ -1085,16 +1140,32 @@ testdb 還在。因為新的 mysql-0 掛載的還是 mysql-data-mysql-0 這個 P
     notes: `接下來是大家的實作時間。必做題：你的團隊要部署 Redis 快取叢集，要求每個 Pod 有固定名稱、有序啟動、各自獨立的 500Mi 儲存。自己寫一個 StatefulSet YAML，image 用 redis:7，2 個副本，volumeClaimTemplates 每個 500Mi。驗收三點：kubectl get pods 要看到 redis-0 和 redis-1，kubectl get pvc 要看到兩個獨立的 PVC，刪掉 redis-0 之後重建的 Pod 名稱還是 redis-0。注意：這題不給模板，要自己寫。挑戰題：scale 到 3，觀察 mysql-2 最後才建；scale 回 1，記錄刪除順序。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
-  // ── 6-16 回頭操作 Loop 5 ──
+  // ── 6-16 學員實作解答 ──
   {
-    title: 'StatefulSet 排錯 + 常見坑',
+    title: '解答：Redis StatefulSet + 常見坑',
     subtitle: '回頭操作 Loop 5',
     section: 'Loop 5：StorageClass + StatefulSet',
     duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">確認狀態</p>
+          <p className="text-cyan-400 font-semibold mb-2">必做題解答（Redis StatefulSet）</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-0.5">
+            <p className="text-slate-500"># 重點結構</p>
+            <p>kind: StatefulSet</p>
+            <p>spec:</p>
+            <p>{'  '}serviceName: redis-headless</p>
+            <p>{'  '}replicas: 2</p>
+            <p>{'  '}template.spec.containers:</p>
+            <p>{'    '}- name: redis, image: redis:7</p>
+            <p>{'  '}volumeClaimTemplates:</p>
+            <p>{'    '}- storage: 500Mi, accessModes: [ReadWriteOnce]</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">完整解答見 answers/redis-statefulset.yaml</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗收</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
             <li><code className="text-green-400">kubectl get statefulset</code> -- READY 2/2</li>
             <li><code className="text-green-400">kubectl get pods -l app=mysql-sts</code> -- mysql-0、mysql-1 Running</li>
@@ -1487,6 +1558,45 @@ helm rollback my-mysql 1
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">WordPress Chart 重點 values（6-24 用到）</p>
+          <p className="text-slate-400 text-xs mb-2"><code className="text-green-400">helm show values bitnami/wordpress</code> 會印出幾百行，只需要關心這幾個：</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-1 font-mono">key</th>
+                <th className="text-left py-1">說明</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300 font-mono">
+              <tr className="border-b border-slate-700">
+                <td className="py-1 text-green-400">wordpressUsername</td>
+                <td className="py-1 font-sans">管理員帳號</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1 text-green-400">wordpressPassword</td>
+                <td className="py-1 font-sans">管理員密碼（必填）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1 text-green-400">mariadb.auth.rootPassword</td>
+                <td className="py-1 font-sans">DB root 密碼（必填）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1 text-green-400">ingress.enabled</td>
+                <td className="py-1 font-sans">true = 開 Ingress</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1 text-green-400">ingress.hostname</td>
+                <td className="py-1 font-sans">wordpress.local</td>
+              </tr>
+              <tr>
+                <td className="py-1 text-green-400">persistence.size</td>
+                <td className="py-1 font-sans">PVC 大小（預設 10Gi）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">values.yaml 多環境部署</p>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-cyan-900/20 border border-cyan-500/30 p-3 rounded">
@@ -1545,7 +1655,7 @@ helm uninstall my-redis2
 一行指令把所有相關資源清乾淨。對比 kubectl delete -f 要一個一個檔案刪，Helm 方便太多了。 [▶ 下一頁]`,
   },
 
-  // ── 6-18 學員實作 ──
+  // ── 6-19 學員實作 ──
   {
     title: '學員實作：Helm upgrade 陷阱 + 多環境部署',
     subtitle: 'Loop 6 練習題',
@@ -1579,20 +1689,49 @@ helm uninstall my-redis2
     notes: `接下來是大家的實作時間。必做第一題：先執行 helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123，然後執行 helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1，注意 upgrade 這行沒有帶 rootPassword。預測會發生什麼事？答案：密碼會被重置成 Helm 自動產生的 random 值，原有連線全斷。避免方法：用 --reuse-values。第二題：自己寫兩個 values.yaml，一個 dev 一個 prod，分別裝兩個 Release 的 Redis，確認 helm list 看到兩個互不干擾。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
-  // ── 6-19 回頭操作 Loop 6 ──
+  // ── 6-19 學員實作解答 ──
   {
-    title: 'Helm 排錯 + 常見坑',
+    title: '解答：Helm upgrade 陷阱 + 多環境部署',
     subtitle: '回頭操作 Loop 6',
     section: 'Loop 6：Helm',
     duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">確認狀態</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">helm list</code> -- Release 都是 deployed</li>
-            <li><code className="text-green-400">kubectl get pods</code> -- Pod 都在 Running</li>
-          </ol>
+          <p className="text-cyan-400 font-semibold mb-2">必做 1 解答：upgrade 沒帶密碼會怎樣</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># 安裝時設了密碼</p>
+            <p>helm install my-mysql bitnami/mysql \</p>
+            <p>{'  '}--set auth.rootPassword=pass123</p>
+            <p className="text-red-400 mt-1"># upgrade 沒帶密碼 → 密碼被清掉！</p>
+            <p>helm upgrade my-mysql bitnami/mysql \</p>
+            <p>{'  '}--set secondary.replicaCount=1</p>
+            <p className="text-green-400 mt-1"># 正確做法：加 --reuse-values</p>
+            <p>helm upgrade my-mysql bitnami/mysql \</p>
+            <p>{'  '}--set secondary.replicaCount=1 \</p>
+            <p>{'  '}--reuse-values</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做 2 解答：dev + prod 兩套 Redis</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># dev-redis-values.yaml</p>
+            <p>master:</p>
+            <p>{'  '}replicaCount: 1</p>
+            <p className="mt-1 text-slate-500"># prod-redis-values.yaml</p>
+            <p>master:</p>
+            <p>{'  '}replicaCount: 3</p>
+            <p>auth:</p>
+            <p>{'  '}password: prod-redis-pass</p>
+            <p className="mt-1 text-slate-500"># 分別安裝</p>
+            <p>helm install dev-redis bitnami/redis -f dev-redis-values.yaml</p>
+            <p>helm install prod-redis bitnami/redis -f prod-redis-values.yaml</p>
+            <p>helm list</p>
+            <p className="text-slate-500"># NAME        STATUS    CHART</p>
+            <p className="text-slate-500"># dev-redis   deployed  redis-x.x.x</p>
+            <p className="text-slate-500"># prod-redis  deployed  redis-x.x.x</p>
+          </div>
         </div>
 
         <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
@@ -1612,30 +1751,17 @@ helm uninstall my-redis2
             </div>
           </div>
         </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
-          <p className="text-amber-400 font-semibold text-sm">銜接下一個 Loop</p>
-          <p className="text-slate-300 text-xs mt-1">Helm 解決了套件安裝，但叢集越來越大，全用 kubectl 管很痛苦 → 想要 GUI</p>
-        </div>
       </div>
     ),
-    notes: `好，回頭確認一下。
+    notes: `好，回頭看一下答案。
 
-helm list 看一下，你安裝的 Release 都有出現嗎？STATUS 是 deployed 就對了。kubectl get pods 確認 Pod 都在跑。
+必做第一題。我們執行了 helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123，然後執行 helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1。upgrade 這行有沒有帶 rootPassword？沒有。結果是什麼？密碼被清掉了。Helm upgrade 預設不會保留上一次的參數，全部從頭來。解法是加 --reuse-values 這個 flag，它會繼承上一次 install 的所有參數，你只需要帶你要改的那個。
 
-來看幾個常見的坑。
+必做第二題。dev-redis-values.yaml 裡面設 replicaCount: 1，prod-redis-values.yaml 裡面設 replicaCount: 3 加密碼。分別用 -f 傳給 helm install，兩個 Release 完全獨立。helm list 可以看到兩行，NAME 不一樣，互不干擾。這就是多環境部署最簡單的做法。
 
-第一個坑，repo 沒 add 就 search。有同學直接打 helm search repo mysql，什麼結果都沒有。因為你還沒加倉庫。要先 helm repo add bitnami https://charts.bitnami.com/bitnami，然後 helm repo update，再 search 才有東西。
+來看三個坑。第一，repo 沒 add 就 search，搜不到東西。要先加倉庫再更新。第二，install 沒設密碼，Chart 自動產生 random 值，你連不上自己的服務。第三，upgrade 沒帶密碼，密碼被清掉，用 --reuse-values 解決。
 
-第二個坑，install 的時候忘了設密碼。有些 Chart，比如 bitnami/mysql，如果你不設 auth.rootPassword，它會自動幫你產生一個 random 密碼存在 Secret 裡面。這不算錯，但你連自己的密碼是什麼都不知道，後面要連 MySQL 的時候就很麻煩。建議安裝的時候都明確設密碼。
-
-第三個坑，upgrade 的時候沒帶密碼。helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=2，但忘了帶 --set auth.rootPassword=xxx。結果密碼被清掉了。Helm upgrade 預設不會保留上一次的參數，你要自己重新帶，或者用 --reuse-values 這個 flag。
-
-好，Helm 的部分到這裡。我們已經可以用一行指令安裝複雜的應用了，不用自己手寫一大堆 YAML。
-
-但是我問大家一個問題。到目前為止我們全部用 kubectl 在管叢集。一個叢集還行，你打打指令看看狀態。但如果你是一個 DevOps 工程師，管三個叢集呢？五個呢？每次查東西都要打指令、切 context、記 namespace。想看全局狀態要打好幾個指令然後自己在腦中拼起來。
-
-有沒有一個圖形介面讓你一目了然？下一個 Loop 我們來看看叢集管理員的日常工具。 [▶ 下一頁]`,
+好，Helm 到這裡。下一個 Loop 我們看叢集管理工具 Rancher。 [▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1826,16 +1952,31 @@ docker run -d --restart=unless-stopped \\
   rancher/rancher:latest
 # Port 衝突時改用：-p 8443:443 -p 8080:80
 
-# 2. 取得初始密碼
-docker logs 容器ID 2>&1 | grep "Bootstrap Password:"
+# 確認容器跑起來（STATUS 要是 Up，不是 Restarting）
+docker ps
+# CONTAINER ID   IMAGE                    STATUS         PORTS
+# a1b2c3d4e5f6   rancher/rancher:latest   Up 45 seconds  0.0.0.0:80->80/tcp
+
+# 2. 取得初始密碼（要等 Rancher 初始化約 30~60 秒才會出現）
+docker logs <容器ID> 2>&1 | grep "Bootstrap Password:"
+# Bootstrap Password: abcd1234efgh5678   ← 把這組密碼複製起來
 
 # 3. 瀏覽器打開 https://master-IP
+#    看到憑證警告 → 點「繼續前往」（自簽憑證，正常）
 #    輸入 Bootstrap Password → 設定新密碼
 
-# 4. 導入 k3s 叢集
-# Cluster Management → Import Existing → 取名 → 執行：
+# 4. 導入 k3s 叢集（指令由 Rancher GUI 產生，以下為範例格式）
+# Cluster Management → Import Existing → Generic → 取名 → 執行：
 kubectl apply -f https://rancher的IP/v3/import/xxxxxxxx.yaml
-# 等 1-2 分鐘 → 叢集狀態變 Active`,
+# namespace/cattle-system created
+# deployment.apps/cattle-cluster-agent created
+# ...
+
+# 確認 agent 有跑起來
+kubectl get pods -n cattle-system
+# NAME                                  READY   STATUS    RESTARTS   AGE
+# cattle-cluster-agent-xxx              1/1     Running   0          2m
+# 等 1-2 分鐘 → Rancher 介面叢集狀態變 Active`,
     notes: `好，這支影片我們來安裝 Rancher，然後用 GUI 管我們的 k3s 叢集。
 
 Rancher 有很多安裝方式，但我們用最簡單的：直接用 Docker 跑。對，就是用 Docker。Rancher 自己也是一個容器化的應用。
@@ -1916,7 +2057,7 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
 但我要強調一件事。GUI 很方便，但它不能取代 kubectl。自動化部署、CI/CD pipeline、批次操作，這些都需要 kubectl 和 YAML。你不可能讓 CI/CD 工具去點 Rancher 的按鈕。GUI 適合日常監控和快速操作，kubectl 適合自動化和可重現的操作。兩者搭配使用才是正確的姿勢。 [▶ 下一頁]`,
   },
 
-  // ── 6-21 學員實作 ──
+  // ── 6-22 學員實作 ──
   {
     title: '學員實作：安裝 Rancher + GUI 操作',
     subtitle: 'Loop 7 練習題',
@@ -1938,31 +2079,63 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">挑戰：用 Rancher GUI 建 Deployment</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>在 Rancher 的 Workloads 頁面，點 Create</li>
-            <li>用 GUI 建一個新的 Deployment（完全不用 kubectl）</li>
-            <li>設 Image、名稱、replicas</li>
+            <li>Workloads → Deployments → 右上角 Create</li>
+            <li>Name: <code className="text-green-400">gui-test</code>，Image: <code className="text-green-400">nginx:1.25</code>，Replicas: 2</li>
+            <li>建完用 kubectl 確認：<code className="text-green-400">kubectl get deploy gui-test</code></li>
           </ul>
+          <div className="bg-slate-900 p-2 rounded mt-2 font-mono text-xs text-slate-300">
+            <p className="text-slate-500"># 預期輸出</p>
+            <p>NAME       READY   UP-TO-DATE   AVAILABLE   AGE</p>
+            <p>gui-test   2/2     2            2           30s</p>
+          </div>
         </div>
       </div>
     ),
     notes: `接下來是大家的實作時間。必做題：安裝 Rancher，導入 k3s 叢集，用 GUI 看今天建的 Deployment，用 GUI 做一次 scale。挑戰題：在 Rancher 的 GUI 上建一個新的 Deployment，完全不用 kubectl。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
-  // ── 6-22 回頭操作 Loop 7 ──
+  // ── 6-22 學員實作解答 ──
   {
-    title: 'Rancher 排錯 + 常見坑',
+    title: '解答：Rancher 安裝 + GUI 操作',
     subtitle: '回頭操作 Loop 7',
     section: 'Loop 7：RKE + Rancher',
     duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">確認狀態</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>Rancher 介面可以登入</li>
-            <li>叢集狀態是 Active</li>
-            <li>可以在 GUI 上看到 Workloads</li>
-          </ol>
+          <p className="text-cyan-400 font-semibold mb-2">必做題解答：安裝 Rancher + 導入叢集</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># Step 1：Docker 啟動 Rancher</p>
+            <p>sudo docker run -d --restart=unless-stopped \</p>
+            <p>{'  '}-p 8080:80 -p 8443:443 \</p>
+            <p>{'  '}--privileged \</p>
+            <p>{'  '}rancher/rancher:latest</p>
+            <p className="text-slate-500 mt-1"># Step 2：取得 Bootstrap Password</p>
+            <p>sudo docker logs {'<container-id>'} 2&gt;&amp;1 | grep "Bootstrap Password:"</p>
+            <p className="text-slate-500 mt-1"># Step 3：瀏覽器 https://{'<VM-IP>'}:8443 → 登入 → Import Existing Cluster</p>
+            <p className="text-slate-500"># Step 4：複製 kubectl apply 指令 → 在 k3s master 跑</p>
+            <p className="text-slate-500 mt-1"># 驗收：確認 cattle-cluster-agent 是 Running</p>
+            <p>kubectl get pods -n cattle-system</p>
+            <p className="text-slate-500"># cattle-cluster-agent-xxx   1/1   Running   0   2m</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">挑戰題解答：GUI 建 Deployment</p>
+          <div className="text-sm text-slate-300 space-y-1">
+            <p>Workloads → Deployments → Create → 填入：</p>
+            <div className="font-mono text-xs bg-slate-900 p-2 rounded mt-1 space-y-1">
+              <p>Name: gui-test</p>
+              <p>Image: nginx:1.25</p>
+              <p>Replicas: 2</p>
+            </div>
+          </div>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mt-2 space-y-1">
+            <p className="text-slate-500"># CLI 驗收</p>
+            <p>kubectl get deploy gui-test</p>
+            <p className="text-slate-500"># NAME       READY   UP-TO-DATE   AVAILABLE</p>
+            <p className="text-slate-500"># gui-test   2/2     2            2</p>
+          </div>
         </div>
 
         <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
@@ -1970,7 +2143,7 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
           <div className="space-y-2 text-sm text-slate-300">
             <div className="flex items-start gap-2">
               <span className="text-red-400 font-bold">1.</span>
-              <p><strong className="text-white">k3s 節點沒有 Docker</strong> -- k3s 用 containerd，需另裝 Docker：<code className="text-green-400">sudo apt install docker.io</code></p>
+              <p><strong className="text-white">k3s 節點沒有 Docker</strong> -- k3s 用 containerd，需另裝：<code className="text-green-400">sudo apt install docker.io</code></p>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-red-400 font-bold">2.</span>
@@ -1978,30 +2151,23 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
             </div>
             <div className="flex items-start gap-2">
               <span className="text-red-400 font-bold">3.</span>
-              <p><strong className="text-white">agent 指令跑錯地方</strong> -- 要在 k3s master 上跑，確認 KUBECONFIG 指向 k3s</p>
+              <p><strong className="text-white">agent 跑錯地方</strong> -- 要在 k3s master 跑，確認 KUBECONFIG 指向 k3s</p>
             </div>
           </div>
         </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">叢集管理員的工作方式</p>
-          <p className="text-slate-300 text-xs mt-1">日常用 Rancher GUI 看狀態 + 快速操作，寫自動化腳本和 CI/CD 用 kubectl。兩者搭配。</p>
-        </div>
       </div>
     ),
-    notes: `好，回頭確認一下。
+    notes: `好，回頭看一下答案。
 
-打開瀏覽器，Rancher 的介面有進去嗎？叢集狀態是 Active 嗎？
+必做題：Docker 啟動 Rancher，注意 Port 用 8080:80 和 8443:443，因為 Traefik 已經佔了標準 Port。取得 Bootstrap Password 的方式是 docker logs 加上 grep "Bootstrap Password:"。瀏覽器進去之後設好密碼，然後 Add Cluster 選 Import Existing，複製那行 kubectl apply 指令到 k3s master 上跑。
 
-來看幾個常見的坑。
+確認成功的方法：kubectl get pods -n cattle-system，看到 cattle-cluster-agent 是 Running 就對了。Rancher 介面的叢集狀態也會從 Pending 變成 Active。
 
-第一個坑，Rancher 要用 Docker 跑，但你的 k3s 節點上有 Docker 嗎？k3s 預設用的 container runtime 是 containerd，不是 Docker。你可能需要另外安裝 Docker。如果你是用 Multipass 開的 Ubuntu VM，sudo apt install docker.io 就可以裝好 Docker。
+挑戰題：Workloads → Deployments → Create，Name 填 gui-test，Image 填 nginx:1.25，Replicas 設 2。存好之後用 kubectl get deploy gui-test 確認，READY 欄位是 2/2 就成功了。GUI 建的 Deployment 跟 kubectl apply 建的沒有差別，底層都是同一個 API。
 
-第二個坑，Port 衝突。k3s 的 Traefik Ingress Controller 已經佔了 80 和 443 Port。如果 Rancher 也要用 80 和 443 就會衝突。解法是 Rancher 用不同的 Port，比如 -p 8443:443 -p 8080:80。
+來看三個坑。第一，k3s 預設用 containerd 不是 Docker，要另裝 Docker 才能跑 Rancher。第二，Port 衝突，Rancher 要避開 80 和 443。第三，Import 的 agent 指令要在 k3s master 上跑，不是你的本機。
 
-第三個坑，導入叢集的 agent 指令要在 k3s master 上跑。有同學在自己的筆電上跑 kubectl apply，但筆電的 kubectl 沒有連到 k3s 叢集。確認你的 KUBECONFIG 是指向 k3s 的。kubectl get nodes 看到你的 k3s 節點就對了。
-
-好，Rancher 到這裡。日常用 Rancher GUI 看叢集狀態和快速操作，寫自動化腳本和 CI/CD 用 kubectl。兩者搭配，這就是叢集管理員的工作方式。 [▶ 下一頁]`,
+好，Rancher 到這裡。日常用 GUI 看狀態和快速操作，CI/CD 和自動化用 kubectl，兩者搭配。 [▶ 下一頁]`,
   },
 
   // ============================================================
@@ -2101,21 +2267,30 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">必做：Helm 安裝 WordPress</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">helm install my-blog bitnami/wordpress</code></li>
-            <li>等 Pod 全部 Running</li>
-            <li><code className="text-green-400">kubectl get svc my-blog-wordpress</code> → 取得 NodePort 或設 Ingress</li>
-            <li>瀏覽器打開 → 看到 WordPress 歡迎頁面</li>
+            <li>加入 Bitnami repo：<code className="text-green-400">helm repo add bitnami https://charts.bitnami.com/bitnami && helm repo update</code></li>
+            <li>安裝：<code className="text-green-400">helm install my-blog bitnami/wordpress --set wordpressUsername=admin --set wordpressPassword=mypass123 --set mariadb.auth.rootPassword=rootpass123</code></li>
+            <li>等 Pod Running：<code className="text-green-400">kubectl get pods -w</code>（看到兩個 Running 再 Ctrl+C）</li>
+            <li>取得連接埠：<code className="text-green-400">kubectl get svc my-blog-wordpress</code> → 找 NodePort 號</li>
+            <li>瀏覽器開 <code className="text-green-400">http://&lt;Node-IP&gt;:&lt;NodePort&gt;</code> → 看到 WordPress 歡迎頁面</li>
             <li>用 Rancher GUI 觀察所有建出來的資源</li>
           </ol>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">挑戰：自訂 values.yaml</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>設定域名：<code className="text-green-400">wordpressUsername</code>、<code className="text-green-400">wordpressPassword</code></li>
-            <li>調整 persistence size</li>
-            <li>設 Ingress hostname</li>
-          </ul>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mb-2">
+            <p className="text-slate-500"># wp-values.yaml</p>
+            <p>wordpressUsername: admin</p>
+            <p>wordpressPassword: my-secure-pass</p>
+            <p>mariadb:</p>
+            <p>{'  '}auth:</p>
+            <p>{'    '}rootPassword: db-root-pass</p>
+            <p>ingress:</p>
+            <p>{'  '}enabled: true</p>
+            <p>{'  '}hostname: wordpress.local</p>
+          </div>
+          <p className="text-slate-300 text-sm"><code className="text-green-400">helm install my-blog bitnami/wordpress -f wp-values.yaml</code></p>
+          <p className="text-slate-400 text-xs mt-1">記得在 /etc/hosts 加上：<code className="text-green-300">&lt;Node-IP&gt; wordpress.local</code></p>
         </div>
 
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
@@ -2187,10 +2362,12 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">今天新學的指令</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-300 font-mono">
+            <p>kubectl get ingress</p>
+            <p>kubectl describe ingress</p>
             <p>kubectl get pv</p>
             <p>kubectl get pvc</p>
             <p>kubectl get storageclass</p>
-            <p>kubectl get statefulset</p>
+            <p>kubectl get statefulset (sts)</p>
             <p>kubectl scale sts ... --replicas=N</p>
             <p>helm repo add / update</p>
             <p>helm search repo</p>

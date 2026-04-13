@@ -2,7 +2,7 @@
 
 ---
 
-## 6-17 Helm 概念（~15 min）
+## 6-17 Helm 概念（~20 min）
 
 ### ① 課程內容
 
@@ -123,7 +123,7 @@ Helm 會記錄每次安裝和升級的歷史。升級之後發現有問題？`he
 
 ---
 
-## 6-18 Helm 實作（~12 min）
+## 6-18 Helm 實作（~60 min）
 
 ### ② 所有指令＋講解
 
@@ -373,19 +373,121 @@ helm install my-redis2 bitnami/redis -f my-redis-values.yaml
 
 📄 6-18 第 8 張
 
-**Step 7：清理**
+**Step 7：一行裝完整監控 stack — Prometheus + Grafana**
+
+剛才裝 MySQL 和 Redis，是應用服務。現在裝一個更有感的——監控系統。
+
+正常手動搭 Prometheus + Grafana 需要：Prometheus Deployment、Grafana Deployment、AlertManager、各種 ConfigMap、ServiceAccount、RBAC 規則⋯⋯加起來幾十個資源、上百行 YAML。
+
+用 Helm，一行：
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install monitoring prometheus-community/kube-prometheus-stack \
+  --set grafana.adminPassword=admin123
+```
+
+等 Pod 跑起來（約 2-3 分鐘）：
+
+```bash
+kubectl get pods | grep monitoring
+```
+
+預期看到：
+```
+monitoring-grafana-xxx                    3/3   Running   2m
+monitoring-kube-prometheus-prometheus-0   2/2   Running   2m
+monitoring-kube-state-metrics-xxx         1/1   Running   2m
+```
+
+打開 Grafana Dashboard：
+
+```bash
+kubectl port-forward svc/monitoring-grafana 3000:80
+```
+
+瀏覽器開 `http://localhost:3000`，帳號 `admin`，密碼 `admin123`。
+
+點進去 **Dashboards → Kubernetes / Compute Resources / Pod**，你可以看到每個 Pod 的 CPU、Memory 使用率即時圖表。
+
+這套監控系統你沒寫一行 YAML，Helm 幫你裝好了所有東西。
+
+---
+
+📄 6-18 第 9 張
+
+**Step 8：自己寫 Chart — 理解模板原理**
+
+剛才都是用別人的 Chart。現在來自己寫一個，理解 Helm 的模板機制。
+
+```bash
+helm create my-app
+```
+
+這個指令會產生一個 Chart 的骨架：
+
+```
+my-app/
+├── Chart.yaml          # Chart 的說明書（名稱、版本）
+├── values.yaml         # 預設參數值
+└── templates/          # YAML 範本，用 {{ .Values.xxx }} 注入參數
+    ├── deployment.yaml
+    ├── service.yaml
+    └── ingress.yaml
+```
+
+打開 `values.yaml`，找到 image 的部分：
+
+```yaml
+image:
+  repository: nginx
+  tag: "latest"
+  pullPolicy: IfNotPresent
+```
+
+打開 `templates/deployment.yaml`，看到：
+
+```yaml
+image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+```
+
+這就是模板語法。`{{ .Values.xxx }}` 會被 values.yaml 裡的值替換掉。
+
+安裝這個 Chart：
+
+```bash
+helm install my-app ./my-app
+kubectl get pods   # 看到 my-app-xxx 跑起來
+```
+
+升級，換一個 image tag：
+
+```bash
+helm upgrade my-app ./my-app --set image.tag=1.25
+kubectl describe pod -l app.kubernetes.io/name=my-app | grep Image
+# → Image: nginx:1.25
+```
+
+這就是為什麼 Helm 可以一份 Chart 部署 dev、staging、prod——三個環境只需要三個不同的 values.yaml，Chart 本身不用動：
+
+```bash
+helm install my-app-dev  ./my-app -f values-dev.yaml
+helm install my-app-prod ./my-app -f values-prod.yaml
+```
+
+---
+
+📄 6-18 第 10 張
+
+**Step 9：清理**
 
 ```bash
 helm uninstall my-mysql
 helm uninstall my-redis
 helm uninstall my-redis2
-```
-
-預期輸出：
-```
-release "my-mysql" uninstalled
-release "my-redis" uninstalled
-release "my-redis2" uninstalled
+helm uninstall monitoring
+helm uninstall my-app
 ```
 
 確認全部清乾淨：
@@ -398,6 +500,12 @@ kubectl get pvc
 
 `helm list` 應該是空的，`kubectl get pods` 應該是 `No resources found`。
 
+PVC 要特別確認——`helm uninstall` 預設不會刪 PVC（避免誤刪資料），要手動清：
+
+```bash
+kubectl delete pvc --all
+```
+
 ---
 
 ### ③ QA
@@ -406,44 +514,124 @@ kubectl get pvc
 
 A：`helm list` 看的是 Release 層級：整體 STATUS（deployed/failed）、版本號（REVISION）、Chart 版本。適合確認「整個應用程式的部署狀態」。`kubectl get pods` 看的是 Pod 層級：個別 Pod 的 STATUS、重啟次數。適合排查「某個 Pod 跑不起來」。兩個搭配用。
 
+**Q：`helm uninstall` 為什麼不刪 PVC？**
+
+A：Helm 設計上保守處理有狀態資源。PVC 裡可能有資料，uninstall 如果自動刪，一個手殘就資料全沒了。所以 Helm 預設保留 PVC，讓你手動確認後再刪。如果你確定要連 PVC 一起刪，可以加 `--cascade=foreground` 或直接 `kubectl delete pvc`。
+
+**Q：`helm create` 產生的 Chart 可以直接用在生產環境嗎？**
+
+A：可以用，但要調整。預設 Chart 沒有設 resource requests/limits、沒有 Probe、沒有 NetworkPolicy。這些生產必要的設定要自己加進 templates/ 或 values.yaml 裡。`helm create` 是骨架，不是成品。
+
 ---
 
-## 6-19 回頭操作 Loop 6（~5 min）
+## 6-19 回頭操作 Loop 5（~30 min）
 
 ### ④ 學員實作
 
-**必做（1-2 題）**
+**必做 1：upgrade 陷阱**
 
-1. 執行 `helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123`，然後執行 `helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1`（**不帶** rootPassword）。預測會發生什麼事？該怎麼避免？
+執行：
+```bash
+helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123
+```
+然後執行：
+```bash
+helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1
+```
+（**不帶** rootPassword）
 
-2. 你的團隊要在同一個叢集用 Helm 跑兩套 Redis：dev 環境（1 個副本）、prod 環境（3 個副本、需要密碼）。寫出兩個 values.yaml 和對應的安裝指令，確認兩個 Release 互不干擾。
+預測會發生什麼事？用 `helm history my-mysql` 確認，再說明該怎麼避免。
+
+---
+
+**必做 2：dev / prod 兩套 Redis**
+
+你的團隊要在同一個叢集跑兩套 Redis：
+- dev：1 個副本，密碼 `dev-pass`
+- prod：3 個副本，密碼 `prod-pass`
+
+寫出兩個 values.yaml，用 `helm install` 各自裝起來，確認兩個 Release 互不干擾（`helm list` 看到兩個）。
+
+---
+
+**必做 3：自己的 Chart**
+
+用 `helm create my-service` 建一個 Chart，修改 `values.yaml` 把 image 改成 `httpd`，安裝起來，確認 Pod 跑的是 httpd 而不是預設的 nginx：
+
+```bash
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+```
+
+然後用 `helm upgrade` 把 image tag 換成 `httpd:2.4`。
+
+---
+
+**挑戰：Grafana 看到自己的 Pod**
+
+確認 `monitoring` 這個 Prometheus+Grafana Release 還在跑：
+```bash
+helm list
+kubectl port-forward svc/monitoring-grafana 3000:80
+```
+
+打開 `http://localhost:3000`，在 Dashboards 找到 **Kubernetes / Compute Resources / Pod**，找到你剛才跑的 `my-service` Pod 的 CPU 和 Memory 圖表。
 
 ---
 
 ### ⑤ 學員實作解答
 
-1. 不帶 `--set auth.rootPassword` 的 upgrade 會讓密碼被設成 Helm 自動產生的 random 值，原有連線的 app 全部斷線。避免方法：加上 `--reuse-values`，沿用上次的所有 values：
-   ```bash
-   helm upgrade my-mysql bitnami/mysql --reuse-values --set secondary.replicaCount=1
-   ```
+**必做 1**
 
-2. 建兩個 values 檔：
-   ```yaml
-   # dev-redis-values.yaml
-   auth:
-     password: dev-redis-pass
-   replica:
-     replicaCount: 1
-   ```
-   ```yaml
-   # prod-redis-values.yaml
-   auth:
-     password: prod-redis-pass
-   replica:
-     replicaCount: 3
-   ```
-   安裝：
-   ```bash
-   helm install dev-redis bitnami/redis -f dev-redis-values.yaml
-   helm install prod-redis bitnami/redis -f prod-redis-values.yaml
-   ```
+不帶 `--set auth.rootPassword` 的 upgrade 會讓密碼被重設成 Helm 隨機產生的值，原有連線全部斷線。`helm history` 看到 REVISION 2。
+
+避免方法：加 `--reuse-values`，沿用上次所有 values：
+```bash
+helm upgrade my-mysql bitnami/mysql --reuse-values --set secondary.replicaCount=1
+```
+
+**必做 2**
+
+```yaml
+# dev-redis-values.yaml
+auth:
+  password: dev-pass
+replica:
+  replicaCount: 1
+```
+```yaml
+# prod-redis-values.yaml
+auth:
+  password: prod-pass
+replica:
+  replicaCount: 3
+```
+```bash
+helm install dev-redis bitnami/redis -f dev-redis-values.yaml
+helm install prod-redis bitnami/redis -f prod-redis-values.yaml
+helm list   # 確認兩個 Release 都是 deployed
+```
+
+**必做 3**
+
+修改 `my-service/values.yaml`：
+```yaml
+image:
+  repository: httpd
+  tag: "latest"
+  pullPolicy: IfNotPresent
+```
+```bash
+helm install my-service ./my-service
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+# → Image: httpd:latest
+
+helm upgrade my-service ./my-service --set image.tag=2.4
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+# → Image: httpd:2.4
+```
+
+**清理**
+```bash
+helm uninstall my-mysql my-redis my-redis2 dev-redis prod-redis my-service monitoring
+kubectl delete pvc --all
+```

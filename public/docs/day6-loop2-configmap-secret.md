@@ -38,64 +38,7 @@ K8s 的解法是：**把設定和程式碼分開**。程式碼打進 Image，設
 
 ---
 
-### ② 所有指令＋講解
-
-**確認環境乾淨**
-
-```bash
-kubectl get all
-```
-
-確認 default namespace 只有 `service/kubernetes`，沒有殘留資源，再開始。
-
----
-
-### ③ QA
-
-**Q：ConfigMap 和 Secret 有什麼差？什麼情況用哪個？**
-
-A：ConfigMap 存一般設定，值是明文，`kubectl describe` 直接看到內容。Secret 存敏感資訊，值是 Base64 編碼，`kubectl describe` 只顯示大小不顯示值。密碼、API Key、憑證用 Secret；其他設定用 ConfigMap。
-
-**Q：為什麼不把所有東西都放 Secret 就好？**
-
-A：Secret 的 Base64 不是加密，任何有 `get secret` 權限的人都能解回明文。用途分開是職責清晰的問題，不是安全性的問題。
-
----
-
-### ④ 學員實作
-
-無（概念引入節）
-
-### ⑤ 學員實作解答
-
-無
-
----
-
 ## 6-6 ConfigMap + Secret 實作（~20 min）
-
-### ① 課程內容
-
-📄 6-6 第 1 張
-
-這節按順序做四個步驟：
-
-| 步驟 | YAML | 重點 |
-|------|------|------|
-| Step 1 | `configmap-literal.yaml` | 環境變數注入，改了要 rollout restart |
-| Step 2 | `configmap-nginx.yaml` | Volume 掛載，改了 30 秒自動更新 |
-| Step 3 | 指令建 | Secret 建立，觀察 Base64 |
-| Step 4 | `secret-db.yaml` | MySQL 同時用 Secret + ConfigMap |
-
----
-
-📄 6-6 第 2 張
-
-**學員實作說明**
-
-完成四個步驟的示範後，自己完成必做題：建一個 Redis Deployment，同時用 Secret（密碼）和 ConfigMap（一般設定）注入環境變數。
-
----
 
 ### ② 所有指令＋講解
 
@@ -500,6 +443,8 @@ A：`data` 欄位的值必須是 Base64 字串；`stringData` 欄位直接寫明
 
 ---
 
+## 6-7 回頭操作 Loop 2（~5 min）
+
 ### ④ 學員實作
 
 你要部署一個 Redis 服務，需要以下設定：
@@ -562,115 +507,4 @@ kubectl exec deployment/redis-deploy -- env | grep REDIS
 ```
 REDIS_PASSWORD=my-redis-pw
 REDIS_MAXMEMORY=256mb
-```
-
----
-
-## 6-7 回頭操作 Loop 2（~5 min）
-
-### ① 課程內容
-
-📄 6-7 第 1 張
-
-回頭確認學員環境，帶大家整理三個常見坑，清理資源，銜接整合實作。
-
----
-
-### ② 所有指令＋講解
-
-**確認學員環境狀態**
-
-```bash
-kubectl get deployments
-kubectl get configmap
-kubectl get secret
-```
-
-確認四個步驟的資源都有建起來。
-
-**三個常見坑**
-
-坑 1：`envFrom` vs `env.valueFrom` 搞混
-
-```bash
-# envFrom：整個 ConfigMap 全部注入
-kubectl get deployment app-with-config -o yaml | grep -A5 envFrom
-
-# env.valueFrom：只注入指定的 key
-# env:
-# - name: MY_ENV
-#   valueFrom:
-#     configMapKeyRef:
-#       name: app-config
-#       key: APP_ENV
-```
-
-坑 2：`subPath` 掛載不會自動更新
-
-```bash
-# 確認你的 volumeMounts 有沒有 subPath
-kubectl get deployment nginx-custom -o yaml | grep -A5 volumeMounts
-```
-
-有 `subPath` → 不會自動更新，要 `rollout restart`。
-
-坑 3：Secret YAML 的 `data` 欄位必須是 Base64
-
-```bash
-# 用 stringData 就不用自己做 Base64
-# stringData:
-#   password: my-secret-pw   ← 直接明文
-
-# 用 data 就要先做 Base64
-echo -n "my-secret-pw" | base64
-# bXktc2VjcmV0LXB3
-```
-
-**清理**
-
-```bash
-kubectl delete deployment app-with-config nginx-custom mysql-deploy
-kubectl delete service nginx-custom-svc mysql-svc
-kubectl delete configmap app-config nginx-config db-config
-kubectl delete secret db-cred db-secret
-kubectl get all    # 確認只剩 kubernetes Service
-```
-
-**銜接**
-
-設定和密碼的問題解決了。下一個 Loop 把今天學的全部串起來：前端 Nginx + API httpd + MySQL，加 Ingress 統一對外，這就是完整的三層架構。
-
----
-
-### ③ QA
-
-**Q：`rollout restart` 和直接刪 Pod 有什麼差？**
-
-A：直接 `kubectl delete pod` 是強制刪除，會有短暫中斷。`rollout restart` 是滾動重啟，先建新 Pod、確認新 Pod 就緒後才刪舊 Pod，零中斷。生產環境一定用 `rollout restart`。
-
----
-
-### ④ 學員實作
-
-確認清理後環境乾淨：
-
-```bash
-kubectl get all
-kubectl get configmap
-kubectl get secret
-```
-
-ConfigMap 只剩 `kube-root-ca.crt`（系統自帶），Secret 只剩 `default-token-*`（系統自帶），其他都清掉。
-
----
-
-### ⑤ 學員實作解答
-
-若有殘留：
-
-```bash
-kubectl delete deployment --all
-kubectl delete svc $(kubectl get svc --no-headers | grep -v kubernetes | awk '{print $1}')
-kubectl delete configmap $(kubectl get configmap --no-headers | grep -v kube-root-ca | awk '{print $1}')
-kubectl delete secret $(kubectl get secret --no-headers | grep -v default-token | awk '{print $1}')
 ```

@@ -2310,6 +2310,34 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
     notes: `接下來是大家的自由練習時間。必做題：用 Helm 安裝一套 WordPress，bitnami/wordpress。它裡面含 MySQL 加 PVC 加 Ingress，全部包好。安裝完之後瀏覽器打開看到 WordPress 的歡迎頁面。挑戰題：自訂 values.yaml 設域名和密碼。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
+  // ── 6-24 QA ──
+  {
+    title: 'QA',
+    subtitle: 'helm install vs kubectl apply',
+    section: 'Loop 8：總結',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-yellow-400 font-semibold mb-3">Q：<code className="text-cyan-300">helm install</code> 和 <code className="text-cyan-300">kubectl apply -f</code> 有什麼差別？</p>
+          <div className="space-y-3 text-slate-300 text-sm">
+            <div className="bg-slate-900/50 p-3 rounded">
+              <p className="text-cyan-400 font-mono mb-1">kubectl apply -f</p>
+              <p>套用單一 YAML 檔，你要自己管每個資源的生命週期</p>
+            </div>
+            <div className="bg-slate-900/50 p-3 rounded">
+              <p className="text-green-400 font-mono mb-1">helm install</p>
+              <p>安裝整個 Chart（一包含多個 YAML 的套件）</p>
+              <p className="text-slate-400 text-xs mt-1">Helm 幫你管所有資源：安裝、升級、rollback、uninstall 都有對應指令，還有 Release 歷史記錄</p>
+            </div>
+          </div>
+          <p className="text-slate-400 text-sm mt-3">Chart 就像 K8s 的 apt 套件，<code className="text-green-400">helm install</code> 就是裝套件。</p>
+        </div>
+      </div>
+    ),
+    notes: `helm install 和 kubectl apply -f 差在哪？kubectl apply -f 是套用單一 YAML 檔，你要自己管每個資源。helm install 是安裝整個 Chart，一包含有多個 YAML 的套件。Helm 幫你管所有資源的生命週期——安裝、升級、rollback、uninstall 都有對應指令，還有 Release 歷史記錄。Chart 就像是 K8s 的 apt 套件，install 就是裝套件。好，學員繼續做，做完的來問我有沒有什麼問題。 [▶ 下一頁]`,
+  },
+
   // ── 6-25 第六堂總結（1/2）：因果鏈回顧 + 指令整理 ──
   {
     title: '第六堂因果鏈回顧',

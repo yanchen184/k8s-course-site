@@ -12,6 +12,10 @@
 
 我們要的是 `https://myapp.com`，標準的 80/443，用域名不用記 IP。
 
+80 和 443 是 HTTP/HTTPS 的標準 port。瀏覽器的規則是：你打 `http://myapp.com`，瀏覽器自動連 port 80；你打 `https://myapp.com`，自動連 port 443。這兩個 port 不用寫出來，瀏覽器知道預設就是這個。
+
+NodePort 給你的是 30000–32767 這個範圍，沒辦法用標準 port。所以用戶要記一個奇怪的網址：`http://192.168.1.100:30080`。這不是正常網站該有的樣子。
+
 這個問題，Docker 時代用 Nginx 反向代理來解。K8s 的等價解法叫 **Ingress**。
 
 Ingress 是兩個東西：一張路由地圖（YAML），還有一個讀地圖的 Pod 叫 **Ingress Controller**。我們用 k3s，**Traefik** 已經裝好了。

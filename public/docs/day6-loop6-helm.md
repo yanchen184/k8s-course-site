@@ -6,7 +6,120 @@
 
 ### ① 課程內容
 
-一個 MySQL 部署就需要 5-6 個 YAML 檔，三個環境就是三套，數量很快爆炸。Helm 是 Kubernetes 的套件管理器，讓你一行指令裝好整個服務，不用自己寫 YAML。
+📄 6-17 第 1 張
+
+**問題引出：YAML 太多了**
+
+好，上一個 Loop 結束之後我問了大家一個問題：YAML 太多了。我們來算一下。
+
+今天一個 MySQL 服務，你要寫什麼？
+
+- `Secret`：管密碼
+- `ConfigMap`：管設定
+- `StatefulSet`：跑 MySQL
+- `Headless Service`：做 DNS
+- `PVC`：要儲存空間
+
+五個 K8s 資源。如果再加上 Ingress 讓外面連進來，六個。
+
+你的系統不只有 MySQL 吧？可能還有 Redis 做快取、RabbitMQ 做訊息佇列、Elasticsearch 做搜尋。每個都要寫一堆 YAML。加起來可能有幾十個檔案、幾千行 YAML。
+
+然後你要部署到 dev、staging、prod 三個環境。三個環境的 YAML 基本上一樣，只是 replicas 不同、Image tag 不同、資料庫連線不同。你是要維護三套 YAML？改了一個東西，三個地方都要改？
+
+還有一個問題。你自己手寫 MySQL 的 StatefulSet、Headless Service、PVC。但全世界有幾百萬人在 K8s 上跑 MySQL，每個人都在寫一樣的東西。有沒有人已經寫好了一份最佳實踐，你直接拿來用就好？
+
+📄 6-17 第 2 張
+
+**套件管理器類比**
+
+用你熟悉的經驗來想。
+
+在 Ubuntu 上要裝 MySQL，你會自己下載原始碼然後編譯嗎？不會，你 `apt install mysql-server`，一行指令搞定。在 Node.js 專案要用 Express，你會自己從零寫 HTTP 框架嗎？不會，你 `npm install express`。在 Python 專案要用 Flask，你 `pip install flask`。
+
+每個技術生態都有套件管理器。Ubuntu 有 apt，macOS 有 brew，Node.js 有 npm，Python 有 pip。
+
+**K8s 的套件管理器叫 Helm。**
+
+Helm 讓你用一行指令在 K8s 上安裝一整套 MySQL：
+
+```bash
+helm install my-mysql bitnami/mysql
+```
+
+StatefulSet、Headless Service、PVC、Secret、ConfigMap，全部幫你建好。你不用寫任何 YAML。
+
+📄 6-17 第 3 張
+
+**四個核心概念**
+
+| 概念 | 說明 | 對照 |
+|:---|:---|:---|
+| Helm | K8s 的套件管理工具 | apt / yum / brew / npm |
+| Chart | 一包 YAML 範本（安裝包） | .deb / .rpm 安裝包 |
+| Release | Chart 安裝後的實例 | 安裝好的軟體 |
+| Repository | Chart 的倉庫 | apt source list |
+| values.yaml | 客製化參數檔 | 軟體的設定檔 / .env |
+
+**Chart**：就像 Ubuntu 的 .deb 檔案，裡面包了所有需要的 YAML 範本。有人已經把 MySQL 的最佳實踐打包成一個 Chart，你直接拿來裝就好。
+
+**Release**：Chart 安裝後的實例。你可以用同一個 Chart 安裝多個 Release，互不干擾。比如一個 Redis 叫 `my-cache` 給快取用，另一個 Redis 叫 `my-session` 給 Session 用，各自獨立。
+
+**Repository**：Chart 的倉庫，就像 Ubuntu 的 apt source list。最大的公開倉庫是 **Bitnami**，裡面有 MySQL、Redis、PostgreSQL、MongoDB、WordPress、Grafana… 常用軟體幾乎都有。
+
+**values.yaml**：參數檔。一個 Chart 有很多可以調整的參數，比如 replicas 幾個、密碼是什麼、PVC 要多大。你把這些參數寫在 values.yaml 裡，Helm 會把它們套進 YAML 範本裡生成最終的 K8s 資源。
+
+📄 6-17 第 4 張
+
+**三個核心功能**
+
+**功能一：一鍵安裝**
+
+別人已經把最佳實踐寫成 Chart 了，你直接 `helm install` 就好。少說幾百行 YAML，幾分鐘搞定。
+
+**功能二：參數化 → 多環境部署**
+
+同一個 Chart，dev 環境設 `replicas 1`、密碼設 `dev123`，prod 環境設 `replicas 3`、密碼設超強密碼。只要換 values.yaml，不用改 Chart 本身。三個環境不再是三套 YAML，是一個 Chart + 三個 values 檔。
+
+**功能三：版本管理 + Rollback**
+
+Helm 會記錄每次安裝和升級的歷史。升級之後發現有問題？`helm rollback` 一行指令回到上一版。而且不只是回滾單一 Deployment，是整個 Release 的所有資源一起回滾。
+
+📄 6-17 第 5 張
+
+**對照 Docker Compose**
+
+如果你用過 Docker Compose，Helm 的概念幾乎一樣，只是換到 K8s 的世界：
+
+| Docker Compose | Helm |
+|:---|:---|
+| `docker-compose.yml` | Chart（一包 YAML 範本） |
+| `docker compose up` | `helm install` |
+| `docker compose down` | `helm uninstall` |
+| `.env` 檔案 | `values.yaml` |
+
+概念完全一樣，只是 Helm 在 K8s 的世界裡功能更強大，多了版本管理和 rollback。
+
+📄 6-17 第 6 張
+
+**今天的指令預覽**
+
+今天這個 Loop 要做的事：
+
+- [ ] 安裝 Helm（一行指令）
+- [ ] 加入 Bitnami 倉庫（`helm repo add`）
+- [ ] 搜尋 Chart（`helm search repo mysql`）
+- [ ] 一鍵安裝 MySQL（`helm install my-mysql bitnami/mysql`）
+- [ ] 看 K8s 幫你建了什麼（`kubectl get all`、`kubectl get pvc`）
+- [ ] 升級 Release（`helm upgrade`）
+- [ ] 看版本歷史（`helm history`）
+- [ ] Rollback（`helm rollback`）
+- [ ] 安裝 Redis（`helm install my-redis bitnami/redis`）
+- [ ] 用 values.yaml 客製化部署
+- [ ] 清理（`helm uninstall`）
+
+基本流程就是：`helm repo add` → `helm search` → `helm install` → `helm list` → `helm uninstall`。
+
+概念講完了，下一支影片我們來實際裝一個試試看。
 
 ---
 

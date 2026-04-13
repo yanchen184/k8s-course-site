@@ -416,6 +416,61 @@ kubectl delete pod 隨便一個名字 --as=system:serviceaccount:default:viewer-
 [▶ 下一頁]`,
   },
 
+  // ── 7-13 學員實作解答：RBAC ──
+  {
+    title: '解答：只讀 Role + ServiceAccount + RoleBinding',
+    subtitle: 'Loop 4 完成',
+    section: 'Loop 4：RBAC',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做解答：YAML 關鍵片段</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># Role：只讀，沒有 delete</p>
+            <p>rules:</p>
+            <p>{'- '}apiGroups: [""]</p>
+            <p>{'  '}resources: ["pods"]</p>
+            <p className="text-green-400">{'  '}verbs: ["get", "list", "watch"]{'  '}# 沒有 delete！</p>
+            <p className="text-slate-500 mt-1"># ServiceAccount + RoleBinding 也要建</p>
+            <p>subjects:</p>
+            <p>{'- '}kind: ServiceAccount</p>
+            <p>{'  '}name: viewer-sa</p>
+            <p>{'  '}namespace: default</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># 成功（有 get 權限）</p>
+            <p>kubectl --as=system:serviceaccount:default:viewer-sa get pods</p>
+            <p className="text-slate-500 mt-1"># 失敗（沒有 delete 權限）→ Forbidden</p>
+            <p>kubectl --as=system:serviceaccount:default:viewer-sa delete pod {'<任意 pod 名>'}</p>
+            <p className="text-slate-500 mt-1"># 清理</p>
+            <p>kubectl delete sa viewer-sa</p>
+            <p>kubectl delete role pod-viewer</p>
+            <p>kubectl delete rolebinding viewer-binding</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">預期結果</p>
+          <p className="text-xs text-slate-300 mt-1">get pods 成功列出 Pod；delete pod 回傳 Forbidden（403）</p>
+        </div>
+      </div>
+    ),
+    notes: `來看解答。
+
+RBAC 的核心是 verbs。這個 Role 只給了 get、list、watch，沒有 delete。有了 delete 才能刪，沒有就被拒。
+
+驗證方式是用 --as 模擬 ServiceAccount 的身份。格式一定要是 system:serviceaccount:namespace:名稱，不能省略前綴。get pods 應該成功，delete pod 應該看到 Error from server (Forbidden)。
+
+如果 get pods 也失敗，最常見的原因是 RoleBinding 的 subjects 裡面 namespace 寫錯，或者 roleRef 的 name 跟 Role 名字不匹配。
+
+清理三個資源：kubectl delete sa viewer-sa、delete role pod-viewer、delete rolebinding viewer-binding。 [▶ 下一頁]`,
+  },
+
   // ============================================================
   // Loop 5：NetworkPolicy（7-14, 7-15, 7-16）
   // ============================================================
@@ -802,6 +857,61 @@ kubectl get networkpolicy 看一下。有 db-allow-api-only 這條嗎？POD-SELE
 [▶ 下一頁]`,
   },
 
+  // ── 7-16 學員實作解答：NetworkPolicy ──
+  {
+    title: '解答：只允許 api → database（port 3306）',
+    subtitle: 'Loop 5 完成',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做解答：NetworkPolicy YAML 關鍵片段</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p>spec:</p>
+            <p className="text-green-400">{'  '}podSelector:</p>
+            <p>{'    '}matchLabels:</p>
+            <p>{'      '}app: database{'  '}# 套用到 database Pod</p>
+            <p>{'  '}policyTypes: [Ingress]</p>
+            <p>{'  '}ingress:</p>
+            <p>{'  - '}from:</p>
+            <p>{'    - '}podSelector:</p>
+            <p>{'        '}matchLabels:</p>
+            <p className="text-green-400">{'          '}app: api{'  '}# 只允許 api Pod 連進來</p>
+            <p>{'    '}ports:</p>
+            <p>{'    - '}port: 3306</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># 從 frontend pod exec，連 database（應該超時被擋）</p>
+            <p>kubectl exec {'<frontend-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
+            <p className="text-slate-500 mt-1"># 從 api pod exec，連 database（應該成功）</p>
+            <p>kubectl exec {'<api-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
+            <p className="text-slate-500 mt-1"># 清理</p>
+            <p>kubectl delete networkpolicy allow-api-to-db</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">預期結果</p>
+          <p className="text-xs text-slate-300 mt-1">frontend → database：超時（Connection timed out）；api → database：成功連線</p>
+        </div>
+      </div>
+    ),
+    notes: `來看解答。
+
+NetworkPolicy 的 podSelector 決定「這條規則套到哪個 Pod」，這裡是 app: database。ingress 的 from.podSelector 決定「誰可以連進來」，這裡是 app: api。ports 限制只開 3306。
+
+驗證的方式是 kubectl exec 進去不同的 Pod，用 curl 或 wget 去試連 database-svc:3306。從 frontend Pod 連應該超時，從 api Pod 連應該成功。超時就表示 NetworkPolicy 有效果。
+
+如果兩個都能連，最常見的原因是 CNI 不支援 NetworkPolicy，或者 label 不匹配，Policy 沒有套到正確的 Pod。用 kubectl get pods --show-labels 確認 label。
+
+清理：kubectl delete networkpolicy allow-api-to-db。 [▶ 下一頁]`,
+  },
+
   // ============================================================
   // Loop 6：從零部署上（7-17, 7-18, 7-19）
   // ============================================================
@@ -1157,6 +1267,59 @@ kubectl get all -n prod
 繼續往下走。
 
 [▶ 下一頁]`,
+  },
+
+  // ── 7-19 學員實作解答：從零部署上（步驟 1-6）──
+  {
+    title: '解答：步驟 1-6 驗收指令',
+    subtitle: 'Loop 6 完成',
+    section: 'Loop 6：從零部署（上）',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做解答：驗收三個指令</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># 1. 確認 Pod 狀態</p>
+            <p>kubectl get pods -n prod</p>
+            <p className="text-slate-500"># mysql-0  Running  → StatefulSet 正常</p>
+            <p className="text-slate-500 mt-1"># 2. 確認 PVC 已綁定</p>
+            <p>kubectl get pvc -n prod</p>
+            <p className="text-slate-500"># STATUS: Bound  → 資料不會丟</p>
+            <p className="text-slate-500 mt-1"># 3. 進 MySQL 確認能連線</p>
+            <p>kubectl exec -n prod mysql-0 -- \</p>
+            <p>{'  '}mysql -u root -pmy-secret-password \</p>
+            <p>{'  '}-e "SHOW DATABASES;"</p>
+            <p className="text-slate-500 mt-1"># 清理（做完全部步驟再清）</p>
+            <p>kubectl delete namespace prod</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">步驟 1-6 清單</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p><span className="text-green-400">1.</span> Namespace prod</p>
+            <p><span className="text-green-400">2.</span> Secret（mysql-secret）</p>
+            <p><span className="text-green-400">3.</span> ConfigMap（mysql-config）</p>
+            <p><span className="text-green-400">4.</span> PVC（mysql-pvc）</p>
+            <p><span className="text-green-400">5.</span> MySQL StatefulSet + Headless Service</p>
+            <p><span className="text-green-400">6.</span> 驗證 mysql-0 Running + PVC Bound</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">預期結果</p>
+          <p className="text-xs text-slate-300 mt-1">mysql-0 Running、PVC Bound、SHOW DATABASES 顯示資料庫列表</p>
+        </div>
+      </div>
+    ),
+    notes: `來看步驟 1 到 6 的驗收。
+
+三個關鍵指令。第一個，kubectl get pods -n prod，確認 mysql-0 是 Running。第二個，kubectl get pvc -n prod，確認 STATUS 是 Bound，代表 PVC 成功掛載了 PV，資料不會因為 Pod 重啟而消失。第三個，kubectl exec 進去 mysql-0，執行 SHOW DATABASES，能看到資料庫列表就表示 MySQL 本身是正常的。
+
+步驟 1 到 6 是整個系統的核心基礎：Namespace 隔離環境、Secret 保存密碼、ConfigMap 放設定、PVC 持久化資料、StatefulSet 管理有狀態的資料庫。這五個層次缺一不可。
+
+注意：kubectl delete namespace prod 這個清理指令留到步驟 7 到 12 全部做完再執行，現在先不要清理。 [▶ 下一頁]`,
   },
 
   // ============================================================
@@ -1547,6 +1710,59 @@ kubectl delete namespace prod
 接下來是今天最後的部分：四堂課的總複習。我們要用一條因果鏈把所有概念串起來。
 
 [▶ 下一頁]`,
+  },
+
+  // ── 7-22 學員實作解答：從零部署下（步驟 7-12）──
+  {
+    title: '解答：步驟 7-12 驗收指令',
+    subtitle: 'Loop 7 完成',
+    section: 'Loop 7：從零部署（下）',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做解答：關鍵驗收指令</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># Ingress 有 ADDRESS</p>
+            <p>kubectl get ingress -n prod</p>
+            <p className="text-slate-500 mt-1"># API health check</p>
+            <p>curl http://{'<NODE-IP>'}/api/health{'  '}# 回傳 200</p>
+            <p className="text-slate-500 mt-1"># HPA 壓測觀察 REPLICAS</p>
+            <p>kubectl get hpa -n prod -w</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">挑戰解答：RBAC 驗證</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># 成功（有 get 權限）</p>
+            <p>kubectl --as=system:serviceaccount:prod:readonly-sa \</p>
+            <p>{'  '}get pods -n prod</p>
+            <p className="text-slate-500 mt-1"># 失敗 → Forbidden（沒有 delete 權限）</p>
+            <p>kubectl --as=system:serviceaccount:prod:readonly-sa \</p>
+            <p>{'  '}delete pod {'<pod>'} -n prod</p>
+            <p className="text-slate-500 mt-1"># 全部做完後清理</p>
+            <p>kubectl delete namespace prod</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">預期結果</p>
+          <p className="text-xs text-slate-300 mt-1">Ingress 有 ADDRESS、API 回 200、HPA REPLICAS 隨壓測變化、RBAC 驗證成功 / Forbidden</p>
+        </div>
+      </div>
+    ),
+    notes: `來看步驟 7 到 12 的驗收。
+
+第一個：kubectl get ingress -n prod，確認 ADDRESS 欄位有 IP。如果在 minikube 需要先跑 minikube tunnel 才會有 ADDRESS。
+
+第二個：curl http://NODE-IP/api/health，回傳 200 代表 Ingress + Service + Deployment 整條路徑都通了。
+
+第三個：kubectl get hpa -n prod -w，用 load-generator 壓測，看 REPLICAS 隨 CPU 使用率自動增加。
+
+RBAC 驗證跟 Loop 4 一樣，但這次是在 prod Namespace 裡面，ServiceAccount 是 readonly-sa。get pods 成功、delete pod 回 Forbidden，就表示權限控制做對了。
+
+全部驗收完畢之後，kubectl delete namespace prod 一次清掉所有資源。Namespace 刪掉，裡面所有的 Pod、Service、PVC 都一起消失。 [▶ 下一頁]`,
   },
 
   // ============================================================

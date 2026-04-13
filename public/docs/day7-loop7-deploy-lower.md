@@ -38,7 +38,7 @@ rules:
               port:
                 number: 80
         - path: /api
-          pathType: Prefix
+          pathType: Prefix    # Prefix = 前綴匹配，/api 會匹配 /api、/api/users 等；Exact = 精確匹配，只匹配路徑本身
           backend:
             service:
               name: api-svc
@@ -56,7 +56,7 @@ rules:
 
 給 API Deployment 加 HPA：CPU 超過 50% 就自動擴，最少 3 個副本、最多 10 個。
 
-HPA 需要 metrics-server 才能讀到 CPU 數據，而且 Deployment 必須設 `resources.requests`。我們的 `05-api.yaml` 已經設好了，所以 HPA 能正常運作。
+HPA 需要 metrics-server 才能讀到 CPU 數據。metrics-server 是 K8s 的資源監控元件，定期從每個 Node 收集 CPU 和 Memory 使用量，HPA 靠它拿數據才能決定要擴縮幾個 Pod。k3s 已經內建，標準 K8s 要另外裝。除了 metrics-server，Deployment 也必須設 `resources.requests`。我們的 `05-api.yaml` 已經設好了，所以 HPA 能正常運作。
 
 **步驟 9：NetworkPolicy**
 
@@ -363,7 +363,7 @@ metadata:
   name: myapp-ingress
   namespace: prod
 spec:
-  ingressClassName: traefik    # k3s 用 traefik；minikube 用 nginx
+  ingressClassName: traefik    # 叢集裡可能有多個 Ingress Controller，ingressClassName 告訴 K8s 這份規則要交給哪個 Controller 處理。k3s 用 traefik；minikube 用 nginx
   rules:
   - host: myapp.local
     http:

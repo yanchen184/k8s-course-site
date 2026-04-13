@@ -70,7 +70,11 @@ API 需要知道資料庫地址和 Port。這些設定用 ConfigMap 存，不寫
 
 **步驟 4：部署 MySQL**
 
-用 StatefulSet 加 PVC 加 Headless Service。為什麼不用 Deployment？因為資料庫需要穩定的網路標識和獨立的儲存。Headless Service 讓每個 Pod 有自己的 DNS 名稱，像 `mysql-0.mysql-headless.prod.svc.cluster.local`。
+用 StatefulSet 加 PVC 加 Headless Service。為什麼不用 Deployment？因為資料庫需要穩定的網路標識和獨立的儲存。
+
+> **Headless Service 是什麼？** 普通 Service 有 ClusterIP（虛擬 IP），流量打進去會 round-robin 到任一 Pod。Headless Service 設 `clusterIP: None`，不給虛擬 IP，每個 Pod 有自己獨立的 DNS 名稱。叫「Headless」就是因為沒有那個「頭」——ClusterIP。StatefulSet 配 Headless Service，才能用 `mysql-0.mysql-headless.svc` 這種方式直接找到特定 Pod。
+
+Headless Service 讓每個 Pod 有自己的 DNS 名稱，像 `mysql-0.mysql-headless.prod.svc.cluster.local`。
 
 **步驟 5：部署 API**
 
@@ -151,6 +155,8 @@ kubectl get pods -n prod -w
 
 這個 YAML 裡有三個資源：Headless Service、StatefulSet、volumeClaimTemplate（含在 StatefulSet 裡）。一次 apply 全部建好。
 
+> **volumeClaimTemplates 是什麼？** Deployment 的所有 Pod 共用同一個 PVC，但 StatefulSet 用 `volumeClaimTemplates`，K8s 會自動幫每個 Pod 建一個專屬的 PVC：mysql-0 得到 `data-mysql-0`，mysql-1 得到 `data-mysql-1`。Pod 重建後會掛回原本的 PVC，資料不會跑到別的 Pod 去。
+
 MySQL 啟動比較慢，可能要 30 到 60 秒。`-w` 是 watch，自動重新整理。等到 READY 變成 `1/1` 再按 Ctrl+C。
 
 ```bash
@@ -185,7 +191,9 @@ kubectl get svc -n prod
 `05-api.yaml` 是最複雜的一個。Deployment 裡面設了：
 - `replicas: 3`
 - `livenessProbe`、`readinessProbe`、`startupProbe` 三種健康檢查
+  > **三種 Probe 的差別：** `livenessProbe` 問「Pod 還活著嗎？」失敗就重啟。`readinessProbe` 問「Pod 準備好接流量了嗎？」失敗就從 Service 暫時移除，不重啟。`startupProbe` 給啟動慢的應用用，啟動期間停用 liveness 檢查，避免誤判。
 - `resources.requests` 和 `resources.limits`
+  > **requests vs limits：** `requests` 是 Pod 啟動時保留的資源，scheduler 靠它決定 Pod 排到哪個 Node。`limits` 是 Pod 能用的上限，超過 CPU limit 會被限速（throttling），超過 Memory limit 會被殺掉（OOMKilled）。最佳實踐是兩個都設，requests 是正常使用量，limits 是最大容忍量。
 - `envFrom.secretRef` 從 Secret 讀密碼
 - `envFrom.configMapRef` 從 ConfigMap 讀設定
 - 同時建了一個 `ClusterIP` Service `api-svc`

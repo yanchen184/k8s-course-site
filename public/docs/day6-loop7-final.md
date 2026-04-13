@@ -23,7 +23,7 @@ MySQL 是有狀態的服務，資料不能消失，所以不用 Deployment，用
 - **StatefulSet**：有狀態，Pod 序號固定（mysql-0、mysql-1）
 - **Headless Service**：給 StatefulSet 一個穩定的 DNS 名稱（`mysql-0.mysql.default.svc.cluster.local`）
 - **StorageClass**：自動佈建 PV，不用手動 `kubectl apply -f pv.yaml`
-- **volumeClaimTemplates**：每個 MySQL Pod 有自己獨立的 PVC，mysql-0 的資料不會跑到 mysql-1 去
+- **volumeClaimTemplates**：StatefulSet 專屬的欄位，讓每個 Pod 自動建立自己的 PVC（不像 Deployment 的 Pod 共用同一個 PVC）。mysql-0 的資料不會跑到 mysql-1 去
 - **Secret**：MySQL 的 root 密碼放 Secret，不能明文寫在 YAML 裡
 
 ---
@@ -93,7 +93,7 @@ MySQL 是有狀態的服務，資料不能消失，所以不用 Deployment，用
 helm install my-blog bitnami/wordpress
 ```
 
-一行指令，WordPress + MariaDB + PVC + Ingress 全部跑起來。
+一行指令，WordPress + MariaDB + PVC + Ingress 全部跑起來。MariaDB 是 MySQL 的開源分支，API 完全相容，Bitnami 的 WordPress Chart 預設用 MariaDB 當資料庫，用法跟 MySQL 一樣。
 
 這不是偷懶，這是正確的工程判斷。自己寫 YAML 的情境是：需要高度客製化、或者在學原理。套 Helm Chart 的情境是：已知的軟體（WordPress、Prometheus、Redis）、不需要改內部邏輯的。
 

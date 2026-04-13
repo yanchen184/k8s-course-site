@@ -40,7 +40,7 @@
 
 **K8s 的套件管理器叫 Helm。**
 
-Helm 讓你用一行指令在 K8s 上安裝一整套 MySQL：
+Helm 讓你用一行指令在 K8s 上安裝一整套 MySQL。Bitnami 是目前最大的公開 Chart 倉庫，待會我們會用 `helm repo add` 把它加進來：
 
 ```bash
 helm install my-mysql bitnami/mysql

@@ -10,9 +10,15 @@
 
 **問題引出：YAML 太多了**
 
-好，上一個 Loop 結束之後我問了大家一個問題：YAML 太多了。我們來算一下。
+上一個 Loop，你花了 15 分鐘，手寫了 Secret、Headless Service、StatefulSet，還要處理 volumeClaimTemplates、有序啟動、Pod 重建後 PVC 還掛在同一個 Pod 上——這些東西你剛才一行一行打出來了。
 
-今天一個 MySQL 服務，你要寫什麼？
+現在問你一個問題：這是你第一次搞 MySQL，你是從頭想出這個架構的嗎？還是你去查文件、抄範例、反覆 debug 才弄好的？
+
+全世界有幾百萬人在 K8s 上跑 MySQL，每個人都在踩一樣的坑、寫一樣的 YAML。有沒有人把這個最佳實踐打包好，讓你直接一行安裝？
+
+有。
+
+你剛才就是幹了這些事：
 
 - `Secret`：管密碼
 - `ConfigMap`：管設定
@@ -25,8 +31,6 @@
 你的系統不只有 MySQL 吧？可能還有 Redis 做快取、RabbitMQ 做訊息佇列、Elasticsearch 做搜尋。每個都要寫一堆 YAML。加起來可能有幾十個檔案、幾千行 YAML。
 
 然後你要部署到 dev、staging、prod 三個環境。三個環境的 YAML 基本上一樣，只是 replicas 不同、Image tag 不同、資料庫連線不同。你是要維護三套 YAML？改了一個東西，三個地方都要改？
-
-還有一個問題。你自己手寫 MySQL 的 StatefulSet、Headless Service、PVC。但全世界有幾百萬人在 K8s 上跑 MySQL，每個人都在寫一樣的東西。有沒有人已經寫好了一份最佳實踐，你直接拿來用就好？
 
 📄 6-17 第 2 張
 

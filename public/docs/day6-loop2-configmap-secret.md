@@ -546,3 +546,24 @@ kubectl exec deployment/redis-deploy -- env | grep REDIS
 REDIS_PASSWORD=my-redis-pw
 REDIS_MAXMEMORY=256mb
 ```
+
+---
+
+**清理**
+
+```bash
+# nginx 相關：清掉
+kubectl delete deployment nginx-custom
+kubectl delete svc nginx-custom-svc
+kubectl delete configmap nginx-config
+
+# busybox 相關：清掉
+kubectl delete deployment app-with-config
+kubectl delete configmap app-config
+
+# MySQL：先不清！6-11 PV/PVC 那個 Loop 直接用這個 mysql-deploy 做實驗
+# 等一下的目標就是讓你親眼看到「沒有 PVC 的 MySQL，Pod 重建後資料消失」
+kubectl get pods    # 確認 mysql-deploy 還在跑
+```
+
+這個 `mysql-deploy` 故意留著。它沒有掛 PVC，資料寫在容器自己的 filesystem 裡。6-11 概念節會直接用它做「資料消失實驗」——先進去寫資料，砍 Pod，進來看資料不見了，這就是為什麼需要 PV/PVC。

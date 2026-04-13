@@ -160,13 +160,26 @@ Pod 掛載 PVC
 
 ---
 
-確認目前環境狀態：
+**確認環境（這是 Loop 2 留下來的 MySQL）**
+
+Loop 2 最後我們部署了 MySQL，Secret 管密碼、ConfigMap 管設定——但沒有掛任何 PVC。那個 `mysql-deploy` 現在應該還在跑：
 
 ```bash
 kubectl get pods
 ```
 
-確認 mysql-deploy 還在跑，待會 6-12 實作會直接用。
+預期輸出：
+```
+NAME                            READY   STATUS    RESTARTS   AGE
+mysql-deploy-xxx                1/1     Running   0          10m
+```
+
+如果 mysql-deploy 不見了，重新 apply secret-db.yaml：
+```bash
+kubectl apply -f secret-db.yaml
+```
+
+這個 MySQL **沒有掛 PVC**，資料是寫在容器自己的 overlay filesystem 裡。現在要用它做一個關鍵實驗：先寫資料、砍 Pod、看資料消不消失。
 
 ---
 
@@ -527,3 +540,21 @@ kubectl get pv,pvc    # 兩個都是 Bound
 **挑戰題解答**
 
 local-pvc2 的 STATUS 是 `Pending`。原因：一個 PV 同時只能綁定一個 PVC（RWO 語義）。local-pv 已經被 local-pvc 佔走，叢集裡沒有其他符合條件的 PV，所以 local-pvc2 只能一直等。`kubectl describe pvc local-pvc2` 的 Events 會顯示 `no persistent volumes available for this claim`。
+
+---
+
+**清理（Loop 3 結束）**
+
+```bash
+# 刪掉 mysql-deploy（Deployment 版本，等一下 Loop 4 改用 StatefulSet 跑同一個 MySQL）
+kubectl delete deployment mysql-deploy
+kubectl delete svc mysql-svc
+
+# PV 和 PVC 保留還是刪掉？— 刪掉，Loop 4 改用 StorageClass 動態佈建，不再手動建 PV
+kubectl delete pvc local-pvc
+kubectl delete pv local-pv
+
+kubectl get all    # 確認清乾淨，只剩 kubernetes Service
+```
+
+下一個 Loop（StatefulSet）會用同一個 MySQL 的概念，但改用 StatefulSet 來跑。你會看到為什麼 Deployment 跑資料庫根本上有哪四個問題，以及 StatefulSet 怎麼解決這些問題。

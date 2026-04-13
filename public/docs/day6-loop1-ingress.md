@@ -51,6 +51,27 @@ Ingress 是兩個東西，要分清楚。
 
 ---
 
+📄 6-2 第 3 張
+
+**兩種路由方式 + YAML 結構**
+
+| 方式 | URL 範例 | 適合場景 |
+|------|---------|---------|
+| Path-based | `myapp.com/` + `myapp.com/api` | 前後端同域名 |
+| Host-based | `www.myapp.com` + `api.myapp.com` | 微服務各有域名 |
+
+Ingress 的 `apiVersion` 是 `networking.k8s.io/v1`，不是 `apps/v1`。記住這張表：
+
+| 資源 | apiVersion |
+|------|-----------|
+| Pod、Service、ConfigMap | `v1` |
+| Deployment | `apps/v1` |
+| **Ingress** | **`networking.k8s.io/v1`** |
+
+Docker 時代你自己寫 nginx.conf，K8s 用 Ingress YAML；Docker 跑 Nginx 容器，K8s 用 Ingress Controller Pod。做的事情一樣，整合進叢集之後不用手動 reload，Service 變了路由自動更新。
+
+---
+
 ## 6-3 Ingress 實作（~20 min）
 
 ### ② 所有指令＋講解

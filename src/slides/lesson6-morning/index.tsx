@@ -499,8 +499,14 @@ app-ingress   traefik   *       192.168.64.10    80`}</pre>
 
         <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
           <p className="text-slate-400 text-xs font-semibold mb-1">Step 4：curl 驗證</p>
-          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`curl http://<NODE-IP>/     → Welcome to nginx!
-curl http://<NODE-IP>/api  → API Server Response`}</pre>
+          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`curl http://<NODE-IP>/frontend
+# Server: 10.42.x.x:80 (frontend-deploy-xxx)
+# Message: Hello from frontend
+
+curl http://<NODE-IP>/api
+# Server: 10.42.x.x:80 (api-deploy-xxx)
+# Message: Hello from api`}</pre>
+          <p className="text-slate-400 text-xs mt-1">SERVER_ADDR 不同 → 確認是兩個不同的 Pod 在服務</p>
         </div>
       </div>
     ),
@@ -512,31 +518,77 @@ kubectl get pods -n kube-system | grep traefik
 kubectl get svc -n kube-system | grep traefik
 # traefik  LoadBalancer  10.43.x.x  192.168.64.10  80:xxx/TCP
 
-# Step 2：部署
+# Step 2：部署（ingress-basic.yaml 內容如下）
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: frontend-deploy
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: frontend
+#   template:
+#     metadata:
+#       labels:
+#         app: frontend
+#     spec:
+#       containers:
+#         - name: app
+#           image: jasonmel/k8s-demo-app:latest
+#           env:
+#             - name: MESSAGE
+#               value: "Hello from frontend"
+#           ports:
+#             - containerPort: 80
+# ---
+# （api-deploy 同理，MESSAGE 改成 "Hello from api"）
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: app-ingress
+# spec:
+#   ingressClassName: traefik
+#   rules:
+#     - http:
+#         paths:
+#           - path: /frontend
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: frontend-svc
+#                 port:
+#                   number: 80
+#           - path: /api
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: api-svc
+#                 port:
+#                   number: 80
+
 kubectl apply -f ingress-basic.yaml
-# deployment.apps/frontend-deploy created
-# service/frontend-svc created
-# deployment.apps/api-deploy created
-# service/api-svc created
-# ingress.networking.k8s.io/app-ingress created
 
 # Step 3：確認
 kubectl get svc
 # frontend-svc  ClusterIP  10.43.x.x  <none>  80/TCP
-# api-svc       ClusterIP  10.43.x.x  <none>  3000/TCP
+# api-svc       ClusterIP  10.43.x.x  <none>  80/TCP
 
 kubectl get ingress
 # NAME         CLASS    HOSTS  ADDRESS        PORTS
 # app-ingress  traefik  *      192.168.64.10  80
 
-kubectl describe ingress app-ingress
-# Rules: * / → frontend-svc:80 (Pod IP)
-#          /api → api-svc:3000 (Pod IP)
-
 # Step 4：測試
-kubectl get nodes -o wide   # 看 INTERNAL-IP 欄位
-curl http://<NODE-IP>/      # → Welcome to nginx! (HTML)
-curl http://<NODE-IP>/api   # → API Server Response`,
+kubectl get nodes -o wide   # 看 INTERNAL-IP
+curl http://<NODE-IP>/frontend
+# Server: 10.42.x.x:80 (frontend-deploy-xxx)
+# Message: Hello from frontend
+
+curl http://<NODE-IP>/api
+# Server: 10.42.x.x:80 (api-deploy-xxx)
+# Message: Hello from api`,
     notes: `好，概念講完，動手做。請大家打開終端機。
 
 第一步，確認 Ingress Controller 有在跑。我們用的是 k3s，Traefik 是內建的，安裝 k3s 的時候就自動帶了。
@@ -549,41 +601,37 @@ svclb-traefik 是 k3s 特有的元件，叫做 Klipper Load Balancer。標準 K8
 
 kubectl get svc -n kube-system，看 traefik 那行，EXTERNAL-IP 就是你 VM 的 IP，等等 curl 要用這個。
 
-Controller 確認了，來部署我們的應用。我準備了一個 ingress-basic.yaml，裡面包含四個東西：frontend 的 Deployment 和 Service，用 nginx image；api 的 Deployment 和 Service，用 httpd image；還有一個 Ingress 規則，path-based routing。
+Controller 確認了，來部署我們的應用。我準備了一個 ingress-basic.yaml。跟之前不一樣的地方是：這次兩個服務都用同一個 image，jasonmel/k8s-demo-app。這個 app 很簡單，它會印出自己的 Server IP 和你設定的 MESSAGE。
+
+frontend-deploy 的 MESSAGE 設成 Hello from frontend，api-deploy 的 MESSAGE 設成 Hello from api。兩個用同一個 image，但環境變數不同，行為就不同。
 
 kubectl apply -f ingress-basic.yaml
 
 一次 apply 全部搞定。來看看建了什麼。
 
-kubectl get deployments。兩個 Deployment，frontend-deploy 和 api-deploy，各一個副本。
+kubectl get svc。兩個 ClusterIP Service。注意是 ClusterIP 不是 NodePort。因為外部流量的入口只有一個，就是 Ingress Controller。流量路徑是：外部用戶 → Traefik → 根據路由規則 → ClusterIP Service → Pod。ClusterIP 就夠用，不需要 NodePort。
 
-kubectl get svc。兩個 ClusterIP Service，frontend-svc 和 api-svc。注意是 ClusterIP 不是 NodePort。
-
-這裡一定有人會問：為什麼不用 NodePort？
-
-因為外部流量的入口只有一個，就是 Ingress Controller。流量路徑是：外部用戶 → Ingress Controller（Traefik Pod，監聽 80/443）→ 根據路由規則 → ClusterIP Service → 後端 Pod。
-
-Ingress Controller 本身是一個 Pod，跑在叢集裡面，它跟 Service 溝通走的是叢集內部網路。ClusterIP 就是讓叢集內的 Pod 互相連用的，Controller 也是 Pod，所以 ClusterIP 夠用，不需要 NodePort。
-
-NodePort 是為了「讓外部直接打 Node IP 加 Port」而存在的。但你現在已經有 Ingress Controller 統一接外部流量了，Service 自己不需要再對外開 Port。如果你還用 NodePort，就是白白暴露一個沒人用的 Port，攻擊面變大，而且你還是要記一堆 Port 號，那你幹嘛用 Ingress？
-
-kubectl get ingress。看到 app-ingress，CLASS 欄位顯示 traefik。ADDRESS 欄位可能一開始是空的，等幾秒就會出現 IP。
-
-kubectl describe ingress app-ingress。看 Rules 那一段，會列出你定義的路由規則。斜線對應 frontend-svc 的 80 Port，斜線 api 對應 api-svc 的 80 Port。
+kubectl get ingress。看到 app-ingress，ADDRESS 欄位可能一開始是空的，等幾秒就會出現 IP。
 
 好，來測試。先拿到 Node 的 IP。
 
-kubectl get nodes -o wide，看 INTERNAL-IP 欄位。假設是 192.168.1.100。
+kubectl get nodes -o wide，看 INTERNAL-IP 欄位。
 
-curl http://192.168.1.100/
+指令：curl http://<NODE-IP>/frontend
 
-你應該看到 Nginx 的歡迎頁面，就是那個 Welcome to nginx 的 HTML。
+你會看到：
+Server: 10.42.x.x:80
+Message: Hello from frontend
 
-curl http://192.168.1.100/api
+指令：curl http://<NODE-IP>/api
 
-你應該看到 httpd 的預設頁面，It works! 的字樣。
+你會看到：
+Server: 10.42.x.x:80
+Message: Hello from api
 
-成功了。同一個 IP，同一個 Port 80，不需要 30080 這種醜陋的 Port 了。根據 URL 路徑的不同，流量被導到不同的 Service。這就是 Path-based routing 的威力。
+注意兩個回應的 Server IP 不一樣，因為是兩個不同的 Pod 在服務。
+
+成功了。同一個 IP，同一個 Port 80，根據 URL 路徑的不同，流量被導到不同的 Pod，而且你能直接從回應看出差異。這就是 Path-based routing 的威力。
 
 [▶ 下一頁]`,
   },
@@ -608,10 +656,12 @@ grep myapp.local /etc/hosts
         <div className="bg-slate-800/50 p-3 rounded-lg">
           <p className="text-cyan-400 font-semibold text-sm mb-2">curl 驗證</p>
           <pre className="text-xs font-mono bg-slate-900 p-2 rounded">{`curl http://www.myapp.local
-# → Welcome to nginx! (HTML)
+# Server: 10.42.x.x:80 (frontend-deploy-xxx)
+# Message: Hello from frontend
 
 curl http://api.myapp.local
-# → API Server Response`}</pre>
+# Server: 10.42.x.x:80 (api-deploy-xxx)
+# Message: Hello from api`}</pre>
         </div>
 
         <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
@@ -638,10 +688,12 @@ grep myapp.local /etc/hosts
 # 192.168.64.10 www.myapp.local api.myapp.local
 
 curl http://www.myapp.local
-# → Welcome to nginx! (HTML)
+# Server: 10.42.x.x:80 (frontend-deploy-xxx)
+# Message: Hello from frontend
 
 curl http://api.myapp.local
-# → API Server Response
+# Server: 10.42.x.x:80 (api-deploy-xxx)
+# Message: Hello from api
 
 # 排錯
 kubectl describe ingress app-ingress   # 看 Events

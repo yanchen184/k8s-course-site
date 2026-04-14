@@ -295,7 +295,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mysql-secret
+  name: mysql-sts-secret
 type: Opaque
 stringData:
   MYSQL_ROOT_PASSWORD: rootpass123
@@ -321,7 +321,7 @@ spec:
         image: mysql:8.0
         envFrom:
         - secretRef:
-            name: mysql-secret
+            name: mysql-sts-secret
         volumeMounts:
         - name: mysql-data
           mountPath: /var/lib/mysql
@@ -339,7 +339,7 @@ spec:
 打完要看：
 ```
 service/mysql-headless created
-secret/mysql-secret created
+secret/mysql-sts-secret created
 statefulset.apps/mysql created
 ```
 
@@ -748,12 +748,12 @@ service "redis-headless" deleted
 ```
 
 ```bash
-kubectl delete secret mysql-secret
+kubectl delete secret mysql-sts-secret
 ```
 
 預期輸出：
 ```
-secret "mysql-secret" deleted
+secret "mysql-sts-secret" deleted
 ```
 
 ```bash
@@ -786,7 +786,7 @@ service/kubernetes   ClusterIP   10.43.0.1    <none>        443/TCP   10d
 
 為了讓一個 MySQL 正常跑起來，你寫了：
 
-1. `Secret`：管密碼（`mysql-secret`）
+1. `Secret`：管密碼（`mysql-sts-secret`）
 2. `Headless Service`：讓每個 Pod 有自己的 DNS（`mysql-headless`）
 3. `StatefulSet`：本體，含 `volumeClaimTemplates`
 4. K8s 自動幫你建了 `mysql-data-mysql-0`、`mysql-data-mysql-1` 兩個 PVC

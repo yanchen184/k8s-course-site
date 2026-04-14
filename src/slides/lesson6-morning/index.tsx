@@ -2188,7 +2188,7 @@ kubectl get pods -w          # mysql-2 先 Terminating，然後 mysql-1
 # 清理
 kubectl delete statefulset mysql redis
 kubectl delete svc mysql-headless redis-headless
-kubectl delete secret mysql-secret
+kubectl delete secret mysql-sts-secret
 kubectl delete pvc --all`,
     notes: `學員實作。寫一個 Redis StatefulSet，image 用 redis:7，2 個副本，每個 Pod 500Mi 儲存。驗證三件事：get pods 看到 redis-0 和 redis-1，get pvc 看到兩個獨立的 PVC，砍掉 redis-0 等重建確認名字還是 redis-0。挑戰：Scale mysql 到 3 看 mysql-2 最後建，Scale 回 1 確認 mysql-2 先被刪（反序）。清理：statefulset、service、secret、pvc 都要刪，PVC 不會自動刪，要手動 kubectl delete pvc --all。[▶ 下一頁]`,
   },

@@ -1427,11 +1427,16 @@ kubectl apply -f configmap-nginx.yaml
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 curl http://<NODE-IP>:30090/healthz  # → OK
 
-# 改 ConfigMap → 檔案自動更新
+# 改 ConfigMap
 kubectl edit configmap nginx-config   # 把 'OK' 改成 'HEALTHY'
-# 等 30-60 秒
-kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf  # 更新了！
+
+# 馬上 reload → 還是 OK！（檔案還沒更新）
+kubectl exec deploy/nginx-custom -- nginx -s reload
 curl http://<NODE-IP>:30090/healthz  # 還是 OK！
+
+# 等 30-60 秒 → 檔案自動更新
+kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf  # 已是 HEALTHY
+# 現在 reload 才有效
 kubectl exec deploy/nginx-custom -- nginx -s reload
 curl http://<NODE-IP>:30090/healthz  # → HEALTHY`,
     notes: `好，概念講完了，四個步驟，一步一步做。
@@ -1492,17 +1497,29 @@ kubectl edit configmap nginx-config
 
 把 return 200 後面的 OK 改成 HEALTHY，存檔。
 
-等 30 到 60 秒。這次我們不重啟 Pod，直接看檔案。
-
-kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
-
-檔案內容自動更新了，變成 HEALTHY 了。不用重啟 Pod，kubelet 定期把 ConfigMap 的新內容同步到 Pod 裡面的掛載目錄。
-
-但注意，Nginx process 本身不會自動 reload。檔案雖然改了，Nginx 還是用舊設定在跑。你 curl 一下還是回 OK。要手動 reload。
+**改完馬上 reload，不等。**
 
 kubectl exec deploy/nginx-custom -- nginx -s reload
 
-現在再 curl http://&lt;NODE-IP&gt;:30090/healthz，回 HEALTHY 了。
+然後 curl。
+
+curl http://&lt;NODE-IP&gt;:30090/healthz
+
+還是 OK。為什麼？因為 ConfigMap 的新內容還沒同步到 Pod 裡的檔案，nginx reload 了也是讀舊的，所以沒用。
+
+現在等 30 到 60 秒，再看檔案。
+
+kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
+
+現在檔案變成 HEALTHY 了。kubelet 定期把 ConfigMap 的新內容同步進來，不用重啟 Pod。
+
+但 nginx 程式本身還不知道，要再 reload 一次。
+
+kubectl exec deploy/nginx-custom -- nginx -s reload
+
+現在再 curl，回 HEALTHY 了。
+
+記住這個對比：env 注入改了，reload 完全沒用，要 rollout restart。Volume 掛載改了，要等檔案同步，同步完再 reload 才生效。
 
 這裡有一個坑要提醒。如果你用 subPath 掛載，就是只掛一個檔案而不是覆蓋整個目錄，那熱更新不會生效。這是 K8s 的已知行為。所以如果你需要熱更新功能，不要用 subPath。但不用 subPath 的話，整個目錄會被 ConfigMap 覆蓋，原本目錄裡的其他檔案會不見。這是一個取捨，要根據你的場景選擇。
 

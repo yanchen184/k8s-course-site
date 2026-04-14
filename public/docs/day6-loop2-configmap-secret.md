@@ -295,7 +295,7 @@ server {
 }
 ```
 
-用 NodePort 測試（不需要 port-forward，直接打 Node IP）：
+用 NodePort 測試：
 
 ```bash
 curl http://<NODE-IP>:30090/healthz
@@ -303,13 +303,24 @@ curl http://<NODE-IP>:30090/healthz
 
 預期輸出：`OK`
 
-改 ConfigMap，觀察自動更新：
+改 ConfigMap：
 
 ```bash
 kubectl edit configmap nginx-config
 ```
 
 把 `return 200 'OK\n';` 改成 `return 200 'HEALTHY\n';`，存檔退出。
+
+**馬上** reload，不等：
+
+```bash
+kubectl exec deploy/nginx-custom -- nginx -s reload
+curl http://<NODE-IP>:30090/healthz
+```
+
+預期輸出：`OK`
+
+還是 `OK`！reload 本身沒問題，但 ConfigMap 的新內容還沒同步到 Pod 裡的檔案，所以 nginx reload 了也沒用。
 
 等 30-60 秒，確認檔案已自動更新：
 
@@ -329,6 +340,8 @@ server {
   }
 }
 ```
+
+檔案更新了。現在 reload 才有效：
 
 檔案已更新（看到 `HEALTHY`）。但 curl 還是舊的：
 

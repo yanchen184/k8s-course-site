@@ -590,7 +590,7 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
 
 ### ④ 學員實作
 
-**Step 5：講師示範建新服務（學生跟著做）**
+**Step 6：講師示範建新服務（學生跟著做）**
 
 ```bash
 kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest

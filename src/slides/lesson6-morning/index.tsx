@@ -1017,7 +1017,7 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
     content: (
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">Step 5：講師示範（學生跟著做）</p>
+          <p className="text-green-400 font-semibold mb-2">Step 6：講師示範（學生跟著做）</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-0.5 mb-2">
             <p>kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest</p>
             <p>kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"</p>

@@ -2316,6 +2316,69 @@ helm history my-ingress   # REVISION 3: deployed (Rollback to 1)`,
   },
 
   // ============================================================
+  // 6-19A：學員實作 Part 1
+  // ============================================================
+  {
+    title: '學員實作：install → upgrade → rollback',
+    subtitle: '用 my-nginx 跑一遍完整 Helm 生命週期（10 分鐘）',
+    section: '6-19A：Helm 學員實作 Part 1',
+    duration: '10',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">目標：自己跑一遍 Helm 核心流程</p>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li>helm install <strong className="text-yellow-400">my-nginx</strong>，replicaCount=1</li>
+            <li>helm upgrade，replicaCount=2，確認副本增加</li>
+            <li>helm history 看 REVISION</li>
+            <li>helm rollback 回第 1 版</li>
+            <li>helm history 確認新 REVISION 產生</li>
+            <li>helm uninstall 清理</li>
+          </ol>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-700/40 p-2 rounded">
+          <p className="text-amber-300 text-xs">Release 名稱用 <strong>my-nginx</strong>，記得加 <code className="text-yellow-400">--set controller.service.type=NodePort</code></p>
+        </div>
+      </div>
+    ),
+    code: `# 學員自己跑，參考指令如下
+
+# Step 1：install（replicaCount=1）
+helm install my-nginx ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=1 \\
+  --set controller.service.type=NodePort
+
+helm list   # STATUS: deployed, REVISION: 1
+kubectl get deployment   # READY: 1/1
+
+# Step 2：upgrade（replicaCount=2）
+helm upgrade my-nginx ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=2 \\
+  --set controller.service.type=NodePort
+
+kubectl get deployment   # READY: 2/2
+
+# Step 3：看歷史
+helm history my-nginx
+# REVISION 1: superseded  REVISION 2: deployed
+
+# Step 4：rollback 回第 1 版
+helm rollback my-nginx 1
+
+# Step 5：確認新 REVISION
+helm history my-nginx
+# REVISION 3: deployed  ← rollback 是新 REVISION，不是覆蓋！
+
+kubectl get deployment   # READY: 1/1 （副本回到 1）
+
+# Step 6：清理
+helm uninstall my-nginx
+helm list   # 應該是空的`,
+    notes: `學員自己動手，跑完整 Helm 生命週期。Release 名稱統一用 my-nginx。install 設 replicaCount=1，upgrade 改成 2，helm history 看 REVISION 1 和 2。rollback 回第 1 版，注意 helm history 會出現 REVISION 3，不是回覆蓋 REVISION 1，這是 Helm 的設計，每一步都是新 REVISION，可以追溯。kubectl get deployment 確認副本數從 2 變回 1。跑完 uninstall 清理，helm list 確認空的。這 10 分鐘是要讓你的手記住這幾個指令：install、upgrade、history、rollback、uninstall。[▶ 下一頁]`,
+  },
+
+  // ============================================================
   // 6-18B：Helm 實作 Part 2
   // ============================================================
   {
@@ -2376,65 +2439,25 @@ helm list   # 應該是空的`,
   },
 
   // ============================================================
-  // 6-19A：學員實作 Part 1
+  // 6-19B：學員實作 Part 2
   // ============================================================
   {
-    title: '學員實作：upgrade 陷阱 + dev/prod 兩套 Ingress',
-    subtitle: '必做 1：--reuse-values 的重要性 / 必做 2：同叢集跑兩個 Release',
-    section: '6-19A：回頭操作 Loop 5 Part 1',
-    duration: '15',
+    title: '學員實作：upgrade 陷阱 + 自己的 Chart + Grafana',
+    subtitle: '必做 1：--reuse-values 陷阱 / 必做 2：自己寫 Chart / 挑戰：Grafana',
+    section: '6-19B：Helm 學員實作 Part 2',
+    duration: '20',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-3 rounded-lg">
           <p className="text-cyan-400 font-semibold text-sm mb-2">必做 1：upgrade 陷阱</p>
-          <p className="text-slate-300 text-sm mb-2">install 帶 replicaCount=1，upgrade 不帶 replicaCount，觀察是否被重設回預設值；再試 --reuse-values。</p>
+          <p className="text-slate-300 text-sm mb-1">install 帶 replicaCount=1，upgrade 不帶，觀察副本數被重設；再用 --reuse-values 修正。</p>
           <div className="bg-amber-900/20 border border-amber-700/40 p-2 rounded text-xs text-amber-300">
-            upgrade 不帶的參數會被重設回 Chart 預設值！生產環境常見坑。加 --reuse-values 沿用上次所有 values。
+            upgrade 沒帶的參數 → 重設回 Chart 預設值！生產常見坑，--reuse-values 救你。
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">必做 2：dev/prod 兩套</p>
-          <p className="text-slate-300 text-sm">兩個 values.yaml，helm install 各裝一個，helm list 看到兩個 Release 互不干擾。</p>
-        </div>
-      </div>
-    ),
-    code: `# 必做 1：upgrade 陷阱
-helm install my-ingress ingress-nginx/ingress-nginx \\
-  --set controller.replicaCount=1 --set controller.service.type=NodePort
-
-helm upgrade my-ingress ingress-nginx/ingress-nginx \\
-  --set controller.service.type=NodePort  # 不帶 replicaCount
-
-kubectl get deployment   # replicaCount 被重設了？
-helm history my-ingress
-
-# 加 --reuse-values 的差別
-helm upgrade my-ingress ingress-nginx/ingress-nginx \\
-  --reuse-values --set controller.replicaCount=2
-
-# 必做 2：dev/prod 兩套
-helm install dev-ingress ingress-nginx/ingress-nginx \\
-  -f dev-ingress-values.yaml --set controller.service.type=NodePort
-helm install prod-ingress ingress-nginx/ingress-nginx \\
-  -f prod-ingress-values.yaml --set controller.service.type=NodePort
-helm list   # 看到兩個 deployed Release`,
-    notes: `必做 1 示範一個常見的坑。install 的時候設了 replicaCount=1，upgrade 的時候忘記帶這個參數，Helm 會把它重設回 Chart 的預設值。kubectl get deployment 看副本數被改了。解法是加 --reuse-values，沿用上次所有的 values，再用 --set 只覆蓋你要改的那個。這個坑在生產環境會出問題，記住。必做 2：同一個 Chart 裝兩次，Release 名稱不同，互不干擾。helm list 看到 dev-ingress 和 prod-ingress 兩個都是 deployed。[▶ 下一頁]`,
-  },
-
-  // ============================================================
-  // 6-19B：學員實作 Part 2
-  // ============================================================
-  {
-    title: '學員實作：自己的 Chart + Grafana 監控',
-    subtitle: '必做 3：httpd Chart + upgrade / 挑戰：Grafana 找到自己的 Pod',
-    section: '6-19B：回頭操作 Loop 5 Part 2',
-    duration: '15',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">必做 3：自己的 Chart</p>
-          <p className="text-slate-300 text-sm mb-1">helm create my-service，改 image 成 httpd，install，upgrade 換 tag。</p>
+          <p className="text-cyan-400 font-semibold text-sm mb-2">必做 2：自己的 Chart（httpd）</p>
           <div className="font-mono text-xs text-slate-400 space-y-0.5">
             <p>image.repository: httpd</p>
             <p>image.tag: "latest"</p>
@@ -2443,17 +2466,33 @@ helm list   # 看到兩個 deployed Release`,
           </div>
         </div>
 
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">挑戰：Grafana</p>
-          <p className="text-slate-300 text-sm">helm list 確認 monitoring 還在，port-forward Grafana，找到 my-service Pod 的圖表。</p>
-          <p className="text-slate-400 text-xs mt-1">Dashboards → Kubernetes / Compute Resources / Pod → 找 my-service</p>
+        <div className="bg-slate-800/50 p-2 rounded-lg">
+          <p className="text-green-400 font-semibold text-xs mb-1">挑戰：Grafana 找到你的 Pod</p>
+          <p className="text-slate-400 text-xs">Dashboards → Kubernetes / Compute Resources / Pod → 找 my-service</p>
         </div>
       </div>
     ),
-    code: `# 必做 3：自己的 Chart
+    code: `# 必做 1：upgrade 陷阱
+helm install my-ingress ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=1 --set controller.service.type=NodePort
+
+helm upgrade my-ingress ingress-nginx/ingress-nginx \\
+  --set controller.service.type=NodePort   # 不帶 replicaCount！
+
+kubectl get deployment   # ← 副本數被重設回預設值了？
+helm history my-ingress
+
+# 解法：--reuse-values 沿用上次所有 values，--set 只覆蓋你要改的
+helm upgrade my-ingress ingress-nginx/ingress-nginx \\
+  --reuse-values --set controller.replicaCount=2
+kubectl get deployment   # ← READY: 2/2
+helm uninstall my-ingress
+
+# 必做 2：自己的 Chart（httpd）
 helm create my-service
-# 修改 my-service/values.yaml:
-#   image.repository: httpd, tag: "latest"
+# 修改 my-service/values.yaml：
+#   image.repository: httpd
+#   image.tag: "latest"
 #   serviceAccount.create: false
 #   httpRoute.enabled: false
 
@@ -2468,14 +2507,13 @@ kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
 # 挑戰：Grafana
 helm list   # 確認 monitoring 還在
 kubectl port-forward svc/monitoring-grafana 3000:80
-# http://localhost:3000 → Dashboards → Kubernetes/Compute Resources/Pod
-# 找到 my-service Pod 的 CPU/Memory 圖表
+# http://localhost:3000 → Dashboards → Kubernetes/Compute Resources/Pod → 找 my-service
 
 # 清理全部
-helm uninstall my-ingress dev-ingress prod-ingress my-service monitoring
+helm uninstall my-service monitoring
 kubectl delete pvc --all
 kubectl get all   # 確認只剩 kubernetes Service`,
-    notes: `必做 3：helm create my-service，修改 values.yaml，把 image 改成 httpd，把 serviceAccount.create 設 false，httpRoute.enabled 設 false。install 起來，describe pod grep Image 確認跑的是 httpd:latest。upgrade 換 tag 到 2.4，再 describe 確認是 httpd:2.4。挑戰：port-forward Grafana，在 Dashboards 裡找 Kubernetes / Compute Resources / Pod，找到 my-service 這個 Pod，看它的 CPU 和 Memory 使用率。這就是你剛才裝的監控系統幫你監控你剛才裝的服務。清理：helm uninstall 全部，kubectl delete pvc --all，確認乾淨。第六堂到這裡全部完成。[▶ 完]`,
+    notes: `必做 1 是 upgrade 陷阱。install 設 replicaCount=1，upgrade 的時候只帶 service.type=NodePort，忘記帶 replicaCount。Helm 把它重設回 Chart 預設值，通常是 1 但可能跟你設的不一樣。生產環境這是個坑，你 upgrade 想改一個參數，結果其他參數全被重設了。解法是加 --reuse-values，沿用上次所有的 values，再用 --set 只覆蓋你要改的那一個。必做 2：helm create my-service 產生骨架，修改 values.yaml，把 image 改成 httpd，serviceAccount.create 和 httpRoute.enabled 設 false，不然新版骨架 apply 會失敗。install 起來，describe pod grep Image 確認跑的是 httpd:latest，upgrade 換 tag 到 2.4。挑戰：monitoring 應該還在（上面 18B 裝的），port-forward Grafana，在 Dashboards 裡找到你自己裝的 my-service Pod 的 CPU Memory 圖表。這就是用你剛裝的監控看你剛裝的服務。清理 helm uninstall 全部，delete pvc，確認乾淨。第六堂全部完成。[▶ 完]`,
   },
 
   // （6-8/6-9/6-10 整合實作已移除）

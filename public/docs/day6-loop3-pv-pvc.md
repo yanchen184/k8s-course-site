@@ -179,36 +179,9 @@ Pod 掛載 PVC
 3. **MySQL 掛載 PVC**：把 MySQL 的資料目錄換成掛 PVC，不再寫到容器裡
 4. **驗證**：delete Pod，等新 Pod 跑起來，進去確認資料還在
 
-做完這四步，你就知道為什麼 K8s 要把儲存拆成 PV 和 PVC 兩層，以及怎麼讓 Pod 重建之後資料還活著。好，開始做。
+做完這四步，你就知道為什麼 K8s 要把儲存拆成 PV 和 PVC 兩層，以及怎麼讓 Pod 重建之後資料還活著。
 
----
-
-**確認環境（這是 Loop 2 留下來的 MySQL）**
-
-Loop 2 最後我們部署了 MySQL，Secret 管密碼、ConfigMap 管設定——但沒有掛任何 PVC。那個 `mysql-deploy` 現在應該還在跑：
-
-```bash
-kubectl get pods
-```
-
-預期輸出：
-```
-NAME                            READY   STATUS    RESTARTS   AGE
-mysql-deploy-xxx                1/1     Running   0          10m
-```
-
-如果 mysql-deploy 不見了，重新 apply secret-db.yaml：
-```bash
-kubectl apply -f secret-db.yaml
-```
-
-預期輸出：
-```
-secret/mysql-secret configured
-deployment.apps/mysql-deploy created
-```
-
-這個 MySQL **沒有掛 PVC**，資料是寫在容器自己的 overlay filesystem 裡。現在要用它做一個關鍵實驗：先寫資料、砍 Pod、看資料消不消失。
+好，現在開始建 PV 和 PVC，讓 MySQL 的資料真正持久化。
 
 ---
 
@@ -301,7 +274,7 @@ spec:
 **套用 YAML**
 
 ```bash
-kubectl apply -f pv-pvc.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/pv-pvc.yaml
 ```
 
 打完要看：

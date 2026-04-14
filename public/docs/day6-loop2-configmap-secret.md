@@ -211,13 +211,12 @@ metadata:
 data:
   default.conf: |
     server {
-      listen 80;
-      location / {
-        return 200 'Hello from ConfigMap\n';
-      }
-      location /healthz {
-        return 200 'OK\n';
-      }
+        listen 80;
+        server_name localhost;
+        location /healthz {
+            return 200 'OK';
+            add_header Content-Type text/plain;
+        }
     }
 ---
 apiVersion: apps/v1
@@ -226,12 +225,12 @@ kind: Deployment
     spec:
       containers:
       - name: nginx
-        image: nginx:1.25
+        image: nginx:1.27
         volumeMounts:
-        - name: nginx-conf
+        - name: nginx-conf-volume
           mountPath: /etc/nginx/conf.d    # 整個目錄掛載
       volumes:
-      - name: nginx-conf
+      - name: nginx-conf-volume
         configMap:
           name: nginx-config
 ```
@@ -241,7 +240,7 @@ kind: Deployment
 這裡是**整個目錄掛載**，所以 K8s 會自動同步更新。ConfigMap 的 key `default.conf` 掛進去就是 `/etc/nginx/conf.d/default.conf`。
 
 ```bash
-kubectl apply -f configmap-nginx.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/configmap-nginx.yaml
 ```
 
 預期輸出：
@@ -259,8 +258,8 @@ kubectl get pods -l app=nginx-custom
 
 預期輸出：
 ```
-NAME                            READY   STATUS    RESTARTS   AGE
-nginx-custom-6b8d7f9c5f-xk7pq   1/1     Running   0          20s
+NAME                              READY   STATUS    RESTARTS   AGE
+nginx-custom-6b8d7f9c5f-xk7pq    1/1     Running   0          20s
 ```
 
 確認設定檔有掛進去：
@@ -272,13 +271,12 @@ kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 預期輸出：
 ```
 server {
-  listen 80;
-  location / {
-    return 200 'Hello from ConfigMap\n';
-  }
-  location /healthz {
-    return 200 'OK\n';
-  }
+    listen 80;
+    server_name localhost;
+    location /healthz {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
 }
 ```
 
@@ -290,13 +288,13 @@ curl http://<NODE-IP>:30090/healthz
 
 預期輸出：`OK`
 
-改 ConfigMap：
+改 ConfigMap（把 `OK` 改成 `HEALTHY`）：
 
 ```bash
 kubectl edit configmap nginx-config
 ```
 
-把 `return 200 'OK\n';` 改成 `return 200 'HEALTHY\n';`，存檔退出。
+找到 `return 200 'OK';`，改成 `return 200 'HEALTHY';`，存檔退出。
 
 **馬上** reload，不等：
 
@@ -307,7 +305,7 @@ curl http://<NODE-IP>:30090/healthz
 
 預期輸出：`OK`
 
-還是 `OK`！reload 本身沒問題，但 ConfigMap 的新內容還沒同步到 Pod 裡的檔案，所以 nginx reload 了也沒用。
+還是 `OK`！因為 ConfigMap 更新後，**Pod 裡的檔案還沒同步**（kubelet 每 30-60 秒才同步一次）。reload 了也沒用，因為 nginx 重讀的還是舊檔案。
 
 等 30-60 秒，確認檔案已自動更新：
 
@@ -315,22 +313,19 @@ curl http://<NODE-IP>:30090/healthz
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 ```
 
-預期輸出：
+預期輸出（看到 `HEALTHY`）：
 ```
 server {
-  listen 80;
-  location / {
-    return 200 'Hello from ConfigMap\n';
-  }
-  location /healthz {
-    return 200 'HEALTHY\n';
-  }
+    listen 80;
+    server_name localhost;
+    location /healthz {
+        return 200 'HEALTHY';
+        add_header Content-Type text/plain;
+    }
 }
 ```
 
-檔案更新了。現在 reload 才有效：
-
-檔案已更新（看到 `HEALTHY`）。但 curl 還是舊的：
+檔案已更新。但 curl 還是舊的：
 
 ```bash
 curl http://<NODE-IP>:30090/healthz
@@ -338,7 +333,7 @@ curl http://<NODE-IP>:30090/healthz
 
 預期輸出：`OK`
 
-還是 `OK`！Volume 自動更新的是「**檔案內容**」，Nginx 程式本身不知道設定改了。要讓設定生效：
+Volume 自動更新的是「**檔案內容**」，Nginx 程式本身不知道設定改了。要讓設定生效，需要 reload：
 
 ```bash
 kubectl exec deploy/nginx-custom -- nginx -s reload
@@ -481,8 +476,8 @@ kind: Deployment
 - `curl /config` → 看 `/etc/app/config.txt`（Volume 掛載）
 
 ```bash
-kubectl apply -f secret-db.yaml
-kubectl apply -f ingress-basic.yaml   # /config 路由已加入
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/secret-db.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml   # /config 路由已加入
 kubectl get pods -l app=frontend -w   # 等 Running，Ctrl+C
 ```
 
@@ -666,8 +661,9 @@ spec:
       containers:
       - name: demo
         image: yanchen184/k8s-demo-app:latest
+        imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 3000
+        - containerPort: 80
         envFrom:
         - configMapRef:
             name: student-config
@@ -684,7 +680,7 @@ spec:
     app: student
   ports:
   - port: 80
-    targetPort: 3000
+    targetPort: 80
     nodePort: 30090
 ```
 
@@ -731,56 +727,17 @@ Password: student-pw
 **清理**
 
 ```bash
-# nginx 相關：清掉
-kubectl delete deployment nginx-custom
-kubectl delete svc nginx-custom-svc
-kubectl delete configmap nginx-config
+# 全部清掉（最乾淨）
+kubectl delete all --all
+kubectl delete configmap --all
+kubectl delete secret --all
 ```
 
 預期輸出：
 ```
-deployment.apps "nginx-custom" deleted
-service "nginx-custom-svc" deleted
-configmap "nginx-config" deleted
-```
-
-```bash
-# Step 1 busybox 相關：清掉
-kubectl delete deployment app-with-config
-kubectl delete configmap app-config
-```
-
-預期輸出：
-```
-deployment.apps "app-with-config" deleted
-configmap "app-config" deleted
-```
-
-```bash
-# Step 4 demo app 相關：清掉
-kubectl delete -f secret-db.yaml
-```
-
-預期輸出：
-```
-deployment.apps "demo-deploy" deleted
-service "demo-svc" deleted
-configmap "app-config" deleted
-secret "app-secret" deleted
-```
-
-```bash
-# 學員實作相關：清掉
-kubectl delete deployment student-deploy
-kubectl delete svc student-svc
-kubectl delete configmap student-config
-kubectl delete secret student-secret
-```
-
-預期輸出：
-```
-deployment.apps "student-deploy" deleted
-service "student-svc" deleted
-configmap "student-config" deleted
-secret "student-secret" deleted
+pod "..." deleted
+deployment.apps "..." deleted
+...
+configmap "..." deleted
+secret "..." deleted
 ```

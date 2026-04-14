@@ -273,7 +273,7 @@ local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsu
 **套用 YAML**
 
 ```bash
-kubectl apply -f statefulset-mysql.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/statefulset-mysql.yaml
 ```
 
 `statefulset-mysql.yaml` 包含三個部分：
@@ -613,7 +613,7 @@ spec:
 ```
 
 ```bash
-kubectl apply -f redis-statefulset.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/redis-statefulset.yaml
 ```
 
 預期輸出：

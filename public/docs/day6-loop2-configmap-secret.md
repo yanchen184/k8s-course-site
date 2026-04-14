@@ -477,7 +477,7 @@ kind: Deployment
 
 ```bash
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/secret-db.yaml
-kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml   # /config 路由已加入
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-step4.yaml   # 只加 Ingress 路由，不蓋 Deployment
 kubectl get pods -l app=frontend -w   # 等 Running，Ctrl+C
 ```
 
@@ -489,7 +489,7 @@ curl http://<NODE-IP>/frontend
 
 預期輸出：
 ```
-Server: 10.42.x.x:80
+Server: 10.42.x.x:80 (frontend-deploy-xxx)
 Message: Hello K8s
 Username: admin
 Password: mypassword
@@ -517,14 +517,14 @@ kubectl edit configmap app-config
 
 把 `USERNAME: "admin"` 改成 `USERNAME: "newuser"`，把 `config.txt` 的 `APP_MODE=production` 改成 `APP_MODE=debug`，存檔退出。
 
-馬上 curl 兩個端點：
+**馬上** curl 兩個端點，不等：
 
 ```bash
 curl http://<NODE-IP>/frontend   # env 注入
 curl http://<NODE-IP>/config     # Volume 掛載
 ```
 
-預期輸出：
+預期輸出（兩個都還是舊的）：
 ```
 # /frontend
 Username: admin       ← 還是舊的
@@ -549,19 +549,24 @@ Username: admin       ← 還是舊的！env 注入不會自動更新
 APP_MODE=debug        ← 自動更新了！Volume 掛載 kubelet 會同步
 ```
 
-**對比出來了**：同一個 ConfigMap 改了，Volume 掛載的檔案自動更新，但 env 注入的值完全沒變。
+**對比出來了**：同一個 ConfigMap 改了，Volume 掛載的檔案 30-60 秒自動更新，但 env 注入完全沒變。
 
-rollout restart，env 才生效：
+rollout restart，env 才生效（/config 依然是已更新的）：
 
 ```bash
 kubectl rollout restart deployment/frontend-deploy
 kubectl get pods -l app=frontend -w    # 等 Running，Ctrl+C
-curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>/frontend         # env 注入終於更新
+curl http://<NODE-IP>/config           # Volume 依然是 debug（不受重啟影響）
 ```
 
 預期輸出：
 ```
+# /frontend
 Username: newuser     ← 重啟後才拿到新的 ConfigMap 值
+
+# /config
+APP_MODE=debug        ← 沒變，Volume 掛載跟 Pod 生命週期無關
 ```
 
 **結論：**

@@ -1585,26 +1585,27 @@ echo "bXktc2VjcmV0LXB3" | base64 -d # → my-secret-pw
 
 # Step 4：整合 — env 注入 vs Volume 掛載，同一個 ConfigMap 兩種行為
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/secret-db.yaml
-kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-step4.yaml   # 只加 Ingress 路由
 kubectl get pods -l app=frontend -w
 curl http://<NODE-IP>/frontend   # Username: admin / Password: mypassword
-curl http://<NODE-IP>/config     # APP_MODE=production
+curl http://<NODE-IP>/config     # APP_MODE=production / FEATURE_FLAG=false
 
-# 同時改 USERNAME 和 config.txt
+# 同時改 USERNAME（env 注入）和 config.txt（Volume 掛載）
 kubectl edit configmap app-config   # USERNAME→newuser, APP_MODE→debug
 
-# 馬上 curl，兩個都沒變
-curl http://<NODE-IP>/frontend   # 還是 admin
-curl http://<NODE-IP>/config     # 還是 production
+# 馬上 curl，兩個都沒變（正常）
+curl http://<NODE-IP>/frontend   # Username: admin（舊的）
+curl http://<NODE-IP>/config     # APP_MODE=production（舊的）
 
-# 等 30-60s，再 curl
-curl http://<NODE-IP>/config     # APP_MODE=debug（Volume 自動更新）
-curl http://<NODE-IP>/frontend   # 還是 admin！（env 不會自動更新）
+# 等 30-60s，再 curl → 對比出來了！
+curl http://<NODE-IP>/config     # APP_MODE=debug ← Volume 自動更新
+curl http://<NODE-IP>/frontend   # Username: admin ← env 注入沒動
 
-# rollout restart，env 才生效
+# rollout restart，env 才生效；/config 依然是 debug
 kubectl rollout restart deployment/frontend-deploy
 kubectl get pods -l app=frontend -w
-curl http://<NODE-IP>/frontend   # Username: newuser`,
+curl http://<NODE-IP>/frontend   # Username: newuser ← 重啟後才生效
+curl http://<NODE-IP>/config     # APP_MODE=debug ← 不受重啟影響`,
     notes: `第三步，Secret。
 
 不用寫 YAML，直接用指令建。

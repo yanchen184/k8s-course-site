@@ -437,9 +437,9 @@ echo "bXktc2VjcmV0LXB3" | base64 -d
 
 ---
 
-**Step 4：Demo App 整合 ConfigMap + Secret**
+**Step 4：Demo App 整合 ConfigMap + Secret（同時示範 env 注入 vs Volume 掛載）**
 
-看 `secret-db.yaml` 的重點：
+`secret-db.yaml` 的重點結構：
 
 ```yaml
 apiVersion: v1
@@ -447,8 +447,11 @@ kind: ConfigMap
 metadata:
   name: app-config
 data:
-  MESSAGE: "Hello from ConfigMap"
+  MESSAGE: "Hello K8s"
   USERNAME: "admin"
+  config.txt: |              # 這個 key 會掛成 Volume 檔案
+    APP_MODE=production
+    FEATURE_FLAG=false
 ---
 apiVersion: v1
 kind: Secret
@@ -456,78 +459,47 @@ metadata:
   name: app-secret
 type: Opaque
 stringData:
-  PASSWORD: "mypassword"    # stringData 直接寫明文，K8s 自動做 Base64
+  PASSWORD: "mypassword"
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata:
-  name: demo-deploy
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: demo
-  template:
-    metadata:
-      labels:
-        app: demo
+...
     spec:
       containers:
-      - name: demo
-        image: yanchen184/k8s-demo-app:latest
-        ports:
-        - containerPort: 80
-        envFrom:
-        - configMapRef:
-            name: app-config      # 注入 ConfigMap 的所有 key
-        - secretRef:
-            name: app-secret      # 注入 Secret 的所有 key，兩者合併
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: demo-svc
-spec:
-  type: ClusterIP
-  selector:
-    app: demo
-  ports:
-  - port: 80
-    targetPort: 80
+        - name: app
+          image: yanchen184/k8s-demo-app:latest
+          envFrom:
+            - configMapRef:
+                name: app-config    # MESSAGE / USERNAME 注入為環境變數
+            - secretRef:
+                name: app-secret    # PASSWORD 注入為環境變數
+          volumeMounts:
+            - name: app-cfg
+              mountPath: /etc/app   # config.txt 掛到這裡
+      volumes:
+        - name: app-cfg
+          configMap:
+            name: app-config
+            items:
+              - key: config.txt
+                path: config.txt
 ```
 
-**`stringData` vs `data`**：寫 YAML 用 `stringData` 比較方便，直接寫明文；用 `data` 的話值必須先做 Base64。
+同一份 ConfigMap，**兩種用法同時存在**：
+- `MESSAGE` / `USERNAME` → `envFrom` 注入為環境變數
+- `config.txt` → Volume 掛載為 `/etc/app/config.txt`
 
-**`envFrom` 列多個**：K8s 把 ConfigMap 和 Secret 的所有 key 合併注入，Pod 裡同時有 `MESSAGE`、`USERNAME` 和 `PASSWORD`。
+驗證用兩個端點：
+- `curl /frontend` → 看環境變數（env 注入）
+- `curl /config` → 看 `/etc/app/config.txt`（Volume 掛載）
 
 ```bash
 kubectl apply -f secret-db.yaml
+kubectl apply -f ingress-basic.yaml   # /config 路由已加入
+kubectl get pods -l app=frontend -w   # 等 Running，Ctrl+C
 ```
 
-預期輸出：
-```
-configmap/app-config configured
-secret/app-secret created
-deployment.apps/demo-deploy created
-service/demo-svc created
-```
-
-等 Pod 跑起來：
-
-```bash
-kubectl get pods -l app=frontend -w
-```
-
-預期輸出：
-```
-NAME                            READY   STATUS              RESTARTS   AGE
-demo-deploy-6c9f8b7d5e-pq4wt    0/1     ContainerCreating   0          5s
-demo-deploy-6c9f8b7d5e-pq4wt    1/1     Running             0          12s
-```
-
-看到 `1/1 Running` 後按 Ctrl+C。
-
-curl 驗收（透過 Ingress，跟 6-3 的路徑一致）：
+curl 驗收：
 
 ```bash
 curl http://<NODE-IP>/frontend
@@ -541,43 +513,63 @@ Username: admin
 Password: mypassword
 ```
 
-`Username: admin` 來自 ConfigMap 的 `USERNAME`，`Password: mypassword` 來自 Secret 的 `PASSWORD`。ConfigMap + Secret 整合成功。
+```bash
+curl http://<NODE-IP>/config
+```
+
+預期輸出：
+```
+APP_MODE=production
+FEATURE_FLAG=false
+```
 
 ---
 
-**實驗：改了之後 reload 有用嗎？**
+**實驗：同一個 ConfigMap 改了，兩個端點的行為有什麼差？**
 
-改 ConfigMap 的 USERNAME：
+同時改 USERNAME（env 注入）和 config.txt（Volume 掛載）：
 
 ```bash
 kubectl edit configmap app-config
 ```
 
-把 `USERNAME: "admin"` 改成 `USERNAME: "student"`，存檔退出。
+把 `USERNAME: "admin"` 改成 `USERNAME: "newuser"`，把 `config.txt` 的 `APP_MODE=production` 改成 `APP_MODE=debug`，存檔退出。
 
-改 Secret 的 PASSWORD：
-
-```bash
-kubectl edit secret app-secret
-```
-
-找到 `PASSWORD`，把值改成 `newpassword`（stringData 直接寫明文），存檔退出。
-
-curl 看看：
+馬上 curl 兩個端點：
 
 ```bash
-curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>/frontend   # env 注入
+curl http://<NODE-IP>/config     # Volume 掛載
 ```
 
 預期輸出：
 ```
-Username: admin
-Password: mypassword
+# /frontend
+Username: admin       ← 還是舊的
+
+# /config
+APP_MODE=production   ← 還是舊的（檔案還沒同步）
 ```
 
-還是舊的！env 注入是 Pod 啟動時抓一次，ConfigMap 和 Secret 改了，跑著的 Pod 完全不知道。
+等 30-60 秒，再 curl：
 
-rollout restart 才生效：
+```bash
+curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>/config
+```
+
+預期輸出：
+```
+# /frontend
+Username: admin       ← 還是舊的！env 注入不會自動更新
+
+# /config
+APP_MODE=debug        ← 自動更新了！Volume 掛載 kubelet 會同步
+```
+
+**對比出來了**：同一個 ConfigMap 改了，Volume 掛載的檔案自動更新，但 env 注入的值完全沒變。
+
+rollout restart，env 才生效：
 
 ```bash
 kubectl rollout restart deployment/frontend-deploy
@@ -587,11 +579,12 @@ curl http://<NODE-IP>/frontend
 
 預期輸出：
 ```
-Username: student
-Password: newpassword
+Username: newuser     ← 重啟後才拿到新的 ConfigMap 值
 ```
 
-**結論：不管是 ConfigMap 還是 Secret，用 env 注入的話，改了都要 `rollout restart` 才生效。**
+**結論：**
+- env 注入（`envFrom`）→ 改了要 `rollout restart` 才生效
+- Volume 掛載 → 改了 30-60s 自動同步，不用重啟
 
 ---
 

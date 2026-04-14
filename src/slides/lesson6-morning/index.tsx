@@ -1577,22 +1577,28 @@ kubectl describe secret db-cred      # 只顯示大小
 kubectl get secret db-cred -o yaml   # 看到 Base64
 echo "bXktc2VjcmV0LXB3" | base64 -d # → my-secret-pw
 
-# Step 4：整合 — app 同時引用 ConfigMap + Secret
+# Step 4：整合 — env 注入 vs Volume 掛載，同一個 ConfigMap 兩種行為
 kubectl apply -f secret-db.yaml
+kubectl apply -f ingress-basic.yaml
 kubectl get pods -l app=frontend -w
-curl http://<NODE-IP>/frontend
-# Server: 10.42.x.x:80
-# Message: Hello K8s
-# Username: admin
-# Password: mypassword
+curl http://<NODE-IP>/frontend   # Username: admin / Password: mypassword
+curl http://<NODE-IP>/config     # APP_MODE=production
 
-# 實驗：改了之後 reload 有用嗎？
-kubectl edit configmap app-config   # USERNAME 改成 student
-kubectl edit secret app-secret      # PASSWORD 改成 newpassword
-curl http://<NODE-IP>/frontend      # 還是舊的！
+# 同時改 USERNAME 和 config.txt
+kubectl edit configmap app-config   # USERNAME→newuser, APP_MODE→debug
+
+# 馬上 curl，兩個都沒變
+curl http://<NODE-IP>/frontend   # 還是 admin
+curl http://<NODE-IP>/config     # 還是 production
+
+# 等 30-60s，再 curl
+curl http://<NODE-IP>/config     # APP_MODE=debug（Volume 自動更新）
+curl http://<NODE-IP>/frontend   # 還是 admin！（env 不會自動更新）
+
+# rollout restart，env 才生效
 kubectl rollout restart deployment/frontend-deploy
 kubectl get pods -l app=frontend -w
-curl http://<NODE-IP>/frontend      # Username: student / Password: newpassword`,
+curl http://<NODE-IP>/frontend   # Username: newuser`,
     notes: `第三步，Secret。
 
 不用寫 YAML，直接用指令建。
@@ -1627,23 +1633,35 @@ curl http://<NODE-IP>/frontend
 
 你會看到四行輸出：Server 是 Pod 的 IP、Message 是 Hello K8s、Username 是 admin、Password 是 mypassword。ConfigMap 的值和 Secret 的值同時出現了。
 
-這就是 ConfigMap 和 Secret 搭配使用的標準模式。非敏感的設定放 ConfigMap，密碼放 Secret，Pod 用 envFrom 一次把兩個都引用進來。
+這就是今天最重要的對比實驗。同一份 ConfigMap，同時用兩種方式注入，改了之後行為完全不同。
 
-現在來做一個實驗。我們同時改 ConfigMap 和 Secret，看看 curl 會不會變。
+kubectl apply -f secret-db.yaml，kubectl apply -f ingress-basic.yaml。
 
-kubectl edit configmap app-config，把 USERNAME 改成 student。kubectl edit secret app-secret，把 PASSWORD 改成 newpassword。
+等 Pod 跑起來。
 
-curl 一下。還是 admin 和 mypassword。
+curl /frontend，看到 Username: admin，Password: mypassword。curl /config，看到 APP_MODE=production。
 
-對，env 注入就是這樣，不管是 ConfigMap 還是 Secret，改了跑著的 Pod 完全不知道。
+現在同時改 ConfigMap 裡的 USERNAME 和 config.txt。
 
-rollout restart。
+kubectl edit configmap app-config，USERNAME 改成 newuser，APP_MODE 改成 debug，存檔。
+
+馬上 curl 兩個端點。兩個都還是舊的，這是正常的。
+
+等 30 到 60 秒，再 curl /config。
+
+APP_MODE=debug 出來了。Volume 掛載的檔案自動同步了。
+
+再 curl /frontend。還是 admin。env 注入完全沒動。
+
+同一個 ConfigMap，同一個時間改，兩個端點行為完全不同。這就是今天要記住的事。
+
+要讓 env 生效，rollout restart。
 
 kubectl rollout restart deployment/frontend-deploy
 
-等新 Pod 起來，再 curl。現在才是 student 和 newpassword。
+等新 Pod 起來，curl /frontend，現在才是 newuser。
 
-記住這個結論：不管是 ConfigMap 還是 Secret，用 env 注入，改了都要 rollout restart 才生效。
+結論：env 注入改了要 rollout restart。Volume 掛載改了 30-60 秒自動同步。
 
 [▶ 下一頁]`,
   },

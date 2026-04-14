@@ -94,6 +94,7 @@ kubectl get all    # 確認只剩 kubernetes Service
 # 先跑一個試試看
 kubectl run demo --image=yanchen184/k8s-demo-app:latest --env="MESSAGE=Hello" --port=80
 kubectl expose pod demo --port=8080 --target-port=80
+kubectl wait pod/demo --for=condition=Ready --timeout=30s
 kubectl port-forward svc/demo 8080:8080 &
 curl http://localhost:8080
 ```
@@ -589,10 +590,22 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
 
 ### ④ 學員實作
 
-公司要加一個新服務 `shop-deploy`（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from shop"），要求：
-1. 建 ClusterIP Service `shop-svc`，port 8080，targetPort 80
-2. 在現有 `app-ingress` 加一條路由：`/shop` → `shop-svc:8080`
-3. `curl http://<NODE-IP>/shop` 看到 `Message: Hello from shop`
+公司要加一個新服務，`shop.yaml` 已經準備好了（Deployment + Service）。
+
+你的任務：
+1. `kubectl apply -f shop.yaml` 把服務跑起來
+2. 在 `ingress-basic.yaml` 的 `paths` 下加這段：
+```yaml
+          - path: /shop
+            pathType: Prefix
+            backend:
+              service:
+                name: shop-svc
+                port:
+                  number: 8080
+```
+3. `kubectl apply -f ingress-basic.yaml` 讓路由生效
+4. `curl http://<NODE-IP>/shop` 看到 `Message: Hello from shop`
 
 挑戰：在 host-based routing 加第三個服務：
 - 域名：`admin.myapp.local`

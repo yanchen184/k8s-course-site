@@ -1018,10 +1018,11 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">必做題</p>
-          <p className="text-slate-400 text-xs mb-2">公司要加一個新服務 shop-deploy（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from shop"）</p>
+          <p className="text-slate-400 text-xs mb-2">shop.yaml 已給好，你的任務是讓它能從外面連到</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>建 ClusterIP Service <code className="text-green-400">shop-svc</code>，port 8080，targetPort 80</li>
-            <li>在現有 <code className="text-green-400">app-ingress</code> 加路由：<code className="text-green-400">/shop</code> → shop-svc:8080</li>
+            <li><code className="text-green-400">kubectl apply -f shop.yaml</code> 把服務跑起來</li>
+            <li>在 <code className="text-green-400">ingress-basic.yaml</code> 的 paths 下加 <code className="text-green-400">/shop</code> 路由</li>
+            <li><code className="text-green-400">kubectl apply -f ingress-basic.yaml</code> 讓路由生效</li>
             <li><code className="text-green-400">curl http://&lt;NODE-IP&gt;/shop</code> 看到 <code className="text-green-400">Message: Hello from shop</code></li>
           </ul>
         </div>

@@ -386,9 +386,23 @@ kubectl logs -n kube-system <traefik-pod>
 
 A：Ingress 是你寫的 YAML 規則（路由地圖），定義哪個路徑或域名導到哪個 Service，本身不處理任何請求。Ingress Controller 是真正跑在叢集裡的 Pod（我們用 Traefik），讀取 Ingress 規則後實際路由流量。少了 Controller，Ingress apply 進去沒有任何效果；少了 Ingress YAML，Controller 不知道要把流量導哪裡。
 
-**Q：為什麼兩個 Service 用 ClusterIP 而不是 NodePort？**
+**Q：為什麼 Ingress 後面的 Service 只需要 ClusterIP？**
 
-A：有 Ingress 了，外部流量由 Ingress Controller 統一接管，再轉給 ClusterIP Service。Service 不需要自己對外開 Port，更安全，也不用記一堆不同的 Port 號。
+A：因為外部流量的入口只有一個——Ingress Controller。流量路徑是：
+
+```
+外部用戶
+  ↓
+Ingress Controller（Traefik Pod，監聽 80/443）
+  ↓ 根據 Ingress YAML 路由規則
+ClusterIP Service
+  ↓
+後端 Pod
+```
+
+Ingress Controller 本身是一個 Pod，跑在叢集裡面，它跟 Service 溝通走的是叢集內部網路。ClusterIP 本來就讓叢集內的 Pod 互相連，Ingress Controller 也是 Pod，所以 ClusterIP 夠用。
+
+NodePort 是為了「讓外部直接打 Node IP + Port」而存在的。但你已經有 Ingress Controller 統一接外部流量了，Service 自己不需要再對外開 Port。用 NodePort 反而多此一舉，白白暴露一個沒人用的 Port，攻擊面變大。
 
 **Q：`pathType: Prefix` 和 `Exact` 差在哪？**
 

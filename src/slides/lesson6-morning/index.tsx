@@ -550,7 +550,15 @@ kubectl apply -f ingress-basic.yaml
 
 kubectl get deployments。兩個 Deployment，frontend-deploy 和 api-deploy，各一個副本。
 
-kubectl get svc。兩個 ClusterIP Service，frontend-svc 和 api-svc。注意是 ClusterIP 不是 NodePort。因為有了 Ingress，我們不需要 NodePort 了。流量從 Ingress Controller 進來，直接轉到 ClusterIP Service。
+kubectl get svc。兩個 ClusterIP Service，frontend-svc 和 api-svc。注意是 ClusterIP 不是 NodePort。
+
+這裡一定有人會問：為什麼不用 NodePort？
+
+因為外部流量的入口只有一個，就是 Ingress Controller。流量路徑是：外部用戶 → Ingress Controller（Traefik Pod，監聽 80/443）→ 根據路由規則 → ClusterIP Service → 後端 Pod。
+
+Ingress Controller 本身是一個 Pod，跑在叢集裡面，它跟 Service 溝通走的是叢集內部網路。ClusterIP 就是讓叢集內的 Pod 互相連用的，Controller 也是 Pod，所以 ClusterIP 夠用，不需要 NodePort。
+
+NodePort 是為了「讓外部直接打 Node IP 加 Port」而存在的。但你現在已經有 Ingress Controller 統一接外部流量了，Service 自己不需要再對外開 Port。如果你還用 NodePort，就是白白暴露一個沒人用的 Port，攻擊面變大，而且你還是要記一堆 Port 號，那你幹嘛用 Ingress？
 
 kubectl get ingress。看到 app-ingress，CLASS 欄位顯示 traefik。ADDRESS 欄位可能一開始是空的，等幾秒就會出現 IP。
 

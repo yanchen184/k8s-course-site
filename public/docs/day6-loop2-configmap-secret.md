@@ -119,38 +119,39 @@ kubectl apply -f configmap-literal.yaml
 預期輸出：
 ```
 configmap/app-config created
-deployment.apps/app-with-config created
+deployment.apps/frontend-deploy created
+service/frontend-svc created
 ```
 
 確認 Pod 跑起來：
 
 ```bash
-kubectl get pods
+kubectl get pods -l app=frontend -w
 ```
 
 預期輸出：
 ```
-NAME                              READY   STATUS    RESTARTS   AGE
-app-with-config-7d9f5b8c4d-abc12  1/1     Running   0          15s
+NAME                               READY   STATUS    RESTARTS   AGE
+frontend-deploy-7d9f5b8c4d-abc12   1/1     Running   0          15s
 ```
 
-確認環境變數有注入：
+看到 `Running` 後按 Ctrl+C。
+
+curl 驗證 ConfigMap 有注入：
 
 ```bash
-kubectl logs deployment/app-with-config | head -20
+curl http://<NODE-IP>/frontend
 ```
-
-- `logs deployment/<name>`：直接看 Deployment 底下 Pod 的 log，不用先查 Pod 名稱
-- `head -20`：只看前 20 行
 
 預期輸出：
 ```
-APP_ENV=production
-LOG_LEVEL=info
-API_URL=https://api.example.com
-MAX_CONNECTIONS=100
-...
+Server: 10.42.x.x:80
+Message: Hello from ConfigMap
+Username: admin
+Password: （未設定）
 ```
+
+`Username: admin` 就是從 ConfigMap 的 `USERNAME` 注入進來的。
 
 改 ConfigMap，觀察 Pod **不會**自動更新：
 
@@ -158,26 +159,26 @@ MAX_CONNECTIONS=100
 kubectl edit configmap app-config
 ```
 
-把 `LOG_LEVEL: "info"` 改成 `LOG_LEVEL: "debug"`，存檔退出。
+找到 `USERNAME: "admin"`，改成 `USERNAME: "student"`，存檔退出。
 
 ```bash
-kubectl logs deployment/app-with-config | grep LOG_LEVEL
+curl http://<NODE-IP>/frontend
 ```
 
 預期輸出：
 ```
-LOG_LEVEL=info
+Username: admin
 ```
 
-還是 `info`！環境變數是 **Pod 啟動時抓一次**，已跑的 Pod 不會重新讀。
+還是 `admin`！環境變數是 **Pod 啟動時抓一次**，已跑的 Pod 不會重新讀。
 
 ```bash
-kubectl rollout restart deployment/app-with-config
+kubectl rollout restart deployment/frontend-deploy
 ```
 
 預期輸出：
 ```
-deployment.apps/app-with-config restarted
+deployment.apps/frontend-deploy restarted
 ```
 
 - `rollout restart`：觸發滾動重啟，新 Pod 啟動時才讀到更新後的 ConfigMap
@@ -185,27 +186,29 @@ deployment.apps/app-with-config restarted
 等新 Pod 跑起來：
 
 ```bash
-kubectl get pods -w
+kubectl get pods -l app=frontend -w
 ```
 
 預期輸出：
 ```
 NAME                               READY   STATUS        RESTARTS   AGE
-app-with-config-7d9f5b8c4d-abc12   1/1     Terminating   0          2m
-app-with-config-8f6c9d7e5b-xyz99   0/1     Pending       0          2s
-app-with-config-8f6c9d7e5b-xyz99   1/1     Running       0          5s
+frontend-deploy-7d9f5b8c4d-abc12   1/1     Terminating   0          2m
+frontend-deploy-8f6c9d7e5b-xyz99   0/1     Pending       0          2s
+frontend-deploy-8f6c9d7e5b-xyz99   1/1     Running       0          5s
 ```
 
-看到新 Pod `Running` 後按 Ctrl+C，再查：
+看到新 Pod `Running` 後按 Ctrl+C，curl 驗收：
 
 ```bash
-kubectl logs deployment/app-with-config | grep LOG_LEVEL
+curl http://<NODE-IP>/frontend
 ```
 
 預期輸出：
 ```
-LOG_LEVEL=debug
+Username: student
 ```
+
+現在才是 `student`，重啟後新 Pod 拿到最新的 ConfigMap 值。
 
 ---
 
@@ -438,7 +441,7 @@ echo "bXktc2VjcmV0LXB3" | base64 -d
 
 **Step 4：Demo App 整合 ConfigMap + Secret**
 
-看 `secret-demo.yaml` 的重點：
+看 `secret-db.yaml` 的重點：
 
 ```yaml
 apiVersion: v1
@@ -475,7 +478,7 @@ spec:
       - name: demo
         image: yanchen184/k8s-demo-app:latest
         ports:
-        - containerPort: 3000
+        - containerPort: 80
         envFrom:
         - configMapRef:
             name: app-config      # 注入 ConfigMap 的所有 key
@@ -487,13 +490,12 @@ kind: Service
 metadata:
   name: demo-svc
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: demo
   ports:
   - port: 80
-    targetPort: 3000
-    nodePort: 30080
+    targetPort: 80
 ```
 
 **`stringData` vs `data`**：寫 YAML 用 `stringData` 比較方便，直接寫明文；用 `data` 的話值必須先做 Base64。
@@ -501,12 +503,12 @@ spec:
 **`envFrom` 列多個**：K8s 把 ConfigMap 和 Secret 的所有 key 合併注入，Pod 裡同時有 `MESSAGE`、`USERNAME` 和 `PASSWORD`。
 
 ```bash
-kubectl apply -f secret-demo.yaml
+kubectl apply -f secret-db.yaml
 ```
 
 預期輸出：
 ```
-configmap/app-config created
+configmap/app-config configured
 secret/app-secret created
 deployment.apps/demo-deploy created
 service/demo-svc created
@@ -515,7 +517,7 @@ service/demo-svc created
 等 Pod 跑起來：
 
 ```bash
-kubectl get pods -l app=demo -w
+kubectl get pods -l app=frontend -w
 ```
 
 預期輸出：
@@ -527,25 +529,18 @@ demo-deploy-6c9f8b7d5e-pq4wt    1/1     Running             0          12s
 
 看到 `1/1 Running` 後按 Ctrl+C。
 
-取得 Node IP，curl 驗收：
+curl 驗收（透過 Ingress，跟 6-3 的路徑一致）：
 
 ```bash
-kubectl get nodes -o wide
+curl http://<NODE-IP>/frontend
 ```
 
-預期輸出（取 `INTERNAL-IP` 欄位）：
+預期輸出：
 ```
-NAME       STATUS   ROLES           AGE   VERSION   INTERNAL-IP
-minikube   Ready    control-plane   5d    v1.28.3   192.168.49.2
-```
-
-```bash
-curl http://192.168.49.2:30080/frontend
-```
-
-預期輸出（看到 Username 和 Password 從環境變數注入）：
-```html
-...Username: admin...Password: mypassword...
+Server: 10.42.x.x:80
+Message: Hello K8s
+Username: admin
+Password: mypassword
 ```
 
 `Username: admin` 來自 ConfigMap 的 `USERNAME`，`Password: mypassword` 來自 Secret 的 `PASSWORD`。ConfigMap + Secret 整合成功。
@@ -735,10 +730,7 @@ configmap "app-config" deleted
 
 ```bash
 # Step 4 demo app 相關：清掉
-kubectl delete deployment demo-deploy
-kubectl delete svc demo-svc
-kubectl delete configmap app-config
-kubectl delete secret app-secret
+kubectl delete -f secret-db.yaml
 ```
 
 預期輸出：

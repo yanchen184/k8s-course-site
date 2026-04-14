@@ -880,8 +880,10 @@ curl http://api.myapp.local
         </div>
       </div>
     ),
-    code: `# 安裝（macOS）
-brew install ngrok
+    code: `# 安裝（Ubuntu/Debian）
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+sudo apt update && sudo apt install ngrok
 
 # 設定 authtoken（只需一次）
 ngrok config add-authtoken <your-token>
@@ -1407,7 +1409,7 @@ Sealed Secret 是一個開源工具，它用 RSA 非對稱加密把你的 Secret
     ),
     code: `# Step 1：ConfigMap 環境變數注入
 kubectl apply -f configmap-literal.yaml
-kubectl get pods -l app=app-with-config -w
+kubectl get pods -l app=frontend -w
 # 等 Pod Running 後 curl 看環境變數
 curl http://<NODE-IP>/frontend
 # Server: 10.42.x.x:80
@@ -1417,7 +1419,7 @@ curl http://<NODE-IP>/frontend
 # 改 ConfigMap → Pod 不會自動更新
 kubectl edit configmap app-config   # 把 USERNAME 改成 student
 curl http://<NODE-IP>/frontend      # 還是 admin！
-kubectl rollout restart deployment/app-with-config        # 重啟才生效
+kubectl rollout restart deployment/frontend-deploy        # 重啟才生效
 curl http://<NODE-IP>/frontend      # 現在是 student
 
 # Step 2：ConfigMap Volume 掛載
@@ -1431,7 +1433,8 @@ kubectl edit configmap nginx-config   # 把 'OK' 改成 'HEALTHY'
 # 等 30-60 秒
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf  # 更新了！
 kubectl exec deploy/nginx-custom -- nginx -s reload
-curl http://localhost:8080/healthz   # → HEALTHY`,
+curl http://localhost:8080/healthz   # → HEALTHY
+kill %1`,
     notes: `好，概念講完了，四個步驟，一步一步做。
 
 第一步，ConfigMap 的環境變數注入。
@@ -1442,7 +1445,7 @@ kubectl apply -f configmap-literal.yaml
 
 等 Pod 跑起來。
 
-kubectl get pods -l app=app-with-config -w，等到 Running。
+kubectl get pods -l app=frontend -w，等到 Running。
 
 來驗證一下。
 
@@ -1464,7 +1467,7 @@ kubectl edit configmap app-config
 
 要讓新的值生效，你得重啟 Pod。
 
-kubectl rollout restart deployment/app-with-config
+kubectl rollout restart deployment/frontend-deploy
 
 等新的 Pod 起來，再 curl，現在才顯示 student。
 
@@ -1562,7 +1565,7 @@ echo "bXktc2VjcmV0LXB3" | base64 -d # → my-secret-pw
 
 # Step 4：整合 — app 同時引用 ConfigMap + Secret
 kubectl apply -f secret-db.yaml
-kubectl get pods -l app=app-with-secret -w
+kubectl get pods -l app=frontend -w
 curl http://<NODE-IP>/frontend
 # Server: 10.42.x.x:80
 # Message: Hello K8s
@@ -1594,7 +1597,7 @@ kubectl apply -f secret-db.yaml
 
 這個 YAML 裡面有一個 ConfigMap 存了 MESSAGE 和 USERNAME，一個 Secret 叫 app-secret 存了 PASSWORD，一個 Deployment 用 envFrom 同時引用兩者，還有一個 NodePort Service。
 
-等 Pod 跑起來。kubectl get pods -l app=app-with-secret -w，等到 Running。
+等 Pod 跑起來。kubectl get pods -l app=frontend -w，等到 Running。
 
 驗證一下。
 

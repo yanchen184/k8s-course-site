@@ -811,7 +811,7 @@ DUCK_DOMAIN="yourname"
 DUCK_TOKEN="your-token"
 NODE_IP=$(kubectl get nodes -o wide --no-headers | awk '{print $6}')
 
-curl "https://www.duckdns.org/update?domains=${DUCK_DOMAIN}&token=${DUCK_TOKEN}&ip=${NODE_IP}"
+curl "https://www.duckdns.org/update?domains=\${DUCK_DOMAIN}&token=\${DUCK_TOKEN}&ip=\${NODE_IP}"
 # 回傳 OK = 成功
 
 # Step 2：確認 DNS 解析

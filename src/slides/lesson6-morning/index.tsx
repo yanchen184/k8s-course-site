@@ -1017,12 +1017,16 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
     content: (
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">必做題</p>
-          <p className="text-slate-400 text-xs mb-2">shop.yaml 已給好，你的任務是讓它能從外面連到</p>
+          <p className="text-green-400 font-semibold mb-2">Step 5：講師示範（學生跟著做）</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-0.5 mb-2">
+            <p>kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest</p>
+            <p>kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"</p>
+            <p>kubectl expose deployment shop-deploy --name=shop-svc --port=80</p>
+          </div>
+          <p className="text-green-400 font-semibold mb-1">學員任務</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li><code className="text-green-400">kubectl apply -f shop.yaml</code> 把服務跑起來</li>
-            <li>在 <code className="text-green-400">ingress-basic.yaml</code> 的 paths 下加 <code className="text-green-400">/shop</code> 路由</li>
-            <li><code className="text-green-400">kubectl apply -f ingress-basic.yaml</code> 讓路由生效</li>
+            <li>在 <code className="text-green-400">ingress-basic.yaml</code> 的 paths 下加 <code className="text-green-400">/shop</code> 路由（port 80）</li>
+            <li><code className="text-green-400">kubectl apply -f ingress-basic.yaml</code></li>
             <li><code className="text-green-400">curl http://&lt;NODE-IP&gt;/shop</code> 看到 <code className="text-green-400">Message: Hello from shop</code></li>
           </ul>
         </div>
@@ -1055,9 +1059,11 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">必做題解答</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-1">
-            <p className="text-slate-500"># 1. 部署 shop-deploy + shop-svc（shop.yaml）</p>
-            <p>kubectl apply -f shop.yaml</p>
-            <p className="text-slate-500 mt-1"># 2. 在 ingress-basic.yaml 的 paths 下加 /shop，再 apply</p>
+            <p className="text-slate-500"># 1. 講師建好 shop-deploy + shop-svc</p>
+            <p>kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest</p>
+            <p>kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"</p>
+            <p>kubectl expose deployment shop-deploy --name=shop-svc --port=80</p>
+            <p className="text-slate-500 mt-1"># 2. 學員在 ingress-basic.yaml 加 /shop 路由，再 apply</p>
             <p>kubectl apply -f ingress-basic.yaml</p>
             <p className="text-slate-500 mt-1"># 3. 驗收</p>
             <p>curl http://{'<NODE-IP>'}/shop  <span className="text-green-400"># → Message: Hello from shop</span></p>
@@ -1078,9 +1084,8 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
         <div className="bg-slate-800/50 p-3 rounded-lg">
           <p className="text-cyan-400 font-semibold text-sm mb-1">清理</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded">
-            <p>kubectl delete -f ingress-basic.yaml</p>
-            <p>kubectl delete -f ingress-host.yaml</p>
-            <p>kubectl delete -f shop.yaml</p>
+            <p>kubectl delete all --all</p>
+            <p>kubectl delete ingress --all</p>
             <p className="text-slate-500"># 手動刪 /etc/hosts 的測試行</p>
           </div>
           <p className="text-yellow-300 text-xs mt-2">Ingress 搞定了，但設定寫死在 Image 裡... → 下一個 Loop</p>

@@ -590,11 +590,18 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
 
 ### ④ 學員實作
 
-公司要加一個新服務，`shop.yaml` 已經準備好了（Deployment + Service）。
+**Step 5：講師示範建新服務（學生跟著做）**
 
-你的任務：
-1. `kubectl apply -f shop.yaml` 把服務跑起來
-2. 在 `ingress-basic.yaml` 的 `paths` 下加這段：
+```bash
+kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
+kubectl expose deployment shop-deploy --name=shop-svc --port=80
+```
+
+**學員任務：讓 /shop 能從外面連到**
+
+在 `~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml` 的 `paths` 下加這段：
+
 ```yaml
           - path: /shop
             pathType: Prefix
@@ -602,10 +609,13 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
               service:
                 name: shop-svc
                 port:
-                  number: 8080
+                  number: 80
 ```
-3. `kubectl apply -f ingress-basic.yaml` 讓路由生效
-4. `curl http://<NODE-IP>/shop` 看到 `Message: Hello from shop`
+
+```bash
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
+curl http://<NODE-IP>/shop
+```
 
 挑戰：在 host-based routing 加第三個服務：
 - 域名：`admin.myapp.local`
@@ -618,55 +628,23 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
 
 **必做**
 
-```yaml
-# shop.yaml
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: shop-deploy
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: shop
-  template:
-    metadata:
-      labels:
-        app: shop
-    spec:
-      containers:
-      - name: shop
-        image: yanchen184/k8s-demo-app:latest
-        imagePullPolicy: IfNotPresent
-        env:
-        - name: MESSAGE
-          value: "Hello from shop"
-        ports:
-        - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: shop-svc
-spec:
-  selector:
-    app: shop
-  ports:
-  - port: 8080
-    targetPort: 80
+```bash
+# 講師示範
+kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
+kubectl expose deployment shop-deploy --name=shop-svc --port=80
 ```
 
 在 `ingress-basic.yaml` 的 `paths` 下加：
 
 ```yaml
-- path: /shop
-  pathType: Prefix
-  backend:
-    service:
-      name: shop-svc
-      port:
-        number: 8080
+          - path: /shop
+            pathType: Prefix
+            backend:
+              service:
+                name: shop-svc
+                port:
+                  number: 80
 ```
 
 ```bash
@@ -692,8 +670,7 @@ Password: (not set)
 **清理**
 
 ```bash
-kubectl delete -f ingress-basic.yaml
-kubectl delete -f ingress-host.yaml
-kubectl delete -f shop.yaml
+kubectl delete all --all
+kubectl delete ingress --all
 kubectl get all    # 確認只剩 kubernetes Service
 ```

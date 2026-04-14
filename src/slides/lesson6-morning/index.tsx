@@ -1280,7 +1280,7 @@ Sealed Secret 是一個開源工具，它用 RSA 非對稱加密把你的 Secret
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">Step 1：環境變數注入</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>ConfigMap 存 APP_ENV / LOG_LEVEL</li>
+            <li>ConfigMap 存 MESSAGE / USERNAME</li>
             <li>Pod 用 envFrom + configMapRef 注入</li>
             <li>改 ConfigMap → Pod <strong className="text-red-300">不會</strong>自動更新</li>
             <li><code className="text-green-400">kubectl rollout restart</code> → 才生效</li>
@@ -1300,13 +1300,18 @@ Sealed Secret 是一個開源工具，它用 RSA 非對稱加密把你的 Secret
     ),
     code: `# Step 1：ConfigMap 環境變數注入
 kubectl apply -f configmap-literal.yaml
-kubectl logs deployment/app-with-config | head -20
-# 看到 APP_ENV=production、LOG_LEVEL=info
+kubectl get pods -l app=app-with-config -w
+# 等 Pod Running 後 curl 看環境變數
+curl http://<NODE-IP>/frontend
+# Server: 10.42.x.x:80
+# Message: Hello K8s
+# Username: admin
 
 # 改 ConfigMap → Pod 不會自動更新
-kubectl edit configmap app-config   # 把 LOG_LEVEL 改成 debug
-kubectl logs deployment/app-with-config | grep LOG_LEVEL  # 還是 info！
+kubectl edit configmap app-config   # 把 USERNAME 改成 student
+curl http://<NODE-IP>/frontend      # 還是 admin！
 kubectl rollout restart deployment/app-with-config        # 重啟才生效
+curl http://<NODE-IP>/frontend      # 現在是 student
 
 # Step 2：ConfigMap Volume 掛載
 kubectl apply -f configmap-nginx.yaml
@@ -1326,23 +1331,27 @@ curl http://localhost:8080/healthz   # → HEALTHY`,
 
 kubectl apply -f configmap-literal.yaml
 
-這個 YAML 裡面有一個 ConfigMap 叫 app-config，存了 APP_ENV、LOG_LEVEL、API_URL、MAX_CONNECTIONS 四個設定。還有一個 Deployment，用 busybox 跑 env pipe sort 印出所有環境變數，然後 sleep 等著。
+這個 YAML 裡面有一個 ConfigMap 叫 app-config，存了 MESSAGE 和 USERNAME 兩個設定。還有一個 Deployment，用 jasonmel/k8s-demo-app 這個 image，它會把環境變數的值顯示在 HTTP response 裡面。
 
-等 Pod 跑起來，看看日誌。
+等 Pod 跑起來。
 
-kubectl logs deployment/app-with-config，用 pipe head -20 只看前 20 行。
+kubectl get pods -l app=app-with-config -w，等到 Running。
 
-你應該能在輸出裡面找到 APP_ENV 等於 production、LOG_LEVEL 等於 info。ConfigMap 的值成功注入為環境變數了。
+來驗證一下。
+
+curl http://<NODE-IP>/frontend
+
+你會看到 Message: Hello K8s 和 Username: admin 這樣的輸出。ConfigMap 的值成功注入為環境變數了。
 
 現在來做一個重要的實驗。我們改 ConfigMap，看看 Pod 會不會自動更新。
 
 kubectl edit configmap app-config
 
-找到 LOG_LEVEL，從 info 改成 debug，存檔。
+找到 USERNAME，從 admin 改成 student，存檔。
 
-現在 kubectl logs 看一下。你猜結果是什麼？
+現在再 curl 一下。你猜結果是什麼？
 
-還是 info。沒有更新。
+還是 admin。沒有更新。
 
 為什麼？因為環境變數是在 Pod 啟動的時候注入的。Pod 的 process 拿到環境變數之後就定死了，ConfigMap 後來改了，已經跑著的 process 不知道。就像你啟動一個 Java 程式的時候傳了 -D 參數，程式啟動之後你再怎麼改那個參數檔，跑著的 JVM 也不會感應到。
 
@@ -1350,7 +1359,7 @@ kubectl edit configmap app-config
 
 kubectl rollout restart deployment/app-with-config
 
-等新的 Pod 起來，再看日誌，現在才是 debug。
+等新的 Pod 起來，再 curl，現在才顯示 student。
 
 記住這個行為：環境變數注入，改了 ConfigMap 要重啟 Pod 才生效。
 
@@ -1411,12 +1420,12 @@ kill %1，把背景的 port-forward 停掉。
           </ul>
         </div>
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 4：整合 — MySQL 用 Secret + ConfigMap</p>
+          <p className="text-cyan-400 font-semibold mb-2">Step 4：整合 — app 同時引用 Secret + ConfigMap</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li><code className="text-green-400">db-secret</code>（stringData）→ MYSQL_ROOT_PASSWORD</li>
-            <li><code className="text-green-400">db-config</code>（ConfigMap）→ MYSQL_DATABASE</li>
+            <li><code className="text-green-400">app-secret</code>（stringData）→ PASSWORD</li>
+            <li><code className="text-green-400">app-config</code>（ConfigMap）→ MESSAGE / USERNAME</li>
             <li>envFrom 同時引用兩個，Pod 一次拿到所有環境變數</li>
-            <li>進 MySQL：<code className="text-green-400">SHOW DATABASES;</code> 看到 myappdb</li>
+            <li>curl 看到 <code className="text-green-400">Username: admin</code> + <code className="text-green-400">Password: mypassword</code></li>
           </ul>
         </div>
         <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
@@ -1444,12 +1453,14 @@ kubectl describe secret db-cred      # 只顯示大小
 kubectl get secret db-cred -o yaml   # 看到 Base64
 echo "bXktc2VjcmV0LXB3" | base64 -d # → my-secret-pw
 
-# Step 4：整合 — MySQL 用 Secret + ConfigMap
+# Step 4：整合 — app 同時引用 ConfigMap + Secret
 kubectl apply -f secret-db.yaml
-kubectl get pods -l app=mysql -w
-kubectl exec -it deployment/mysql-deploy -- \\
-  mysql -u root -prootpassword123 -e "SHOW DATABASES;"
-# 看到 myappdb`,
+kubectl get pods -l app=app-with-secret -w
+curl http://<NODE-IP>/frontend
+# Server: 10.42.x.x:80
+# Message: Hello K8s
+# Username: admin
+# Password: mypassword`,
     notes: `第三步，Secret。
 
 不用寫 YAML，直接用指令建。
@@ -1470,19 +1481,19 @@ kubectl get secret db-cred -o yaml
 
 Secret 注入 Pod 的方式跟 ConfigMap 一模一樣，envFrom 或 Volume 掛載，YAML 寫法幾乎一樣，只是把 configMapRef 換成 secretRef。
 
-第四步，整合。MySQL Pod 用 Secret 設密碼，用 ConfigMap 設資料庫名稱。
+第四步，整合。這次我們用 jasonmel/k8s-demo-app，同時 envFrom 引用 ConfigMap 和 Secret。
 
 kubectl apply -f secret-db.yaml
 
-這個 YAML 裡面有一個 Secret 存了 MySQL 的 root 密碼和其他認證資訊，一個 ConfigMap 存了 MYSQL_DATABASE 資料庫名稱，一個 MySQL 的 Deployment 用 envFrom 同時引用 Secret 和 ConfigMap，還有一個 ClusterIP Service。
+這個 YAML 裡面有一個 ConfigMap 存了 MESSAGE 和 USERNAME，一個 Secret 叫 app-secret 存了 PASSWORD，一個 Deployment 用 envFrom 同時引用兩者，還有一個 NodePort Service。
 
-等 MySQL Pod 跑起來，大概 30 秒。kubectl get pods -l app=mysql -w，等到 Running。
+等 Pod 跑起來。kubectl get pods -l app=app-with-secret -w，等到 Running。
 
 驗證一下。
 
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123 -e "SHOW DATABASES;"
+curl http://<NODE-IP>/frontend
 
-看到 myappdb 在列表裡。Secret 的 MYSQL_ROOT_PASSWORD 和 ConfigMap 的 MYSQL_DATABASE 都成功注入了，MySQL 讀到這些環境變數之後自動建立了資料庫。
+你會看到四行輸出：Server 是 Pod 的 IP、Message 是 Hello K8s、Username 是 admin、Password 是 mypassword。ConfigMap 的值和 Secret 的值同時出現了。
 
 這就是 ConfigMap 和 Secret 搭配使用的標準模式。非敏感的設定放 ConfigMap，密碼放 Secret，Pod 用 envFrom 一次把兩個都引用進來。
 

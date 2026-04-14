@@ -25,7 +25,7 @@ YAML 檔案位置：`k8s-course-labs/lesson6/`
 | 13 | 6-6(13) | 學員實作：ConfigMap + Secret | configmap-literal.yaml, configmap-nginx.yaml, secret-db.yaml |
 | 14 | 6-7(14) | 回頭操作 Loop 2：帶做四步驟 → 三個坑 → 銜接整合 | — |
 | 15 | 6-8(15) | 整合實作引導：目標架構（Namespace + 三服務 + 九步驟） | — |
-| 16 | 6-9(16) | 整合示範：九步走完（Namespace→Secret→ConfigMap→MySQL→Nginx→httpd→Ingress→curl） | configmap-frontend.yaml, mysql-deploy.yaml, frontend-deploy.yaml, api-deploy.yaml, app-ingress.yaml |
+| 16 | 6-9(16) | 整合示範：九步走完（Namespace→Secret→ConfigMap→MySQL→frontend-deploy→api-deploy→Ingress→curl） | configmap-frontend.yaml, mysql-deploy.yaml, frontend-deploy.yaml, api-deploy.yaml, app-ingress.yaml |
 | 17 | 6-9(17) | 學員實作：完整整合 Ingress + ConfigMap + Secret | — |
 | 18 | 6-10(18) | 回頭操作 + 上午總結：三個 Loop 因果鏈 | — |
 
@@ -81,8 +81,8 @@ YAML 檔案位置：`k8s-course-labs/lesson6/`
 | secret-db.yaml | 6-6 | Secret + MySQL Deployment（Base64 示範） |
 | configmap-frontend.yaml | 6-9 整合 | 前端 HTML ConfigMap（namespace: my-app） |
 | mysql-deploy.yaml | 6-9 整合 | MySQL Deployment + ClusterIP（namespace: my-app） |
-| frontend-deploy.yaml | 6-9 整合 | Nginx 前端 + subPath 掛載（namespace: my-app） |
-| api-deploy.yaml | 6-9 整合 | httpd API Deployment（namespace: my-app） |
+| frontend-deploy.yaml | 6-9 整合 | k8s-demo-app 前端（MESSAGE=Hello from frontend，namespace: my-app） |
+| api-deploy.yaml | 6-9 整合 | k8s-demo-app API Deployment（MESSAGE=Hello from api，namespace: my-app） |
 | app-ingress.yaml | 6-9 整合 | Ingress path routing（myapp.local，traefik） |
 | pv-pvc.yaml | 6-12 | PV(2Gi) + PVC(1Gi) + busybox Deployment（持久化示範） |
 | broken-pv-pvc.yaml | 6-12 題目 | 有 3 個 bug 的 PV/PVC（accessModes錯、storageClassName不一致、容量超過） |

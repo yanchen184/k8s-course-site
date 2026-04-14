@@ -605,15 +605,6 @@ deployment.apps "mysql-deploy" deleted
 ```
 
 ```bash
-kubectl delete svc mysql-svc
-```
-
-預期輸出：
-```
-service "mysql-svc" deleted
-```
-
-```bash
 # PV 和 PVC 保留還是刪掉？— 刪掉，Loop 4 改用 StorageClass 動態佈建，不再手動建 PV
 kubectl delete pvc local-pvc
 ```

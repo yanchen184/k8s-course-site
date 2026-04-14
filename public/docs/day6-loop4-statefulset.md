@@ -713,15 +713,14 @@ mysql-1   1/1     Terminating   0          14m
 mysql-0   1/1     Running       0          15m
 ```
 
-縮容到 1 後手動清多餘的 PVC：
+縮容到 1 後手動清多餘的 PVC（mysql-2 的 PVC 若已在縮到 2 時刪過，這裡只刪 mysql-1 即可）：
 ```bash
-kubectl delete pvc mysql-data-mysql-1 mysql-data-mysql-2
+kubectl delete pvc mysql-data-mysql-1
 ```
 
 預期輸出：
 ```
 persistentvolumeclaim "mysql-data-mysql-1" deleted
-persistentvolumeclaim "mysql-data-mysql-2" deleted
 ```
 
 ---
@@ -729,21 +728,23 @@ persistentvolumeclaim "mysql-data-mysql-2" deleted
 **清理（Loop 4 結束）**
 
 ```bash
-kubectl delete statefulset mysql
+kubectl delete statefulset mysql redis
 ```
 
 預期輸出：
 ```
 statefulset.apps "mysql" deleted
+statefulset.apps "redis" deleted
 ```
 
 ```bash
-kubectl delete svc mysql-headless
+kubectl delete svc mysql-headless redis-headless
 ```
 
 預期輸出：
 ```
 service "mysql-headless" deleted
+service "redis-headless" deleted
 ```
 
 ```bash
@@ -756,14 +757,18 @@ secret "mysql-secret" deleted
 ```
 
 ```bash
-kubectl delete pvc mysql-data-mysql-0 mysql-data-mysql-1
+kubectl delete pvc --all
 ```
 
 預期輸出：
 ```
 persistentvolumeclaim "mysql-data-mysql-0" deleted
 persistentvolumeclaim "mysql-data-mysql-1" deleted
+persistentvolumeclaim "redis-data-redis-0" deleted
+persistentvolumeclaim "redis-data-redis-1" deleted
 ```
+
+（實際會根據你的操作刪掉所有殘留的 PVC，包含 mysql 和 redis 的）
 
 ```bash
 kubectl get all    # 確認清乾淨

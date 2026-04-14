@@ -618,9 +618,30 @@ curl http://<NODE-IP>/shop
 ```
 
 挑戰：在 host-based routing 加第三個服務：
-- 域名：`admin.myapp.local`
-- 後端：`admin-deploy`（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from admin"）+ `admin-svc`（port 8080）
-- 在 `/etc/hosts` 加入，`curl http://admin.myapp.local/admin` 驗證，看到 `Message: Hello from admin`
+
+```bash
+# 1. 建 admin-deploy + admin-svc
+kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
+kubectl expose deployment admin-deploy --name=admin-svc --port=80
+
+# 2. 在 ingress-host.yaml 加第三個 host 規則，再 apply
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-host.yaml
+
+# 3. /etc/hosts 加一行
+sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
+
+# 4. 驗證
+curl http://admin.myapp.local
+```
+
+預期輸出：
+```
+Server: 10.42.x.x:80 (admin-deploy-xxx)
+Message: Hello from admin
+Username: (not set)
+Password: (not set)
+```
 
 ---
 
@@ -648,8 +669,7 @@ kubectl expose deployment shop-deploy --name=shop-svc --port=80
 ```
 
 ```bash
-kubectl apply -f shop.yaml
-kubectl apply -f ingress-basic.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
 curl http://<NODE-IP>/shop
 ```
 
@@ -659,6 +679,29 @@ Server: 10.42.x.x:80 (shop-deploy-xxx)
 Message: Hello from shop
 Username: (not set)
 Password: (not set)
+```
+
+**挑戰解答**
+
+在 `ingress-host.yaml` 加：
+
+```yaml
+    - host: admin.myapp.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-svc
+                port:
+                  number: 80
+```
+
+```bash
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-host.yaml
+sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
+curl http://admin.myapp.local
 ```
 
 **三個坑**

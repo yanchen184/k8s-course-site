@@ -189,20 +189,20 @@ export const slides: Slide[] = [
           <table className="w-full text-sm font-mono">
             <tbody className="text-slate-300">
               <tr className="border-b border-slate-700">
-                <td className="py-1.5 pr-3 text-green-400">curl http://{'<NODE-IP>'}/ </td>
-                <td className="py-1.5 text-slate-400">→ nginx 前端</td>
+                <td className="py-1.5 pr-3 text-green-400">curl http://{'<NODE-IP>'}/frontend</td>
+                <td className="py-1.5 text-slate-400">→ Message: Hello from frontend</td>
               </tr>
               <tr className="border-b border-slate-700">
                 <td className="py-1.5 pr-3 text-green-400">curl http://{'<NODE-IP>'}/api</td>
-                <td className="py-1.5 text-slate-400">→ httpd API</td>
+                <td className="py-1.5 text-slate-400">→ Message: Hello from api</td>
               </tr>
               <tr className="border-b border-slate-700">
                 <td className="py-1.5 pr-3 text-cyan-400">curl http://www.myapp.local</td>
-                <td className="py-1.5 text-slate-400">→ nginx 前端</td>
+                <td className="py-1.5 text-slate-400">→ Message: Hello from frontend</td>
               </tr>
               <tr>
                 <td className="py-1.5 pr-3 text-cyan-400">curl http://api.myapp.local</td>
-                <td className="py-1.5 text-slate-400">→ httpd API</td>
+                <td className="py-1.5 text-slate-400">→ Message: Hello from api</td>
               </tr>
             </tbody>
           </table>
@@ -214,7 +214,7 @@ export const slides: Slide[] = [
 
 現在的狀況是 NodePort，使用者要輸入 192.168.1.100 冒號 30080。今天做完，我們要能做到這四件事：
 
-第一，curl http 斜斜 NODE-IP 斜線，看到 nginx 的歡迎頁，這是前端。第二，curl http 斜斜 NODE-IP 斜線 api，看到 httpd 的 It works，這是 API。第三，curl http://www.myapp.local，也看到 nginx。第四，curl http://api.myapp.local，看到 httpd。
+第一，curl http 斜斜 NODE-IP 斜線 frontend，看到 Message: Hello from frontend。第二，curl http 斜斜 NODE-IP 斜線 api，看到 Message: Hello from api。第三，curl http://www.myapp.local，也看到 Hello from frontend。第四，curl http://api.myapp.local，看到 Hello from api。
 
 前兩個是用路徑區分，叫 Path-based routing。後兩個是用域名區分，叫 Host-based routing。同一個 IP，標準的 Port 80，不用再記那些醜陋的 Port 號。
 

@@ -1079,6 +1079,7 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded">
             <p>kubectl delete -f ingress-basic.yaml</p>
             <p>kubectl delete -f ingress-host.yaml</p>
+            <p>kubectl delete -f shop.yaml</p>
             <p className="text-slate-500"># 手動刪 /etc/hosts 的測試行</p>
           </div>
           <p className="text-yellow-300 text-xs mt-2">Ingress 搞定了，但設定寫死在 Image 裡... → 下一個 Loop</p>

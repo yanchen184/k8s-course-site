@@ -605,126 +605,118 @@ A：`data` 欄位的值必須是 Base64 字串；`stringData` 欄位直接寫明
 
 ---
 
-## 6-7 回頭操作 Loop 2（~5 min）
+## 6-7 回頭操作 Loop 2（~10 min）
 
 ### ④ 學員實作
 
-你要部署 `yanchen184/k8s-demo-app:latest`，把設定分開管理：
-- `MESSAGE: "Hello from Student"`（一般設定，用 ConfigMap）
-- `USERNAME: "student"`（一般設定，用 ConfigMap）
-- `PASSWORD: "student-pw"`（敏感，用 Secret）
+**必做：自己建 ConfigMap + Secret，套用講師的 Deployment**
+
+Step 4 剛才是講師示範。現在你來，**自己的名字、自己的密碼**。
 
 任務：
-1. 建立 ConfigMap `student-config`，包含 `MESSAGE` 和 `USERNAME`
-2. 建立 Secret `student-secret`，包含 `PASSWORD`
-3. 寫一個 Deployment（image: `yanchen184/k8s-demo-app:latest`，containerPort: 3000），用 `envFrom` 同時引用兩者
-4. 建立 NodePort Service，nodePort 用 `30090`
-5. 驗收：`curl http://<NODE-IP>:30090/frontend`，確認頁面顯示 `Username: student` 和 `Password: student-pw`
+
+1. 用 `kubectl create configmap` 建 ConfigMap `app-config`，包含：
+   - `MESSAGE`：隨便填（例如你的名字）
+   - `USERNAME`：你的名字
+   - `config.txt`：`APP_MODE=student\nFEATURE_FLAG=true`
+2. 用 `kubectl create secret` 建 Secret `app-secret`，包含：
+   - `PASSWORD`：你自己設的密碼
+3. apply `student-deploy.yaml` 和 `ingress-step4.yaml`
+4. curl `/frontend` 確認看到自己的 `Username` 和 `Password`
+5. curl `/config` 確認看到 `APP_MODE=student`
+
+**挑戰：觀察 env 注入 vs Volume 掛載的差異**
+
+6. `kubectl edit configmap app-config`，把 `APP_MODE=student` 改成 `APP_MODE=debug`，USERNAME 改成別的值
+7. 馬上 curl 兩個端點 → 看結果
+8. 等 30-60 秒再 curl → 看哪個變了
+9. `kubectl rollout restart deployment/frontend-deploy` → curl `/frontend` 看到什麼
 
 ---
 
 ### ⑤ 學員實作解答
 
+**步驟 1：建 ConfigMap**
+
 ```bash
-kubectl create configmap student-config \
-  --from-literal=MESSAGE="Hello from Student" \
-  --from-literal=USERNAME=student
+kubectl create configmap app-config \
+  --from-literal=MESSAGE="Hello from Bob" \
+  --from-literal=USERNAME=Bob \
+  --from-literal=config.txt=$'APP_MODE=student\nFEATURE_FLAG=true'
 ```
 
 預期輸出：
 ```
-configmap/student-config created
+configmap/app-config created
 ```
 
+**步驟 2：建 Secret**
+
 ```bash
-kubectl create secret generic student-secret \
-  --from-literal=PASSWORD=student-pw
+kubectl create secret generic app-secret \
+  --from-literal=PASSWORD=my-own-password
 ```
 
 預期輸出：
 ```
-secret/student-secret created
+secret/app-secret created
 ```
 
-Deployment + Service YAML：
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: student-deploy
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: student
-  template:
-    metadata:
-      labels:
-        app: student
-    spec:
-      containers:
-      - name: demo
-        image: yanchen184/k8s-demo-app:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 80
-        envFrom:
-        - configMapRef:
-            name: student-config
-        - secretRef:
-            name: student-secret
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: student-svc
-spec:
-  type: NodePort
-  selector:
-    app: student
-  ports:
-  - port: 80
-    targetPort: 80
-    nodePort: 30090
-```
+**步驟 3：apply Deployment + Ingress**
 
 ```bash
-kubectl apply -f student-deploy.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/student-deploy.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-step4.yaml
+kubectl get pods -l app=frontend -w   # 等 Running，Ctrl+C
+```
+
+**步驟 4-5：curl 驗收**
+
+```bash
+curl http://<NODE-IP>/frontend
 ```
 
 預期輸出：
 ```
-deployment.apps/student-deploy created
-service/student-svc created
+Server: 10.42.x.x:80 (frontend-deploy-xxx)
+Message: Hello from Bob
+Username: Bob
+Password: my-own-password
 ```
 
 ```bash
-kubectl get pods -l app=student -w    # 等 Running
+curl http://<NODE-IP>/config
 ```
 
 預期輸出：
 ```
-NAME                              READY   STATUS    RESTARTS   AGE
-student-deploy-5d8f7b9c4e-mn3qr   1/1     Running   0          10s
+APP_MODE=student
+FEATURE_FLAG=true
 ```
 
-取得 Node IP：
+**挑戰解答（env 注入 vs Volume 掛載對比）**
 
 ```bash
-kubectl get nodes -o wide
+kubectl edit configmap app-config
+# APP_MODE=student → APP_MODE=debug
+# USERNAME: Bob → USERNAME: newBob
 ```
 
-curl 驗收：
+馬上 curl → 兩個都沒變（正常）
+
+等 30-60 秒：
 
 ```bash
-curl http://<NODE-IP>:30090/frontend
+curl http://<NODE-IP>/config    # APP_MODE=debug ← 自動更新
+curl http://<NODE-IP>/frontend  # Username: Bob ← 沒動
 ```
 
-預期輸出（頁面中看到）：
-```
-Username: student
-Password: student-pw
+rollout restart：
+
+```bash
+kubectl rollout restart deployment/frontend-deploy
+kubectl get pods -l app=frontend -w
+curl http://<NODE-IP>/frontend  # Username: newBob ← 重啟後才生效
 ```
 
 ---
@@ -732,17 +724,8 @@ Password: student-pw
 **清理**
 
 ```bash
-# 全部清掉（最乾淨）
 kubectl delete all --all
 kubectl delete configmap --all
 kubectl delete secret --all
-```
-
-預期輸出：
-```
-pod "..." deleted
-deployment.apps "..." deleted
-...
-configmap "..." deleted
-secret "..." deleted
+kubectl delete ingress --all
 ```

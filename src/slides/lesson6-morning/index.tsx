@@ -1675,41 +1675,53 @@ kubectl rollout restart deployment/frontend-deploy
 
   // ── 6-7（學員實作）──
   {
-    title: '學員實作：Secret + ConfigMap 注入 Redis',
-    subtitle: '必做：busybox 驗證兩個環境變數都注入成功',
+    title: '學員實作：自己的 ConfigMap + Secret',
+    subtitle: '必做：用自己的值跑 Step 4 / 挑戰：觀察 env vs Volume 更新差異',
     section: '6-7：回頭操作 Loop 2',
     duration: '10',
     content: (
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">必做題</p>
-          <p className="text-slate-400 text-xs mb-2">部署 Redis 服務，敏感設定用 Secret，一般設定用 ConfigMap</p>
+          <p className="text-slate-400 text-xs mb-2">自己的名字、自己的密碼，跑出來才算你的</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>建 <code className="text-green-400">redis-secret</code>：REDIS_PASSWORD=my-redis-pw</li>
-            <li>建 <code className="text-green-400">redis-config</code>：REDIS_MAXMEMORY=256mb</li>
-            <li>Deployment（image: busybox:1.36，command: env &amp;&amp; sleep 3600）用 envFrom 引用兩者</li>
-            <li><code className="text-green-400">kubectl exec</code> 進 Pod，<code className="text-green-400">env | grep REDIS</code> 確認兩個都在</li>
+            <li>用 <code className="text-cyan-400">kubectl create configmap</code> 建 <code className="text-green-400">app-config</code>（MESSAGE、USERNAME 填你的）</li>
+            <li>用 <code className="text-cyan-400">kubectl create secret</code> 建 <code className="text-green-400">app-secret</code>（PASSWORD 填你的）</li>
+            <li>apply <code className="text-green-400">student-deploy.yaml</code> + <code className="text-green-400">ingress-step4.yaml</code></li>
+            <li>curl <code className="text-cyan-400">/frontend</code> 看到自己的 Username 和 Password</li>
+            <li>curl <code className="text-cyan-400">/config</code> 看到 APP_MODE=student</li>
           </ol>
         </div>
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
           <p className="text-yellow-400 font-semibold mb-2">挑戰題</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>Volume 掛載自訂 nginx.conf</li>
-            <li>修改 ConfigMap → 等 30-60 秒</li>
-            <li>觀察檔案是否自動更新</li>
-          </ul>
+          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
+            <li><code className="text-cyan-400">kubectl edit configmap app-config</code>，同時改 USERNAME 和 APP_MODE</li>
+            <li>馬上 curl 兩個端點 → 都沒變</li>
+            <li>等 30-60 秒 → <code className="text-green-400">/config</code> 自動更新，<code className="text-yellow-400">/frontend</code> 沒動</li>
+            <li>rollout restart → <code className="text-green-400">/frontend</code> 才更新</li>
+          </ol>
         </div>
       </div>
     ),
-    notes: `學員實作時間。必做題：你要部署一個 Redis 服務。先用 kubectl create secret generic redis-secret --from-literal=REDIS_PASSWORD=my-redis-pw 建 Secret，再用 kubectl create configmap redis-config --from-literal=REDIS_MAXMEMORY=256mb 建 ConfigMap。然後自己寫一個 Deployment，image 用 busybox:1.36，command 是 sh -c env && sleep 3600，用 envFrom 同時引用這兩個。驗收：kubectl exec 進 Pod，env | grep REDIS 要看到兩行。挑戰題：用 Volume 掛載方式自訂一個 nginx.conf，修改 ConfigMap，等 30 到 60 秒觀察檔案是否自動更新。
+    notes: `學員實作時間。
+
+必做題：你要用自己的名字和密碼。
+
+kubectl create configmap app-config --from-literal=MESSAGE="Hello from 你的名字" --from-literal=USERNAME=你的名字 --from-literal=config.txt=$'APP_MODE=student\\nFEATURE_FLAG=true'
+
+kubectl create secret generic app-secret --from-literal=PASSWORD=你的密碼
+
+然後 apply student-deploy.yaml 和 ingress-step4.yaml。等 Pod 起來，curl /frontend 看到你自己的 Username 和 Password，curl /config 看到 APP_MODE=student。
+
+挑戰題：kubectl edit configmap app-config，同時改 USERNAME 和 APP_MODE。馬上 curl，兩個都沒變。等 30 到 60 秒再 curl，/config 更新了，/frontend 還是舊的。這就是 env 注入和 Volume 掛載的核心差異。rollout restart 後 /frontend 才更新。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
   },
 
   // ── 6-7（學員實作解答）──
   {
-    title: '解答：Secret + ConfigMap 注入 Redis',
-    subtitle: '必做解答 + 清理資源 + 銜接整合實作',
+    title: '解答：自己的 ConfigMap + Secret',
+    subtitle: '必做解答 + 三個常見坑 + 清理',
     section: '6-7：回頭操作 Loop 2',
     duration: '5',
     content: (
@@ -1717,34 +1729,38 @@ kubectl rollout restart deployment/frontend-deploy
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">必做題解答</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-1">
-            <p className="text-slate-500"># 1. 建 Secret</p>
-            <p>kubectl create secret generic redis-secret \</p>
-            <p>{'  '}--from-literal=REDIS_PASSWORD=my-redis-pw</p>
-            <p className="text-slate-500 mt-1"># 2. 建 ConfigMap</p>
-            <p>kubectl create configmap redis-config \</p>
-            <p>{'  '}--from-literal=REDIS_MAXMEMORY=256mb</p>
-            <p className="text-slate-500 mt-1"># 3. 驗收</p>
-            <p>kubectl exec deployment/redis-deploy -- env | grep REDIS</p>
-            <p className="text-slate-500"># REDIS_PASSWORD=my-redis-pw</p>
-            <p className="text-slate-500"># REDIS_MAXMEMORY=256mb</p>
+            <p className="text-slate-500"># 1. 建 ConfigMap</p>
+            <p>kubectl create configmap app-config \</p>
+            <p>{'  '}--from-literal=MESSAGE="Hello from Bob" \</p>
+            <p>{'  '}--from-literal=USERNAME=Bob \</p>
+            <p>{`  `}--from-literal=config.txt=${'\'APP_MODE=student\\nFEATURE_FLAG=true\''}</p>
+            <p className="text-slate-500 mt-1"># 2. 建 Secret</p>
+            <p>kubectl create secret generic app-secret \</p>
+            <p>{'  '}--from-literal=PASSWORD=my-own-password</p>
+            <p className="text-slate-500 mt-1"># 3. apply + 驗收</p>
+            <p>kubectl apply -f student-deploy.yaml</p>
+            <p>kubectl apply -f ingress-step4.yaml</p>
+            <p>curl http://{'<NODE-IP>'}/frontend  <span className="text-slate-500"># Username: Bob</span></p>
+            <p>curl http://{'<NODE-IP>'}/config    <span className="text-slate-500"># APP_MODE=student</span></p>
           </div>
         </div>
 
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
           <p className="text-red-400 font-semibold mb-2">三個常見的坑</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li><strong className="text-red-300">envFrom vs env 搞混</strong> — envFrom 全部注入 / env 逐一對應</li>
-            <li><strong className="text-red-300">subPath 不自動更新</strong> — 只有整個目錄掛載才會</li>
-            <li><strong className="text-red-300">Secret data 忘記 Base64</strong> — 用 stringData 寫明文</li>
+            <li><strong className="text-red-300">ConfigMap 名字打錯</strong> — YAML 裡的 configMapRef.name 要跟建立時一樣</li>
+            <li><strong className="text-red-300">config.txt 沒有換行</strong> — <code className="text-slate-400">$'...\n...'</code> 語法才有換行</li>
+            <li><strong className="text-red-300">env 注入改了不會動</strong> — 要 rollout restart，Volume 掛載才會自動更新</li>
           </ul>
         </div>
 
         <div className="bg-slate-800/50 p-3 rounded-lg">
           <p className="text-cyan-400 font-semibold text-sm mb-1">清理</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded">
-            <p>kubectl delete deployment --all</p>
-            <p>kubectl delete configmap app-config nginx-config db-config redis-config</p>
-            <p>kubectl delete secret db-cred db-secret redis-secret</p>
+            <p>kubectl delete all --all</p>
+            <p>kubectl delete configmap --all</p>
+            <p>kubectl delete secret --all</p>
+            <p>kubectl delete ingress --all</p>
             <p>kubectl get all  <span className="text-slate-500"># 確認只剩 kubernetes Service</span></p>
           </div>
         </div>
@@ -1752,17 +1768,21 @@ kubectl rollout restart deployment/frontend-deploy
     ),
     notes: `來對答案。
 
-必做題。kubectl create secret generic redis-secret --from-literal=REDIS_PASSWORD=my-redis-pw。kubectl create configmap redis-config --from-literal=REDIS_MAXMEMORY=256mb。Deployment 的 envFrom 引用兩個。kubectl exec 進去 env | grep REDIS 看到兩行。
+kubectl create configmap app-config，三個 key：MESSAGE、USERNAME、config.txt。config.txt 要用 $'...' 語法才有換行。
 
-三個常見的坑快速過一遍。
+kubectl create secret generic app-secret，PASSWORD 填自己的。
 
-第一，envFrom 和 env 搞混。envFrom 加 configMapRef 是整個 ConfigMap 全部注入。env 加 valueFrom configMapKeyRef 是逐一指定。Key 名字一樣的情況用 envFrom 省事，要重新命名的情況才用 env。
+apply student-deploy.yaml 和 ingress-step4.yaml，curl /frontend 看到自己的名字和密碼，curl /config 看到 APP_MODE=student。
 
-第二，subPath 不自動更新。只有整個目錄掛載才會 30-60 秒自動同步，subPath 掛單一檔案不行。
+三個常見的坑：
 
-第三，Secret YAML 的 data 欄位要 Base64。嫌麻煩就用 stringData 寫明文，K8s 自動轉。
+第一，ConfigMap 名字打錯。YAML 裡的 configMapRef.name 是 app-config，你建的時候也要叫 app-config，名字不對 Pod 起不來。
 
-好，清理一下環境。kubectl delete deployment --all，再把 configmap 和 secret 清掉。kubectl get all 確認只剩 kubernetes Service 就乾淨了。
+第二，config.txt 沒有換行。要用 $'APP_MODE=student\\nFEATURE_FLAG=true' 這個語法，\\n 才會變成真正的換行。
+
+第三，env 注入改了不會動。這是今天的核心觀念，Volume 掛載才會自動更新，env 注入要 rollout restart。
+
+好，清理。kubectl delete all --all，kubectl delete configmap --all，kubectl delete secret --all，kubectl delete ingress --all。kubectl get all 確認只剩 kubernetes Service 就乾淨了。
 
 到目前為止 Ingress、ConfigMap、Secret 都學了。上午的內容到這裡，休息一下，下午繼續。
 

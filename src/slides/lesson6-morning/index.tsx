@@ -1018,24 +1018,24 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
           <p className="text-green-400 font-semibold mb-2">必做題</p>
-          <p className="text-slate-400 text-xs mb-2">公司要加一個新服務 shop-deploy（image: httpd:2.4）</p>
+          <p className="text-slate-400 text-xs mb-2">公司要加一個新服務 shop-deploy（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from shop"）</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
             <li>建 ClusterIP Service <code className="text-green-400">shop-svc</code>，port 8080，targetPort 80</li>
             <li>在現有 <code className="text-green-400">app-ingress</code> 加路由：<code className="text-green-400">/shop</code> → shop-svc:8080</li>
-            <li><code className="text-green-400">curl http://&lt;NODE-IP&gt;/shop</code> 看到 It works!</li>
+            <li><code className="text-green-400">curl http://&lt;NODE-IP&gt;/shop</code> 看到 <code className="text-green-400">Message: Hello from shop</code></li>
           </ul>
         </div>
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
           <p className="text-yellow-400 font-semibold mb-2">挑戰題</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
             <li>在 host routing 加第三個服務：域名 <code className="text-yellow-300">admin.myapp.local</code></li>
-            <li>後端：admin-deploy（image: tomcat:10.1）+ admin-svc（port 8080）</li>
-            <li>/etc/hosts 加入，<code className="text-yellow-300">curl http://admin.myapp.local</code> 驗證</li>
+            <li>後端：admin-deploy（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from admin"）+ admin-svc（port 8080）</li>
+            <li>/etc/hosts 加入，<code className="text-yellow-300">curl http://admin.myapp.local</code> 驗證，看到 <code className="text-yellow-300">Message: Hello from admin</code></li>
           </ul>
         </div>
       </div>
     ),
-    notes: `學員實作時間。必做題：公司說要加一個購物服務。部署 shop-deploy，image 用 httpd:2.4，建一個 ClusterIP Service 叫 shop-svc，port 8080，targetPort 80。然後在現有的 app-ingress 裡加一條 /shop 的路由，指向 shop-svc:8080。最後 curl http://<NODE-IP>/shop 看到 It works! 就對了。注意：這裡是在「現有 Ingress 加路由」，不是重新建一個新的 Ingress。挑戰題：在 host routing 再加一個 admin.myapp.local，用 tomcat:10.1，記得 /etc/hosts 也要加。
+    notes: `學員實作時間。必做題：公司說要加一個購物服務。部署 shop-deploy，image 用 yanchen184/k8s-demo-app:latest，env 設 MESSAGE="Hello from shop"，建一個 ClusterIP Service 叫 shop-svc，port 8080，targetPort 80。然後在現有的 app-ingress 裡加一條 /shop 的路由，指向 shop-svc:8080。最後 curl http://<NODE-IP>/shop 看到 Message: Hello from shop 就對了。注意：這裡是在「現有 Ingress 加路由」，不是重新建一個新的 Ingress。挑戰題：在 host routing 再加一個 admin.myapp.local，image 一樣用 yanchen184/k8s-demo-app:latest，MESSAGE 改成 Hello from admin，記得 /etc/hosts 也要加。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
   },
@@ -1054,13 +1054,12 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">必做題解答</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-1">
-            <p className="text-slate-500"># 1. 部署 shop-deploy + shop-svc</p>
-            <p>kubectl create deployment shop-deploy --image=httpd:2.4</p>
-            <p>kubectl expose deployment shop-deploy --name=shop-svc --port=8080 --target-port=80</p>
-            <p className="text-slate-500 mt-1"># 2. 在現有 app-ingress 加 /shop 路由（kubectl edit ingress app-ingress）</p>
-            <p className="text-slate-500"># 或 kubectl apply -f 更新後的 ingress YAML</p>
+            <p className="text-slate-500"># 1. 部署 shop-deploy + shop-svc（shop.yaml）</p>
+            <p>kubectl apply -f shop.yaml</p>
+            <p className="text-slate-500 mt-1"># 2. 在 ingress-basic.yaml 的 paths 下加 /shop，再 apply</p>
+            <p>kubectl apply -f ingress-basic.yaml</p>
             <p className="text-slate-500 mt-1"># 3. 驗收</p>
-            <p>curl http://{'<NODE-IP>'}/shop  <span className="text-green-400"># → It works!</span></p>
+            <p>curl http://{'<NODE-IP>'}/shop  <span className="text-green-400"># → Message: Hello from shop</span></p>
           </div>
         </div>
 

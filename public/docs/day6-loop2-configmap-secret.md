@@ -76,32 +76,41 @@ kind: ConfigMap
 metadata:
   name: app-config
 data:
-  APP_ENV: "production"
-  LOG_LEVEL: "info"
-  API_URL: "https://api.example.com"
-  MAX_CONNECTIONS: "100"
+  MESSAGE: "Hello from ConfigMap"
+  USERNAME: "admin"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-with-config
+  name: frontend-deploy
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: app-with-config
+      app: frontend
   template:
     metadata:
       labels:
-        app: app-with-config
+        app: frontend
     spec:
       containers:
       - name: app
-        image: busybox:1.36
-        command: ["sh", "-c", "env && sleep 3600"]
+        image: yanchen184/k8s-demo-app:latest
+        imagePullPolicy: IfNotPresent
         envFrom:
         - configMapRef:
             name: app-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
 ```
 
 重點說明：
@@ -110,10 +119,8 @@ spec:
 
 **`envFrom: configMapRef`** — 整個 ConfigMap 一次全部注入，所有 key 都變成環境變數。只要特定 key 用 `env.valueFrom.configMapKeyRef`（逐一指定）。
 
-**`command: ["sh", "-c", "env && sleep 3600"]`** — 啟動後先印出所有環境變數，再 sleep，讓我們有時間進去確認。
-
 ```bash
-kubectl apply -f configmap-literal.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/configmap-literal.yaml
 ```
 
 預期輸出：
@@ -132,7 +139,7 @@ kubectl get pods -l app=frontend -w
 預期輸出：
 ```
 NAME                               READY   STATUS    RESTARTS   AGE
-frontend-deploy-7d9f5b8c4d-abc12   1/1     Running   0          15s
+frontend-deploy-xxx   1/1     Running   0          15s
 ```
 
 看到 `Running` 後按 Ctrl+C。
@@ -140,12 +147,12 @@ frontend-deploy-7d9f5b8c4d-abc12   1/1     Running   0          15s
 curl 驗證 ConfigMap 有注入：
 
 ```bash
-curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>:30080/frontend
 ```
 
 預期輸出：
 ```
-Server: 10.42.x.x:80
+Server: 10.42.x.x:80 (frontend-deploy-xxx)
 Message: Hello from ConfigMap
 Username: admin
 Password: （未設定）
@@ -162,7 +169,7 @@ kubectl edit configmap app-config
 找到 `USERNAME: "admin"`，改成 `USERNAME: "student"`，存檔退出。
 
 ```bash
-curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>:30080/frontend
 ```
 
 預期輸出：
@@ -174,33 +181,13 @@ Username: admin
 
 ```bash
 kubectl rollout restart deployment/frontend-deploy
-```
-
-預期輸出：
-```
-deployment.apps/frontend-deploy restarted
-```
-
-- `rollout restart`：觸發滾動重啟，新 Pod 啟動時才讀到更新後的 ConfigMap
-
-等新 Pod 跑起來：
-
-```bash
 kubectl get pods -l app=frontend -w
-```
-
-預期輸出：
-```
-NAME                               READY   STATUS        RESTARTS   AGE
-frontend-deploy-7d9f5b8c4d-abc12   1/1     Terminating   0          2m
-frontend-deploy-8f6c9d7e5b-xyz99   0/1     Pending       0          2s
-frontend-deploy-8f6c9d7e5b-xyz99   1/1     Running       0          5s
 ```
 
 看到新 Pod `Running` 後按 Ctrl+C，curl 驗收：
 
 ```bash
-curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>:30080/frontend
 ```
 
 預期輸出：

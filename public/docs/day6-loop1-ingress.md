@@ -408,6 +408,21 @@ A：`Prefix` 前綴匹配，`/api` 可以匹配 `/api`、`/api/users`、`/api/v1
 
 A：k3s 預設內建 Traefik，`ingressClassName` 要填 `traefik`，不需要額外安裝。minikube 預設沒有，要 `minikube addons enable ingress` 啟用 Nginx Ingress Controller，`ingressClassName` 填 `nginx`。
 
+**Q：`ingressClassName` 不寫會怎樣？**
+
+A：取決於叢集有沒有設定 default IngressClass。
+
+```bash
+kubectl get ingressclass
+# NAME      CONTROLLER                      PARAMETERS   AGE
+# traefik   traefik.io/ingress-controller   <none>       5d
+```
+
+- **有 default IngressClass**：K8s 自動用那個 Controller 處理，不寫也能動。新版 k3s 通常會把 Traefik 標為 default。
+- **沒有 default，或裝了多個 Controller**：沒有任何 Controller 認領這條 Ingress，ADDRESS 永遠空白，curl timeout。`kubectl describe ingress` 會看到 `Warning: no ingress class annotation or ingressClassName field`。
+
+最安全的做法：**永遠明確寫 `ingressClassName: traefik`**，不依賴 default，行為明確，換環境也不會壞。
+
 **Q：練習用 `/etc/hosts`，正式環境怎麼讓全世界的人連進來？**
 
 A：三件事。第一，買真實域名，在 DNS 商後台加一筆 A Record 指向你叢集的公網 IP。第二，取得公網 IP——雲端建 LoadBalancer 型 Service 平台會自動給；地端要設路由器 Port Forwarding 或裝 MetalLB。第三，Ingress Controller 的角色沒變，還是同一個 Traefik，只是現在接的是來自世界各地的真實請求，不是你自己的 curl。

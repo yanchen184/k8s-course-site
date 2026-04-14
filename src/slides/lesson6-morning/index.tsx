@@ -904,12 +904,14 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
         </div>
 
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">三個常見的坑</p>
+          <p className="text-red-400 font-semibold mb-2">四個常見的坑</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
             <li><strong className="text-red-300">/etc/hosts 忘記改</strong> — curl 域名出現 could not resolve host</li>
-            <li><strong className="text-red-300">ingressClassName 寫錯</strong> — k3s 要用 traefik，ADDRESS 一直空白</li>
+            <li><strong className="text-red-300">ingressClassName 寫錯（nginx）</strong> — k3s 沒有 nginx Controller，ADDRESS 永遠空白，curl timeout</li>
+            <li><strong className="text-red-300">ingressClassName 不寫</strong> — 叢集沒有 default IngressClass 時沒人認領，一樣 ADDRESS 空白</li>
             <li><strong className="text-red-300">pathType 沒填</strong> — apply 時直接報錯，必填欄位</li>
           </ul>
+          <p className="text-slate-400 text-xs mt-2">最安全：永遠明確寫 <code className="text-green-400">ingressClassName: traefik</code></p>
         </div>
 
         <div className="bg-slate-800/50 p-3 rounded-lg">
@@ -933,7 +935,9 @@ Host-based routing 的部分。kubectl apply -f ingress-host.yaml。改 /etc/hos
 
 第一，/etc/hosts 忘記改。你 curl www.myapp.local 的時候如果出現 Could not resolve host，那就是 /etc/hosts 沒有加那一行。這是最常見的。
 
-第二，ingressClassName 寫錯。k3s 的 Ingress Controller 是 Traefik，所以 ingressClassName 要寫 traefik。如果你寫了 nginx，K8s 會去找名字叫 nginx 的 Ingress Controller，找不到的話 Ingress 就不會生效。你 describe ingress 會看到 ADDRESS 一直是空的。
+第二，ingressClassName 寫錯。k3s 的 Ingress Controller 是 Traefik，所以 ingressClassName 要寫 traefik。如果你寫了 nginx，K8s 會去找名字叫 nginx 的 Ingress Controller，k3s 沒有裝，找不到就沒人處理這條 Ingress，ADDRESS 一直空白，curl timeout，不是 connection refused。
+
+還有一種情況是完全不寫 ingressClassName。行為取決於叢集有沒有 default IngressClass。有的話 K8s 自動用那個 Controller 處理；沒有的話，沒有任何 Controller 認領，一樣 ADDRESS 空白。kubectl describe ingress 會看到 Warning: no ingress class annotation or ingressClassName field。所以最安全的做法是永遠明確寫 ingressClassName: traefik，不要靠 default，換環境也不會壞。
 
 第三，pathType 沒加。Ingress YAML 裡面每個 path 都必須指定 pathType，Prefix 或 Exact。這是必填欄位，漏了 kubectl apply 的時候就會報錯。
 

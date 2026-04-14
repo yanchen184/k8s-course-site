@@ -1584,7 +1584,15 @@ curl http://<NODE-IP>/frontend
 # Server: 10.42.x.x:80
 # Message: Hello K8s
 # Username: admin
-# Password: mypassword`,
+# Password: mypassword
+
+# 實驗：改了之後 reload 有用嗎？
+kubectl edit configmap app-config   # USERNAME 改成 student
+kubectl edit secret app-secret      # PASSWORD 改成 newpassword
+curl http://<NODE-IP>/frontend      # 還是舊的！
+kubectl rollout restart deployment/frontend-deploy
+kubectl get pods -l app=frontend -w
+curl http://<NODE-IP>/frontend      # Username: student / Password: newpassword`,
     notes: `第三步，Secret。
 
 不用寫 YAML，直接用指令建。
@@ -1620,6 +1628,22 @@ curl http://<NODE-IP>/frontend
 你會看到四行輸出：Server 是 Pod 的 IP、Message 是 Hello K8s、Username 是 admin、Password 是 mypassword。ConfigMap 的值和 Secret 的值同時出現了。
 
 這就是 ConfigMap 和 Secret 搭配使用的標準模式。非敏感的設定放 ConfigMap，密碼放 Secret，Pod 用 envFrom 一次把兩個都引用進來。
+
+現在來做一個實驗。我們同時改 ConfigMap 和 Secret，看看 curl 會不會變。
+
+kubectl edit configmap app-config，把 USERNAME 改成 student。kubectl edit secret app-secret，把 PASSWORD 改成 newpassword。
+
+curl 一下。還是 admin 和 mypassword。
+
+對，env 注入就是這樣，不管是 ConfigMap 還是 Secret，改了跑著的 Pod 完全不知道。
+
+rollout restart。
+
+kubectl rollout restart deployment/frontend-deploy
+
+等新 Pod 起來，再 curl。現在才是 student 和 newpassword。
+
+記住這個結論：不管是 ConfigMap 還是 Secret，用 env 注入，改了都要 rollout restart 才生效。
 
 [▶ 下一頁]`,
   },

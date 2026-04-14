@@ -545,6 +545,56 @@ Password: mypassword
 
 ---
 
+**實驗：改了之後 reload 有用嗎？**
+
+改 ConfigMap 的 USERNAME：
+
+```bash
+kubectl edit configmap app-config
+```
+
+把 `USERNAME: "admin"` 改成 `USERNAME: "student"`，存檔退出。
+
+改 Secret 的 PASSWORD：
+
+```bash
+kubectl edit secret app-secret
+```
+
+找到 `PASSWORD`，把值改成 `newpassword`（stringData 直接寫明文），存檔退出。
+
+curl 看看：
+
+```bash
+curl http://<NODE-IP>/frontend
+```
+
+預期輸出：
+```
+Username: admin
+Password: mypassword
+```
+
+還是舊的！env 注入是 Pod 啟動時抓一次，ConfigMap 和 Secret 改了，跑著的 Pod 完全不知道。
+
+rollout restart 才生效：
+
+```bash
+kubectl rollout restart deployment/frontend-deploy
+kubectl get pods -l app=frontend -w    # 等 Running，Ctrl+C
+curl http://<NODE-IP>/frontend
+```
+
+預期輸出：
+```
+Username: student
+Password: newpassword
+```
+
+**結論：不管是 ConfigMap 還是 Secret，用 env 注入的話，改了都要 `rollout restart` 才生效。**
+
+---
+
 ### ③ QA
 
 **Q：改了 ConfigMap 之後，環境變數注入和 Volume 掛載的更新行為有什麼不同？**

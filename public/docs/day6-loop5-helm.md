@@ -765,6 +765,12 @@ helm list   # 確認空的
 
 ### ④ 學員實作
 
+> 開始前先確認：`helm list` 不能有任何 ingress-nginx 的 Release（18B 的 `dev-ingress` 要先 uninstall），否則安裝 my-ingress 時會因為 IngressClass 衝突失敗。
+> ```bash
+> helm uninstall dev-ingress 2>/dev/null || true
+> helm list   # 確認空的
+> ```
+
 **必做 1：upgrade 陷阱**
 
 執行：

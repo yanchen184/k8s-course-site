@@ -100,10 +100,10 @@ curl http://localhost:8080
 
 預期輸出：
 ```
-Server: 10.42.x.x:80
+Server: 127.0.0.1:8080 (demo)
 Message: Hello
-Username:
-Password:
+Username: (not set)
+Password: (not set)
 ```
 
 這四行是今天所有 demo 的觀察視窗：
@@ -237,10 +237,10 @@ kubectl get svc
 
 預期輸出：
 ```
-NAME           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
-api-svc        ClusterIP   10.43.x.x       <none>        3000/TCP   30s
-frontend-svc   ClusterIP   10.43.x.x       <none>        80/TCP     30s
-kubernetes     ClusterIP   10.43.0.1       <none>        443/TCP    2d
+NAME           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+api-svc        ClusterIP   10.43.x.x       <none>        80/TCP    30s
+frontend-svc   ClusterIP   10.43.x.x       <none>        80/TCP    30s
+kubernetes     ClusterIP   10.43.0.1       <none>        443/TCP   2d
 ```
 
 兩個 Service 都是 `ClusterIP`，`EXTERNAL-IP <none>` 是正常的——有 Ingress 了，不需要 NodePort。
@@ -271,8 +271,9 @@ Rules:
   Host        Path  Backends
   ----        ----  --------
   *
-              /      frontend-svc:80 (10.42.x.x:80)
-              /api   api-svc:3000 (10.42.x.x:5678)
+              /frontend   frontend-svc:80 (10.42.x.x:80,10.42.x.x:80)
+              /api        api-svc:80 (10.42.x.x:80,10.42.x.x:80)
+              /config     frontend-svc:80 (10.42.x.x:80,10.42.x.x:80)
 ```
 
 `Backends` 括號裡有 Pod IP → Service 正確找到後端 Pod。括號是空的 → `kubectl get endpoints` 確認 label 有沒有對上。
@@ -299,8 +300,10 @@ curl http://<NODE-IP>/frontend
 
 預期輸出：
 ```
-Server: 10.42.x.x:80
+Server: 10.42.x.x:80 (frontend-deploy-xxx)
 Message: Hello from frontend
+Username: guest
+Password: （未設定）
 ```
 
 ```bash
@@ -309,8 +312,10 @@ curl http://<NODE-IP>/api
 
 預期輸出：
 ```
-Server: 10.42.x.x:80
+Server: 10.42.x.x:80 (api-deploy-xxx)
 Message: Hello from api
+Username: guest
+Password: （未設定）
 ```
 
 ---
@@ -654,7 +659,15 @@ spec:
 ```bash
 kubectl apply -f shop.yaml
 kubectl apply -f ingress-basic.yaml
-curl http://<NODE-IP>/shop    # → Message: Hello from shop
+curl http://<NODE-IP>/shop
+```
+
+預期輸出：
+```
+Server: 10.42.x.x:80 (shop-deploy-xxx)
+Message: Hello from shop
+Username: (not set)
+Password: (not set)
 ```
 
 **三個坑**

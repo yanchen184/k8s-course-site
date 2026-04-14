@@ -473,7 +473,7 @@ spec:
     spec:
       containers:
       - name: demo
-        image: jasonmel/k8s-demo-app:latest
+        image: yanchen184/k8s-demo-app:latest
         ports:
         - containerPort: 3000
         envFrom:
@@ -586,7 +586,7 @@ A：`data` 欄位的值必須是 Base64 字串；`stringData` 欄位直接寫明
 
 ### ④ 學員實作
 
-你要部署 `jasonmel/k8s-demo-app:latest`，把設定分開管理：
+你要部署 `yanchen184/k8s-demo-app:latest`，把設定分開管理：
 - `MESSAGE: "Hello from Student"`（一般設定，用 ConfigMap）
 - `USERNAME: "student"`（一般設定，用 ConfigMap）
 - `PASSWORD: "student-pw"`（敏感，用 Secret）
@@ -594,7 +594,7 @@ A：`data` 欄位的值必須是 Base64 字串；`stringData` 欄位直接寫明
 任務：
 1. 建立 ConfigMap `student-config`，包含 `MESSAGE` 和 `USERNAME`
 2. 建立 Secret `student-secret`，包含 `PASSWORD`
-3. 寫一個 Deployment（image: `jasonmel/k8s-demo-app:latest`，containerPort: 3000），用 `envFrom` 同時引用兩者
+3. 寫一個 Deployment（image: `yanchen184/k8s-demo-app:latest`，containerPort: 3000），用 `envFrom` 同時引用兩者
 4. 建立 NodePort Service，nodePort 用 `30090`
 5. 驗收：`curl http://<NODE-IP>:30090/frontend`，確認頁面顯示 `Username: student` 和 `Password: student-pw`
 
@@ -642,7 +642,7 @@ spec:
     spec:
       containers:
       - name: demo
-        image: jasonmel/k8s-demo-app:latest
+        image: yanchen184/k8s-demo-app:latest
         ports:
         - containerPort: 3000
         envFrom:

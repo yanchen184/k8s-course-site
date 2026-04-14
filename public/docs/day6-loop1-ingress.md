@@ -41,10 +41,10 @@ Ingress 是兩個東西，要分清楚。
 **今天的實作目標**
 
 ```
-使用者輸入 http://<NODE-IP>/frontend  → 前端（jasonmel/k8s-demo-app）
-使用者輸入 http://<NODE-IP>/api       → API（jasonmel/k8s-demo-app）
-使用者輸入 http://www.myapp.local     → 前端（jasonmel/k8s-demo-app）
-使用者輸入 http://api.myapp.local     → API（jasonmel/k8s-demo-app）
+使用者輸入 http://<NODE-IP>/frontend  → 前端（yanchen184/k8s-demo-app）
+使用者輸入 http://<NODE-IP>/api       → API（yanchen184/k8s-demo-app）
+使用者輸入 http://www.myapp.local     → 前端（yanchen184/k8s-demo-app）
+使用者輸入 http://api.myapp.local     → API（yanchen184/k8s-demo-app）
 ```
 
 一個 IP、標準 80 Port，用路徑或域名區分不同服務。NodePort 再見。
@@ -145,7 +145,7 @@ spec:
                   number: 3000
 ```
 
-> 前端和 API 都用 `jasonmel/k8s-demo-app:latest`，透過環境變數 `MESSAGE` 設定回傳內容，回應格式包含 Pod IP 與訊息，適合教學示範路由與環境變數注入。
+> 前端和 API 都用 `yanchen184/k8s-demo-app:latest`，透過環境變數 `MESSAGE` 設定回傳內容，回應格式包含 Pod IP 與訊息，適合教學示範路由與環境變數注入。
 
 **`apiVersion: networking.k8s.io/v1`** — Ingress 不是 `apps/v1`。記住這個表格：
 
@@ -538,14 +538,14 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
 
 ### ④ 學員實作
 
-公司要加一個新服務 `shop-deploy`（image: jasonmel/k8s-demo-app:latest，MESSAGE="Hello from shop"），要求：
+公司要加一個新服務 `shop-deploy`（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from shop"），要求：
 1. 建 ClusterIP Service `shop-svc`，port 8080，targetPort 80
 2. 在現有 `app-ingress` 加一條路由：`/shop` → `shop-svc:8080`
 3. `curl http://<NODE-IP>/shop` 看到 `Message: Hello from shop`
 
 挑戰：在 host-based routing 加第三個服務：
 - 域名：`admin.myapp.local`
-- 後端：`admin-deploy`（image: jasonmel/k8s-demo-app:latest，MESSAGE="Hello from admin"）+ `admin-svc`（port 8080）
+- 後端：`admin-deploy`（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from admin"）+ `admin-svc`（port 8080）
 - 在 `/etc/hosts` 加入，`curl http://admin.myapp.local/admin` 驗證，看到 `Message: Hello from admin`
 
 ---
@@ -573,7 +573,7 @@ spec:
     spec:
       containers:
       - name: shop
-        image: jasonmel/k8s-demo-app:latest
+        image: yanchen184/k8s-demo-app:latest
         env:
         - name: MESSAGE
           value: "Hello from shop"

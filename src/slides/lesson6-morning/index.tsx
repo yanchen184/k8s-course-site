@@ -1425,16 +1425,15 @@ curl http://<NODE-IP>/frontend      # 現在是 student
 # Step 2：ConfigMap Volume 掛載
 kubectl apply -f configmap-nginx.yaml
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
-kubectl port-forward svc/nginx-custom-svc 8080:80 &
-curl http://localhost:8080/healthz   # → OK
+curl http://<NODE-IP>:30090/healthz  # → OK
 
 # 改 ConfigMap → 檔案自動更新
 kubectl edit configmap nginx-config   # 把 'OK' 改成 'HEALTHY'
 # 等 30-60 秒
 kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf  # 更新了！
+curl http://<NODE-IP>:30090/healthz  # 還是 OK！
 kubectl exec deploy/nginx-custom -- nginx -s reload
-curl http://localhost:8080/healthz   # → HEALTHY
-kill %1`,
+curl http://<NODE-IP>:30090/healthz  # → HEALTHY`,
     notes: `好，概念講完了，四個步驟，一步一步做。
 
 第一步，ConfigMap 的環境變數注入。
@@ -1485,7 +1484,7 @@ kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 
 看到我們寫的那段 Nginx 設定。
 
-來測試一下。kubectl port-forward svc/nginx-custom-svc 8080:80 &，背景跑 port-forward。然後 curl http://localhost:8080/healthz，回 OK。完美。
+來測試一下。curl http://&lt;NODE-IP&gt;:30090/healthz，回 OK。完美。
 
 現在來測試 Volume 掛載的熱更新。改 ConfigMap。
 
@@ -1503,11 +1502,9 @@ kubectl exec deploy/nginx-custom -- cat /etc/nginx/conf.d/default.conf
 
 kubectl exec deploy/nginx-custom -- nginx -s reload
 
-現在再 curl，回 HEALTHY 了。
+現在再 curl http://&lt;NODE-IP&gt;:30090/healthz，回 HEALTHY 了。
 
 這裡有一個坑要提醒。如果你用 subPath 掛載，就是只掛一個檔案而不是覆蓋整個目錄，那熱更新不會生效。這是 K8s 的已知行為。所以如果你需要熱更新功能，不要用 subPath。但不用 subPath 的話，整個目錄會被 ConfigMap 覆蓋，原本目錄裡的其他檔案會不見。這是一個取捨，要根據你的場景選擇。
-
-kill %1，把背景的 port-forward 停掉。
 
 [▶ 下一頁]`,
   },

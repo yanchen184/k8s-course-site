@@ -295,11 +295,10 @@ server {
 }
 ```
 
-用 port-forward 測試：
+用 NodePort 測試（不需要 port-forward，直接打 Node IP）：
 
 ```bash
-kubectl port-forward svc/nginx-custom-svc 8080:80 &
-curl http://localhost:8080/healthz
+curl http://<NODE-IP>:30090/healthz
 ```
 
 預期輸出：`OK`
@@ -334,13 +333,10 @@ server {
 檔案已更新（看到 `HEALTHY`）。但 curl 還是舊的：
 
 ```bash
-curl http://localhost:8080/healthz
+curl http://<NODE-IP>:30090/healthz
 ```
 
-預期輸出：
-```
-OK
-```
+預期輸出：`OK`
 
 還是 `OK`！Volume 自動更新的是「**檔案內容**」，Nginx 程式本身不知道設定改了。要讓設定生效：
 
@@ -354,21 +350,10 @@ kubectl exec deploy/nginx-custom -- nginx -s reload
 ```
 
 ```bash
-curl http://localhost:8080/healthz
+curl http://<NODE-IP>:30090/healthz
 ```
 
 預期輸出：`HEALTHY`
-
-停掉 port-forward：
-
-```bash
-kill %1
-```
-
-預期輸出：
-```
-[1]  + terminated  kubectl port-forward svc/nginx-custom-svc 8080:80
-```
 
 ---
 

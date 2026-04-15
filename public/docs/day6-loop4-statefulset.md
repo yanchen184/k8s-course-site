@@ -2,7 +2,7 @@
 
 ---
 
-## 6-14 StorageClass + StatefulSet 概念（~15 min）
+## 6-14 StorageClass + StatefulSet 概念（~5 min）
 
 ### ① 課程內容
 

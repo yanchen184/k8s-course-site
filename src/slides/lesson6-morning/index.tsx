@@ -1948,7 +1948,7 @@ kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
 
 # PVC Pending 排查
 kubectl describe pvc local-pvc   # 看 Events 區塊`,
-    notes: `apply 之後先看 PV 和 PVC 的狀態。kubectl get pv，STATUS 要是 Bound，代表已配對到 PVC。kubectl get pvc，STATUS 也要是 Bound。如果是 Pending 就有問題，三個原因：storageClassName 不一致、PV 容量不夠、accessModes 不匹配。進 MySQL 建 testdb，寫一筆 Alice 進去，exit。砍 Pod。等新 Pod 起來，再進去 USE testdb; SELECT，Alice 還在。這就是 PVC 掛載的效果，資料跟著 PV 走，不跟 Pod 走。[▶ 下一頁]`,
+    notes: `先把流程講一遍：管理員建 PV → 開發者建 PVC → K8s 自動配對 Binding → Pod 掛載 PVC → 資料跟 PV 走不跟 Pod 走。這叫靜態佈建，PV 要先手動建好。好，apply。看 PV 和 PVC 的狀態，kubectl get pv，STATUS 要是 Bound，代表已配對到 PVC。kubectl get pvc，STATUS 也要是 Bound。如果是 Pending 就有問題，三個原因：storageClassName 不一致、PV 容量不夠、accessModes 不匹配。進 MySQL 建 testdb，寫一筆 Alice 進去，exit。砍 Pod。等新 Pod 起來，再進去 USE testdb; SELECT，Alice 還在。這就是 PVC 掛載的效果，資料跟著 PV 走，不跟 Pod 走。[▶ 下一頁]`,
   },
 
   // ============================================================
@@ -2123,6 +2123,7 @@ kubectl delete pv local-pv`,
       </div>
     ),
     code: `kubectl get storageclass   # 確認有 local-path (default)
+# 動態佈建：只要建 PVC，local-path provisioner 自動幫你建 PV，不用手動
 
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/statefulset-mysql.yaml
 kubectl get pods -w        # 觀察 mysql-0 Running 後 mysql-1 才建
@@ -2137,13 +2138,17 @@ kubectl get pods -w                  # 等重建，名字還是 mysql-0
 kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "SHOW DATABASES;"
 # → testdb 還在！
 
+# Headless Service DNS 驗證
+kubectl run dns-test --image=busybox:1.28 --restart=Never --rm -it -- nslookup mysql-0.mysql-headless
+# → 解析到 mysql-0 的 Pod IP，不是 ClusterIP
+
 # Scale
 kubectl scale statefulset mysql --replicas=3
 kubectl get pods -w    # mysql-2 最後建
 kubectl scale statefulset mysql --replicas=2
 kubectl get pods -w    # mysql-2 先 Terminating（反序）
 kubectl delete pvc mysql-data-mysql-2`,
-    notes: `先確認 StorageClass，kubectl get storageclass，看到 local-path (default) 才繼續。apply statefulset-mysql.yaml，立刻 kubectl get pods -w，看有序啟動：mysql-0 ContainerCreating、mysql-0 Running、然後 mysql-1 才 Pending。Ctrl+C 後看 pod 名稱是 mysql-0、mysql-1，不是 random hash。kubectl get pvc，看到 mysql-data-mysql-0 和 mysql-data-mysql-1，你沒有手動建任何 PVC，StatefulSet 自動幫你建的。驗證資料持久化：exec 到 mysql-0 建 testdb，delete pod mysql-0，等重建，再 exec 確認 testdb 還在。最後 Scale 到 3 看有序擴容，Scale 回 2 看反序縮容，記得手動刪 mysql-data-mysql-2 這個殘留的 PVC。[▶ 下一頁]`,
+    notes: `先確認 StorageClass，kubectl get storageclass，看到 local-path (default) 才繼續。帶一句：這就是動態佈建——等一下你建 PVC 的時候不需要手動建 PV，local-path provisioner 全自動。apply statefulset-mysql.yaml，立刻 kubectl get pods -w，看有序啟動：mysql-0 ContainerCreating、mysql-0 Running、然後 mysql-1 才 Pending。Ctrl+C 後看 pod 名稱是 mysql-0、mysql-1，不是 random hash。kubectl get pvc，看到 mysql-data-mysql-0 和 mysql-data-mysql-1，你沒有手動建任何 PVC，StatefulSet 自動幫你建的。驗證資料持久化：exec 到 mysql-0 建 testdb，delete pod mysql-0，等重建，再 exec 確認 testdb 還在。驗證 Headless Service DNS：跑 busybox nslookup mysql-0.mysql-headless，看到它解析到 Pod IP 而不是 ClusterIP——這就是每個 Pod 有自己 DNS 的效果。最後 Scale 到 3 看有序擴容，Scale 回 2 看反序縮容，記得手動刪 mysql-data-mysql-2 這個殘留的 PVC。[▶ 下一頁]`,
   },
 
   // ============================================================

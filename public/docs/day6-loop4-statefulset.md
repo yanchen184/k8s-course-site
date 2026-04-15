@@ -46,14 +46,6 @@ StorageClass 就是工廠的模板。有人下訂單（建 PVC），工廠（pro
 
 Docker 對照：Volume Driver（`--driver local` 或 `--driver nfs`），概念相同，只是 K8s 的版本更完整、更可設定。
 
-**靜態 vs 動態佈建比較**
-
-| | 靜態佈建 | 動態佈建 |
-|:---|:---|:---|
-| 流程 | 管理員先建 PV → PVC 配對 | PVC 建立 → PV 自動建 |
-| 適合 | 學習、小規模、特殊硬體 | 生產環境 |
-| 問題 | 要事先建好所有 PV | 需要 StorageClass |
-
 ---
 
 📄 6-14 第 3 張
@@ -123,14 +115,11 @@ spec:
 Headless Service 不做負載均衡，改成讓每個 Pod 有自己的 DNS：
 
 ```
-mysql-0.mysql-headless.default.svc.cluster.local
-mysql-1.mysql-headless.default.svc.cluster.local
-mysql-2.mysql-headless.default.svc.cluster.local
+mysql-0.mysql-headless
+mysql-1.mysql-headless
 ```
 
-DNS 格式：`<pod名稱>.<service名稱>.<namespace>.svc.cluster.local`
-
-這是 K8s 內部 DNS 的格式，StatefulSet 配 Headless Service 才有的。拿 `mysql-0.mysql-headless.default.svc.cluster.local` 來說：`mysql-0` 是 Pod 名稱、`mysql-headless` 是 Service 名稱、`default` 是 namespace、`svc.cluster.local` 是固定後綴。普通 Pod 沒有這種固定 DNS，只有 StatefulSet 搭配 Headless Service 的 Pod 才有。
+（完整格式是 `<pod>.<svc>.<namespace>.svc.cluster.local`，6-15 實作時我們會實際 nslookup 驗證。）
 
 ---
 
@@ -203,6 +192,8 @@ local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsu
 ```
 
 有看到 `local-path (default)` 就可以繼續。
+
+動態佈建的好處：開發者只建 PVC，StorageClass 的 provisioner（這裡是 `rancher.io/local-path`）自動幫你建 PV 並配對。靜態佈建要手動建 PV，動態佈建全自動。
 
 ---
 
@@ -403,6 +394,25 @@ kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "SHOW DATABASES;"
 ```
 
 `testdb` 還在，證明 Pod 重建後資料沒有消失。
+
+---
+
+**驗證 Headless Service DNS**
+
+```bash
+kubectl run dns-test --image=busybox:1.28 --restart=Never --rm -it -- nslookup mysql-0.mysql-headless
+```
+
+打完要看：
+```
+Server:    10.43.0.10
+Address 1: 10.43.0.10 kube-dns.kube-system.svc.cluster.local
+
+Name:      mysql-0.mysql-headless
+Address 1: 10.42.0.X mysql-0.mysql-headless.default.svc.cluster.local
+```
+
+`mysql-0.mysql-headless` 解析到 mysql-0 的 Pod IP，不是隨機的。這就是 Headless Service 的效果——每個 Pod 有自己固定的 DNS，可以直接定址。普通 Service 你只能拿到 ClusterIP，連進去不知道打到誰。
 
 ---
 

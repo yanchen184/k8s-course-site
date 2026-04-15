@@ -326,13 +326,16 @@ helm show values ingress-nginx/ingress-nginx | head -50
 
 預期輸出（節錄）：
 ```
-## @param controller.replicaCount
-## Number of desired pods
+## nginx configuration
 ##
-controller:
-  replicaCount: 1
+
+global:
   image:
     registry: registry.k8s.io
+
+controller:
+  name: controller
+  image:
     image: ingress-nginx/controller
     tag: "v1.15.1"
     pullPolicy: IfNotPresent
@@ -341,10 +344,6 @@ controller:
     ports:
       http: 80
       https: 443
-  resources:
-    requests:
-      cpu: 100m
-      memory: 90Mi
 ```
 
 - `helm show values`：顯示 Chart 的預設 values.yaml，所有可以客製化的參數都在這裡
@@ -865,6 +864,6 @@ kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
 
 **清理**
 ```bash
-helm uninstall my-ingress my-service monitoring
+helm uninstall my-ingress my-service monitoring 2>/dev/null || true
 kubectl delete pvc --all
 ```

@@ -2521,5 +2521,470 @@ kubectl get all   # 確認只剩 kubernetes Service`,
     notes: `必做 1 是 upgrade 陷阱。install 設 replicaCount=1，upgrade 的時候只帶 service.type=NodePort，忘記帶 replicaCount。Helm 把它重設回 Chart 預設值，通常是 1 但可能跟你設的不一樣。生產環境這是個坑，你 upgrade 想改一個參數，結果其他參數全被重設了。解法是加 --reuse-values，沿用上次所有的 values，再用 --set 只覆蓋你要改的那一個。必做 2：helm create my-service 產生骨架，修改 values.yaml，把 image 改成 httpd，serviceAccount.create 和 httpRoute.enabled 設 false，不然新版骨架 apply 會失敗。install 起來，describe pod grep Image 確認跑的是 httpd:latest，upgrade 換 tag 到 2.4。挑戰：monitoring 應該還在（上面 18B 裝的），port-forward Grafana，在 Dashboards 裡找到你自己裝的 my-service Pod 的 CPU Memory 圖表。這就是用你剛裝的監控看你剛裝的服務。清理 helm uninstall 全部，delete pvc，確認乾淨。第六堂全部完成。[▶ 完]`,
   },
 
+  // ============================================================
+  // 6-20：RKE + Rancher 概念（~15 min）
+  // ============================================================
+
+  // ── 6-20（1/2）：kubectl 管多叢集的痛點 ──
+  {
+    title: 'Rancher：Web GUI 叢集管理',
+    subtitle: 'kubectl 管多叢集太危險 → 需要視覺化保護',
+    section: '6-20：RKE + Rancher 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-red-900/20 border border-red-700/40 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold text-sm mb-2">問題：kubectl 沒有「你在哪個叢集」的視覺提醒</p>
+          <div className="font-mono text-xs text-slate-400 space-y-0.5">
+            <p>kubectl config use-context prod</p>
+            <p className="text-amber-400"># 切完之後你記得你在 prod 嗎？</p>
+            <p className="text-red-400"># 然後你 delete pod... 刪的是 prod 的 Pod</p>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Rancher 三個核心功能</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>① <span className="text-green-400">多叢集管理</span> — 統一介面，永遠看得到你在哪個叢集</p>
+            <p>② <span className="text-green-400">GUI 操作</span> — 看 Pod/改 replicas/查 logs，滑鼠搞定</p>
+            <p>③ <span className="text-green-400">Kubectl Shell</span> — 瀏覽器裡打 kubectl，免裝本機環境</p>
+          </div>
+        </div>
+        <div className="bg-slate-700/30 p-2 rounded text-xs text-slate-400">
+          Rancher 本身跑在 Docker 容器裡，不是裝在 K8s 裡面
+        </div>
+      </div>
+    ),
+    notes: `先讓學員想像：你管三個叢集 dev/staging/prod，每次操作前要切 context。切完之後 terminal 只是黑色視窗，你不一定記得自己在哪。然後你下了刪除指令，才發現刪的是 prod 的 Pod。這種事真的會發生。kubectl 是 CLI，天生沒有「你現在在哪個叢集」的視覺保護。Rancher 解決這個問題。Rancher 是 SUSE 出的 K8s 叢集管理平台，Web GUI，免費開源。三個核心：多叢集統一管理、GUI 操作 Pod/replicas/logs、Kubectl Shell（瀏覽器裡打指令）。部署方式：Rancher 本身用 Docker 跑，不裝在 K8s 裡。今天要做四件事：docker run 跑 Rancher、瀏覽器初始設定、import k3s 叢集、GUI 導覽。`,
+  },
+
+  // ── 6-20（2/2）：k8s 發行版對照 + RKE/RKE2 ──
+  {
+    title: 'K8s 發行版：minikube vs k3s vs RKE2',
+    subtitle: '學習 → 輕量生產 → 企業合規',
+    section: '6-20：RKE + Rancher 概念',
+    duration: '10',
+    content: (
+      <div className="space-y-3">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-700">
+                <th className="text-left py-1 pr-3"></th>
+                <th className="text-left py-1 pr-3 text-blue-400">minikube</th>
+                <th className="text-left py-1 pr-3 text-green-400">k3s</th>
+                <th className="text-left py-1 text-amber-400">RKE2</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-800"><td className="py-1 pr-3 text-slate-500">用途</td><td className="pr-3">本機開發測試</td><td className="pr-3">輕量生產/邊緣</td><td>企業生產</td></tr>
+              <tr className="border-b border-slate-800"><td className="py-1 pr-3 text-slate-500">多節點</td><td className="pr-3 text-red-400">✗</td><td className="pr-3 text-green-400">✓</td><td className="text-green-400">✓</td></tr>
+              <tr className="border-b border-slate-800"><td className="py-1 pr-3 text-slate-500">安全合規</td><td className="pr-3">無</td><td className="pr-3">無</td><td className="text-amber-400">FIPS/CIS</td></tr>
+              <tr><td className="py-1 pr-3 text-slate-500">適合場景</td><td className="pr-3">學習</td><td className="pr-3">小公司/課程</td><td>銀行/政府</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-xs mb-2">kubeconfig 位置</p>
+          <div className="font-mono text-xs text-slate-400 space-y-0.5">
+            <p><span className="text-slate-500"># k3s</span></p>
+            <p>/etc/rancher/k3s/k3s.yaml</p>
+            <p><span className="text-slate-500"># RKE2</span></p>
+            <p>/etc/rancher/rke2/rke2.yaml</p>
+          </div>
+        </div>
+        <div className="bg-green-900/20 border border-green-700/40 p-2 rounded text-xs text-green-300">
+          kubectl 指令完全一樣，換環境只要換 kubeconfig
+        </div>
+      </div>
+    ),
+    notes: `補充學員以後會用到的概念。minikube 是筆電上練習用，不上生產。k3s 就是我們課程用的，也是很多小公司的選擇。RKE2 是 SUSE 的企業版，多了 FIPS 140-2 和 CIS Benchmark 認證，銀行政府有稽核需求才要這個。三個都是 K8s，kubectl 指令零差異。差的只是 kubeconfig 放哪裡，還有 systemctl 的服務名字不一樣。換環境只要換 kubeconfig，kubectl 一個字都不用改。今天學會用 Rancher 管 k3s，到公司換成 RKE2，介面操作完全一樣。`,
+  },
+
+  // ============================================================
+  // 6-21：Rancher 實作（~12 min）
+  // ============================================================
+
+  // ── 6-21（1/3）：安裝 Docker + 跑 Rancher ──
+  {
+    title: 'Rancher 實作：安裝與啟動',
+    subtitle: 'docker run 一行跑起 Rancher → 取得初始密碼',
+    section: '6-21：Rancher 實作',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Step 1：確認 Docker（Rancher 要用 Docker 跑）</p>
+          <div className="font-mono text-xs text-slate-400 space-y-0.5">
+            <p>docker --version</p>
+            <p className="text-slate-500"># 沒有的話：</p>
+            <p>sudo apt install -y docker.io</p>
+            <p>sudo systemctl enable --now docker</p>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Step 2：用 Docker 跑 Rancher</p>
+          <div className="font-mono text-xs text-slate-400 space-y-0.5">
+            <p>docker run -d --restart=unless-stopped \</p>
+            <p className="pl-4">-p 80:80 -p 443:443 \</p>
+            <p className="pl-4">--privileged \</p>
+            <p className="pl-4">rancher/rancher:latest</p>
+          </div>
+          <div className="bg-amber-900/20 border border-amber-700/40 p-2 rounded text-xs text-amber-300 mt-2">
+            k3s Traefik 佔了 80/443？改用 -p 8080:80 -p 8443:443
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-2 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-xs mb-1">取得初始密碼</p>
+          <div className="font-mono text-xs text-slate-400">
+            <p>docker logs &lt;容器ID&gt; 2&gt;&amp;1 | grep "Bootstrap Password:"</p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# Step 1：確認 Docker
+docker --version
+# 沒有的話：
+sudo apt install -y docker.io
+sudo systemctl enable --now docker
+
+# Step 2：跑 Rancher（k3s 環境 Traefik 佔 80/443，改用 8080/8443）
+docker run -d --restart=unless-stopped \\
+  -p 8080:80 -p 8443:443 \\
+  --privileged \\
+  rancher/rancher:latest
+
+# 確認容器跑起來
+docker ps
+# STATUS 要是 Up，不能是 Restarting
+
+# 取得初始密碼（等 30-60 秒讓 Rancher 初始化）
+docker logs <容器ID> 2>&1 | grep "Bootstrap Password:"
+# → Bootstrap Password: abcd1234efgh5678`,
+    notes: `先確認 master 節點有 Docker。k3s 預設用 containerd，但 Rancher server 要用 Docker 跑一個容器。docker run 那行：-d 背景執行，restart=unless-stopped 崩潰自動重啟，--privileged Rancher 需要特殊權限管叢集資源。我們的 k3s 環境 Traefik 已佔住 80/443，改用 8080/8443，之後瀏覽器用 https://<master-IP>:8443 開。docker ps 確認 STATUS 是 Up。等 30-60 秒讓 Rancher 初始化，再 docker logs grep Bootstrap Password 拿初始密碼。`,
+  },
+
+  // ── 6-21（2/3）：瀏覽器設定 + Import 叢集 ──
+  {
+    title: 'Rancher：瀏覽器登入 + Import k3s 叢集',
+    subtitle: '初始設定 → Generic import → kubectl apply agent',
+    section: '6-21：Rancher 實作',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Step 3：瀏覽器第一次登入</p>
+          <ol className="text-sm text-slate-300 space-y-1 list-decimal list-inside">
+            <li>打開 <span className="font-mono text-xs text-amber-300">https://&lt;master-IP&gt;:8443</span></li>
+            <li>HTTPS 憑證警告 → 點「繼續前往」（自簽憑證，正常）</li>
+            <li>輸入 Bootstrap Password，設定新密碼</li>
+            <li>確認 Rancher Server URL，保留預設</li>
+          </ol>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Step 4：Import k3s 叢集</p>
+          <ol className="text-sm text-slate-300 space-y-1 list-decimal list-inside">
+            <li>☰ → Cluster Management → Import Existing</li>
+            <li>選 Generic → Cluster Name: <span className="font-mono text-xs">my-k3s-cluster</span></li>
+            <li>複製 Rancher 給的 kubectl apply 指令</li>
+            <li>回 master 執行（忽略憑證錯誤加 --insecure-skip-tls-verify）</li>
+          </ol>
+        </div>
+        <div className="bg-green-900/20 border border-green-700/40 p-2 rounded text-xs text-green-300">
+          等 1-2 分鐘，Rancher 叢集狀態從 Pending → Active
+        </div>
+      </div>
+    ),
+    code: `# Step 4：在 k3s master 執行 Rancher 給的指令
+kubectl apply -f https://<rancher-IP>:8443/v3/import/xxxxxxxx.yaml
+
+# 預期看到：
+# namespace/cattle-system created
+# serviceaccount/cattle created
+# deployment.apps/cattle-cluster-agent created
+
+# 確認 agent 有跑起來
+kubectl get pods -n cattle-system
+# NAME                                    READY   STATUS    RESTARTS   AGE
+# cattle-cluster-agent-xxx                1/1     Running   0          2m`,
+    notes: `瀏覽器開 https://master-IP:8443，HTTPS 憑證警告直接繼續（自簽憑證）。輸入 Bootstrap Password，設定新密碼，確認 Rancher Server URL。Import 叢集：Cluster Management → Import Existing → Generic，填名字 my-k3s-cluster，Rancher 會給你一段 kubectl apply 指令。回到 master 節點執行它。如果有憑證錯誤加 --insecure-skip-tls-verify。這個指令會在 k3s 叢集裡裝 Rancher agent，agent 主動連回 Rancher server。kubectl get pods -n cattle-system 確認 cattle-cluster-agent Running。等 1-2 分鐘，回 Rancher 介面，叢集狀態從 Pending 變 Active。`,
+  },
+
+  // ── 6-21（3/3）：GUI 導覽 ──
+  {
+    title: 'Rancher GUI 導覽',
+    subtitle: 'Dashboard + Workloads + Logs + Shell + Scale + Storage',
+    section: '6-21：Rancher 實作',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-slate-800/50 p-2 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-xs mb-1">① Cluster Dashboard</p>
+            <p className="text-xs text-slate-400">CPU/Memory 使用率 + Node 列表 + Pod 數</p>
+            <p className="text-xs text-slate-500 mt-1">≈ kubectl top nodes + get nodes</p>
+          </div>
+          <div className="bg-slate-800/50 p-2 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-xs mb-1">② 看 Pod Logs</p>
+            <p className="text-xs text-slate-400">Workloads → Pod 右邊 ⋮ → View Logs</p>
+            <p className="text-xs text-slate-500 mt-1">≈ kubectl logs &lt;pod-name&gt;</p>
+          </div>
+          <div className="bg-slate-800/50 p-2 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-xs mb-1">③ Web Terminal</p>
+            <p className="text-xs text-slate-400">Pod ⋮ → Execute Shell → 瀏覽器 shell</p>
+            <p className="text-xs text-slate-500 mt-1">≈ kubectl exec -it -- /bin/sh</p>
+          </div>
+          <div className="bg-slate-800/50 p-2 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-xs mb-1">④ GUI Scale</p>
+            <p className="text-xs text-slate-400">Deployments → Edit Config → 改 Replicas</p>
+            <p className="text-xs text-slate-500 mt-1">≈ kubectl scale --replicas=N</p>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-2 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-xs mb-1">⑤ Service + Ingress + Storage</p>
+          <p className="text-xs text-slate-400">左側 Service Discovery → Services / Ingresses</p>
+          <p className="text-xs text-slate-400">左側 Storage → PersistentVolumes / PVCs</p>
+        </div>
+        <div className="bg-green-900/20 border border-green-700/40 p-2 rounded text-xs text-green-300">
+          CLI 不是被取代，是互補：出問題用 kubectl 精確操作，平時巡視用 GUI 一覽全局
+        </div>
+      </div>
+    ),
+    notes: `GUI 導覽重點：點進 my-k3s-cluster，Overview 頁就是 kubectl top nodes + get nodes + get pods --all-namespaces 的視覺版。View Logs 等同 kubectl logs，Execute Shell 等同 kubectl exec -it。GUI Scale 改 replicas 等同 kubectl scale。左側 Service Discovery 看 Service 和 Ingress，Storage 看 PV 和 PVC。強調 CLI 和 GUI 互補：出問題要排查用 kubectl 精確操作，平時監控巡視用 GUI 一眼看全局。讓學員試試 Execute Shell 進一個 Pod，感受一下不用打 kubectl exec 的方便。`,
+  },
+
+  // ============================================================
+  // 6-22：回頭操作 Loop 6（~5 min）
+  // ============================================================
+
+  {
+    title: '回頭操作 Loop 6：安裝 Rancher + GUI 操作',
+    subtitle: 'Rancher 完整流程 → GUI scale → 挑戰：GUI 建 Deployment',
+    section: '6-22：Rancher 學員實作',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">操作題 1：安裝 Rancher + Import 叢集</p>
+          <ol className="text-xs text-slate-300 space-y-1 list-decimal list-inside">
+            <li>kubectl get nodes 確認 Ready</li>
+            <li>docker run 跑 Rancher（-p 8080:80 -p 8443:443）</li>
+            <li>docker ps 確認 Up，取得 Bootstrap Password</li>
+            <li>瀏覽器登入 https://&lt;master-IP&gt;:8443 設定</li>
+            <li>Import Existing → Generic → my-k3s-cluster</li>
+            <li>等叢集狀態 Active</li>
+          </ol>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">操作題 2：GUI 改 replicas + kubectl 確認</p>
+          <p className="text-xs text-slate-400">Workloads → Deployments → Edit Config → replicas 改 4 → Save</p>
+          <p className="text-xs text-slate-500 mt-1">kubectl get deploy &lt;name&gt; → READY: 4/4</p>
+        </div>
+        <div className="bg-amber-900/20 border border-amber-700/40 p-2 rounded-lg">
+          <p className="text-amber-400 font-semibold text-xs mb-1">挑戰：GUI 建 Deployment</p>
+          <p className="text-xs text-slate-400">Workloads → Deployments → Create → nginx:1.25 / replicas=2 / name=gui-test</p>
+          <p className="text-xs text-slate-500 mt-1">kubectl get deploy gui-test → READY: 2/2</p>
+        </div>
+      </div>
+    ),
+    notes: `學員自己動手跑完整流程。操作題 1 就是剛才 21 示範的步驟，學員自己做一遍。操作題 2：在 GUI 上把某個 Deployment 的 replicas 改成 4，然後用 kubectl get deploy 確認真的變了。這邊讓學員體會 GUI 和 CLI 的一致性——GUI 操作背後就是 kubectl 在運作。挑戰：用 GUI 建一個全新的 Deployment，nginx:1.25，replicas=2，名字 gui-test，建完用 kubectl 確認存在。讓學員感受用 GUI 建資源是什麼體驗。`,
+  },
+
+  // ============================================================
+  // 6-23：綜合實作引導（~10 min）
+  // ============================================================
+
+  {
+    title: '綜合實作：完整部落格系統架構',
+    subtitle: '串起 Ingress + ConfigMap + Secret + PVC + StatefulSet + Helm + Rancher',
+    section: '6-23：綜合實作引導',
+    duration: '10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">六步驟架構</p>
+          <div className="space-y-1.5 text-xs text-slate-300">
+            <div className="flex gap-2">
+              <span className="text-amber-400 font-semibold w-5">①</span>
+              <span><span className="text-purple-400">StatefulSet</span> MySQL + Headless Service + Secret + volumeClaimTemplates</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-amber-400 font-semibold w-5">②</span>
+              <span><span className="text-blue-400">Deployment</span> 後端 API + ConfigMap（DB 連線）+ Secret（DB 密碼）+ ClusterIP</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-amber-400 font-semibold w-5">③</span>
+              <span><span className="text-blue-400">Deployment</span> 前端 Nginx + ConfigMap（nginx.conf）+ ClusterIP</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-amber-400 font-semibold w-5">④</span>
+              <span><span className="text-green-400">Ingress</span> blog.example.com → 前端 / blog.example.com/api → 後端</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-amber-400 font-semibold w-5">⑤</span>
+              <span>驗證：curl 前端 + 砍 mysql-0 資料還在 + 改 ConfigMap 熱更新</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-amber-400 font-semibold w-5">⑥</span>
+              <span><span className="text-cyan-400">Rancher</span> GUI 一覽：Deployment + StatefulSet + Service + Ingress + PVC</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-green-900/20 border border-green-700/40 p-2 rounded text-xs text-green-300">
+          Helm 捷徑：以上六步 → <span className="font-mono">helm install my-blog bitnami/wordpress</span> 一行搞定
+        </div>
+      </div>
+    ),
+    notes: `這個 section 不做實作，是概念串接。讓學員看到第六堂所有概念怎麼組在一個真實系統裡。MySQL 有狀態用 StatefulSet，後端無狀態用 Deployment，設定用 ConfigMap，密碼用 Secret，對外路由用 Ingress，監控用 Rancher。六步走完就是一個完整的三層系統。然後告訴學員：真實世界如果是跑已知軟體，不用自己寫這六步，helm install 一行搞定。6-24 就是讓他們體驗這個。Helm 不是偷懶，是正確的工程判斷。`,
+  },
+
+  // ============================================================
+  // 6-24：學員自由練習（不錄影）
+  // ============================================================
+
+  {
+    title: '學員自由練習：Helm 安裝 WordPress',
+    subtitle: 'bitnami/wordpress — 一行裝完整 WordPress + MariaDB + PVC',
+    section: '6-24：學員練習',
+    duration: '15',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">必做：Helm 安裝 WordPress</p>
+          <div className="font-mono text-xs text-slate-400 space-y-0.5">
+            <p>helm repo add bitnami https://charts.bitnami.com/bitnami</p>
+            <p>helm repo update</p>
+            <p>helm install my-blog bitnami/wordpress \</p>
+            <p className="pl-4">--set wordpressUsername=admin \</p>
+            <p className="pl-4">--set wordpressPassword=mypass123 \</p>
+            <p className="pl-4">--set mariadb.auth.rootPassword=rootpass123</p>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-2 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-xs mb-1">等 Pod 跑起來</p>
+          <div className="font-mono text-xs text-slate-400">
+            <p>kubectl get pods -w   # 等兩個 Pod Running</p>
+            <p>kubectl get svc my-blog-wordpress   # 找 NodePort</p>
+          </div>
+        </div>
+        <div className="bg-amber-900/20 border border-amber-700/40 p-2 rounded text-xs text-amber-300">
+          ⚠️ Bitnami 2025/8 起 image 需付費 → 可能出現 ImagePullBackOff，這個 section 以概念理解為主
+        </div>
+      </div>
+    ),
+    code: `# Step 1：加入 Bitnami repo
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# Step 2：安裝 WordPress
+helm install my-blog bitnami/wordpress \\
+  --set wordpressUsername=admin \\
+  --set wordpressPassword=mypass123 \\
+  --set mariadb.auth.rootPassword=rootpass123
+
+# Step 3：等 Pod 跑起來
+kubectl get pods -w
+# my-blog-wordpress-xxx   1/1   Running   2m
+# my-blog-mariadb-0       1/1   Running   2m
+
+# Step 4：找入口
+kubectl get svc my-blog-wordpress
+# TYPE: LoadBalancer → 用 NodePort 進：http://<Node-IP>:<NodePort>
+
+# Step 5：驗收（瀏覽器看到 WordPress 歡迎頁）
+
+# 清理
+helm uninstall my-blog
+kubectl delete pvc --all`,
+    notes: `這個 section 不錄影，學員自由操作時間。老師巡堂。必做：照步驟跑 WordPress。注意：Bitnami 2025/8 起 image 需要付費訂閱，可能遇到 ImagePullBackOff。如果遇到，告訴學員這是 Bitnami 的商業策略，讓他們看到 helm install 的輸出和 helm list 就夠了，理解流程即可。挑戰 1：改用 values.yaml 安裝，啟用 Ingress，加 /etc/hosts，瀏覽器用 hostname 連。挑戰 2：登入 WordPress 發文，砍 MariaDB Pod，等重啟後確認文章還在，驗證 PVC 持久化。`,
+  },
+
+  // ============================================================
+  // 6-25：第六堂總結（~12 min）
+  // ============================================================
+
+  // ── 6-25（1/2）：完整因果鏈回顧 ──
+  {
+    title: '第六堂因果鏈回顧',
+    subtitle: 'NodePort 太醜 → Ingress → ConfigMap → Secret → PV → StorageClass → StatefulSet → Helm → Rancher',
+    section: '6-25：第六堂總結',
+    duration: '8',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">NodePort 地址醜、沒域名、沒 HTTPS</span> → <span className="text-green-400 font-semibold">Ingress</span> <span className="text-slate-500">（域名路由 + 路徑分流）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">設定寫死在 Image，換環境要重 build</span> → <span className="text-green-400 font-semibold">ConfigMap</span> <span className="text-slate-500">（env 注入 / Volume 掛載熱更新）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">密碼放 ConfigMap 明文，不安全</span> → <span className="text-green-400 font-semibold">Secret</span> <span className="text-slate-500">（Base64 + RBAC）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">Pod 重啟資料消失</span> → <span className="text-green-400 font-semibold">PV + PVC</span> <span className="text-slate-500">（停車位 + 租約 + Retain）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">手動建 PV 太煩</span> → <span className="text-green-400 font-semibold">StorageClass</span> <span className="text-slate-500">（動態佈建全自動）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">Deployment 不適合跑 DB（無身份）</span> → <span className="text-green-400 font-semibold">StatefulSet</span> <span className="text-slate-500">（固定序號 + 獨立 PVC + Headless DNS）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">YAML 太多太散，版本管理痛苦</span> → <span className="text-green-400 font-semibold">Helm</span> <span className="text-slate-500">（一行安裝 + values 多環境 + rollback）</span></div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-red-400 mt-0.5">→</span>
+          <div><span className="text-slate-400">kubectl 管多叢集沒視覺保護</span> → <span className="text-green-400 font-semibold">Rancher</span> <span className="text-slate-500">（Web GUI 一覽全局）</span></div>
+        </div>
+      </div>
+    ),
+    notes: `把第六堂的完整因果鏈串一遍。每一個新概念都不是憑空出現的，都是因為前一步有問題。NodePort 太醜 → Ingress，設定寫死 → ConfigMap，密碼不安全 → Secret，資料消失 → PV/PVC，手動建 PV 太煩 → StorageClass，Deployment 不適合 DB → StatefulSet，YAML 太多 → Helm，CLI 管多叢集危險 → Rancher。讓學員感受：學 K8s 不是記指令，是理解「為什麼需要這個東西」。`,
+  },
+
+  // ── 6-25（2/2）：今日指令清單 + Docker 對照 + 回家作業 ──
+  {
+    title: '今日指令清單 + 第七堂預告',
+    subtitle: 'Docker vs K8s 對照 + 完整指令速查 + 回家作業',
+    section: '6-25：第六堂總結',
+    duration: '4',
+    content: (
+      <div className="space-y-3">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-700">
+                <th className="text-left py-1 pr-3">Docker</th>
+                <th className="text-left py-1">K8s</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-800"><td className="py-0.5 pr-3">docker volume create</td><td>PersistentVolume (PV)</td></tr>
+              <tr className="border-b border-slate-800"><td className="py-0.5 pr-3">docker run -v</td><td>PersistentVolumeClaim (PVC)</td></tr>
+              <tr className="border-b border-slate-800"><td className="py-0.5 pr-3">--name 固定容器名</td><td>StatefulSet 固定序號</td></tr>
+              <tr className="border-b border-slate-800"><td className="py-0.5 pr-3">docker-compose.yml</td><td>Helm Chart</td></tr>
+              <tr className="border-b border-slate-800"><td className="py-0.5 pr-3">docker compose up</td><td>helm install</td></tr>
+              <tr><td className="py-0.5 pr-3">.env 檔案</td><td>values.yaml</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-blue-900/20 border border-blue-700/40 p-2 rounded text-xs">
+          <p className="text-blue-400 font-semibold mb-1">第七堂預告：生產就緒</p>
+          <p className="text-slate-400">RBAC 權限控制 + Resource Limits + HPA 自動擴縮容 + 監控告警</p>
+        </div>
+        <div className="bg-slate-800/50 p-2 rounded text-xs text-slate-400">
+          <p className="text-amber-400 font-semibold mb-1">回家作業</p>
+          <p>用 Helm 在自己的環境裝一個 Redis（ingress-nginx Chart 以外的）</p>
+        </div>
+      </div>
+    ),
+    notes: `最後兩件事：Docker vs K8s 對照表讓學員把今天學的對應到熟悉的概念，降低陌生感。第七堂預告：生產就緒，RBAC 控誰能做什麼、Resource Limits 防止一個 Pod 吃掉所有資源、HPA 自動擴縮容、監控告警。回家作業：用 Helm 裝一個 Redis 或其他 Chart，鞏固今天學的 helm install/upgrade/rollback 流程。[▶ 第六堂完]`,
+  },
+
   // （6-8/6-9/6-10 整合實作已移除）
 ]

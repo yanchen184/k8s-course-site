@@ -498,14 +498,21 @@ persistentvolumeclaim/pg-pvc   Bound    pg-pv    1Gi        RWO            manua
 錯誤三：PVC `storage: 2Gi` 超過 PV 的 1Gi → 改成 `1Gi`（或把 PV 的容量改到 >= 2Gi）。PVC 申請的容量不能超過 PV 提供的容量。
 
 修好後驗證：
+
+注意：`storageClassName` 是建立後不可修改的欄位（immutable）。直接 `kubectl apply` 更新不了它，K8s 會拒絕。正確做法是**刪掉舊的再重建**：
+
 ```bash
-kubectl apply -f broken-pv-pvc.yaml
+kubectl delete pvc pg-pvc
+kubectl delete pv pg-pv
+kubectl apply -f broken-pv-pvc.yaml   # 用修好的版本重新建
 ```
 
 預期輸出：
 ```
-persistentvolume/pg-pv configured
-persistentvolumeclaim/pg-pvc configured
+persistentvolumeclaim "pg-pvc" deleted
+persistentvolume "pg-pv" deleted
+persistentvolume/pg-pv created
+persistentvolumeclaim/pg-pvc created
 ```
 
 ```bash
@@ -515,10 +522,10 @@ kubectl get pv,pvc    # 兩個都是 Bound
 預期輸出：
 ```
 NAME                     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM            STORAGECLASS   AGE
-persistentvolume/pg-pv   1Gi        RWO            Retain           Bound    default/pg-pvc   manual         30s
+persistentvolume/pg-pv   1Gi        RWO            Retain           Bound    default/pg-pvc   manual         5s
 
 NAME                           STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/pg-pvc   Bound    pg-pv    1Gi        RWO            manual         30s
+persistentvolumeclaim/pg-pvc   Bound    pg-pv    1Gi        RWO            manual         5s
 ```
 
 **挑戰題解答**

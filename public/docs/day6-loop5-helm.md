@@ -142,7 +142,7 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 預期輸出：
 ```
-Downloading https://get.helm.sh/helm-v3.17.0-linux-amd64.tar.gz
+Downloading https://get.helm.sh/helm-v3.20.2-linux-amd64.tar.gz
 Verifying checksum... Done.
 Preparing to install helm into /usr/local/bin
 helm installed into /usr/local/bin/helm
@@ -156,7 +156,7 @@ helm version
 
 預期輸出：
 ```
-version.BuildInfo{Version:"v3.17.0", ...}
+version.BuildInfo{Version:"v3.20.2", ...}
 ```
 
 確認是 v3.x（v2 已停止維護）。

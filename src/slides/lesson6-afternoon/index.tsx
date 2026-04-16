@@ -1496,7 +1496,7 @@ YAML 上的差異只有兩個地方。第一個是 spec 裡多了 serviceName，
     title: 'Lab：確認 StorageClass + 套用 YAML',
     subtitle: 'kubectl get storageclass + kubectl apply statefulset-mysql.yaml',
     section: '6-15：StatefulSet MySQL 實作',
-    duration: '8',
+    duration: '3',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
@@ -1517,228 +1517,298 @@ YAML 上的差異只有兩個地方。第一個是 spec 裡多了 serviceName，
           </div>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">操作流程</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl get storageclass</code> -- 確認 local-path (default)</li>
-            <li><code className="text-green-400">kubectl apply -f statefulset-mysql.yaml</code></li>
-            <li><code className="text-green-400">kubectl get pods -w</code> -- 觀察有序啟動</li>
-            <li>mysql-0 先 Running → mysql-1 才開始建</li>
-          </ol>
-        </div>
-
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">驗證重點</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p><span className="text-cyan-400 font-semibold">固定名稱：</span>mysql-0、mysql-1（不是 random hash）</p>
-            <p><span className="text-cyan-400 font-semibold">獨立 PVC：</span>mysql-data-mysql-0、mysql-data-mysql-1</p>
+          <p className="text-green-400 font-semibold mb-2">套用後看到三行輸出</p>
+          <div className="font-mono text-xs text-slate-300 space-y-1">
+            <p><span className="text-green-400">service/mysql-headless</span> created</p>
+            <p><span className="text-green-400">secret/mysql-sts-secret</span> created</p>
+            <p><span className="text-green-400">statefulset.apps/mysql</span> created</p>
           </div>
         </div>
       </div>
     ),
-    code: `# statefulset-mysql.yaml
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql-headless
-spec:
-  clusterIP: None              # ← Headless Service
-  selector:
-    app: mysql-sts
-  ports:
-    - port: 3306
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mysql-sts-secret
-type: Opaque
-stringData:
-  MYSQL_ROOT_PASSWORD: rootpass123
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mysql
-spec:
-  serviceName: mysql-headless  # ← 對應 Headless Service
-  replicas: 2
-  selector:
-    matchLabels:
-      app: mysql-sts
-  template:
-    metadata:
-      labels:
-        app: mysql-sts
-    spec:
-      containers:
-        - name: mysql
-          image: mysql:8.0
-          envFrom:
-            - secretRef:
-                name: mysql-sts-secret
-          volumeMounts:
-            - name: mysql-data
-              mountPath: /var/lib/mysql
-  volumeClaimTemplates:        # ← StatefulSet 獨有
-    - metadata:
-        name: mysql-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi`,
-    notes: `好，上一支影片講了 StorageClass 和 StatefulSet 的概念，這支影片直接動手做。
+    code: `# 1. 確認 k3s 的 StorageClass 有在
+kubectl get storageclass
+# NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE
+# local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer
 
-首先確認一下 k3s 的 StorageClass 有在。
+# 2. 套用 YAML（三件套：Headless Service + Secret + StatefulSet）
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/statefulset-mysql.yaml
+# service/mysql-headless created
+# secret/mysql-sts-secret created
+# statefulset.apps/mysql created`,
+    notes: `好，概念講完了，現在來動手做。
+
+第一步，先確認 k3s 有預設的 StorageClass。
 
 kubectl get storageclass
 
-你應該看到 local-path (default)，provisioner 是 rancher.io/local-path。有了這個，我們的 PVC 就不用手動建 PV 了，K8s 會自動搞定。
+你應該看到 local-path (default)，provisioner 是 rancher.io/local-path。有了這個，我們的 PVC 就不用手動建 PV，K8s 會自動搞定。
 
-現在來看 statefulset-mysql.yaml。這個檔案裡面有三個東西。
+確認有了之後，套用 YAML。
 
-第一個是 Headless Service。apiVersion v1，kind Service，metadata name 叫 mysql-headless。spec 裡面最關鍵的一行：clusterIP: None。這就是 Headless Service 的標誌。selector 設 app: mysql-sts。ports 的 port 是 3306。
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/statefulset-mysql.yaml
 
-第二個是 Secret，存 MySQL 的 root 密碼。跟上午的做法一樣，用 Secret 管密碼，不寫死在 YAML 裡面。
-
-第三個是 StatefulSet 本身。apiVersion apps/v1，kind StatefulSet，metadata name 叫 mysql。spec 裡面 serviceName 設 mysql-headless，對應剛才的 Headless Service。replicas 設 2，我們先跑兩個副本。selector 的 matchLabels 設 app: mysql-sts。
-
-template 的部分跟 Deployment 一模一樣。containers 裡面 name 叫 mysql，image 是 mysql:8.0。envFrom 引用 Secret 注入密碼。volumeMounts 的 name 是 mysql-data，mountPath 是 /var/lib/mysql。
-
-最後是重頭戲 -- volumeClaimTemplates。這是 StatefulSet 獨有的。它是一個 PVC 範本，metadata name 叫 mysql-data。spec 裡面 accessModes 設 ReadWriteOnce，resources requests storage 是 1Gi。注意這裡不用指定 storageClassName，因為 k3s 的 local-path 是 default StorageClass，沒指定就用它。
-
-K8s 會根據這個範本，自動為每個 Pod 建一個 PVC。mysql-0 的 PVC 叫 mysql-data-mysql-0，mysql-1 的叫 mysql-data-mysql-1。 [▶ 下一頁]`,
+你應該看到三行輸出：service/mysql-headless created、secret/mysql-sts-secret created、statefulset.apps/mysql created。三件套一次到位。 [▶ 下一頁]`,
   },
 
-  // ── 6-15 實作（2/2）：驗證有序啟動 + 資料持久化 ──
+  // ── 6-15 實作（2/5）：觀察有序啟動 ──
   {
-    title: 'Lab：砍 mysql-0 → 資料還在！',
-    subtitle: '有序啟動 + 固定名稱 + 獨立 PVC 驗證',
-    section: 'Loop 5：StorageClass + StatefulSet',
-    duration: '8',
+    title: 'Lab：觀察有序啟動',
+    subtitle: 'kubectl get pods -w — mysql-0 先 Ready 再 mysql-1',
+    section: '6-15：StatefulSet MySQL 實作',
+    duration: '3',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">驗證操作</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl get pods -l app=mysql-sts</code> -- mysql-0、mysql-1</li>
-            <li><code className="text-green-400">kubectl get pvc</code> -- mysql-data-mysql-0、mysql-data-mysql-1</li>
-            <li>進 mysql-0 建 testdb：<code className="text-green-400">kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "CREATE DATABASE testdb;"</code></li>
-            <li><code className="text-green-400">kubectl delete pod mysql-0</code></li>
-            <li>新 mysql-0 起來 → <code className="text-green-400">SHOW DATABASES;</code> → <span className="text-green-400 font-bold">testdb 還在！</span></li>
-          </ol>
+          <p className="text-cyan-400 font-semibold mb-2">StatefulSet 有序啟動</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="flex items-center gap-3">
+              <span className="bg-green-900/40 border border-green-500/40 px-2 py-0.5 rounded text-green-300 text-xs font-semibold">Step 1</span>
+              <p>mysql-0 先出現：Pending → ContainerCreating → Running</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="bg-amber-900/40 border border-amber-500/40 px-2 py-0.5 rounded text-amber-300 text-xs font-semibold">Step 2</span>
+              <p>mysql-0 完全 Ready 後，mysql-1 才開始建</p>
+            </div>
+          </div>
         </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">對比 Deployment</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-2 w-32">特性</th>
-                <th className="text-left py-2">Deployment</th>
-                <th className="text-left py-2">StatefulSet</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-2">Pod 名稱</td>
-                <td className="py-2">random (abc-xyz)</td>
-                <td className="py-2 text-green-400">固定序號 (mysql-0)</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-2">啟動順序</td>
-                <td className="py-2">全部同時</td>
-                <td className="py-2 text-green-400">0 → 1 → 2</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-2">PVC</td>
-                <td className="py-2">共用一個</td>
-                <td className="py-2 text-green-400">每個 Pod 獨立</td>
-              </tr>
-              <tr>
-                <td className="py-2">DNS</td>
-                <td className="py-2">只有 Service</td>
-                <td className="py-2 text-green-400">每個 Pod 有 DNS</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-600/40">
+          <p className="text-slate-400 text-xs mb-2">對比 Deployment（同時啟動）vs StatefulSet（依序 0→1）</p>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="bg-red-900/20 p-2 rounded border border-red-500/20">
+              <p className="text-red-400 font-semibold mb-1">Deployment</p>
+              <p className="text-slate-400">app-abc 和 app-xyz 同時啟動</p>
+            </div>
+            <div className="bg-green-900/20 p-2 rounded border border-green-500/20">
+              <p className="text-green-400 font-semibold mb-1">StatefulSet</p>
+              <p className="text-slate-400">mysql-0 Ready 才建 mysql-1</p>
+            </div>
+          </div>
         </div>
       </div>
     ),
-    code: `# 部署後觀察有序啟動
-kubectl apply -f statefulset-mysql.yaml
+    code: `# 觀察有序啟動（-w = watch）
 kubectl get pods -w
-# mysql-0: Pending → Running (先)
-# mysql-1: Pending → Running (後)
+# NAME      READY   STATUS              RESTARTS   AGE
+# mysql-0   0/1     ContainerCreating   0          1s
+# mysql-0   1/1     Running             0          15s
+# mysql-1   0/1     Pending             0          0s
+# mysql-1   1/1     Running             0          20s
+#
+# ↑ mysql-0 完全 Ready 後，mysql-1 才開始建
+# Ctrl+C 結束 watch`,
+    notes: `套用完了，馬上用 -w 觀察。
 
-# 驗證固定名稱 + 獨立 PVC
+kubectl get pods -w
+
+注意看順序。你會看到 mysql-0 先出現，狀態從 ContainerCreating 變成 Running。mysql-0 完全 Ready 之後，mysql-1 才開始 Pending，然後才 ContainerCreating，最後 Running。
+
+這就是有序啟動。Deployment 的兩個 Pod 會同時開始建。StatefulSet 不一樣，它保證 0 號先起來，0 號好了 1 號才動。
+
+等兩個都 Running，按 Ctrl+C。 [▶ 下一頁]`,
+  },
+
+  // ── 6-15 實作（3/5）：確認固定名稱 + 獨立 PVC ──
+  {
+    title: 'Lab：確認固定名稱 + 獨立 PVC',
+    subtitle: 'kubectl get pods + kubectl get pvc',
+    section: '6-15：StatefulSet MySQL 實作',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">固定名稱</p>
+          <div className="font-mono text-xs text-slate-300 space-y-1">
+            <p><span className="text-green-400">mysql-0</span>   1/1     Running   0          2m</p>
+            <p><span className="text-green-400">mysql-1</span>   1/1     Running   0          1m</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">固定序號，不是 random hash（如 abc-xyz）</p>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">獨立 PVC（自動建立）</p>
+          <div className="font-mono text-xs text-slate-300 space-y-1">
+            <p><span className="text-amber-400">mysql-data-mysql-0</span>   Bound   pvc-a1b2...   1Gi   RWO</p>
+            <p><span className="text-amber-400">mysql-data-mysql-1</span>   Bound   pvc-b2c3...   1Gi   RWO</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">volumeClaimTemplates 自動為每個 Pod 建獨立 PVC</p>
+        </div>
+      </div>
+    ),
+    code: `# 確認固定 Pod 名稱（序號，不是 random hash）
 kubectl get pods -l app=mysql-sts
-# mysql-0   1/1   Running
-# mysql-1   1/1   Running
+# NAME      READY   STATUS    RESTARTS   AGE
+# mysql-0   1/1     Running   0          2m
+# mysql-1   1/1     Running   0          1m
+
+# 確認每個 Pod 有獨立 PVC（自動建立）
 kubectl get pvc
-# mysql-data-mysql-0   Bound
-# mysql-data-mysql-1   Bound
-
-# 驗證資料持久化
-kubectl exec -it mysql-0 -- mysql -u root -prootpass123 \\
-  -e "CREATE DATABASE testdb;"
-kubectl delete pod mysql-0
-kubectl get pods -w           # 新 mysql-0 自動重建
-kubectl exec -it mysql-0 -- mysql -u root -prootpass123 \\
-  -e "SHOW DATABASES;"        # testdb 還在！`,
-    notes: `好，部署。
-
-kubectl apply -f statefulset-mysql.yaml
-
-部署之後馬上用 -w 觀察。
-
-kubectl get pods -w
-
-注意看順序。你會看到 mysql-0 先出現，狀態從 Pending 變成 ContainerCreating，再變成 Running。mysql-0 完全 Ready 之後，mysql-1 才開始建立。mysql-1 也經歷 Pending、ContainerCreating、Running。
-
-這就是有序啟動。如果你之前用 Deployment 跑 replicas 2，兩個 Pod 是同時開始建的。StatefulSet 不一樣，它保證 0 號先起來，0 號好了 1 號才動。
-
-等兩個都 Running 了，按 Ctrl+C。看看 Pod 名稱。
+# NAME                 STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS
+# mysql-data-mysql-0   Bound    pvc-a1b2c3d4   1Gi        RWO            local-path
+# mysql-data-mysql-1   Bound    pvc-b2c3d4e5   1Gi        RWO            local-path`,
+    notes: `看看 Pod 名稱。
 
 kubectl get pods -l app=mysql-sts
 
-mysql-0 和 mysql-1。固定的序號，不是 random hash。
+mysql-0 和 mysql-1。固定的序號，不是 random hash。這是 StatefulSet 的第一個特性。
 
 看 PVC。
 
 kubectl get pvc
 
-mysql-data-mysql-0 和 mysql-data-mysql-1。每個 Pod 有自己的 PVC，自動建立的，不用手動。
+mysql-data-mysql-0 和 mysql-data-mysql-1。每個 Pod 有自己的 PVC，自動建立的，不用手動 apply PVC YAML。這是 volumeClaimTemplates 的功能。
 
-現在來驗證資料持久化。進 mysql-0 建一個資料庫。
+兩個 PVC 都是 Bound 狀態，代表已經綁定到實際的 Volume，可以用了。 [▶ 下一頁]`,
+  },
+
+  // ── 6-15 實作（4/5）：驗證資料持久化 3 步驟 ──
+  {
+    title: 'Lab：砍 mysql-0 → 資料還在！',
+    subtitle: 'exec CREATE DATABASE → delete pod → exec SHOW DATABASES',
+    section: '6-15：StatefulSet MySQL 實作',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗證資料持久化 3 步驟</p>
+          <ol className="text-slate-300 text-sm space-y-2 list-decimal list-inside">
+            <li>進 mysql-0 建一個資料庫 <code className="text-green-400">testdb</code></li>
+            <li>砍掉 mysql-0（<code className="text-green-400">kubectl delete pod mysql-0</code>）</li>
+            <li>新 mysql-0 起來後查 <code className="text-green-400">SHOW DATABASES;</code> → testdb 還在！</li>
+          </ol>
+        </div>
+        <div className="bg-green-900/30 border border-green-500/40 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-1">為什麼資料還在？</p>
+          <p className="text-slate-300 text-sm">新 mysql-0 掛載的還是 <strong className="text-white">mysql-data-mysql-0</strong> 這個 PVC，資料從未丟失</p>
+        </div>
+      </div>
+    ),
+    code: `# Step 1：進 mysql-0 建資料庫
+kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "CREATE DATABASE testdb;"
+# mysql: [Warning] Using a password on the command line interface can be insecure.
+
+# Step 2：砍掉 mysql-0
+kubectl delete pod mysql-0
+# pod "mysql-0" deleted
+
+# 等新 mysql-0 重建 Running
+kubectl get pods -w
+# mysql-0   0/1     ContainerCreating   0          1s
+# mysql-0   1/1     Running             0          15s
+
+# Step 3：查資料庫 → testdb 還在！
+kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "SHOW DATABASES;"
+# +--------------------+
+# | Database           |
+# +--------------------+
+# | information_schema |
+# | mysql              |
+# | performance_schema |
+# | sys                |
+# | testdb             |    ← 這個！資料還在
+# +--------------------+`,
+    notes: `現在來驗證資料持久化，這是最精彩的部分。
+
+第一步，進 mysql-0 建一個資料庫。
 
 kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "CREATE DATABASE testdb;"
 
-然後砍掉 mysql-0。
+你會看到一個 Warning 說密碼放在指令列不安全，這個正常，忽略它。
+
+第二步，砍掉 mysql-0。
 
 kubectl delete pod mysql-0
 
-觀察。
+然後觀察。
 
 kubectl get pods -w
 
-mysql-0 被砍了，StatefulSet 會重建一個新的 mysql-0。注意，名字還是 mysql-0，不是什麼 mysql-abc-xyz。等它 Running 之後，查資料。
+mysql-0 被砍了，StatefulSet 會重建一個新的 mysql-0。注意，名字還是 mysql-0，不是什麼 mysql-abc-xyz。等它 Running 之後，進去查資料。
 
 kubectl exec -it mysql-0 -- mysql -u root -prootpass123 -e "SHOW DATABASES;"
 
-testdb 還在。因為新的 mysql-0 掛載的還是 mysql-data-mysql-0 這個 PVC，資料沒有丟。
-
-我再跟大家對比一下 Deployment。如果你用 Deployment 跑 MySQL 然後砍 Pod，新 Pod 的名字會變，而且掛載的是同一個 PVC。如果你有多個副本，所有 Pod 都搶同一塊儲存。StatefulSet 每個 Pod 有自己的 PVC，資料完全隔離。 [▶ 下一頁]`,
+你看，testdb 還在。因為新的 mysql-0 掛載的還是 mysql-data-mysql-0 這個 PVC，資料沒有丟。這就是 StatefulSet + PVC 的威力。 [▶ 下一頁]`,
   },
 
-  // ── 6-16 學員實作 ──
+  // ── 6-15 實作（5/5）：Headless DNS + Scale ──
+  {
+    title: 'Lab：Headless DNS + Scale 擴縮容',
+    subtitle: 'nslookup mysql-0.mysql-headless + scale 3 → 2',
+    section: '6-15：StatefulSet MySQL 實作',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">Headless Service DNS</p>
+          <p className="text-slate-300 text-sm mb-2">每個 Pod 有自己的 DNS：<code className="text-cyan-300">pod名稱.service名稱.namespace.svc.cluster.local</code></p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded">
+            <p>mysql-0.mysql-headless.default.svc.cluster.local</p>
+            <p>mysql-1.mysql-headless.default.svc.cluster.local</p>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">有序擴縮容</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-green-900/20 p-2 rounded border border-green-500/20">
+              <p className="text-green-400 font-semibold">Scale up 3</p>
+              <p className="text-slate-400">mysql-2 最後才建</p>
+            </div>
+            <div className="bg-amber-900/20 p-2 rounded border border-amber-500/20">
+              <p className="text-amber-400 font-semibold">Scale down 2</p>
+              <p className="text-slate-400">mysql-2 先被刪（反序）</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# 驗證 Headless Service DNS
+kubectl run dns-test --image=busybox:1.28 --restart=Never --rm -it -- \\
+  nslookup mysql-0.mysql-headless
+# Name:      mysql-0.mysql-headless
+# Address 1: 10.42.0.X mysql-0.mysql-headless.default.svc.cluster.local
+
+# Scale 擴容到 3（有序新增 mysql-2）
+kubectl scale statefulset mysql --replicas=3
+kubectl get pods -w
+# mysql-2   0/1     Pending   0          0s
+# mysql-2   1/1     Running   0          20s
+
+# Scale 縮容回 2（反序刪除 mysql-2 先）
+kubectl scale statefulset mysql --replicas=2
+kubectl get pods -w
+# mysql-2   1/1     Terminating   0          2m
+
+# 縮容後刪除多餘 PVC（StatefulSet 不自動刪）
+kubectl delete pvc mysql-data-mysql-2`,
+    notes: `最後來驗證 Headless Service 的 DNS 功能。
+
+每個 Pod 都有自己的 DNS 名稱，格式是 Pod名稱點Service名稱。
+
+kubectl run dns-test --image=busybox:1.28 --restart=Never --rm -it -- nslookup mysql-0.mysql-headless
+
+你會看到它解析到 mysql-0 的 IP，完整域名是 mysql-0.mysql-headless.default.svc.cluster.local。這讓其他服務可以直接連線到指定的 Pod，不像普通 Service 是負載均衡的。
+
+來試試擴縮容。
+
+kubectl scale statefulset mysql --replicas=3
+
+用 -w 觀察，你會看到 mysql-2 最後才建立，等前面的都 Ready 了才輪到它。
+
+縮容回 2。
+
+kubectl scale statefulset mysql --replicas=2
+
+反序刪除，mysql-2 先被刪。
+
+注意一個重點：StatefulSet 縮容後，多出來的 PVC 不會自動刪除，要手動 delete。這是設計如此，為了保護資料。 [▶ 下一頁]`,
+  },
+
+  // ── 6-16 學員實作（1/2）：學員任務題 ──
   {
     title: '學員實作：StatefulSet Redis 快取叢集',
-    subtitle: 'Loop 5 練習題 — 自己寫 Redis StatefulSet（不給模板）',
-    section: 'Loop 5：StorageClass + StatefulSet',
-    duration: '10',
+    subtitle: '6-16 練習題 — 自己寫 Redis StatefulSet（不給模板）',
+    section: '6-16：Redis StatefulSet 學員實作',
+    duration: '7',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
@@ -1751,110 +1821,161 @@ testdb 還在。因為新的 mysql-0 掛載的還是 mysql-data-mysql-0 這個 P
             <li>刪 <code className="text-green-400">redis-0</code>，確認重建後名稱還是 <code className="text-green-400">redis-0</code></li>
           </ol>
         </div>
-
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
           <p className="text-yellow-400 font-semibold mb-2">挑戰：有序擴縮容驗證</p>
           <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>Scale 到 3，用 <code className="text-yellow-300">-w</code> 看 mysql-2 最後才建</li>
-            <li>Scale 回 1，確認刪除順序：mysql-2 先刪還是 mysql-1 先刪？</li>
+            <li>Scale 到 3，用 <code className="text-yellow-300">-w</code> 看 redis-2 最後才建</li>
+            <li>Scale 回 1，確認刪除順序：redis-2 先刪還是 redis-1 先刪？</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `接下來是大家的實作時間。必做題：你的團隊要部署 Redis 快取叢集，要求每個 Pod 有固定名稱、有序啟動、各自獨立的 500Mi 儲存。自己寫一個 StatefulSet YAML，image 用 redis:7，2 個副本，volumeClaimTemplates 每個 500Mi。驗收三點：kubectl get pods 要看到 redis-0 和 redis-1，kubectl get pvc 要看到兩個獨立的 PVC，刪掉 redis-0 之後重建的 Pod 名稱還是 redis-0。注意：這題不給模板，要自己寫。挑戰題：scale 到 3，觀察 mysql-2 最後才建；scale 回 1，記錄刪除順序。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    code: `# 提示：YAML 結構關鍵點
+# kind: StatefulSet
+# spec:
+#   serviceName: redis-headless   ← 對應 Headless Service
+#   replicas: 2
+#   volumeClaimTemplates:         ← 每個 Pod 獨立 PVC
+#     - metadata:
+#         name: redis-data
+#       spec:
+#         accessModes: ["ReadWriteOnce"]
+#         resources:
+#           requests:
+#             storage: 500Mi
+
+# 驗收指令（做完跑這三個）
+kubectl get pods          # 看到 redis-0, redis-1
+kubectl get pvc           # 看到兩個獨立 PVC
+kubectl delete pod redis-0 && kubectl get pods -w  # 重建後名稱還是 redis-0`,
+    notes: `接下來是大家的實作時間。必做題：你的團隊要部署 Redis 快取叢集，要求每個 Pod 有固定名稱、有序啟動、各自獨立的 500Mi 儲存。
+
+自己寫一個 StatefulSet YAML，image 用 redis:7，2 個副本，volumeClaimTemplates 每個 500Mi。
+
+注意：這題不給完整模板，要自己寫。但我給了你結構提示，照著補就好。
+
+驗收三點：kubectl get pods 要看到 redis-0 和 redis-1，kubectl get pvc 要看到兩個獨立的 PVC，刪掉 redis-0 之後重建的 Pod 名稱還是 redis-0。
+
+挑戰題：scale 到 3，觀察 redis-2 最後才建；scale 回 1，記錄刪除順序。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
-  // ── 6-16 學員實作解答 ──
+  // ── 6-16 學員實作（2/2）：解答 + 清理 ──
   {
-    title: '解答：Redis StatefulSet + 常見坑',
-    subtitle: '回頭操作 Loop 5',
-    section: 'Loop 5：StorageClass + StatefulSet',
-    duration: '5',
+    title: '解答：Redis StatefulSet + 清理',
+    subtitle: '完整 YAML 解答 + 驗收指令 + kubectl delete 清理',
+    section: '6-16：Redis StatefulSet 學員實作',
+    duration: '3',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做題解答（Redis StatefulSet）</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-0.5">
-            <p className="text-slate-500"># 重點結構</p>
-            <p>kind: StatefulSet</p>
-            <p>spec:</p>
-            <p>{'  '}serviceName: redis-headless</p>
-            <p>{'  '}replicas: 2</p>
-            <p>{'  '}template.spec.containers:</p>
-            <p>{'    '}- name: redis, image: redis:7</p>
-            <p>{'  '}volumeClaimTemplates:</p>
-            <p>{'    '}- storage: 500Mi, accessModes: [ReadWriteOnce]</p>
-          </div>
-          <p className="text-slate-400 text-xs mt-2">完整解答見 answers/redis-statefulset.yaml</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">驗收</p>
+          <p className="text-cyan-400 font-semibold mb-2">驗收三點</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl get statefulset</code> -- READY 2/2</li>
-            <li><code className="text-green-400">kubectl get pods -l app=mysql-sts</code> -- mysql-0、mysql-1 Running</li>
+            <li><code className="text-green-400">kubectl get statefulset</code> -- redis READY 2/2</li>
+            <li><code className="text-green-400">kubectl get pods</code> -- redis-0、redis-1 Running</li>
             <li><code className="text-green-400">kubectl get pvc</code> -- 兩個 PVC 都是 Bound</li>
           </ol>
         </div>
-
         <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
           <p className="text-red-400 font-semibold mb-2">StatefulSet 常見三個坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">1.</span>
-              <p><strong className="text-white">volumeClaimTemplates 縮排錯</strong> -- 跟 selector、replicas、template 平級，不是在 template 裡面</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">2.</span>
-              <p><strong className="text-white">忘了建 Headless Service</strong> -- StatefulSet 可以起來但 DNS 解析不了</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">3.</span>
-              <p><strong className="text-white">serviceName 打錯</strong> -- 要跟 Headless Service 的 metadata name 完全一致</p>
-            </div>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p><span className="text-red-400 font-bold">1.</span> <strong className="text-white">volumeClaimTemplates 縮排錯</strong> -- 跟 template 平級，不是在 template 裡面</p>
+            <p><span className="text-red-400 font-bold">2.</span> <strong className="text-white">忘了建 Headless Service</strong> -- StatefulSet 能起來但 DNS 解析不了</p>
+            <p><span className="text-red-400 font-bold">3.</span> <strong className="text-white">serviceName 打錯</strong> -- 要跟 Headless Service 的 metadata name 完全一致</p>
           </div>
         </div>
-
         <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
           <p className="text-amber-400 font-semibold text-sm">銜接下一個 Loop</p>
           <p className="text-slate-300 text-xs mt-1">PV、PVC、StorageClass、StatefulSet、Headless Service、Secret... 一個 MySQL 就要這麼多 YAML。如果還有 Redis、RabbitMQ、ES？ → Helm</p>
         </div>
       </div>
     ),
-    notes: `好，回頭確認一下大家的狀態。
+    code: `# ── 完整解答：redis-statefulset.yaml ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+spec:
+  clusterIP: None
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+spec:
+  serviceName: redis-headless
+  replicas: 2
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Mi
 
-kubectl get statefulset 看一下，mysql 的 READY 應該是 2/2。kubectl get pods -l app=mysql-sts 看到 mysql-0 和 mysql-1 都是 Running。kubectl get pvc 看到兩個 PVC 都是 Bound。
+# ── 清理（下個 Loop 前先清乾淨）──
+kubectl delete statefulset mysql redis
+kubectl delete svc mysql-headless redis-headless
+kubectl delete secret mysql-sts-secret
+kubectl delete pvc --all
+kubectl get all    # 確認清乾淨`,
+    notes: `好，來看解答。
 
-如果有問題的同學，來看看常見的三個坑。
+完整的 redis-statefulset.yaml 分兩個部分。
 
-第一個坑，volumeClaimTemplates 的縮排。這個欄位是在 spec 下面，跟 template 同級，不是在 template 裡面。很多同學把它放到 template 裡面，那就錯了。記住，volumeClaimTemplates 跟 selector、replicas、template 是平級的。
+第一個是 Headless Service，name 叫 redis-headless，clusterIP: None，selector 設 app: redis，port 6379。
 
-第二個坑，忘了建 Headless Service。StatefulSet 的 serviceName 指定了一個 Service 名稱，但如果那個 Service 不存在，StatefulSet 可以建起來但 DNS 解析會有問題。Pod 之間沒辦法用 mysql-0.mysql-headless 互相連。
+第二個是 StatefulSet，serviceName 設 redis-headless，replicas 2。template 裡面的容器 image 是 redis:7，volumeMounts 掛在 /data。volumeClaimTemplates 設 storage 500Mi，accessModes ReadWriteOnce。
 
-第三個坑，serviceName 打錯。StatefulSet 裡面的 serviceName 要跟 Headless Service 的 metadata name 完全一致。打錯一個字就對不上。
+常見的三個坑。第一個，volumeClaimTemplates 縮排。這個欄位在 spec 下面，跟 template 同級，不是在 template 裡面。第二個，忘了建 Headless Service。StatefulSet 的 serviceName 指向的 Service 必須存在。第三個，serviceName 打錯，一個字都不能錯。
 
-好，做到挑戰題的同學，你應該看到 scale 到 3 的時候 mysql-2 最後建，scale 回 2 的時候 mysql-2 先被刪。這就是 StatefulSet 的有序生命週期管理。
+驗收通過了之後，做清理，下一個 Loop 要用 Helm，環境要乾淨。
 
-到這裡，大家回想一下今天下午做了多少事情。PV、PVC、StorageClass、StatefulSet、Headless Service、Secret。一個 MySQL 服務就要寫這麼多 YAML。再加上午的 Ingress、ConfigMap，你的目錄裡面已經有七八個 YAML 檔案了。
+kubectl delete statefulset mysql redis
+kubectl delete svc mysql-headless redis-headless
+kubectl delete secret mysql-sts-secret
+kubectl delete pvc --all
 
-如果你的系統不只一個 MySQL，還有 Redis、RabbitMQ、Elasticsearch，每個都要手寫一堆 YAML？太痛苦了。下一個 Loop 要介紹一個工具，讓你一行指令就能搞定這些事情。 [▶ 下一頁]`,
+最後 kubectl get all 確認清乾淨。
+
+到這裡，大家回想一下。PV、PVC、StorageClass、StatefulSet、Headless Service、Secret，一個 MySQL 就要這麼多 YAML。下一個 Loop 要介紹 Helm，讓你一行指令就能搞定這些事情。 [▶ 下一頁]`,
   },
 
   // ============================================================
   // Loop 6：Helm（6-17, 6-18, 6-19）
   // ============================================================
 
-  // ── 6-17 概念（1/2）：YAML 太多 → Helm = 套件管理器 ──
+  // ── 6-17 概念（1/6）：YAML 太多的問題 ──
   {
     title: 'YAML 太多太散了',
-    subtitle: '一個 MySQL 就要五六個 YAML，還有 Redis、RabbitMQ...',
-    section: 'Loop 6：Helm',
-    duration: '8',
+    subtitle: '一個 MySQL 就要五六個 YAML，三個環境維護三套？',
+    section: '6-17：Helm 概念',
+    duration: '3',
     content: (
       <div className="space-y-4">
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
           <p className="text-red-400 font-semibold mb-2">一個 MySQL 服務要多少 YAML？</p>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap gap-2 text-xs mb-2">
             <span className="bg-red-900/40 border border-red-500/30 px-2 py-1 rounded text-red-300">Secret</span>
             <span className="bg-red-900/40 border border-red-500/30 px-2 py-1 rounded text-red-300">ConfigMap</span>
             <span className="bg-red-900/40 border border-red-500/30 px-2 py-1 rounded text-red-300">StatefulSet</span>
@@ -1862,12 +1983,12 @@ kubectl get statefulset 看一下，mysql 的 READY 應該是 2/2。kubectl get 
             <span className="bg-red-900/40 border border-red-500/30 px-2 py-1 rounded text-red-300">PVC</span>
             <span className="bg-red-900/40 border border-red-500/30 px-2 py-1 rounded text-red-300">Ingress</span>
           </div>
-          <p className="text-slate-400 text-xs mt-2">再加 Redis、RabbitMQ、ES... 幾十個檔案、幾千行 YAML</p>
+          <p className="text-slate-400 text-xs">再加 Redis、RabbitMQ、ES... 幾十個檔案、幾千行 YAML</p>
         </div>
 
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
           <p className="text-red-400 font-semibold mb-2">三個環境 = 三套 YAML？</p>
-          <div className="grid grid-cols-3 gap-2 text-xs text-center">
+          <div className="grid grid-cols-3 gap-2 text-xs text-center mb-2">
             <div className="bg-slate-800 border border-slate-600 p-2 rounded">
               <p className="text-cyan-400 font-semibold">dev</p>
               <p className="text-slate-400">replicas: 1</p>
@@ -1881,402 +2002,949 @@ kubectl get statefulset 看一下，mysql 的 READY 應該是 2/2。kubectl get 
               <p className="text-slate-400">replicas: 3</p>
             </div>
           </div>
-          <p className="text-slate-400 text-xs mt-2">改一個東西三個地方都要改？</p>
+          <p className="text-slate-400 text-xs">改一個東西三個地方都要改？</p>
         </div>
 
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">每個技術生態都有套件管理器</p>
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
-            <p>Ubuntu → <span className="text-cyan-400 font-semibold">apt</span></p>
-            <p>macOS → <span className="text-cyan-400 font-semibold">brew</span></p>
-            <p>Node.js → <span className="text-cyan-400 font-semibold">npm</span></p>
-            <p>Python → <span className="text-cyan-400 font-semibold">pip</span></p>
-          </div>
-          <p className="text-green-400 font-semibold mt-3">K8s → Helm</p>
+        <div className="bg-amber-900/20 border border-amber-500/30 p-3 rounded-lg text-sm text-slate-300">
+          <span className="text-amber-400 font-semibold">痛點：</span>全世界幾百萬人都在 K8s 上跑 MySQL，每個人都在寫一樣的 YAML。有沒有人把最佳實踐打包好，直接拿來用？
         </div>
       </div>
     ),
+    code: `# 一個 MySQL 要手寫這麼多 YAML...
+kubectl apply -f mysql-secret.yaml
+kubectl apply -f mysql-configmap.yaml
+kubectl apply -f mysql-headless-svc.yaml
+kubectl apply -f mysql-statefulset.yaml
+kubectl apply -f mysql-pvc.yaml
+kubectl apply -f mysql-ingress.yaml
+
+# 三個環境就是三套... 改密碼要改三個地方
+# dev/mysql-secret.yaml
+# staging/mysql-secret.yaml
+# prod/mysql-secret.yaml`,
     notes: `好，上一個 Loop 結束之後我問了大家一個問題：YAML 太多了。我們來算一下。
 
-今天一個 MySQL 服務，你要寫 Secret 管密碼、ConfigMap 管設定、StatefulSet 跑 MySQL、Headless Service 做 DNS、PVC 要儲存空間。五個 K8s 資源。如果再加上 Ingress 讓外面連進來，六個。
+今天一個 MySQL 服務，你要寫 Secret 管密碼、ConfigMap 管設定、StatefulSet 跑 MySQL、Headless Service 做 DNS、PVC 要儲存空間。五個 K8s 資源。如果再加上 Ingress，六個。
 
-你的系統不只有 MySQL 吧？可能還有 Redis 做快取、RabbitMQ 做訊息佇列、Elasticsearch 做搜尋。每個都要寫一堆 YAML。加起來可能有幾十個檔案，幾千行 YAML。
+你的系統不只有 MySQL 吧？可能還有 Redis、RabbitMQ、Elasticsearch。每個都要寫一堆 YAML。加起來幾十個檔案，幾千行。
 
-然後你要部署到 dev、staging、prod 三個環境。三個環境的 YAML 基本上一樣，只是 replicas 不同、Image tag 不同、資料庫連線不同。你是要維護三套 YAML？改了一個東西三個地方都要改？
+然後你要部署到 dev、staging、prod 三個環境。三個環境的 YAML 基本上一樣，只是 replicas 不同、Image tag 不同、密碼不同。你是要維護三套 YAML？改了一個東西三個地方都要改？
 
-還有一個問題。你自己手寫 MySQL 的 StatefulSet、Headless Service、PVC。但全世界有幾百萬人在 K8s 上跑 MySQL，每個人都在寫一樣的東西。有沒有人已經寫好了一份最佳實踐，你直接拿來用就好？
-
-用你熟悉的經驗來想。在 Ubuntu 上要裝 MySQL，你會自己下載原始碼然後編譯嗎？不會，你 apt install mysql-server，一行指令搞定。在 Node.js 專案要用 Express，你會自己從零寫 HTTP 框架嗎？不會，你 npm install express。在 Python 專案要用 Flask，你 pip install flask。
-
-每個技術生態都有套件管理器。Ubuntu 有 apt，macOS 有 brew，Node.js 有 npm，Python 有 pip。
-
-K8s 的套件管理器叫 Helm。 [▶ 下一頁]`,
+還有一個問題。全世界有幾百萬人在 K8s 上跑 MySQL，每個人都在寫一樣的東西。有沒有人已經把最佳實踐打包好，你直接拿來用？ [▶ 下一頁]`,
   },
 
-  // ── 6-17 概念（2/2）：Chart / Repo / Release / values.yaml ──
+  // ── 6-17 概念（2/6）：套件管理器類比 ──
   {
-    title: 'Helm 核心概念',
-    subtitle: 'Chart + Release + Repository + values.yaml',
-    section: 'Loop 6：Helm',
-    duration: '8',
+    title: 'Helm = K8s 的套件管理器',
+    subtitle: '就像 apt / brew / npm，一行指令搞定所有東西',
+    section: '6-17：Helm 概念',
+    duration: '3',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Helm 四大概念</p>
+          <p className="text-cyan-400 font-semibold mb-3">你已經用過的套件管理器</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-2 w-28">概念</th>
+                <th className="text-left py-2">平台</th>
+                <th className="text-left py-2">工具</th>
+                <th className="text-left py-2">一行安裝</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2">Ubuntu</td>
+                <td className="py-2 text-green-400">apt</td>
+                <td className="py-2 font-mono text-xs">apt install nginx</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2">macOS</td>
+                <td className="py-2 text-green-400">brew</td>
+                <td className="py-2 font-mono text-xs">brew install nginx</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2">Node.js</td>
+                <td className="py-2 text-green-400">npm</td>
+                <td className="py-2 font-mono text-xs">npm install express</td>
+              </tr>
+              <tr>
+                <td className="py-2">Python</td>
+                <td className="py-2 text-green-400">pip</td>
+                <td className="py-2 font-mono text-xs">pip install flask</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-cyan-900/30 border border-cyan-500/50 p-4 rounded-lg">
+          <p className="text-cyan-300 font-semibold mb-2">K8s 的答案</p>
+          <p className="text-slate-300 text-sm">Kubernetes 太複雜，部署一個應用需要 5-6 個 YAML。</p>
+          <p className="text-yellow-300 text-sm mt-2 font-semibold">→ Helm 就是 K8s 的 apt / brew / npm</p>
+          <p className="text-slate-300 text-sm mt-1 font-mono">helm install my-nginx ingress-nginx/ingress-nginx  ← 一行搞定</p>
+        </div>
+      </div>
+    ),
+    code: `# 類比：你早就在用套件管理器了
+# Ubuntu：  apt   install  nginx
+# macOS：   brew  install  nginx
+# Node.js： npm   install  express
+# Python：  pip   install  flask
+
+# K8s 的答案就是 Helm
+# helm install <release-name> <chart>
+helm install my-nginx ingress-nginx/ingress-nginx
+# 一行指令，幫你建立所有 K8s 資源`,
+    notes: `類比是這節最重要的概念。學員都用過 apt 或 npm，這個類比讓他們立刻理解 Helm 是什麼。
+
+重點：Helm 不是發明了新的東西，只是把 K8s 世界的「最佳實踐 YAML」打包成可重用的套件。 [▶ 下一頁]`,
+  },
+
+  // ── 6-17 概念（3/6）：四大核心概念 ──
+  {
+    title: 'Helm 四大核心概念',
+    subtitle: 'Chart / Release / Repository / values.yaml',
+    section: '6-17：Helm 概念',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-2 w-32">Helm 術語</th>
                 <th className="text-left py-2">說明</th>
-                <th className="text-left py-2 w-32">對照</th>
+                <th className="text-left py-2 w-28">apt 對照</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
               <tr className="border-b border-slate-700">
                 <td className="py-2 text-cyan-400 font-semibold">Helm</td>
-                <td className="py-2">套件管理工具</td>
-                <td className="py-2">apt / yum / brew</td>
+                <td className="py-2">K8s 套件管理工具（CLI）</td>
+                <td className="py-2">apt</td>
               </tr>
               <tr className="border-b border-slate-700">
-                <td className="py-2 text-cyan-400 font-semibold">Chart</td>
-                <td className="py-2">一包 YAML 範本</td>
-                <td className="py-2">.deb / .rpm 安裝包</td>
+                <td className="py-2 text-yellow-400 font-semibold">Chart</td>
+                <td className="py-2">打包好的 K8s 應用（含所有 YAML 模板）</td>
+                <td className="py-2">.deb 套件</td>
               </tr>
               <tr className="border-b border-slate-700">
-                <td className="py-2 text-cyan-400 font-semibold">Release</td>
-                <td className="py-2">Chart 安裝後的實例</td>
-                <td className="py-2">安裝好的軟體</td>
+                <td className="py-2 text-green-400 font-semibold">Release</td>
+                <td className="py-2">Chart 安裝後的執行實例（有名字）</td>
+                <td className="py-2">已安裝的程式</td>
               </tr>
               <tr className="border-b border-slate-700">
-                <td className="py-2 text-cyan-400 font-semibold">Repository</td>
-                <td className="py-2">Chart 倉庫</td>
-                <td className="py-2">apt source list</td>
+                <td className="py-2 text-purple-400 font-semibold">Repository</td>
+                <td className="py-2">存放 Chart 的遠端倉庫</td>
+                <td className="py-2">apt source</td>
               </tr>
               <tr>
-                <td className="py-2 text-cyan-400 font-semibold">values.yaml</td>
-                <td className="py-2">客製化參數</td>
-                <td className="py-2">軟體的設定檔</td>
+                <td className="py-2 text-orange-400 font-semibold">values.yaml</td>
+                <td className="py-2">安裝參數設定檔（客製化用）</td>
+                <td className="py-2">config 檔</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg">
+          <p className="text-green-300 text-sm font-semibold">同一個 Chart，可以安裝多個 Release</p>
+          <p className="text-slate-300 text-sm mt-1">例如：mysql Chart 安裝兩次 → release: my-mysql-dev 和 my-mysql-prod</p>
+        </div>
+      </div>
+    ),
+    code: `# 四大概念的實際對應
 
+# Chart = .deb 套件（打包好的 K8s 應用模板）
+# Release = 已安裝的執行實例（有名字、有狀態）
+# Repository = 套件來源倉庫
+# values.yaml = 安裝參數
+
+# 同一個 Chart，可安裝多個 Release
+helm install my-mysql-dev  bitnami/mysql  # Release 1
+helm install my-mysql-prod bitnami/mysql  # Release 2
+
+# 每個 Release 獨立管理
+helm list
+# NAME            NAMESPACE  REVISION  STATUS
+# my-mysql-dev    default    1         deployed
+# my-mysql-prod   default    1         deployed`,
+    notes: `這五個概念要讓學員記住。可以畫在白板上。
+
+最容易混淆的是 Chart vs Release：Chart 是模板（可重用），Release 是安裝後的實例（有狀態有名字）。 [▶ 下一頁]`,
+  },
+
+  // ── 6-17 概念（4/6）：三大核心功能 ──
+  {
+    title: 'Helm 三大核心功能',
+    subtitle: '為什麼要用 Helm？',
+    section: '6-17：Helm 概念',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-300 font-semibold mb-2">① 一鍵安裝</p>
+          <p className="text-slate-300 text-sm">部署 MySQL 原本要寫：Deployment + Service + Secret + ConfigMap + PVC + ServiceAccount = 6 個 YAML</p>
+          <p className="text-yellow-300 text-sm mt-2 font-mono">helm install my-mysql bitnami/mysql  → 全搞定</p>
+        </div>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-4 rounded-lg">
+          <p className="text-blue-300 font-semibold mb-2">② 參數化部署</p>
+          <p className="text-slate-300 text-sm">同一個 Chart，用不同 values 部署到 dev / staging / prod</p>
+          <p className="text-slate-300 text-sm mt-1 font-mono">helm install ... -f values-dev.yaml</p>
+          <p className="text-slate-300 text-sm font-mono">helm install ... -f values-prod.yaml</p>
+        </div>
+        <div className="bg-purple-900/30 border border-purple-500/50 p-4 rounded-lg">
+          <p className="text-purple-300 font-semibold mb-2">③ 版本管理 + 一鍵回滾</p>
+          <p className="text-slate-300 text-sm">每次 install/upgrade/rollback 都記錄 REVISION</p>
+          <p className="text-slate-300 text-sm mt-1 font-mono">helm rollback my-mysql 1  ← 回到第 1 版</p>
+          <p className="text-slate-400 text-xs mt-1">比 kubectl rollout undo 更強：整個 Release 所有資源一起回滾</p>
+        </div>
+      </div>
+    ),
+    code: `# ① 一鍵安裝（自動建立所有 K8s 資源）
+helm install my-mysql bitnami/mysql
+
+# ② 參數化部署（同 Chart，不同環境）
+helm install my-mysql-dev  bitnami/mysql -f values-dev.yaml
+helm install my-mysql-prod bitnami/mysql -f values-prod.yaml
+
+# ③ 版本管理 + 回滾
+helm upgrade my-mysql bitnami/mysql --set image.tag=8.0
+helm history my-mysql
+# REVISION  STATUS      DESCRIPTION
+# 1         superseded  Install complete
+# 2         deployed    Upgrade complete
+
+helm rollback my-mysql 1   # 回到 REVISION 1（整個 Release 回滾）`,
+    notes: `重點強調第三個：helm rollback 和 kubectl rollout undo 的差異。
+
+kubectl rollout undo 只能回滾一個 Deployment。helm rollback 會把整個 Release（Deployment + Service + ConfigMap + Secret + ...）全部一起回滾到指定版本。這在正式環境非常重要。 [▶ 下一頁]`,
+  },
+
+  // ── 6-17 概念（5/6）：和 Docker Compose 比較 ──
+  {
+    title: 'Helm vs Docker Compose：概念對照',
+    subtitle: '你已經懂 Compose，Helm 只是 K8s 版本',
+    section: '6-17：Helm 概念',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Docker Compose 對照</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-2">Docker Compose</th>
-                <th className="text-left py-2">Helm</th>
+                <th className="text-left py-2">概念</th>
+                <th className="text-left py-2 text-blue-400">Docker Compose</th>
+                <th className="text-left py-2 text-cyan-400">Helm</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
               <tr className="border-b border-slate-700">
-                <td className="py-2">docker-compose.yml</td>
-                <td className="py-2">Chart（一包 YAML 範本）</td>
+                <td className="py-2">定義檔</td>
+                <td className="py-2 font-mono text-xs text-blue-300">compose.yml</td>
+                <td className="py-2 font-mono text-xs text-cyan-300">Chart（目錄）</td>
               </tr>
               <tr className="border-b border-slate-700">
-                <td className="py-2">docker compose up</td>
-                <td className="py-2">helm install</td>
+                <td className="py-2">啟動</td>
+                <td className="py-2 font-mono text-xs text-blue-300">docker compose up</td>
+                <td className="py-2 font-mono text-xs text-cyan-300">helm install</td>
               </tr>
               <tr className="border-b border-slate-700">
-                <td className="py-2">docker compose down</td>
-                <td className="py-2">helm uninstall</td>
+                <td className="py-2">更新</td>
+                <td className="py-2 font-mono text-xs text-blue-300">docker compose up（重跑）</td>
+                <td className="py-2 font-mono text-xs text-cyan-300">helm upgrade</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2">清除</td>
+                <td className="py-2 font-mono text-xs text-blue-300">docker compose down</td>
+                <td className="py-2 font-mono text-xs text-cyan-300">helm uninstall</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2">參數化</td>
+                <td className="py-2 font-mono text-xs text-blue-300">.env 檔</td>
+                <td className="py-2 font-mono text-xs text-cyan-300">values.yaml</td>
               </tr>
               <tr>
-                <td className="py-2">.env 檔案</td>
-                <td className="py-2">values.yaml</td>
+                <td className="py-2">版本回滾</td>
+                <td className="py-2 text-slate-500 text-xs">❌ 沒有</td>
+                <td className="py-2 font-mono text-xs text-cyan-300">helm rollback ✅</td>
               </tr>
             </tbody>
           </table>
         </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">三大核心功能</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p><span className="text-green-400 font-semibold">1. 一鍵安裝</span> -- 別人寫好最佳實踐，你直接用</p>
-            <p><span className="text-green-400 font-semibold">2. 參數化</span> -- 同一個 Chart，不同 values.yaml 部署不同環境</p>
-            <p><span className="text-green-400 font-semibold">3. 版本管理</span> -- helm rollback 整個 Release 一起回滾</p>
-          </div>
+        <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
+          <p className="text-yellow-300 text-sm">Helm 比 Compose 多了：版本歷史、回滾、Repository 生態系</p>
         </div>
       </div>
     ),
-    code: `# Helm 基本指令流程
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-helm search repo mysql
-helm install my-mysql bitnami/mysql
-helm list
-helm uninstall my-mysql
+    code: `# Docker Compose 你已經會了
+docker compose up -d      # 啟動
+docker compose down       # 清除
+# .env 檔控制參數
 
-# 一行指令安裝整套 MySQL
-helm install my-mysql bitnami/mysql \\
-  --set auth.rootPassword=my-secret
-# → StatefulSet + Headless Service + PVC + Secret 全部建好`,
-    notes: `Helm 讓你用一行指令在 K8s 上安裝一整套 MySQL：helm install my-mysql bitnami/mysql。StatefulSet、Headless Service、PVC、Secret、ConfigMap，全部幫你建好。你不用寫任何 YAML。
+# Helm 的對照指令
+helm install   my-app ingress-nginx/ingress-nginx   # 啟動
+helm upgrade   my-app ingress-nginx/ingress-nginx   # 更新
+helm uninstall my-app                               # 清除
+# values.yaml 控制參數
 
-Helm 有幾個核心概念。Chart 就是一個安裝包，裡面包了所有需要的 YAML 範本。就像 Ubuntu 的 .deb 檔案。Release 是 Chart 安裝後的實例。你可以用同一個 Chart 安裝多個 Release，比如一個 Redis 叫 my-cache 給快取用，另一個 Redis 叫 my-session 給 session 用，互不干擾。Repository 是 Chart 的倉庫，就像 Ubuntu 的 apt source list。最大的公開倉庫是 Bitnami，裡面有 MySQL、Redis、PostgreSQL、MongoDB、WordPress、Grafana... 常用的軟體幾乎都有。
+# Helm 多出來的功能
+helm history my-app     # 查看所有版本
+helm rollback my-app 1  # 回滾到指定版本
 
-values.yaml 是參數檔。一個 Chart 有很多可以調整的參數，比如 replicas 幾個、密碼是什麼、PVC 要多大。你把這些參數寫在 values.yaml 裡面，Helm 會把它們套進 YAML 範本裡生成最終的 K8s 資源。
+# 這是 Compose 做不到的！`,
+    notes: `學員都有 Compose 經驗，這個對照表可以快速建立 mental model。
 
-Helm 的三個核心功能。第一，一鍵安裝。別人已經把最佳實踐寫成 Chart 了，你直接 helm install 就好。第二，參數化。同一個 Chart，dev 環境設 replicas 1、密碼設 dev123，prod 環境設 replicas 3、密碼設超強密碼。只要換 values.yaml，不用改 Chart。第三，版本管理。Helm 會記錄每次安裝和升級的歷史。升級之後發現有問題？helm rollback 一行指令回到上一版。而且不只是回滾一個 Deployment，是整個 Release 的所有資源一起回滾。
-
-對照 Docker Compose 來看。Chart 就像 docker-compose.yml，定義了整個系統的結構。helm install 就像 docker compose up。helm uninstall 就像 docker compose down。values.yaml 就像 .env 檔案。概念完全一樣，只是 Helm 在 K8s 的世界裡功能更強大。
-
-基本的指令流程是這樣的。helm repo add bitnami https://charts.bitnami.com/bitnami 加入倉庫。helm search repo mysql 搜尋有哪些 Chart。helm install my-mysql bitnami/mysql 安裝。helm list 看已安裝的 Release。helm uninstall my-mysql 解除安裝。
-
-概念講完了，下一支影片我們來實際裝一個試試看。 [▶ 下一頁]`,
+特別強調 rollback 是 Helm 比 Compose 強的地方。 [▶ 下一頁]`,
   },
 
-  // ── 6-18 實作（1/2）：Helm 安裝 + MySQL + Redis ──
+  // ── 6-17 概念（6/6）：今天指令預覽 ──
   {
-    title: 'Lab：Helm 一行指令裝 MySQL + Redis',
-    subtitle: 'helm install / upgrade / rollback / uninstall',
-    section: 'Loop 6：Helm',
-    duration: '8',
+    title: '今天要跑的 Helm 指令一覽',
+    subtitle: '先看整體地圖，等一下一個一個跑',
+    section: '6-17：Helm 概念',
+    duration: '3',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">操作流程</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>安裝 Helm：<code className="text-green-400">curl ... | bash</code></li>
-            <li><code className="text-green-400">helm repo add bitnami ...</code></li>
-            <li><code className="text-green-400">helm search repo mysql</code></li>
-            <li><code className="text-green-400">helm install my-mysql bitnami/mysql --set auth.rootPassword=my-secret</code></li>
-            <li><code className="text-green-400">kubectl get all -l app.kubernetes.io/instance=my-mysql</code></li>
-            <li><code className="text-green-400">helm list</code> -- REVISION 1, deployed</li>
-          </ol>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">升級 + 回滾</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p><code className="text-green-400">helm upgrade</code> -- 加 read replica</p>
-            <p><code className="text-green-400">helm history</code> -- 看 REVISION 1, 2</p>
-            <p><code className="text-green-400">helm rollback my-mysql 1</code> -- 整個 Release 回滾</p>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-green-400 font-semibold text-sm mb-2">安裝 Helm</p>
+            <p className="text-slate-300 text-xs font-mono">curl | bash → v3.20.2</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-green-400 font-semibold text-sm mb-2">新增 Repo</p>
+            <p className="text-slate-300 text-xs font-mono">helm repo add / update</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-sm mb-2">安裝應用</p>
+            <p className="text-slate-300 text-xs font-mono">helm install my-ingress</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-cyan-400 font-semibold text-sm mb-2">升級 / 回滾</p>
+            <p className="text-slate-300 text-xs font-mono">helm upgrade / rollback</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-purple-400 font-semibold text-sm mb-2">查看預設值</p>
+            <p className="text-slate-300 text-xs font-mono">helm show values</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-purple-400 font-semibold text-sm mb-2">多環境部署</p>
+            <p className="text-slate-300 text-xs font-mono">-f values-dev.yaml</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-yellow-400 font-semibold text-sm mb-2">Prometheus Stack</p>
+            <p className="text-slate-300 text-xs font-mono">kube-prometheus-stack</p>
+          </div>
+          <div className="bg-slate-800/50 p-3 rounded-lg">
+            <p className="text-yellow-400 font-semibold text-sm mb-2">自建 Chart</p>
+            <p className="text-slate-300 text-xs font-mono">helm create my-app</p>
           </div>
         </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">自訂 values.yaml</p>
-          <p className="text-slate-300 text-xs">dev 和 prod 用不同的 values 檔 → 同一個 Chart 部署不同環境</p>
-          <p className="text-slate-400 text-xs mt-1"><code className="text-green-400">helm install my-redis bitnami/redis -f my-redis-values.yaml</code></p>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
+          <p className="text-blue-300 text-sm">全部指令跑完大約 40 分鐘。先把概念記清楚，等一下操作會順很多。</p>
         </div>
       </div>
     ),
-    code: `# 1. 安裝 Helm
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-helm version
-
-# 2. 加入 Bitnami 倉庫
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-helm search repo mysql
-
-# 3. 一鍵安裝 MySQL
-helm install my-mysql bitnami/mysql --set auth.rootPassword=my-secret
-kubectl get all -l app.kubernetes.io/instance=my-mysql
-kubectl get pvc
-helm list
-
-# 4. 升級 + 回滾
-helm upgrade my-mysql bitnami/mysql \\
-  --set auth.rootPassword=my-secret \\
-  --set secondary.replicaCount=1
-helm history my-mysql
-helm rollback my-mysql 1
-
-# 5. 再裝一個 Redis
-helm install my-redis bitnami/redis --set auth.password=myredis123
-
-# 6. 自訂 values.yaml
-# my-redis-values.yaml:
-#   auth:
-#     password: myredis123
-#   master:
-#     persistence:
-#       size: 2Gi
-#   replica:
-#     replicaCount: 2
-helm install my-redis2 bitnami/redis -f my-redis-values.yaml
-
-# 7. 清理
-helm uninstall my-mysql
-helm uninstall my-redis
-helm uninstall my-redis2`,
-    notes: `好，上一支影片講了 Helm 的概念，這支影片來實際體驗一下。
-
-第一步，安裝 Helm。一行指令。
-
+    code: `# 今天 Helm 實作的完整流程
+# ① 安裝 Helm v3.20.2
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-跑完之後驗證一下。
-
-helm version
-
-看到版本號就表示裝好了。
-
-第二步，加入 Bitnami 的 Chart 倉庫。
-
-helm repo add bitnami https://charts.bitnami.com/bitnami
-
-然後更新一下本地的索引。
-
+# ② 新增 Repo
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
-搜尋 MySQL 的 Chart。
-
-helm search repo mysql
-
-你會看到 bitnami/mysql，以及版本號和描述。
-
-第三步，一鍵安裝 MySQL。
-
-helm install my-mysql bitnami/mysql --set auth.rootPassword=my-secret
-
-就這一行。等它跑個一兩分鐘。
-
-跑完之後，Helm 會印出一大段說明，告訴你怎麼連到 MySQL、密碼存在哪個 Secret 裡面。這些資訊很有用，建議看一下。
-
-現在看看 Helm 幫你建了什麼。
-
-kubectl get all -l app.kubernetes.io/instance=my-mysql
-
-你會看到 StatefulSet、Pod、Service，全部自動建好了。再看 PVC。
-
-kubectl get pvc
-
-也有了。如果你自己手寫這些 YAML，少說一百行起跳。Helm 一行指令搞定。
-
-看已安裝的 Release。
-
+# ③ 安裝 / 驗證
+helm install my-ingress ingress-nginx/ingress-nginx ...
+kubectl get all -l app.kubernetes.io/instance=my-ingress
 helm list
 
-你會看到 my-mysql，REVISION 是 1，STATUS 是 deployed。
+# ④ 升級 + 歷史 + 回滾
+helm upgrade my-ingress ...
+helm history my-ingress
+helm rollback my-ingress 1
 
-假設現在你想加一個 read replica。用 helm upgrade。
+# ⑤ 查預設值 / 多環境
+helm show values ingress-nginx/ingress-nginx | head -50
+helm install ... -f values-dev.yaml
 
-helm upgrade my-mysql bitnami/mysql --set auth.rootPassword=my-secret --set secondary.replicaCount=1
+# ⑥ Prometheus + Grafana
+helm install kube-prometheus prometheus-community/kube-prometheus-stack ...
 
-注意 auth.rootPassword 要重複帶，不然 upgrade 的時候密碼會被清掉。這是 Helm 的一個小坑，記一下。
+# ⑦ 自建 Chart
+helm create my-app
 
-看升級歷史。
-
-helm history my-mysql
-
-REVISION 1 是原始安裝，REVISION 2 是剛才的升級。
-
-如果升級後發現有問題，一行指令回滾。
-
-helm rollback my-mysql 1
-
-再看 history，多了一個 REVISION 3，描述是 Rollback to 1。對照 K8s 原生的 kubectl rollout undo，那只能回滾單一個 Deployment。但 helm rollback 是把整個 Release 的所有資源一起回滾。 [▶ 下一頁]`,
+# ⑧ 清理
+helm uninstall my-ingress`,
+    notes: `這張是路線圖。學員看完知道今天要做什麼。不需要解釋細節，等一下實作時會一步一步來。 [▶ 下一頁]`,
   },
 
-  // ── 6-18 實作（2/2）：Redis + values.yaml + 清理 ──
+  // ── 6-18A 實作（1/4）：安裝 Helm ──
   {
-    title: 'Lab：自訂 values.yaml + 清理',
-    subtitle: '多環境部署 + helm uninstall',
-    section: 'Loop 6：Helm',
+    title: '安裝 Helm v3.20.2',
+    subtitle: '一行指令安裝，30 秒搞定',
+    section: '6-18A：Helm 實作 Part 1',
     duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">WordPress Chart 重點 values（6-24 用到）</p>
-          <p className="text-slate-400 text-xs mb-2"><code className="text-green-400">helm show values bitnami/wordpress</code> 會印出幾百行，只需要關心這幾個：</p>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-1 font-mono">key</th>
-                <th className="text-left py-1">說明</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300 font-mono">
-              <tr className="border-b border-slate-700">
-                <td className="py-1 text-green-400">wordpressUsername</td>
-                <td className="py-1 font-sans">管理員帳號</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-1 text-green-400">wordpressPassword</td>
-                <td className="py-1 font-sans">管理員密碼（必填）</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-1 text-green-400">mariadb.auth.rootPassword</td>
-                <td className="py-1 font-sans">DB root 密碼（必填）</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-1 text-green-400">ingress.enabled</td>
-                <td className="py-1 font-sans">true = 開 Ingress</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-1 text-green-400">ingress.hostname</td>
-                <td className="py-1 font-sans">wordpress.local</td>
-              </tr>
-              <tr>
-                <td className="py-1 text-green-400">persistence.size</td>
-                <td className="py-1 font-sans">PVC 大小（預設 10Gi）</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">values.yaml 多環境部署</p>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-cyan-900/20 border border-cyan-500/30 p-3 rounded">
-              <p className="text-cyan-400 font-semibold mb-1">values-dev.yaml</p>
-              <div className="font-mono text-slate-300">
-                <p>replicas: 1</p>
-                <p>password: dev123</p>
-              </div>
+          <p className="text-cyan-400 font-semibold mb-3">安裝方式</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="bg-slate-700/50 p-3 rounded font-mono text-xs">
+              curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
             </div>
-            <div className="bg-green-900/20 border border-green-500/30 p-3 rounded">
-              <p className="text-green-400 font-semibold mb-1">values-prod.yaml</p>
-              <div className="font-mono text-slate-300">
-                <p>replicas: 3</p>
-                <p>password: super-secret</p>
-              </div>
-            </div>
+            <p className="text-slate-400 text-xs">下載官方安裝腳本，自動偵測平台（Linux/macOS），安裝最新穩定版</p>
           </div>
-          <p className="text-slate-400 text-xs mt-2">同一個 Chart，不同的 values 檔 → 搞定多環境</p>
         </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">helm uninstall 一鍵清理</p>
-          <p className="text-slate-300 text-sm">一行指令清掉所有相關資源</p>
-          <p className="text-slate-400 text-xs mt-1">對比 kubectl delete -f 要一個一個檔案刪</p>
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-300 font-semibold mb-2">安裝完成確認</p>
+          <div className="space-y-1 text-sm font-mono">
+            <p className="text-slate-300">helm version</p>
+            <p className="text-slate-400 text-xs"># version.BuildInfo&#123;Version:"v3.20.2", ...&#125;</p>
+          </div>
+        </div>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
+          <p className="text-blue-300 text-sm font-semibold">現在是 v3，不是 v2</p>
+          <p className="text-slate-300 text-xs mt-1">Helm v2 需要在 cluster 裡安裝 Tiller server，v3 移除了，只有 client CLI，更安全簡單</p>
         </div>
       </div>
     ),
-    notes: `好，MySQL 體驗完了。我們再裝一個 Redis 試試，證明 Helm 不只能裝 MySQL。
+    code: `# 安裝 Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Downloading https://get.helm.sh/helm-v3.20.2-linux-amd64.tar.gz
+# Preparing to install helm into /usr/local/bin
+# helm installed into /usr/local/bin/helm
 
-helm install my-redis bitnami/redis --set auth.password=myredis123
+# 確認版本
+helm version
+# version.BuildInfo{Version:"v3.20.2", GitCommit:"...", GoVersion:"go1.24.3"}
 
-等它跑起來，kubectl get pods 看一下。Redis 的 master 和 replica 都跑起來了。
+# Helm v3 vs v2 差異
+# v2: 需要在 cluster 安裝 Tiller（麻煩且有安全問題）
+# v3: 只有 client CLI，不需要 server 端元件`,
+    notes: `直接跑安裝指令。安裝很快，30 秒左右。
 
-現在再教你一個更好的做法。剛才我們用 --set 在命令列傳參數，參數多的時候命令列會超長。更好的方式是用 values.yaml 檔案。
+版本確認是重要步驟，讓學員知道他們裝了什麼版本。今天跑的是 v3.20.2。 [▶ 下一頁]`,
+  },
 
-先看看 Chart 有哪些參數可以設定。
+  // ── 6-18A 實作（2/4）：helm repo add ──
+  {
+    title: 'helm repo add：新增 Chart 來源',
+    subtitle: '從哪裡找 Chart URL？為什麼不用 Bitnami？',
+    section: '6-18A：Helm 實作 Part 1',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/40 border border-red-500/60 p-3 rounded-lg">
+          <p className="text-red-400 font-bold text-sm mb-1">⚠️ 不能用 Bitnami！</p>
+          <p className="text-slate-300 text-xs">Bitnami 於 <span className="text-yellow-300 font-semibold">2025/8/28</span> 起 image registry 改為付費方案</p>
+          <p className="text-slate-300 text-xs mt-1">→ 安裝會出現 <span className="text-red-400 font-mono">Init:ImagePullBackOff</span>，Pod 永遠起不來</p>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">今天用的兩個官方 Repo</p>
+          <div className="space-y-2 text-xs">
+            <div className="bg-slate-700/50 p-2 rounded">
+              <p className="text-green-400 font-semibold">ingress-nginx（K8s 官方）</p>
+              <p className="text-slate-300 font-mono">https://kubernetes.github.io/ingress-nginx</p>
+              <p className="text-slate-400 mt-1">來源：github.com/kubernetes/ingress-nginx → README</p>
+            </div>
+            <div className="bg-slate-700/50 p-2 rounded">
+              <p className="text-blue-400 font-semibold">prometheus-community</p>
+              <p className="text-slate-300 font-mono">https://prometheus-community.github.io/helm-charts</p>
+              <p className="text-slate-400 mt-1">來源：github.com/prometheus-community/helm-charts → README</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
+          <p className="text-yellow-300 text-sm font-semibold">CHART VERSION vs APP VERSION</p>
+          <p className="text-slate-300 text-xs mt-1">CHART VERSION = Chart 打包版本（Helm 維護者管的）</p>
+          <p className="text-slate-300 text-xs">APP VERSION = 實際軟體版本（Nginx / Prometheus 本身）</p>
+          <p className="text-slate-400 text-xs mt-1">例：ingress-nginx Chart 4.15.1 打包的是 Nginx Ingress Controller 1.15.1</p>
+        </div>
+      </div>
+    ),
+    code: `# 新增官方 Repo（URL 都在各自 GitHub README 裡）
+# ingress-nginx: github.com/kubernetes/ingress-nginx
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
-helm show values bitnami/redis | head -50
+# prometheus-community: github.com/prometheus-community/helm-charts
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
-會印出一大堆，每個參數都有註解說明。
+# 更新索引
+helm repo update
+# ...Successfully got an update from the "ingress-nginx" chart repository
+# ...Successfully got an update from the "prometheus-community" chart repository
+# Update Complete. Happy Helming!
 
-建一個自己的 values 檔案。比如 my-redis-values.yaml，裡面寫 auth 的 password 是 myredis123，master 的 persistence size 是 2Gi，replica 的 replicaCount 是 2、persistence size 是 1Gi。
+# 搜尋可用的 Chart
+helm search repo ingress-nginx
+# NAME                            CHART VERSION  APP VERSION  DESCRIPTION
+# ingress-nginx/ingress-nginx     4.15.1         1.15.1       Ingress controller for K8s...
 
-安裝的時候用 -f 指定。
+# ⚠️  Bitnami 從 2025/8/28 起 image 改付費
+# helm repo add bitnami https://charts.bitnami.com/bitnami
+# → helm install bitnami/mysql 會出現 Init:ImagePullBackOff！`,
+    notes: `這頁有三個重點，都要講清楚：
 
-helm install my-redis2 bitnami/redis -f my-redis-values.yaml
+1. URL 從哪來：去 GitHub 搜尋 ingress-nginx，找到官方 repo，README 第一行就有 helm repo add 指令
+2. Bitnami 付費警告：2025/8/28 之後 image 改付費，Pull 會失敗，Init:ImagePullBackOff
+3. CHART VERSION vs APP VERSION：很多學員會搞混，用 ingress-nginx 4.15.1 裝的是 Nginx 1.15.1 [▶ 下一頁]`,
+  },
 
-這個做法最大的好處是什麼？你可以為不同環境建不同的 values 檔。values-dev.yaml 裡面 replicas 設 1、密碼設 dev123。values-prod.yaml 裡面 replicas 設 3、密碼設超強密碼。同一個 Chart，不同的 values 檔，搞定多環境部署。
+  // ── 6-18A 實作（3/4）：helm install + 驗證 ──
+  {
+    title: 'helm install：一鍵安裝 Ingress Controller',
+    subtitle: '安裝後用 instance label 驗證所有資源',
+    section: '6-18A：Helm 實作 Part 1',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">安裝指令（k3s 用 NodePort）</p>
+          <div className="bg-slate-700/50 p-2 rounded font-mono text-xs text-slate-300">
+            <p>helm install my-ingress ingress-nginx/ingress-nginx \</p>
+            <p className="pl-4">--set controller.replicaCount=1 \</p>
+            <p className="pl-4">--set controller.service.type=NodePort</p>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">k3s 內建 Traefik 已佔用 80/443，用 NodePort 避免衝突</p>
+        </div>
+        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg">
+          <p className="text-green-300 font-semibold text-sm mb-2">用 instance label 查所有資源</p>
+          <p className="text-slate-300 text-xs font-mono">kubectl get all -l app.kubernetes.io/instance=my-ingress</p>
+          <p className="text-slate-400 text-xs mt-1">Helm 會自動為所有資源加上這個 label</p>
+        </div>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
+          <p className="text-blue-300 font-semibold text-sm mb-1">helm list 確認 Release 狀態</p>
+          <p className="text-slate-300 text-xs">REVISION: 1（第一次安裝），STATUS: deployed</p>
+        </div>
+      </div>
+    ),
+    code: `# 安裝 Nginx Ingress Controller
+# k3s 有 Traefik，所以用 NodePort
+helm install my-ingress ingress-nginx/ingress-nginx \
+  --set controller.replicaCount=1 \
+  --set controller.service.type=NodePort
+# NAME: my-ingress
+# LAST DEPLOYED: ...
+# STATUS: deployed
+# REVISION: 1
 
-最後清理。
+# 驗證：用 instance label 查出所有相關資源
+kubectl get all -l app.kubernetes.io/instance=my-ingress
+# NAME                                               READY  STATUS   AGE
+# pod/my-ingress-ingress-nginx-controller-xxx        1/1    Running  1m
+#
+# NAME                                               TYPE       CLUSTER-IP    PORT(S)
+# service/my-ingress-ingress-nginx-controller        NodePort   10.43.x.x     80:3xxxx/TCP,443:3xxxx/TCP
+#
+# NAME                                               READY  UP-TO-DATE  AVAILABLE
+# deployment.apps/my-ingress-ingress-nginx-controller  1/1  1           1
 
-helm uninstall my-mysql
-helm uninstall my-redis
-helm uninstall my-redis2
+# 查看所有 Release
+helm list
+# NAME        NAMESPACE  REVISION  UPDATED    STATUS    CHART                    APP VERSION
+# my-ingress  default    1         2026-...   deployed  ingress-nginx-4.15.1     1.15.1`,
+    notes: `重點示範兩件事：
 
-一行指令把所有相關資源清乾淨。對比 kubectl delete -f 要一個一個檔案刪，Helm 方便太多了。 [▶ 下一頁]`,
+1. kubectl get all -l app.kubernetes.io/instance=my-ingress：Helm 自動幫所有資源加上這個 label，一個指令查出全部資源
+2. helm list：看到 REVISION=1, STATUS=deployed 就代表安裝成功
+
+k3s 為什麼用 NodePort：因為 k3s 內建 Traefik，已經在 80/443 上了，LoadBalancer 會 pending，NodePort 最簡單 [▶ 下一頁]`,
+  },
+
+  // ── 6-18A 實作（4/4）：upgrade + history + rollback ──
+  {
+    title: 'helm upgrade → history → rollback',
+    subtitle: 'REVISION 追蹤每一次變更，隨時可以回滾',
+    section: '6-18A：Helm 實作 Part 1',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">REVISION 流程</p>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="bg-green-900/50 border border-green-500/50 px-3 py-2 rounded text-center">
+              <p className="text-green-400 font-bold">REVISION 1</p>
+              <p className="text-slate-400 text-xs">install</p>
+            </div>
+            <span className="text-slate-500">→</span>
+            <div className="bg-blue-900/50 border border-blue-500/50 px-3 py-2 rounded text-center">
+              <p className="text-blue-400 font-bold">REVISION 2</p>
+              <p className="text-slate-400 text-xs">upgrade</p>
+            </div>
+            <span className="text-slate-500">→</span>
+            <div className="bg-yellow-900/50 border border-yellow-500/50 px-3 py-2 rounded text-center">
+              <p className="text-yellow-400 font-bold">REVISION 3</p>
+              <p className="text-slate-400 text-xs">rollback</p>
+            </div>
+          </div>
+          <p className="text-slate-400 text-xs mt-2">rollback 本身也會產生新的 REVISION（不是刪除記錄）</p>
+        </div>
+        <div className="bg-purple-900/30 border border-purple-500/50 p-3 rounded-lg">
+          <p className="text-purple-300 font-semibold text-sm">helm rollback vs kubectl rollout undo</p>
+          <div className="mt-1 space-y-1 text-xs text-slate-300">
+            <p>kubectl rollout undo → 只回滾單一 Deployment</p>
+            <p>helm rollback → 整個 Release 所有資源一起回滾 ✅</p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# upgrade（修改 replica 數量）
+helm upgrade my-ingress ingress-nginx/ingress-nginx \
+  --set controller.replicaCount=2 \
+  --set controller.service.type=NodePort
+# Release "my-ingress" has been upgraded. Happy Helming!
+# REVISION: 2
+
+# 查看版本歷史
+helm history my-ingress
+# REVISION  UPDATED    STATUS      CHART                    DESCRIPTION
+# 1         2026-...   superseded  ingress-nginx-4.15.1     Install complete
+# 2         2026-...   deployed    ingress-nginx-4.15.1     Upgrade complete
+
+# rollback 到 REVISION 1
+helm rollback my-ingress 1
+# Rollback was a success! Happy Helming!
+
+helm history my-ingress
+# REVISION  STATUS      DESCRIPTION
+# 1         superseded  Install complete
+# 2         superseded  Upgrade complete
+# 3         deployed    Rollback to 1    ← rollback 本身是新的 REVISION
+
+# 確認 replica 回到 1
+kubectl get deploy -l app.kubernetes.io/instance=my-ingress`,
+    notes: `最重要的概念：rollback 不是「刪除 REVISION 2」，而是新增 REVISION 3（內容和 REVISION 1 一樣）。這樣歷史記錄完整保留。
+
+再次強調 helm rollback 和 kubectl rollout undo 的差異。 [▶ 下一頁]`,
+  },
+
+  // ── 6-18B 實作（1/5）：helm show values ──
+  {
+    title: 'helm show values：看 Chart 有哪些參數',
+    subtitle: '安裝前先看，避免亂猜參數名稱',
+    section: '6-18B：Helm 實作 Part 2',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">查看 Chart 的所有可設定參數</p>
+          <div className="bg-slate-700/50 p-2 rounded font-mono text-xs text-slate-300">
+            helm show values ingress-nginx/ingress-nginx | head -50
+          </div>
+          <p className="text-slate-400 text-xs mt-2">輸出是完整的 values.yaml，有幾百行，加 | head -50 只看前 50 行</p>
+        </div>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
+          <p className="text-blue-300 font-semibold text-sm mb-2">三種覆蓋參數的方式</p>
+          <div className="space-y-1 text-xs text-slate-300">
+            <div className="flex gap-2">
+              <span className="text-yellow-400 w-5">①</span>
+              <span><span className="font-mono text-green-400">--set key=value</span> 直接在指令列設定（簡單修改用）</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-yellow-400 w-5">②</span>
+              <span><span className="font-mono text-green-400">-f values.yaml</span> 用自訂 yaml 檔覆蓋（複雜設定用）</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-yellow-400 w-5">③</span>
+              <span>兩者可以混用，<span className="font-mono text-green-400">-f</span> 先套用，<span className="font-mono text-green-400">--set</span> 後覆蓋</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# 查看 Chart 有哪些可設定的參數
+helm show values ingress-nginx/ingress-nginx | head -50
+# controller:
+#   name: controller
+#   image:
+#     registry: registry.k8s.io
+#     image: ingress-nginx/controller
+#     tag: ""
+#   replicaCount: 1
+#   service:
+#     type: LoadBalancer
+#     ports:
+#       http: 80
+#       https: 443
+#   ...（還有幾百行）
+
+# 用 --set 覆蓋單一參數
+helm install my-ingress ingress-nginx/ingress-nginx \
+  --set controller.replicaCount=2
+
+# 用 -f 覆蓋多個參數（推薦複雜設定）
+cat values-custom.yaml
+# controller:
+#   replicaCount: 2
+#   service:
+#     type: NodePort
+
+helm install my-ingress ingress-nginx/ingress-nginx -f values-custom.yaml`,
+    notes: `helm show values 是很實用的指令，讓你知道可以設定什麼。
+
+重點：參數名稱要完全對應 values.yaml 的結構（巢狀用點分隔），拼錯了 helm 不會報錯，只是不生效。 [▶ 下一頁]`,
+  },
+
+  // ── 6-18B 實作（2/5）：多環境 values ──
+  {
+    title: '多環境部署：values-dev.yaml + values-prod.yaml',
+    subtitle: '同一個 Chart，不同環境不同參數',
+    section: '6-18B：Helm 實作 Part 2',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">兩個環境的設定差異</p>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="bg-blue-900/30 border border-blue-500/50 p-2 rounded">
+              <p className="text-blue-300 font-semibold mb-1">values-dev.yaml</p>
+              <p className="text-slate-300 font-mono">replicaCount: 1</p>
+              <p className="text-slate-300 font-mono">resources:</p>
+              <p className="text-slate-300 font-mono pl-2">limits:</p>
+              <p className="text-slate-300 font-mono pl-4">memory: 256Mi</p>
+            </div>
+            <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
+              <p className="text-green-300 font-semibold mb-1">values-prod.yaml</p>
+              <p className="text-slate-300 font-mono">replicaCount: 3</p>
+              <p className="text-slate-300 font-mono">resources:</p>
+              <p className="text-slate-300 font-mono pl-2">limits:</p>
+              <p className="text-slate-300 font-mono pl-4">memory: 512Mi</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
+          <p className="text-yellow-300 text-sm font-semibold">對比沒有 Helm 的痛點</p>
+          <p className="text-slate-300 text-xs mt-1">沒有 Helm：dev-deployment.yaml, staging-deployment.yaml, prod-deployment.yaml → 3 套 YAML 同步維護</p>
+          <p className="text-green-300 text-xs mt-1">有 Helm：一個 Chart + 兩個 values 檔 → 解決了</p>
+        </div>
+      </div>
+    ),
+    code: `# 建立 dev 環境 values
+cat > values-dev.yaml << 'EOF'
+controller:
+  replicaCount: 1
+  service:
+    type: NodePort
+  resources:
+    limits:
+      memory: 256Mi
+      cpu: 200m
+EOF
+
+# 建立 prod 環境 values
+cat > values-prod.yaml << 'EOF'
+controller:
+  replicaCount: 3
+  service:
+    type: LoadBalancer
+  resources:
+    limits:
+      memory: 512Mi
+      cpu: 500m
+EOF
+
+# 部署 dev
+helm install my-ingress-dev ingress-nginx/ingress-nginx -f values-dev.yaml
+
+# 部署 prod（只示範，不實際裝）
+# helm install my-ingress-prod ingress-nginx/ingress-nginx -f values-prod.yaml
+
+# 確認 Release
+helm list
+# NAME              REVISION  STATUS    CHART
+# my-ingress-dev    1         deployed  ingress-nginx-4.15.1
+
+# 清理 dev（練習完）
+helm uninstall my-ingress-dev`,
+    notes: `這是 Helm 參數化部署的核心用法。
+
+重點強調：「同一個 Chart 安裝多次，每次是獨立的 Release」，這和之前講的概念呼應。 [▶ 下一頁]`,
+  },
+
+  // ── 6-18B 實作（3/5）：Prometheus + Grafana ──
+  {
+    title: 'kube-prometheus-stack：一鍵安裝監控全家桶',
+    subtitle: 'Prometheus + Grafana + AlertManager + 預設 Dashboard',
+    section: '6-18B：Helm 實作 Part 2',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">kube-prometheus-stack 包含什麼</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-green-400">✓</span> Prometheus（指標收集）
+            </div>
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-green-400">✓</span> Grafana（視覺化）
+            </div>
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-green-400">✓</span> AlertManager（告警）
+            </div>
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-green-400">✓</span> Node Exporter（節點指標）
+            </div>
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-green-400">✓</span> kube-state-metrics
+            </div>
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-green-400">✓</span> 預設 K8s Dashboard
+            </div>
+          </div>
+        </div>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
+          <p className="text-blue-300 text-sm font-semibold">如果沒有 Helm</p>
+          <p className="text-slate-300 text-xs mt-1">手動安裝：Prometheus operator + CRD + Grafana + AlertManager + Exporter = 幾十個 YAML，幾小時</p>
+          <p className="text-green-300 text-xs mt-1">有 Helm：helm install ... → 5 分鐘全搞定</p>
+        </div>
+      </div>
+    ),
+    code: `# 安裝 kube-prometheus-stack（Prometheus + Grafana 全家桶）
+helm install kube-prometheus prometheus-community/kube-prometheus-stack \
+  --set grafana.service.type=NodePort \
+  --set prometheus.service.type=NodePort \
+  --set alertmanager.service.type=NodePort
+
+# 安裝需要幾分鐘，等 Pod 都 Running
+kubectl get pods -l app.kubernetes.io/instance=kube-prometheus
+# NAME                                                READY  STATUS
+# kube-prometheus-grafana-xxx                         2/2    Running
+# kube-prometheus-kube-prometheus-stack-prometheus-0  2/2    Running
+# kube-prometheus-kube-state-metrics-xxx              1/1    Running
+
+# 找 Grafana 的 NodePort
+kubectl get svc -l app.kubernetes.io/name=grafana
+# NAME                      TYPE       PORT(S)
+# kube-prometheus-grafana   NodePort   3000:3xxxx/TCP
+
+# 取得 Grafana 預設密碼
+kubectl get secret kube-prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d
+# 預設帳密：admin / prom-operator
+
+# 瀏覽器開 http://192.168.43.130:<NodePort>
+# 進入後點 Dashboards → 已有預設 K8s 監控 Dashboard`,
+    notes: `這頁的重點是「Helm 讓複雜的東西變簡單」。
+
+kube-prometheus-stack 手動安裝要幾小時，用 Helm 只要一行。這是說服學員在正式環境用 Helm 最有力的例子。
+
+安裝比較慢（要 pull 很多 image），可以先下指令讓它跑，一邊講下一頁，等等再回來看結果。 [▶ 下一頁]`,
+  },
+
+  // ── 6-18B 實作（4/5）：helm create ──
+  {
+    title: 'helm create my-app：自建 Chart',
+    subtitle: '把你自己的應用打包成可重用的 Chart',
+    section: '6-18B：Helm 實作 Part 2',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">helm create 產生的目錄結構</p>
+          <div className="font-mono text-xs text-slate-300 space-y-1">
+            <p>my-app/</p>
+            <p className="pl-4">├── <span className="text-yellow-400">Chart.yaml</span>      <span className="text-slate-500"># Chart 基本資訊（名稱、版本）</span></p>
+            <p className="pl-4">├── <span className="text-green-400">values.yaml</span>     <span className="text-slate-500"># 預設參數值</span></p>
+            <p className="pl-4">├── templates/</p>
+            <p className="pl-8">├── <span className="text-blue-400">deployment.yaml</span> <span className="text-slate-500"># 模板（用&#123;&#123; .Values.xxx &#125;&#125;）</span></p>
+            <p className="pl-8">├── <span className="text-blue-400">service.yaml</span></p>
+            <p className="pl-8">└── ...</p>
+          </div>
+        </div>
+        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg">
+          <p className="text-green-300 text-sm font-semibold">模板語法範例</p>
+          <p className="text-slate-300 text-xs font-mono mt-1">replicas: &#123;&#123; .Values.replicaCount &#125;&#125;</p>
+          <p className="text-slate-300 text-xs font-mono">image: &#123;&#123; .Values.image.repository &#125;&#125;:&#123;&#123; .Values.image.tag &#125;&#125;</p>
+          <p className="text-slate-400 text-xs mt-1">values.yaml 裡的值，透過 &#123;&#123; .Values.xxx &#125;&#125; 注入到 YAML 模板</p>
+        </div>
+      </div>
+    ),
+    code: `# 建立 Chart 骨架
+helm create my-app
+# Creating my-app
+
+# 查看結構
+ls my-app/
+# Chart.yaml  charts/  templates/  values.yaml
+
+cat my-app/Chart.yaml
+# apiVersion: v2
+# name: my-app
+# version: 0.1.0
+# appVersion: "1.0"
+
+cat my-app/values.yaml
+# replicaCount: 1
+# image:
+#   repository: nginx
+#   tag: ""
+# service:
+#   type: ClusterIP
+#   port: 80
+
+# templates/deployment.yaml 裡面長這樣
+# replicas: {{ .Values.replicaCount }}
+# image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+# 安裝自建 Chart
+helm install my-release ./my-app
+
+# 用自訂參數安裝
+helm install my-release ./my-app \
+  --set replicaCount=2 \
+  --set image.repository=my-registry/my-app \
+  --set image.tag=v1.0.0`,
+    notes: `helm create 讓學員知道 Chart 的內部結構。
+
+模板語法 {{ .Values.xxx }} 是 Go template，不用深入講，只要讓學員知道「values.yaml 的值可以被注入到 YAML 模板裡」就夠了。 [▶ 下一頁]`,
+  },
+
+  // ── 6-18B 實作（5/5）：清理 ──
+  {
+    title: '清理：helm uninstall',
+    subtitle: '一鍵清除所有相關資源（注意 PVC 例外）',
+    section: '6-18B：Helm 實作 Part 2',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">helm uninstall 會刪除什麼</p>
+          <div className="space-y-1 text-xs text-slate-300">
+            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> Deployment / ReplicaSet / Pod</div>
+            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> Service / Ingress</div>
+            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> ConfigMap / Secret（Helm 建立的）</div>
+            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> ServiceAccount / RBAC</div>
+          </div>
+        </div>
+        <div className="bg-red-900/40 border border-red-500/60 p-3 rounded-lg">
+          <p className="text-red-400 font-semibold text-sm">⚠️ PVC 預設不會被刪除！</p>
+          <p className="text-slate-300 text-xs mt-1">有狀態應用（MySQL / Redis）的資料卷 PVC 刻意保留，防止誤刪資料</p>
+          <p className="text-yellow-300 text-xs mt-1">要手動刪：<span className="font-mono">kubectl delete pvc --all</span> 或指定名稱</p>
+        </div>
+      </div>
+    ),
+    code: `# 清理本節所有 Release
+helm uninstall my-ingress
+# release "my-ingress" uninstalled
+
+helm uninstall kube-prometheus
+# release "kube-prometheus" uninstalled
+
+helm uninstall my-release  # 自建的 Chart
+# release "my-release" uninstalled
+
+# 確認全部清除
+helm list
+# NAME  NAMESPACE  REVISION  STATUS
+# （應該是空的）
+
+# ⚠️ 確認 PVC 情況
+kubectl get pvc
+# 如果有 PVC 殘留，手動刪除
+# kubectl delete pvc <pvc-name>
+
+# 確認 Pod 全部停止
+kubectl get pods`,
+    notes: `最後的清理步驟。
+
+重點提醒 PVC 不會自動刪除，這是刻意設計的（保護資料）。在 lab 環境如果 PVC 沒刪，下次安裝可能會用到舊資料，造成困惑。 [▶ 下一頁]`,
   },
 
   // ── 6-19A 學員實作 Part 1 ──

@@ -1040,6 +1040,36 @@ dig 確認 DNS 解析。dig +short yourname.duckdns.org，應該回傳你 VM 的
         </div>
       </div>
     ),
+    code: `# ── Step 6：講師示範（學生跟著做）──
+kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
+kubectl expose deployment shop-deploy --name=shop-svc --port=80
+
+# ── 學員任務：在 ingress-basic.yaml 的 paths 加這段 ──
+#          - path: /shop
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: shop-svc
+#                port:
+#                  number: 80
+
+kubectl apply -f ingress-basic.yaml
+
+# 驗收
+curl http://<NODE-IP>/shop
+# Server: 10.42.x.x:80 (shop-deploy-xxx)
+# Message: Hello from shop
+
+# ── 挑戰題解答 ──
+kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
+kubectl expose deployment admin-deploy --name=admin-svc --port=80
+# 在 ingress-host.yaml 加 admin.myapp.local 規則，再 apply
+kubectl apply -f ingress-host.yaml
+sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
+curl http://admin.myapp.local
+# Message: Hello from admin`,
     notes: `學員實作時間。必做題：公司說要加一個購物服務。部署 shop-deploy，image 用 yanchen184/k8s-demo-app:latest，env 設 MESSAGE="Hello from shop"，建一個 ClusterIP Service 叫 shop-svc，port 8080，targetPort 80。然後在現有的 app-ingress 裡加一條 /shop 的路由，指向 shop-svc:8080。最後 curl http://<NODE-IP>/shop 看到 Message: Hello from shop 就對了。注意：這裡是在「現有 Ingress 加路由」，不是重新建一個新的 Ingress。挑戰題：在 host routing 再加一個 admin.myapp.local，image 一樣用 yanchen184/k8s-demo-app:latest，MESSAGE 改成 Hello from admin，記得 /etc/hosts 也要加。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
@@ -1703,6 +1733,33 @@ kubectl rollout restart deployment/frontend-deploy
         </div>
       </div>
     ),
+    code: `# ── 必做題 ──
+kubectl create configmap app-config \\
+  --from-literal=MESSAGE="Hello from 你的名字" \\
+  --from-literal=USERNAME=你的名字 \\
+  --from-literal=config.txt=$'APP_MODE=student\\nFEATURE_FLAG=true'
+
+kubectl create secret generic app-secret \\
+  --from-literal=PASSWORD=你的密碼
+
+kubectl apply -f student-deploy.yaml
+kubectl apply -f ingress-step4.yaml
+kubectl get pods -l app=frontend -w   # 等 Running，Ctrl+C
+
+curl http://<NODE-IP>/frontend   # → Username: 你的名字 / Password: 你的密碼
+curl http://<NODE-IP>/config     # → APP_MODE=student
+
+# ── 挑戰題 ──
+kubectl edit configmap app-config
+# 改 APP_MODE=student → APP_MODE=debug，USERNAME → 新名字
+
+# 馬上 curl → 兩個都沒變（正常）
+# 等 30-60 秒 → /config 自動更新，/frontend 沒動
+curl http://<NODE-IP>/config     # → APP_MODE=debug（自動更新）
+curl http://<NODE-IP>/frontend   # → 還是舊的（env 注入不自動更新）
+
+kubectl rollout restart deployment/frontend-deploy
+curl http://<NODE-IP>/frontend   # → 新名字（重啟後才生效）`,
     notes: `學員實作時間。
 
 必做題：你要用自己的名字和密碼。

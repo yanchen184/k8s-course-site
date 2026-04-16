@@ -2183,7 +2183,7 @@ helm install my-nginx ingress-nginx/ingress-nginx
         </div>
         <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg">
           <p className="text-green-300 text-sm font-semibold">同一個 Chart，可以安裝多個 Release</p>
-          <p className="text-slate-300 text-sm mt-1">例如：mysql Chart 安裝兩次 → release: my-mysql-dev 和 my-mysql-prod</p>
+          <p className="text-slate-300 text-sm mt-1">例如：ingress-nginx Chart 安裝兩次 → release: my-nginx-dev 和 my-nginx-prod</p>
         </div>
       </div>
     ),
@@ -2194,15 +2194,18 @@ helm install my-nginx ingress-nginx/ingress-nginx
 # Repository = 套件來源倉庫
 # values.yaml = 安裝參數
 
-# 同一個 Chart，可安裝多個 Release
-helm install my-mysql-dev  bitnami/mysql  # Release 1
-helm install my-mysql-prod bitnami/mysql  # Release 2
+# 同一個 Chart，可安裝多個 Release（概念示範）
+helm install my-nginx-dev  ingress-nginx/ingress-nginx  # Release 1
+helm install my-nginx-prod ingress-nginx/ingress-nginx  # Release 2
 
 # 每個 Release 獨立管理
 helm list
-# NAME            NAMESPACE  REVISION  STATUS
-# my-mysql-dev    default    1         deployed
-# my-mysql-prod   default    1         deployed`,
+# NAME             NAMESPACE  REVISION  STATUS
+# my-nginx-dev     default    1         deployed
+# my-nginx-prod    default    1         deployed
+
+# ⚠️ Bitnami 從 2025/8/28 起 image 改付費
+# helm install my-mysql bitnami/mysql → Init:ImagePullBackOff！`,
     notes: `這五個概念要讓學員記住。可以畫在白板上。
 
 最容易混淆的是 Chart vs Release：Chart 是模板（可重用），Release 是安裝後的實例（有狀態有名字）。 [▶ 下一頁]`,
@@ -2218,8 +2221,8 @@ helm list
       <div className="space-y-4">
         <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
           <p className="text-green-300 font-semibold mb-2">① 一鍵安裝</p>
-          <p className="text-slate-300 text-sm">部署 MySQL 原本要寫：Deployment + Service + Secret + ConfigMap + PVC + ServiceAccount = 6 個 YAML</p>
-          <p className="text-yellow-300 text-sm mt-2 font-mono">helm install my-mysql bitnami/mysql  → 全搞定</p>
+          <p className="text-slate-300 text-sm">部署 Nginx Ingress 原本要寫：Deployment + Service + ServiceAccount + ClusterRole + ... = 多個 YAML</p>
+          <p className="text-yellow-300 text-sm mt-2 font-mono">helm install my-ingress ingress-nginx/ingress-nginx  → 全搞定</p>
         </div>
         <div className="bg-blue-900/30 border border-blue-500/50 p-4 rounded-lg">
           <p className="text-blue-300 font-semibold mb-2">② 參數化部署</p>
@@ -2236,20 +2239,23 @@ helm list
       </div>
     ),
     code: `# ① 一鍵安裝（自動建立所有 K8s 資源）
-helm install my-mysql bitnami/mysql
+helm install my-ingress ingress-nginx/ingress-nginx
 
 # ② 參數化部署（同 Chart，不同環境）
-helm install my-mysql-dev  bitnami/mysql -f values-dev.yaml
-helm install my-mysql-prod bitnami/mysql -f values-prod.yaml
+helm install my-ingress-dev  ingress-nginx/ingress-nginx -f values-dev.yaml
+helm install my-ingress-prod ingress-nginx/ingress-nginx -f values-prod.yaml
 
 # ③ 版本管理 + 回滾
-helm upgrade my-mysql bitnami/mysql --set image.tag=8.0
-helm history my-mysql
+helm upgrade my-ingress ingress-nginx/ingress-nginx --set controller.replicaCount=3
+helm history my-ingress
 # REVISION  STATUS      DESCRIPTION
 # 1         superseded  Install complete
 # 2         deployed    Upgrade complete
 
-helm rollback my-mysql 1   # 回到 REVISION 1（整個 Release 回滾）`,
+helm rollback my-ingress 1   # 回到 REVISION 1（整個 Release 回滾）
+
+# ⚠️ Bitnami 從 2025/8/28 起 image 改付費
+# helm install bitnami/mysql → Init:ImagePullBackOff！`,
     notes: `重點強調第三個：helm rollback 和 kubectl rollout undo 的差異。
 
 kubectl rollout undo 只能回滾一個 Deployment。helm rollback 會把整個 Release（Deployment + Service + ConfigMap + Secret + ...）全部一起回滾到指定版本。這在正式環境非常重要。 [▶ 下一頁]`,
@@ -3875,9 +3881,10 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">或者用 Helm 一行搞定</p>
-          <p className="text-slate-300 text-sm font-mono"><code className="text-green-400">helm install my-blog bitnami/wordpress</code></p>
-          <p className="text-slate-400 text-xs mt-1">WordPress 前端 + MySQL 後端 + PVC + Ingress，全部包好</p>
+          <p className="text-cyan-400 font-semibold mb-2">或者用 Helm 一行搞定（OCI 方式，免費）</p>
+          <p className="text-slate-300 text-sm font-mono"><code className="text-green-400">helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress</code></p>
+          <p className="text-slate-400 text-xs mt-1">WordPress 前端 + MariaDB 後端 + PVC + Ingress，全部包好</p>
+          <p className="text-yellow-400 text-xs mt-1">⚠️ bitnami/wordpress（repo 方式）2025/8/28 起付費 → 改用 OCI registry</p>
         </div>
       </div>
     ),
@@ -3910,11 +3917,16 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
     duration: '15',
     content: (
       <div className="space-y-4">
+        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
+          <p className="text-amber-400 text-xs font-semibold mb-1">⚠️ Bitnami repo 2025/8/28 起付費</p>
+          <p className="text-slate-300 text-xs"><code>helm repo add bitnami + helm install bitnami/wordpress</code> → <code className="text-red-400">Init:ImagePullBackOff</code></p>
+          <p className="text-slate-300 text-xs mt-1">改用 OCI registry（免費）：<code className="text-green-400">oci://registry-1.docker.io/bitnamicharts/wordpress</code></p>
+        </div>
+
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做：Helm 安裝 WordPress</p>
+          <p className="text-cyan-400 font-semibold mb-2">必做：Helm 安裝 WordPress（OCI 方式）</p>
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li>加入 Bitnami repo：<code className="text-green-400">helm repo add bitnami https://charts.bitnami.com/bitnami && helm repo update</code></li>
-            <li>安裝：<code className="text-green-400">helm install my-blog bitnami/wordpress --set wordpressUsername=admin --set wordpressPassword=mypass123 --set mariadb.auth.rootPassword=rootpass123</code></li>
+            <li>直接安裝（不需要 helm repo add）：<code className="text-green-400">helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress --set wordpressUsername=admin --set wordpressPassword=mypass123 --set mariadb.auth.rootPassword=rootpass123</code></li>
             <li>等 Pod Running：<code className="text-green-400">kubectl get pods -w</code>（看到兩個 Running 再 Ctrl+C）</li>
             <li>取得連接埠：<code className="text-green-400">kubectl get svc my-blog-wordpress</code> → 找 NodePort 號</li>
             <li>瀏覽器開 <code className="text-green-400">http://&lt;Node-IP&gt;:&lt;NodePort&gt;</code> → 看到 WordPress 歡迎頁面</li>
@@ -3935,7 +3947,7 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
             <p>{'  '}enabled: true</p>
             <p>{'  '}hostname: wordpress.local</p>
           </div>
-          <p className="text-slate-300 text-sm"><code className="text-green-400">helm install my-blog bitnami/wordpress -f wp-values.yaml</code></p>
+          <p className="text-slate-300 text-sm"><code className="text-green-400">helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress -f wp-values.yaml</code></p>
           <p className="text-slate-400 text-xs mt-1">記得在 /etc/hosts 加上：<code className="text-green-300">&lt;Node-IP&gt; wordpress.local</code></p>
         </div>
 
@@ -3953,7 +3965,35 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
         </div>
       </div>
     ),
-    notes: `接下來是大家的自由練習時間。必做題：用 Helm 安裝一套 WordPress，bitnami/wordpress。它裡面含 MySQL 加 PVC 加 Ingress，全部包好。安裝完之後瀏覽器打開看到 WordPress 的歡迎頁面。挑戰題：自訂 values.yaml 設域名和密碼。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    code: `# ⚠️ 注意：Bitnami repo 方式（helm repo add bitnami）2025/8/28 起付費
+# 改用 OCI registry（免費，不需要 helm repo add）
+
+# 必做題：OCI 方式安裝 WordPress
+helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress \\
+  --set wordpressUsername=admin \\
+  --set wordpressPassword=mypass123 \\
+  --set mariadb.auth.rootPassword=rootpass123
+
+# 等 Pod 跑起來（約 2-3 分鐘）
+kubectl get pods -w
+# NAME                              READY   STATUS    RESTARTS   AGE
+# my-blog-wordpress-xxx             1/1     Running   0          2m
+# my-blog-mariadb-0                 1/1     Running   0          2m
+
+# 找 NodePort
+kubectl get svc my-blog-wordpress
+# NAME                TYPE           CLUSTER-IP    PORT(S)
+# my-blog-wordpress   LoadBalancer   10.43.x.x     80:31234/TCP
+
+# 瀏覽器打開 http://<Node-IP>:31234 → WordPress 歡迎頁面
+
+# 挑戰：用 -f values.yaml 安裝
+helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress -f wp-values.yaml
+
+# 清理
+helm uninstall my-blog
+kubectl delete pvc --all`,
+    notes: `接下來是大家的自由練習時間。必做題：用 Helm 安裝一套 WordPress。注意：bitnami repo 方式（helm repo add bitnami）從 2025 年 8 月 28 日起 image 改付費，裝了會出現 Init:ImagePullBackOff。改用 OCI registry 方式：helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress，不用加 repo，直接從 Docker Hub 的 OCI registry 拉。它裡面含 MariaDB 加 PVC 加 Ingress，全部包好。安裝完之後瀏覽器打開看到 WordPress 的歡迎頁面。挑戰題：自訂 values.yaml 設域名和密碼。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
   // ── 6-24 QA ──

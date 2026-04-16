@@ -590,6 +590,10 @@ echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=yourname&token
 
 ### ④ 學員實作
 
+> 📢 **講師說話口吻**
+>
+> 好，現在是你們的實作時間。我先幫大家把新的服務建起來，你們跟著我一起做。
+
 **Step 6：講師示範建新服務（學生跟著做）**
 
 ```bash
@@ -598,49 +602,42 @@ kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
 kubectl expose deployment shop-deploy --name=shop-svc --port=80
 ```
 
-**學員任務：讓 /shop 能從外面連到**
+> 確認服務起來了之後，我暫停一下，讓大家自己來做下一步。
 
-在 `~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml` 的 `paths` 下加這段：
+---
 
-```yaml
-          - path: /shop
-            pathType: Prefix
-            backend:
-              service:
-                name: shop-svc
-                port:
-                  number: 80
-```
+**🎯 必做題：讓 /shop 能從外面連到**
 
+> 任務說明（只給學員看這段，不給 YAML 答案）：
+>
+> 剛才我們建好了 shop-deploy 和 shop-svc。現在你的任務是：打開 `ingress-basic.yaml`，在 `paths` 陣列裡加一個新的路由規則，讓 `/shop` 這個路徑可以對應到 shop-svc。
+>
+> 加完之後執行 `kubectl apply`，再用 `curl http://<NODE-IP>/shop` 驗收，看到 `Message: Hello from shop` 就完成了。
+>
+> 提示：參考 `/frontend` 或 `/api` 的寫法，格式一樣，換個 path 名稱和 Service 名稱就好。
+
+驗收指令：
 ```bash
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
-curl http://<NODE-IP>/shop
+curl http://192.168.43.130/shop
+# 期望：Message: Hello from shop
 ```
 
-挑戰：在 host-based routing 加第三個服務：
+---
 
+**🏆 挑戰題：在 host-based routing 加第三個服務**
+
+> 任務說明（只給學員看這段）：
+>
+> 挑戰題分三步：
+> 1. 自己建一個 admin-deploy（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from admin"）和 admin-svc
+> 2. 打開 `ingress-host.yaml`，仿照 www.myapp.local 的寫法，加一個 `admin.myapp.local` 的 host 規則，apply
+> 3. 在 `/etc/hosts` 加入 admin.myapp.local 的映射，`curl http://admin.myapp.local` 驗收
+
+驗收指令：
 ```bash
-# 1. 建 admin-deploy + admin-svc
-kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
-kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
-kubectl expose deployment admin-deploy --name=admin-svc --port=80
-
-# 2. 在 ingress-host.yaml 加第三個 host 規則，再 apply
-kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-host.yaml
-
-# 3. /etc/hosts 加一行
-sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
-
-# 4. 驗證
 curl http://admin.myapp.local
-```
-
-預期輸出：
-```
-Server: 10.42.x.x:80 (admin-deploy-xxx)
-Message: Hello from admin
-Username: (not set)
-Password: (not set)
+# 期望：Message: Hello from admin
 ```
 
 ---

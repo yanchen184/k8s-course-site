@@ -609,28 +609,160 @@ A：`data` 欄位的值必須是 Base64 字串；`stringData` 欄位直接寫明
 
 ### ④ 學員實作
 
-**必做：自己建 ConfigMap + Secret，套用講師的 Deployment**
+**🎯 必做題：自己建 ConfigMap + Secret，套用 Deployment**
 
-Step 4 剛才是講師示範。現在你來，**自己的名字、自己的密碼**。
+> 剛才是我示範，現在換你來。用你自己的名字當 USERNAME、自己設一個密碼當 PASSWORD，把這些設定值送進去，讓 App 顯示出你的資料。
+>
+> 任務：
+> 1. 用 `kubectl create configmap` 建立 `app-config`，把你的名字和一段訊息放進去，同時附帶一個 `config.txt` 包含 `APP_MODE=student` 和 `FEATURE_FLAG=true`
+> 2. 用 `kubectl create secret` 建立 `app-secret`，放入你自己設的密碼
+> 3. apply 講師提供的 `student-deploy.yaml` 和 `ingress-step4.yaml`
+> 4. 用以下指令驗收，確認 App 顯示你的資料
 
-任務：
+驗收指令：
+```bash
+# 等 Pod Running 後執行
+kubectl get pods -l app=frontend
 
-1. 用 `kubectl create configmap` 建 ConfigMap `app-config`，包含：
-   - `MESSAGE`：隨便填（例如你的名字）
-   - `USERNAME`：你的名字
-   - `config.txt`：`APP_MODE=student\nFEATURE_FLAG=true`
-2. 用 `kubectl create secret` 建 Secret `app-secret`，包含：
-   - `PASSWORD`：你自己設的密碼
-3. apply `student-deploy.yaml` 和 `ingress-step4.yaml`
-4. curl `/frontend` 確認看到自己的 `Username` 和 `Password`
-5. curl `/config` 確認看到 `APP_MODE=student`
+# 確認 /frontend 顯示你的 Username 和 Password
+curl http://<NODE-IP>/frontend
 
-**挑戰：觀察 env 注入 vs Volume 掛載的差異**
+# 確認 /config 顯示 APP_MODE=student
+curl http://<NODE-IP>/config
+```
 
-6. `kubectl edit configmap app-config`，把 `APP_MODE=student` 改成 `APP_MODE=debug`，USERNAME 改成別的值
-7. 馬上 curl 兩個端點 → 看結果
-8. 等 30-60 秒再 curl → 看哪個變了
-9. `kubectl rollout restart deployment/frontend-deploy` → curl `/frontend` 看到什麼
+<details>
+<summary>📋 講師參考答案（巡堂用，學員做完才看）</summary>
+
+**步驟 1：建 ConfigMap**
+
+```bash
+kubectl create configmap app-config \
+  --from-literal=MESSAGE="Hello from Bob" \
+  --from-literal=USERNAME=Bob \
+  --from-literal=config.txt=$'APP_MODE=student\nFEATURE_FLAG=true'
+```
+
+- `--from-literal` 直接帶入 key=value
+- `config.txt` 用 `$'...'` 語法讓 `\n` 真正換行，K8s 會把它存成多行文字
+- 預期輸出：`configmap/app-config created`
+
+**步驟 2：建 Secret**
+
+```bash
+kubectl create secret generic app-secret \
+  --from-literal=PASSWORD=my-own-password
+```
+
+- `generic` 是最常用的 Secret 類型（相對於 docker-registry、tls 等）
+- 值會自動做 Base64 編碼存到 etcd
+- 預期輸出：`secret/app-secret created`
+
+**步驟 3：apply Deployment + Ingress**
+
+```bash
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/student-deploy.yaml
+kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-step4.yaml
+kubectl get pods -l app=frontend -w   # 等 Running，Ctrl+C 離開
+```
+
+**步驟 4-5：curl 驗收**
+
+```bash
+curl http://<NODE-IP>/frontend
+```
+
+預期輸出：
+```
+Server: 10.42.x.x:80 (frontend-deploy-xxx)
+Message: Hello from Bob
+Username: Bob
+Password: my-own-password
+```
+
+```bash
+curl http://<NODE-IP>/config
+```
+
+預期輸出：
+```
+APP_MODE=student
+FEATURE_FLAG=true
+```
+
+</details>
+
+---
+
+**🎯 挑戰題：觀察 env 注入 vs Volume 掛載的即時更新差異**
+
+> 剛才你的資料都進去了。現在我們來做一個實驗：改掉 ConfigMap 的值，看看兩個端點的反應有什麼不同。想想看，env 和 Volume 哪個會即時更新？
+>
+> 任務：
+> 1. 用 `kubectl edit configmap app-config` 把 `APP_MODE=student` 改成 `APP_MODE=debug`，USERNAME 也改成別的值
+> 2. 馬上 curl `/frontend` 和 `/config`，記錄結果
+> 3. 等 30-60 秒後再 curl 一次，觀察哪個變了、哪個沒變
+> 4. 執行 `kubectl rollout restart deployment/frontend-deploy`，再 curl 看結果
+
+驗收指令：
+```bash
+# 改完立刻 curl（兩個都還沒變，是正常的）
+curl http://<NODE-IP>/frontend
+curl http://<NODE-IP>/config
+
+# 等 30-60 秒後再 curl（注意 /config 有沒有變）
+curl http://<NODE-IP>/config
+
+# rollout restart 後 curl
+kubectl rollout restart deployment/frontend-deploy
+kubectl get pods -l app=frontend -w
+curl http://<NODE-IP>/frontend
+```
+
+<details>
+<summary>📋 講師參考答案（巡堂用，學員做完才看）</summary>
+
+**步驟 1：edit ConfigMap**
+
+```bash
+kubectl edit configmap app-config
+# 找到 APP_MODE=student → 改成 APP_MODE=debug
+# 找到 USERNAME: Bob → 改成 USERNAME: newBob
+# 儲存離開（:wq）
+```
+
+**步驟 2：馬上 curl → 兩個都沒變**
+
+這是正常的。ConfigMap 剛改完，Pod 不會立刻感知到：
+- `/frontend`（env 注入）：Pod 啟動時就把值固定住了，改 ConfigMap 完全沒用，除非重啟
+- `/config`（Volume 掛載）：kubelet 同步有延遲，還沒刷新
+
+**步驟 3：等 30-60 秒後再 curl**
+
+```bash
+curl http://<NODE-IP>/config    # APP_MODE=debug ← Volume 自動更新了
+curl http://<NODE-IP>/frontend  # Username: Bob ← env 還是舊的
+```
+
+Volume 掛載的 ConfigMap 會由 kubelet 定期同步（預設約 1 分鐘），**不需要重啟 Pod**。
+但 env 注入的值是 Pod 啟動時快照的，**改 ConfigMap 對它無效**。
+
+**步驟 4：rollout restart**
+
+```bash
+kubectl rollout restart deployment/frontend-deploy
+kubectl get pods -l app=frontend -w   # 等新 Pod Running
+curl http://<NODE-IP>/frontend        # Username: newBob ← 重啟後才拿到新值
+```
+
+**結論**
+
+| 注入方式 | ConfigMap 更新後 |
+|---------|----------------|
+| env（`envFrom` / `valueFrom`）| 要 rollout restart 才生效 |
+| Volume 掛載（`volumeMounts`）| kubelet 自動同步，約 30-60 秒 |
+
+</details>
 
 ---
 

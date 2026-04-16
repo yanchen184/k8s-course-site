@@ -692,10 +692,14 @@ kubectl get nodes -o wide   # 看 INTERNAL-IP
 curl http://<NODE-IP>/frontend
 # Server: 10.42.x.x:80 (frontend-deploy-xxx)
 # Message: Hello from frontend
+# Username: guest
+# Password: （未設定）
 
 curl http://<NODE-IP>/api
 # Server: 10.42.x.x:80 (api-deploy-xxx)
-# Message: Hello from api`,
+# Message: Hello from api
+# Username: guest
+# Password: （未設定）`,
     notes: `好，概念講完，動手做。請大家打開終端機。
 
 第一步，確認 Ingress Controller 有在跑。我們用的是 k3s，Traefik 是內建的，安裝 k3s 的時候就自動帶了。
@@ -786,21 +790,25 @@ curl http://api.myapp.local
     ),
     code: `# Step 5：host-based routing
 kubectl apply -f ingress-host.yaml
-# ingress.networking.k8s.io/app-ingress configured
+# ingress.networking.k8s.io/app-ingress-host created
 
 # ⚠ >> 追加，絕對不能用 >
 sudo sh -c 'echo "<NODE-IP> www.myapp.local api.myapp.local" >> /etc/hosts'
 
 grep myapp.local /etc/hosts
-# 192.168.64.10 www.myapp.local api.myapp.local
+# 192.168.43.130 www.myapp.local api.myapp.local
 
 curl http://www.myapp.local
 # Server: 10.42.x.x:80 (frontend-deploy-xxx)
 # Message: Hello from frontend
+# Username: guest
+# Password: （未設定）
 
 curl http://api.myapp.local
 # Server: 10.42.x.x:80 (api-deploy-xxx)
 # Message: Hello from api
+# Username: guest
+# Password: （未設定）
 
 # 排錯
 kubectl describe ingress app-ingress   # 看 Events
@@ -824,11 +832,11 @@ sudo sh -c 'echo "192.168.1.100 www.myapp.local api.myapp.local" >> /etc/hosts'
 
 curl http://www.myapp.local
 
-看到 Nginx 的歡迎頁面。
+看到 Message: Hello from frontend。
 
 curl http://api.myapp.local
 
-看到 httpd 的 It works! 頁面。
+看到 Message: Hello from api。
 
 兩個不同的域名，同一個 IP，但 Ingress Controller 根據 HTTP 請求裡面的 Host header，把流量導到不同的 Service。這就是 Host-based routing。
 

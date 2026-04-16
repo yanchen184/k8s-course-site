@@ -758,10 +758,10 @@ Message: Hello from api
         <div className="bg-slate-800/50 p-4 rounded-lg">
           <p className="text-cyan-400 font-semibold mb-2">Step 5：Host-based routing</p>
           <pre className="text-xs font-mono text-slate-300 bg-slate-900 p-2 rounded">{`kubectl apply -f ingress-host.yaml
-# → ingress.networking.k8s.io/app-ingress configured
+# → ingress.networking.k8s.io/app-ingress-host created
 
 grep myapp.local /etc/hosts
-# → 192.168.64.10 www.myapp.local api.myapp.local`}</pre>
+# → 192.168.43.130 www.myapp.local api.myapp.local`}</pre>
         </div>
 
         <div className="bg-slate-800/50 p-3 rounded-lg">

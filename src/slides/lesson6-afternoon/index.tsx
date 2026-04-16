@@ -3911,11 +3911,11 @@ helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress \\
   --set wordpressPassword=mypass123 \\
   --set mariadb.auth.rootPassword=rootpass123
 
-# 等 Pod 跑起來（約 2-3 分鐘）
+# 等 Pod 跑起來（第一次拉 image 約 5-8 分鐘，請耐心等）
 kubectl get pods -w
 # NAME                              READY   STATUS    RESTARTS   AGE
-# my-blog-wordpress-xxx             1/1     Running   0          2m
-# my-blog-mariadb-0                 1/1     Running   0          2m
+# my-blog-wordpress-xxx             1/1     Running   0          6m
+# my-blog-mariadb-0                 1/1     Running   0          5m
 
 # 找 NodePort
 kubectl get svc my-blog-wordpress

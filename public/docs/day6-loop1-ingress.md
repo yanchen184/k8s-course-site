@@ -274,7 +274,6 @@ Rules:
   *
               /frontend   frontend-svc:80 (10.42.x.x:80,10.42.x.x:80)
               /api        api-svc:80 (10.42.x.x:80,10.42.x.x:80)
-              /config     frontend-svc:80 (10.42.x.x:80,10.42.x.x:80)
 ```
 
 `Backends` 括號裡有 Pod IP → Service 正確找到後端 Pod。括號是空的 → `kubectl get endpoints` 確認 label 有沒有對上。

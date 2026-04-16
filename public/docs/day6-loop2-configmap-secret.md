@@ -816,6 +816,12 @@ configmap/app-config created
 
 **Step 4-7：apply 所有 YAML**
 
+各 YAML 用途說明：
+- `mysql-deploy.yaml`：MySQL Deployment + ClusterIP Service，從 `mysql-secret` 讀密碼
+- `frontend-deploy.yaml`：k8s-demo-app 前端（`/frontend` 顯示 Message/Username）+ ClusterIP Service，從 `app-config` 讀設定
+- `api-deploy.yaml`：k8s-demo-app API（`/api` 顯示 Message: Hello from api）+ ClusterIP Service
+- `app-ingress.yaml`：Path-based Ingress，`/frontend` → frontend-svc，`/api` → api-svc
+
 ```bash
 kubectl apply -f mysql-deploy.yaml -n my-app
 kubectl apply -f frontend-deploy.yaml -n my-app

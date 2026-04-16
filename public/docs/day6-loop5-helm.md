@@ -355,6 +355,14 @@ controller:
 
 **Step 6：自訂 values.yaml — 多環境部署**
 
+> ⚠ **前置：先 uninstall my-ingress**
+> ingress-nginx 的 IngressClass 名稱預設都是 `nginx`，同時間只能有一個 Release 佔用。
+> 先清掉 my-ingress，再裝 dev-ingress，否則會報 `IngressClass "nginx" exists` 衝突錯誤。
+>
+> ```bash
+> helm uninstall my-ingress
+> ```
+
 建立兩個環境的 values 檔：
 
 ```yaml

@@ -230,7 +230,11 @@ a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678
 
 （只會印出一行 container ID，代表容器已在背景啟動）
 
-等幾十秒讓 Rancher 初始化。
+⚠️ **Rancher 第一次啟動需要 2-3 分鐘**，這段時間打開瀏覽器會看到 `API Aggregation not ready`，屬於正常現象，繼續等就好。等到瀏覽器出現 Rancher 登入畫面才算好。可以用以下指令確認 Rancher log：
+
+```bash
+docker logs $(docker ps | grep rancher | awk '{print $1}') 2>&1 | tail -5
+```
 
 > **如果 Port 衝突（k3s 的 Traefik 佔了 80 和 443）**：
 > ```bash

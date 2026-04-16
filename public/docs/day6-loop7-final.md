@@ -150,6 +150,8 @@ NOTES:
 
 **第三步：等 Pod 跑起來**
 
+⚠️ **WordPress + MariaDB image 第一次要從 Docker Hub 拉，需要 5-8 分鐘**，這段時間 Pod 狀態會是 `Init:0/1` 或 `Pending`，屬於正常，繼續等就好。講師可以在等待期間講解 Chart 的架構或回答問題。
+
 ```bash
 kubectl get pods -w
 ```

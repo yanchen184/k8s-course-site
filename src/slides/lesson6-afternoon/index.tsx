@@ -898,22 +898,17 @@ Alice 還在！
   // ── 6-13 學員實作 ──
   {
     title: '學員實作：PV + PVC 故障診斷',
-    subtitle: 'Loop 4 練習題 — 找出 broken-pv-pvc.yaml 的三個 bug',
+    subtitle: '這份 YAML 有三個 bug，找出來修好讓 PostgreSQL 正常啟動',
     section: '6-13：回頭操作 Loop 4',
     duration: '10',
     content: (
       <div className="space-y-4">
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
           <p className="text-red-400 font-semibold mb-2">必做：故障診斷題</p>
-          <p className="text-slate-300 text-sm mb-2">以下 YAML 有三個錯誤，找出來並修好，讓 PostgreSQL 正常啟動並持久化資料</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-0.5">
-            <p><span className="text-slate-500">accessModes:</span></p>
-            <p className="text-red-400">{'  - ReadWriteMany        # 錯誤一'}</p>
-            <p><span className="text-slate-500">storageClassName:</span> <span className="text-red-400">fast   # 錯誤二</span></p>
-            <p><span className="text-slate-500">storage:</span> <span className="text-red-400">2Gi    # 錯誤三（超過 PV 容量）</span></p>
-          </div>
-          <p className="text-slate-400 text-xs mt-2">題目 YAML 只有 PV + PVC，需要自己再加 PostgreSQL Deployment 掛 pg-pvc</p>
-          <p className="text-slate-400 text-xs">修好後：kubectl get pv,pvc → 兩個都是 Bound</p>
+          <p className="text-slate-300 text-sm mb-2">以下 YAML 有三個錯誤，找出來並修好，讓 PostgreSQL 可以正常啟動並持久化資料</p>
+          <p className="text-slate-400 text-xs mb-2">hint：仔細看 PV 和 PVC 的 accessModes、storageClassName、storage 容量</p>
+          <p className="text-slate-400 text-xs">修好後：<code className="text-green-400">kubectl get pv,pvc</code> → 兩個都是 <strong className="text-green-400">Bound</strong></p>
+          <p className="text-slate-400 text-xs mt-1">注意：題目只有 PV + PVC，需要自己再加 PostgreSQL Deployment 掛 pg-pvc</p>
         </div>
 
         <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
@@ -926,7 +921,49 @@ Alice 還在！
         </div>
       </div>
     ),
-    notes: `接下來是大家的實作時間。必做題：打開 broken-pv-pvc.yaml，這個 YAML 有三個錯誤，你要找出來並修好，讓 PostgreSQL 可以正常啟動並持久化資料。線索在 YAML 裡，仔細看 accessModes、storageClassName、還有容量。修好之後 kubectl apply，然後 kubectl get pv,pvc，兩個都要是 Bound 才算成功。挑戰題：在 local-pv 已經被 local-pvc 綁定的情況下，再建一個 local-pvc2，requests 1Gi。觀察 kubectl get pvc，local-pvc2 的 STATUS 是什麼，說明為什麼。大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    code: `# ── 題目 YAML（broken-pv-pvc.yaml）──
+# 這份 YAML 有三個錯誤，找出來！
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pg-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  hostPath:
+    path: /tmp/pg-pv-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-pvc
+spec:
+  accessModes:
+    - ReadWriteMany       # ← bug？
+  storageClassName: fast  # ← bug？
+  resources:
+    requests:
+      storage: 2Gi        # ← bug？
+
+# 修好後測試：
+kubectl apply -f broken-pv-pvc.yaml
+kubectl get pv,pvc
+# 目標：兩個都是 Bound`,
+    notes: `接下來是大家的實作時間。
+
+這份 YAML 有三個錯誤，你要找出來並修好，讓 PostgreSQL 可以正常啟動並持久化資料。題目 YAML 在 code 區塊，自己看、自己找，不要看解答頁。
+
+hint：仔細對照 PV 和 PVC 的三個欄位——accessModes、storageClassName、storage 容量。PVC 要能跟 PV 配對，這三個都要符合。
+
+修好之後 kubectl apply，然後 kubectl get pv,pvc，兩個都要是 Bound 才算成功。
+
+挑戰題：在 local-pv 已經被 local-pvc 綁定的情況下，再建一個 local-pvc2，requests 1Gi。觀察 kubectl get pvc，local-pvc2 的 STATUS 是什麼，說明為什麼。
+
+大家動手做，有問題舉手。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
   // ── 6-13 學員實作解答 ──
@@ -2619,68 +2656,70 @@ kubectl get deploy -l app.kubernetes.io/instance=my-ingress`,
   // ── 6-18B 實作（1/5）：helm show values ──
   {
     title: 'helm show values：看 Chart 有哪些參數',
-    subtitle: '安裝前先看，避免亂猜參數名稱',
+    subtitle: '從輸出讀出參數名稱 → 知道 --set 要打什麼',
     section: '6-18B：Helm 實作 Part 2',
     duration: '5',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">查看 Chart 的所有可設定參數</p>
-          <div className="bg-slate-700/50 p-2 rounded font-mono text-xs text-slate-300">
-            helm show values ingress-nginx/ingress-nginx | head -50
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">為什麼要先看 values？</p>
+          <p className="text-slate-300 text-xs">參數名稱不能亂猜。拼錯了 helm 不會報錯，只是靜默不生效。先看輸出，再決定要改哪個。</p>
+        </div>
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">從輸出讀出 --set 怎麼打</p>
+          <div className="font-mono text-xs bg-slate-900 p-2 rounded text-slate-300 space-y-0.5">
+            <p className="text-slate-500"># helm show values 輸出（節錄）：</p>
+            <p>controller:</p>
+            <p className="pl-4 text-yellow-300">replicaCount: 1</p>
+            <p className="pl-4">service:</p>
+            <p className="pl-8 text-yellow-300">type: LoadBalancer</p>
           </div>
-          <p className="text-slate-400 text-xs mt-2">輸出是完整的 values.yaml，有幾百行，加 | head -50 只看前 50 行</p>
+          <div className="mt-2 space-y-1 text-xs text-slate-300">
+            <p><span className="text-slate-500">↓ 看到 controller.replicaCount: 1，所以：</span></p>
+            <p className="font-mono text-green-400">--set controller.replicaCount=2</p>
+            <p><span className="text-slate-500">↓ 看到 controller.service.type: LoadBalancer，所以：</span></p>
+            <p className="font-mono text-green-400">--set controller.service.type=NodePort</p>
+          </div>
         </div>
         <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
-          <p className="text-blue-300 font-semibold text-sm mb-2">三種覆蓋參數的方式</p>
-          <div className="space-y-1 text-xs text-slate-300">
-            <div className="flex gap-2">
-              <span className="text-yellow-400 w-5">①</span>
-              <span><span className="font-mono text-green-400">--set key=value</span> 直接在指令列設定（簡單修改用）</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-yellow-400 w-5">②</span>
-              <span><span className="font-mono text-green-400">-f values.yaml</span> 用自訂 yaml 檔覆蓋（複雜設定用）</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-yellow-400 w-5">③</span>
-              <span>兩者可以混用，<span className="font-mono text-green-400">-f</span> 先套用，<span className="font-mono text-green-400">--set</span> 後覆蓋</span>
-            </div>
-          </div>
+          <p className="text-blue-300 font-semibold text-xs mb-1">-f 和 --set 都可以覆蓋參數</p>
+          <p className="text-slate-400 text-xs">--set：單一參數快速改 &nbsp;|&nbsp; -f values.yaml：多個參數統一管（推薦）</p>
+          <p className="text-slate-400 text-xs mt-1">混用時：-f 先套用，--set 後覆蓋（優先級更高）</p>
         </div>
       </div>
     ),
-    code: `# 查看 Chart 有哪些可設定的參數
+    code: `# 查看 Chart 有哪些可設定的參數（輸出很長，| head -50 只看前半）
 helm show values ingress-nginx/ingress-nginx | head -50
+# 實際輸出（節錄關鍵部分）：
 # controller:
 #   name: controller
+#   replicaCount: 1          ← 這就是 --set controller.replicaCount=? 的來源
 #   image:
 #     registry: registry.k8s.io
-#     image: ingress-nginx/controller
 #     tag: ""
-#   replicaCount: 1
 #   service:
-#     type: LoadBalancer
+#     type: LoadBalancer      ← 這就是 --set controller.service.type=NodePort 的來源
 #     ports:
 #       http: 80
 #       https: 443
-#   ...（還有幾百行）
+#
+# 規則：YAML 巢狀結構 → 用「.」連接 → 變成 --set 的參數名稱
+# controller.service.type 對應 controller: → service: → type:
 
-# 用 --set 覆蓋單一參數
+# 知道參數名後，--set 覆蓋：
 helm install my-ingress ingress-nginx/ingress-nginx \
-  --set controller.replicaCount=2
+  --set controller.replicaCount=1 \
+  --set controller.service.type=NodePort
 
-# 用 -f 覆蓋多個參數（推薦複雜設定）
-cat values-custom.yaml
-# controller:
-#   replicaCount: 2
-#   service:
-#     type: NodePort
+# 或用 -f 把多個參數寫在 yaml 檔裡（下一張示範）`,
+    notes: `這張的重點不是指令，是「怎麼讀懂輸出」。
 
-helm install my-ingress ingress-nginx/ingress-nginx -f values-custom.yaml`,
-    notes: `helm show values 是很實用的指令，讓你知道可以設定什麼。
+helm show values 印出幾百行 YAML。大家看到這個通常傻眼。
+教學員：你要找的是「我想改的那個功能叫什麼 key」。
 
-重點：參數名稱要完全對應 values.yaml 的結構（巢狀用點分隔），拼錯了 helm 不會報錯，只是不生效。 [▶ 下一頁]`,
+舉例：你想讓 replica 從 1 改成 2，就在輸出裡找 replicaCount，看它在哪個層級下面（controller.replicaCount），然後 --set controller.replicaCount=2。參數名稱就是 YAML 巢狀路徑，用點分隔。
+
+拼錯不會報錯這個要特別強調，因為很多學員以為設了沒效是 bug，其實是打錯參數名。 [▶ 下一頁]`,
   },
 
   // ── 6-18B 實作（2/5）：多環境 values ──

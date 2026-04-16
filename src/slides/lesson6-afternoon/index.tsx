@@ -15,154 +15,95 @@ export const slides: Slide[] = [
   // Loop 4：PV + PVC（6-11, 6-12, 6-13）
   // ============================================================
 
-  // ── 6-11 概念（1/2）：Pod 重啟資料消失 → PV/PVC 解法 ──
+  // ── 6-11 概念（1/6）：為什麼資料會消失？ ──
   {
-    title: 'Pod 重啟 → 資料全消失',
-    subtitle: 'MySQL Pod 刪了重建，資料庫不見了',
-    section: 'Loop 4：PV + PVC',
-    duration: '8',
+    title: '為什麼資料會消失？',
+    subtitle: 'overlay filesystem、emptyDir、真正的持久化',
+    section: '6-11：PV + PVC 概念',
+    duration: '5',
     content: (
       <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">實驗：資料消失了！</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">1.</span>
-              <p>進 MySQL Pod，建 testdb、插入 Alice</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">2.</span>
-              <p>SELECT * FROM users → Alice 在！</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">3.</span>
-              <p><code className="text-green-400">kubectl delete pod -l app=mysql</code></p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">4.</span>
-              <p>新 Pod → USE testdb → <span className="text-red-400 font-bold">ERROR: Unknown database 'testdb'</span></p>
-            </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">Pod 的檔案系統是 overlay filesystem</p>
+          <div className="font-mono text-xs text-slate-400 bg-slate-900 p-3 rounded space-y-1">
+            <p>Pod 刪 → 容器刪 → overlay filesystem 刪 → 資料全不見</p>
+            <p className="text-slate-500 mt-1">/var/lib/mysql 就這樣消失了</p>
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">為什麼？</p>
-          <div className="text-sm text-slate-300 font-mono bg-slate-900 p-2 rounded">
-            <p>Pod 檔案系統 = 容器 overlay filesystem</p>
-            <p>Pod 刪 → 容器刪 → filesystem 刪 → 資料不見</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Docker 也一樣</p>
+          <p className="text-cyan-400 font-semibold mb-3">Docker 也一樣</p>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-red-900/20 border border-red-500/30 p-2 rounded text-center">
-              <p className="text-red-400 text-xs font-semibold">不掛 -v</p>
-              <p className="text-slate-400 text-xs">容器刪 → 資料沒</p>
+            <div className="bg-red-900/20 border border-red-500/30 p-3 rounded text-center">
+              <p className="text-red-400 font-semibold text-xs mb-1">不掛 -v</p>
+              <p className="font-mono text-xs text-slate-400">docker run mysql:8.0</p>
+              <p className="text-slate-400 text-xs mt-1">容器刪 → 資料沒</p>
             </div>
-            <div className="bg-green-900/20 border border-green-500/30 p-2 rounded text-center">
-              <p className="text-green-400 text-xs font-semibold">掛 -v</p>
-              <p className="text-slate-400 text-xs">容器刪 → 資料還在</p>
+            <div className="bg-green-900/20 border border-green-500/30 p-3 rounded text-center">
+              <p className="text-green-400 font-semibold text-xs mb-1">掛 -v</p>
+              <p className="font-mono text-xs text-slate-400">docker run -v mydata:/var/lib/mysql</p>
+              <p className="text-slate-400 text-xs mt-1">容器刪 → 資料還在</p>
             </div>
           </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/30 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">emptyDir 不是持久化</p>
+          <p className="text-slate-300 text-sm">emptyDir 跟 Pod 生命週期綁定，Pod 刪了 emptyDir 也消失。它是讓同一個 Pod 裡多個容器共享暫存資料用的，不能拿來存資料庫。</p>
         </div>
 
         <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">K8s 解法 → PV + PVC</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><strong className="text-white">emptyDir</strong> 跟 Pod 綁定，Pod 刪就沒 → 不能用</p>
-            <p>需要「跟 Pod 無關」的儲存 → <strong className="text-cyan-400">PersistentVolume + PersistentVolumeClaim</strong></p>
-          </div>
+          <p className="text-green-400 font-semibold mb-2">真正持久化 → PV + PVC</p>
+          <p className="text-slate-300 text-sm">需要「跟 Pod 無關」的儲存空間，Pod 來來去去，資料穩穩待著。K8s 的答案是 <strong className="text-cyan-400">PersistentVolume + PersistentVolumeClaim</strong>。</p>
         </div>
       </div>
     ),
-    code: `# 進 MySQL Pod 建資料
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
-> CREATE DATABASE testdb;
-> USE testdb;
-> CREATE TABLE users (id INT, name VARCHAR(50));
-> INSERT INTO users VALUES (1, 'Alice');
-> SELECT * FROM users;    # Alice 在！
-> exit
+    notes: `好，歡迎回來。下午第一個主題是儲存。
 
-# 模擬 Pod 重啟
-kubectl delete pod -l app=mysql
+問大家一個問題：如果你的 MySQL Pod 今天被重啟了，資料還在嗎？
 
-# 新 Pod 起來後再查
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
-> USE testdb;              # ERROR: Unknown database 'testdb'
-# 資料全部不見了！`,
-    notes: `好，歡迎回來。上午我們把 Ingress、ConfigMap、Secret 全部整合在一起了。使用者可以用域名連到你的服務，設定和密碼也不再寫死在 Image 裡面。聽起來一切都很完美，對不對？
+答案是：不在。資料全部消失。
 
-但是我要跟大家做一個殘酷的實驗。
+為什麼？因為 Pod 的檔案系統本質上就是容器的 overlay filesystem。容器啟動的時候，K8s 幫你疊了一層可寫的層。MySQL 把資料寫到 /var/lib/mysql 這個目錄。看起來很正常，但這個目錄其實是活在那個可寫層裡面的。Pod 一被刪，容器被刪，那個可寫層也跟著消失，/var/lib/mysql 就不見了，裡面的所有資料通通沒有。
 
-上午我們部署了 MySQL，用 Secret 管理密碼。現在進 MySQL 建一張表，插入一筆資料。
+用 Docker 來對照，大家比較好理解。docker run mysql:8.0 不掛任何 Volume，容器一刪，資料就沒了，這是一樣的道理。Docker 的解法是掛 -v，-v mydata:/var/lib/mysql，這樣資料存在 Host 的 Volume 裡面，容器怎麼刪都不怕。
 
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
+那有同學可能記得，第四堂課我們講過 emptyDir。emptyDir 是 K8s 的一種 Volume，但是它跟 Pod 的生命週期綁定，Pod 在它才在，Pod 一刪它也消失。emptyDir 的用途是讓同一個 Pod 裡的多個容器可以共享暫存資料，比如說 Sidecar 架構。它不是拿來做資料持久化的。
 
-進去之後打 CREATE DATABASE testdb，然後 USE testdb，CREATE TABLE users (id INT, name VARCHAR(50))，INSERT INTO users VALUES (1, 'Alice')。查一下 SELECT * FROM users，Alice 在，完美。退出 MySQL。
-
-好，現在我模擬一個場景。生產環境很常發生的事情：Pod 因為某些原因被重啟了。可能是 Node 記憶體不夠把 Pod 趕走了，可能是你做了一次 rollout restart，也可能就只是 Pod crash 了。我們用最簡單的方式模擬。
-
-kubectl delete pod -l app=mysql
-
-Pod 被刪了。但別擔心，Deployment 會自動重建一個新的 Pod。等新 Pod 跑起來之後，我們再進 MySQL 看看。
-
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
-
-進去之後打 USE testdb。
-
-ERROR 1049 (42000): Unknown database 'testdb'。
-
-資料全部不見了。不是只有 Alice 不見了，連資料庫本身都不見了。就好像你從來沒建過這個資料庫一樣。
-
-為什麼會這樣？因為 Pod 的檔案系統就是容器的 overlay filesystem。Pod 被刪了，容器被刪了，filesystem 也跟著被刪了，裡面的所有檔案通通消失。MySQL 的資料存在 /var/lib/mysql 這個目錄裡面，Pod 一刪，這個目錄就沒了。
-
-用 Docker 的經驗來想，這件事一點都不意外。你 docker run mysql 的時候如果不掛 -v，容器刪了資料就沒了。Docker 的解法是什麼？掛 Volume。docker run -v mydata:/var/lib/mysql mysql:8.0，資料存在 Volume 裡面，容器怎麼刪都不怕。
-
-那第四堂課我們不是學過 Volume 嗎？有的同學可能記得，第四堂講了一個叫 emptyDir 的東西。emptyDir 確實是一種 Volume，但它有一個致命的問題：它跟 Pod 的生命週期綁定。Pod 在，emptyDir 在。Pod 刪了，emptyDir 也跟著刪了。emptyDir 的用途是讓同一個 Pod 裡面的多個容器共享資料，比如 Sidecar 模式。它不是拿來做資料持久化的。
-
-所以我們需要一種「跟 Pod 無關」的儲存空間。Pod 來來去去，這塊儲存穩穩地待在那裡，不受 Pod 的生死影響。
-
-K8s 提供的方案是兩個東西：PersistentVolume，簡稱 PV，和 PersistentVolumeClaim，簡稱 PVC。 [▶ 下一頁]`,
+所以我們需要的是一種「跟 Pod 完全無關」的儲存空間。Pod 死了又活、活了又死，這塊儲存空間穩穩地待在那裡，不受任何影響。K8s 提供的解法就是 PersistentVolume 跟 PersistentVolumeClaim，簡稱 PV 和 PVC。 [▶ 下一頁]`,
   },
 
-  // ── 6-11 概念（2/2）：PV/PVC 比喻 + AccessMode + ReclaimPolicy ──
+  // ── 6-11 概念（2/6）：PV 跟 PVC 是什麼？ ──
   {
-    title: 'PV + PVC 概念',
-    subtitle: '停車位（PV）+ 租約（PVC）+ K8s 自動配對',
-    section: 'Loop 4：PV + PVC',
-    duration: '8',
+    title: 'PV 跟 PVC 是什麼？',
+    subtitle: '兩層設計：管理員 vs 開發者，停車位比喻',
+    section: '6-11：PV + PVC 概念',
+    duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3 text-center">PV / PVC 關係圖</p>
-          <div className="flex items-start justify-center gap-4 flex-wrap">
-            <div className="border-2 border-amber-500/70 rounded-lg p-3 bg-amber-900/10 min-w-[160px]">
-              <p className="text-amber-400 text-sm font-bold text-center mb-2">管理員</p>
-              <div className="bg-amber-900/40 border border-amber-500/30 px-2 py-2 rounded text-center">
-                <p className="text-amber-300 text-xs font-semibold">建立 PV</p>
-                <p className="text-slate-400 text-[10px]">「10GB SSD 停車位」</p>
-              </div>
+          <p className="text-cyan-400 font-semibold mb-3 text-center">兩層設計</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <div className="border-2 border-amber-500/70 rounded-lg p-3 bg-amber-900/10 min-w-[150px] text-center">
+              <p className="text-amber-400 text-sm font-bold mb-1">管理員</p>
+              <p className="text-amber-300 text-xs font-semibold">建立 PV</p>
+              <p className="text-slate-400 text-xs mt-1">「這裡有 10GB SSD 停車位」</p>
             </div>
-            <div className="flex flex-col items-center justify-center pt-6">
-              <div className="border-2 border-cyan-500/70 rounded-lg px-3 py-2 bg-cyan-900/20">
-                <p className="text-cyan-400 text-xs font-bold">K8s 自動配對</p>
-                <p className="text-slate-400 text-[10px]">Binding</p>
-              </div>
+            <div className="flex flex-col items-center">
+              <span className="text-cyan-400 text-lg">→</span>
+              <p className="text-cyan-400 text-xs font-bold">Binding</p>
+              <p className="text-slate-400 text-[10px]">K8s 自動配對</p>
             </div>
-            <div className="border-2 border-green-500/70 rounded-lg p-3 bg-green-900/10 min-w-[160px]">
-              <p className="text-green-400 text-sm font-bold text-center mb-2">開發者</p>
-              <div className="bg-green-900/40 border border-green-500/30 px-2 py-2 rounded text-center">
-                <p className="text-green-300 text-xs font-semibold">建立 PVC</p>
-                <p className="text-slate-400 text-[10px]">「我要 5GB 停車位租約」</p>
-              </div>
+            <div className="border-2 border-green-500/70 rounded-lg p-3 bg-green-900/10 min-w-[150px] text-center">
+              <p className="text-green-400 text-sm font-bold mb-1">開發者</p>
+              <p className="text-green-300 text-xs font-semibold">建立 PVC</p>
+              <p className="text-slate-400 text-xs mt-1">「我要租 5GB 的停車位」</p>
             </div>
           </div>
           <div className="flex justify-center mt-3">
-            <div className="bg-blue-900/40 border border-blue-500/50 px-4 py-2 rounded-lg">
-              <p className="text-blue-400 text-xs font-bold text-center">Pod 拿著租約去停車</p>
-              <p className="text-slate-400 text-[10px] text-center">volumes: persistentVolumeClaim</p>
+            <div className="bg-blue-900/40 border border-blue-500/50 px-4 py-2 rounded-lg text-center">
+              <p className="text-blue-400 text-xs font-bold">Pod 拿著租約去停車</p>
+              <p className="text-slate-400 text-[10px]">volumes: persistentVolumeClaim</p>
             </div>
           </div>
         </div>
@@ -173,171 +114,499 @@ K8s 提供的方案是兩個東西：PersistentVolume，簡稱 PV，和 Persiste
             <thead>
               <tr className="text-slate-400 border-b border-slate-600">
                 <th className="text-left py-2 w-40">Docker</th>
-                <th className="text-left py-2 w-36">K8s</th>
-                <th className="text-left py-2">角色</th>
+                <th className="text-left py-2">K8s</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
               <tr className="border-b border-slate-700">
                 <td className="py-2 font-mono text-xs">docker volume create</td>
-                <td className="py-2">PersistentVolume (PV)</td>
-                <td className="py-2">建立儲存空間</td>
+                <td className="py-2">PersistentVolume (PV)　建立儲存空間</td>
               </tr>
               <tr>
                 <td className="py-2 font-mono text-xs">-v mydata:/var/lib/mysql</td>
-                <td className="py-2">PersistentVolumeClaim (PVC)</td>
-                <td className="py-2">使用儲存空間</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">AccessMode（存取模式）</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-2 w-36">模式</th>
-                <th className="text-left py-2 w-16">縮寫</th>
-                <th className="text-left py-2">意思</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-2">ReadWriteOnce</td>
-                <td className="py-2 font-semibold text-cyan-400">RWO</td>
-                <td className="py-2">一個 Node 讀寫（最常用）</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-2">ReadOnlyMany</td>
-                <td className="py-2 font-semibold text-cyan-400">ROX</td>
-                <td className="py-2">多個 Node 唯讀</td>
-              </tr>
-              <tr>
-                <td className="py-2">ReadWriteMany</td>
-                <td className="py-2 font-semibold text-cyan-400">RWX</td>
-                <td className="py-2">多個 Node 讀寫（需 NFS）</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">ReclaimPolicy（回收策略）</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-2 w-24">策略</th>
-                <th className="text-left py-2">行為</th>
-                <th className="text-left py-2 w-32">適合</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-2 text-cyan-400 font-semibold">Retain</td>
-                <td className="py-2">PVC 刪了，PV 和資料保留</td>
-                <td className="py-2">生產環境</td>
-              </tr>
-              <tr>
-                <td className="py-2 text-cyan-400 font-semibold">Delete</td>
-                <td className="py-2">PVC 刪了，PV 和資料一起刪</td>
-                <td className="py-2">開發/雲端</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    ),
-    notes: `我用一個生活化的比喻來解釋。PV 就像停車場裡的停車位。停車場管理員，也就是 K8s 管理員，負責規劃停車位：這裡有一個 10GB 的位子，那裡有一個 50GB 的位子，這個是 SSD 的高級車位，那個是 HDD 的普通車位。管理員把這些車位劃好，就是建立 PV。
-
-PVC 就像停車位租約。開發者說：「我的 MySQL 需要一個 5GB 的停車位，要能讀寫。」這就是建立 PVC。開發者不需要知道底層是 NFS 還是 SSD 還是雲端磁碟，他只要說「我要多大、什麼模式」就好。
-
-然後 K8s 自動幫你配對。它看看有沒有合適的 PV 能滿足這個 PVC 的需求，找到了就把它們綁在一起，這個過程叫 Binding。配對成功之後，Pod 就可以透過 PVC 掛載這塊儲存空間了。
-
-對照 Docker 來看。docker volume create mydata 就像建立 PV，創造一塊儲存空間。docker run -v mydata:/var/lib/mysql 就像 PVC，把那塊儲存空間掛到容器裡。Docker 把這兩步合在一起了，K8s 把它拆成兩步。
-
-為什麼要拆？因為職責分離。在大公司裡面，管儲存的人跟寫程式的人不是同一個人。基礎架構團隊負責「我們公司有幾台 NAS、幾塊 SSD、每塊多大」，這是 PV。應用開發團隊只要說「我的 App 需要 10GB 空間」，這是 PVC。開發者不需要知道底層的實作細節。
-
-PV 有兩個重要的屬性要知道。第一個是 AccessMode，存取模式。RWO，ReadWriteOnce，同時只能被一個 Node 掛載讀寫，這是最常用的，資料庫通常用這個。ROX，ReadOnlyMany，可以被多個 Node 唯讀掛載，適合存靜態檔案。RWX，ReadWriteMany，可以被多個 Node 同時讀寫，但不是所有儲存系統都支援，通常需要 NFS 之類的網路儲存。
-
-第二個是 ReclaimPolicy，回收策略。當 PVC 被刪掉的時候，PV 裡的資料怎麼處理？Retain 是保留，PVC 刪了但 PV 和資料都還在，管理員可以手動決定要不要清理。生產環境通常用這個，因為資料不能隨便丟。Delete 是刪除，PVC 一刪 PV 也跟著刪，資料也消失。雲端環境常用這個，PVC 刪了對應的 EBS 磁碟也一起刪掉省錢。
-
-靜態佈建的流程是這樣的：管理員先建 PV，開發者建 PVC，K8s 自動配對，Pod 掛 PVC 使用。概念講完了，下一支影片我們來動手做。 [▶ 下一頁]`,
-  },
-
-  // ── 6-12 實作（1/2）：PV + PVC YAML + 部署驗證 ──
-  {
-    title: 'Lab：PV + PVC 靜態佈建',
-    subtitle: 'PV YAML + PVC YAML + MySQL Deployment 掛載',
-    section: 'Loop 4：PV + PVC',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">PV YAML 四重點</p>
-          <table className="w-full text-sm">
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-2 pr-4 text-cyan-400 font-semibold w-40">capacity</td>
-                <td className="py-2">storage: 2Gi</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-2 pr-4 text-cyan-400 font-semibold">accessModes</td>
-                <td className="py-2">ReadWriteOnce</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-2 pr-4 text-cyan-400 font-semibold">reclaimPolicy</td>
-                <td className="py-2">Retain</td>
-              </tr>
-              <tr>
-                <td className="py-2 pr-4 text-cyan-400 font-semibold">hostPath</td>
-                <td className="py-2">/tmp/k8s-pv-data（學習用，生產用 NFS/雲端磁碟）</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">PVC YAML 三重點</p>
-          <table className="w-full text-sm">
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-2 pr-4 text-cyan-400 font-semibold w-40">accessModes</td>
-                <td className="py-2">ReadWriteOnce（跟 PV 一致）</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-2 pr-4 text-cyan-400 font-semibold">requests.storage</td>
-                <td className="py-2">1Gi（PV 有 2Gi，夠用就配對）</td>
-              </tr>
-              <tr>
-                <td className="py-2 pr-4 text-cyan-400 font-semibold">storageClassName</td>
-                <td className="py-2">manual（跟 PV 一致才能配對）</td>
+                <td className="py-2">PersistentVolumeClaim (PVC)　使用儲存空間</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-xs mb-2">storageClassName 三種寫法</p>
-          <div className="font-mono text-xs space-y-1">
-            <div className="flex gap-2">
-              <span className="text-green-400 w-48">storageClassName: manual</span>
-              <span className="text-slate-400">自訂名稱，靜態配對（本節用法）</span>
+          <p className="text-cyan-400 font-semibold text-sm mb-2">為什麼要拆成兩層？</p>
+          <p className="text-slate-300 text-sm">職責分離。管理員管「公司有幾塊磁碟、在哪裡」，開發者只說「我需要多大空間」，彼此不需要知道對方的細節。</p>
+        </div>
+      </div>
+    ),
+    notes: `我用一個生活化的比喻來解釋 PV 和 PVC。
+
+PV 就像停車場裡的停車位。停車場管理員，也就是 K8s 的管理員，負責規劃停車位：這裡有一個 10GB 的位子，那裡有一個 50GB 的位子，這個是 SSD 的高級車位，那個是 HDD 的普通車位。管理員把這些車位劃好，就是建立 PV。
+
+PVC 就像停車位租約。開發者說：「我的 MySQL 需要一個 5GB 的停車位，要能讀寫。」這就是建立 PVC。開發者完全不需要知道底層是 NFS 還是 SSD 還是雲端磁碟，他只要說「我要多大、什麼存取方式」就好。
+
+然後 K8s 自動幫你配對。找到合適的 PV 滿足 PVC 的需求，把它們綁在一起，這個過程叫 Binding。配對成功之後，Pod 就可以透過 PVC 掛載這塊儲存空間了。
+
+對照 Docker 來看就很清楚。docker volume create 就像建立 PV。docker run -v mydata:/var/lib/mysql 就像建立 PVC 並掛載。Docker 把這兩步合在一起了，K8s 把它拆成兩層。
+
+拆成兩層的原因是職責分離。在大公司裡面，管儲存的人跟寫程式的人不是同一個人。基礎架構團隊管 PV，應用開發團隊管 PVC，雙方互不干擾。 [▶ 下一頁]`,
+  },
+
+  // ── 6-11 概念（3/6）：AccessMode ──
+  {
+    title: 'AccessMode 存取模式',
+    subtitle: 'RWO / ROX / RWX — 誰能掛、能讀還是能寫',
+    section: '6-11：PV + PVC 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">三種 AccessMode</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-2 w-16">縮寫</th>
+                <th className="text-left py-2 w-40">全名</th>
+                <th className="text-left py-2">意思</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 font-semibold text-cyan-400">RWO</td>
+                <td className="py-2">ReadWriteOnce</td>
+                <td className="py-2">單一 Node 可讀寫（最常用，資料庫用這個）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 font-semibold text-cyan-400">ROX</td>
+                <td className="py-2">ReadOnlyMany</td>
+                <td className="py-2">多個 Node 唯讀（靜態檔案共享）</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-cyan-400">RWX</td>
+                <td className="py-2">ReadWriteMany</td>
+                <td className="py-2">多個 Node 讀寫（需要 NFS / AWS EFS）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/30 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">hostPath 只支援 RWO</p>
+          <p className="text-slate-300 text-sm">今天 Lab 用的 hostPath 是 Node 本機的目錄，只能讓同一個 Node 上的 Pod 掛載，所以只支援 RWO。生產環境如果要 RWX，需要用 NFS 或雲端的共享儲存（如 AWS EFS、Azure Files）。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-slate-400 text-xs font-semibold mb-2">重點提醒</p>
+          <p className="text-slate-300 text-sm">PVC 的 accessModes 必須是 PV 支援的模式的子集，才能配對成功。</p>
+        </div>
+      </div>
+    ),
+    notes: `PV 有一個很重要的屬性叫 AccessMode，存取模式，決定這塊儲存可以怎麼被掛載。
+
+第一個是 RWO，ReadWriteOnce。同時只能被一個 Node 讀寫。注意是 Node 不是 Pod，同一個 Node 上的多個 Pod 可以同時掛載同一個 RWO 的 PV。資料庫通常用 RWO，MySQL、PostgreSQL 都是，因為資料庫本身負責並發控制，不需要讓多個 Node 同時寫。
+
+第二個是 ROX，ReadOnlyMany。可以被多個 Node 唯讀掛載。適合存放靜態內容，比如說前端的靜態檔案，多個 Node 上的 Pod 都可以讀，但沒有人可以寫。
+
+第三個是 RWX，ReadWriteMany。可以被多個 Node 同時讀寫。但不是所有儲存系統都支援這個模式。今天 Lab 用的 hostPath，就是 Node 本機的目錄，只支援 RWO。如果你需要 RWX，要用 NFS 這類網路共享儲存，或者雲端上的 AWS EFS、Azure Files。
+
+記住一個原則：PVC 設定的 accessModes 必須是 PV 支援的模式才能配對。你的 PV 只有 RWO，但 PVC 要求 RWX，那就配不上，PVC 會一直 Pending。 [▶ 下一頁]`,
+  },
+
+  // ── 6-11 概念（4/6）：ReclaimPolicy ──
+  {
+    title: 'ReclaimPolicy 回收策略',
+    subtitle: 'Retain vs Delete — PVC 刪了，資料怎麼處理？',
+    section: '6-11：PV + PVC 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">兩種 ReclaimPolicy</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-2 w-24">策略</th>
+                <th className="text-left py-2">PVC 刪了之後的行為</th>
+                <th className="text-left py-2 w-32">適合場景</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 text-cyan-400 font-semibold">Retain</td>
+                <td className="py-2">PV 和資料保留，狀態變 Released，等管理員手動處理</td>
+                <td className="py-2">生產環境</td>
+              </tr>
+              <tr>
+                <td className="py-2 text-cyan-400 font-semibold">Delete</td>
+                <td className="py-2">PVC 刪了，PV 和底層磁碟資料一起自動刪除</td>
+                <td className="py-2">雲端 / 開發環境</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm mb-1">本課用 Retain</p>
+          <p className="text-slate-300 text-sm">學習階段用 Retain，資料不會因為誤刪 PVC 而消失，管理員還有機會找回來。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">退租車位比喻</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold w-16 shrink-0">Retain</span>
+              <span>租約（PVC）退了，車位（PV）還在，鑰匙還留著，管理員可以決定要不要重新出租</span>
             </div>
-            <div className="flex gap-2">
-              <span className="text-green-400 w-48">storageClassName: local-path</span>
-              <span className="text-slate-400">指定 StorageClass，動態建 PV</span>
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold w-16 shrink-0">Delete</span>
+              <span>租約退了，車位直接拆掉，重新鋪草皮，什麼都沒了</span>
             </div>
-            <div className="flex gap-2">
-              <span className="text-green-400 w-48">storageClassName: ""</span>
-              <span className="text-slate-400 text-red-300">空字串 = 強制靜態，不用任何 StorageClass</span>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `ReclaimPolicy 是回收策略，決定 PVC 被刪掉的時候，PV 裡面的資料要怎麼處理。
+
+第一個是 Retain，保留。PVC 刪了，PV 的狀態會從 Bound 變成 Released，但是資料還在。這個時候 PV 不能被其他 PVC 直接使用，需要管理員手動去確認資料沒問題之後，才能清理或重新綁定。生產環境通常用 Retain，因為資料是公司最重要的資產，不能因為某個人不小心刪了 PVC 就把資料庫資料一起刪掉。
+
+第二個是 Delete，刪除。PVC 刪了，PV 跟著刪，底層的磁碟資料也一起清掉。雲端環境常用這個，比如 AWS 的 EBS 磁碟，PVC 刪了對應的 EBS Volume 也自動刪掉，不用付額外的磁碟費用。開發環境也會用，因為開發環境的資料本來就可以重建。
+
+用退租車位來想：Retain 就是你退租了，車位還在，管理員可以決定接下來要怎麼用。Delete 就是你退租了，車位直接拆掉，寸草不留。
+
+今天 Lab 我們用 Retain。因為我們是學習環境，Retain 更安全，就算你不小心刪了 PVC，資料還在，我們還有機會處理。 [▶ 下一頁]`,
+  },
+
+  // ── 6-11 概念（5/6）：靜態佈建流程 ──
+  {
+    title: '靜態佈建流程',
+    subtitle: '管理員建 PV → 開發者建 PVC → 自動 Binding → Pod 掛載',
+    section: '6-11：PV + PVC 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-4 text-center">靜態佈建流程</p>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-amber-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">1</div>
+              <div className="bg-amber-900/20 border border-amber-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-amber-300 text-sm font-semibold">管理員建立 PV</p>
+                <p className="text-slate-400 text-xs font-mono">kind: PersistentVolume　2Gi，RWO，hostPath</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pl-3">
+              <span className="text-slate-500 text-lg">↓</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">2</div>
+              <div className="bg-green-900/20 border border-green-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-green-300 text-sm font-semibold">開發者建立 PVC</p>
+                <p className="text-slate-400 text-xs font-mono">kind: PersistentVolumeClaim　1Gi，RWO，storageClassName: manual</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pl-3">
+              <span className="text-slate-500 text-lg">↓</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">3</div>
+              <div className="bg-cyan-900/20 border border-cyan-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-cyan-300 text-sm font-semibold">K8s 自動 Binding</p>
+                <p className="text-slate-400 text-xs">storageClassName 一致 + accessModes 符合 + 容量夠 → STATUS: Bound</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pl-3">
+              <span className="text-slate-500 text-lg">↓</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-blue-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">4</div>
+              <div className="bg-blue-900/20 border border-blue-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-blue-300 text-sm font-semibold">Pod 掛載 PVC</p>
+                <p className="text-slate-400 text-xs font-mono">volumes: persistentVolumeClaim: claimName: local-pvc</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pl-3">
+              <span className="text-slate-500 text-lg">↓</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">5</div>
+              <div className="bg-purple-900/20 border border-purple-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-purple-300 text-sm font-semibold">資料跟著 PV 走</p>
+                <p className="text-slate-400 text-xs">Pod 刪了重建，掛同一個 PVC → 資料還在</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `靜態佈建的流程我再整理一遍，讓大家在動手之前先在腦袋裡跑過一遍。
+
+第一步，管理員建立 PV。我們今天的 PV 叫 local-pv，2GB 的空間，ReadWriteOnce，用 hostPath 指到 Node 本機的 /tmp/k8s-pv-data 這個目錄，storageClassName 是 manual。
+
+第二步，開發者建立 PVC。我們的 PVC 叫 local-pvc，申請 1GB，ReadWriteOnce，storageClassName 也是 manual。
+
+第三步，K8s 自動 Binding。K8s 看到 PVC 建立了，去找有沒有合適的 PV：storageClassName 一樣嗎？accessModes 符合嗎？PV 的容量夠嗎？三個條件都滿足，就把 local-pv 和 local-pvc 綁在一起，兩個的狀態都變成 Bound。
+
+第四步，Pod 掛載 PVC。Deployment 的 YAML 裡面，volumes 那裡引用 local-pvc，volumeMounts 把它掛到 /var/lib/mysql。這樣 MySQL 寫到 /var/lib/mysql 的資料就存到 PV 裡面了。
+
+第五步，資料跟著 PV 走。Pod 刪了，新的 Pod 起來，掛同一個 PVC，讀到同一個 PV，資料還在。Pod 的生死跟資料再也沒有關係了。
+
+好，概念講完了，下一節我們直接來做。 [▶ 下一頁]`,
+  },
+
+  // ── 6-11 概念（6/6）：今天要做的事 ──
+  {
+    title: '今天要做的事',
+    subtitle: '一個 YAML 建 PV + PVC + MySQL，驗證資料在 Pod 重建後還在',
+    section: '6-11：PV + PVC 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">Lab 目標</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold shrink-0">①</span>
+              <p>用一個 YAML 同時建立 PV、PVC、MySQL Deployment（含 PVC 掛載）</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold shrink-0">②</span>
+              <p>確認 PV 和 PVC 都是 <strong className="text-green-400">Bound</strong> 狀態</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold shrink-0">③</span>
+              <p>進 MySQL 建 testdb，插入 Alice</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold shrink-0">④</span>
+              <p>砍 Pod，等新 Pod 起來</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold shrink-0">⑤</span>
+              <p>再進 MySQL，SELECT → <strong className="text-green-400">Alice 還在！</strong></p>
             </div>
           </div>
         </div>
 
-        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
-          <p className="text-amber-400 font-semibold text-sm">配對關鍵</p>
-          <p className="text-slate-300 text-xs mt-1">storageClassName 一致 + accessModes 一致 + PV 容量 &ge; PVC 需求</p>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">關鍵 YAML 結構</p>
+          <div className="font-mono text-xs text-slate-400 space-y-1">
+            <p><span className="text-yellow-400">pv-pvc.yaml</span>  包含三個 K8s 物件</p>
+            <p className="ml-4">── PersistentVolume <span className="text-slate-500">（local-pv，2Gi，hostPath）</span></p>
+            <p className="ml-4">── PersistentVolumeClaim <span className="text-slate-500">（local-pvc，1Gi）</span></p>
+            <p className="ml-4">── Deployment <span className="text-slate-500">（mysql，掛 local-pvc 到 /var/lib/mysql）</span></p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">驗收標準</p>
+          <p className="text-slate-300 text-sm mt-1">砍 Pod 之後重新查詢，Alice 還在 → PV/PVC 設定正確。</p>
+        </div>
+      </div>
+    ),
+    notes: `好，今天 6-11 和 6-12 要做的事情我先講清楚。
+
+我們會用一個叫 pv-pvc.yaml 的檔案，裡面一次定義三個 K8s 物件：PV、PVC、還有 MySQL Deployment。一個 YAML 搞定全部。
+
+部署之後，先用 kubectl get pv 和 kubectl get pvc 確認兩個都是 Bound 狀態。Bound 表示配對成功，資料存到 PV 了。
+
+然後進 MySQL，建 testdb 資料庫，建一張 users 表，插入 Alice 這筆資料，查一下確認 Alice 在。
+
+接著砍 Pod，kubectl delete pod -l app=mysql。Deployment 會自動重建一個新的 Pod。
+
+等新 Pod 跑起來，再進 MySQL，USE testdb，SELECT * FROM users。
+
+如果你看到 Alice，恭喜，PV/PVC 設定成功。資料不再活在容器裡了，而是活在 PV 裡面，Pod 怎麼死都不怕。
+
+這個驗收標準很直觀：砍 Pod 之後 Alice 還在，就是成功。 [▶ 下一頁]`,
+  },
+
+  // ── 6-12 實作（1/7）：靜態佈建流程圖（實作開場）──
+  {
+    title: '靜態佈建流程（複習）',
+    subtitle: '動手前再看一眼流程',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-4 text-center">靜態佈建流程</p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-amber-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">1</div>
+              <div className="bg-amber-900/20 border border-amber-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-amber-300 text-sm font-semibold">管理員建立 PV</p>
+              </div>
+            </div>
+            <div className="pl-6"><span className="text-slate-500">↓</span></div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">2</div>
+              <div className="bg-green-900/20 border border-green-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-green-300 text-sm font-semibold">開發者建立 PVC</p>
+              </div>
+            </div>
+            <div className="pl-6"><span className="text-slate-500">↓</span></div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">3</div>
+              <div className="bg-cyan-900/20 border border-cyan-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-cyan-300 text-sm font-semibold">K8s 自動 Binding → STATUS: Bound</p>
+              </div>
+            </div>
+            <div className="pl-6"><span className="text-slate-500">↓</span></div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-blue-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">4</div>
+              <div className="bg-blue-900/20 border border-blue-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-blue-300 text-sm font-semibold">Pod 掛載 PVC</p>
+              </div>
+            </div>
+            <div className="pl-6"><span className="text-slate-500">↓</span></div>
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0">5</div>
+              <div className="bg-purple-900/20 border border-purple-500/30 px-3 py-2 rounded flex-1">
+                <p className="text-purple-300 text-sm font-semibold">資料跟著 PV 走，Pod 怎麼死都不怕</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg">
+          <p className="text-blue-400 font-semibold text-sm">現在開始動手</p>
+          <p className="text-slate-300 text-sm mt-1">接下來逐步執行這個流程，最後砍 Pod 確認資料還在。</p>
+        </div>
+      </div>
+    ),
+    notes: `好，概念都看過了，現在來動手。
+
+大家先確認叢集還在跑：kubectl get nodes，兩個 Node 都是 Ready 就可以了。
+
+我們這次用一個叫 pv-pvc.yaml 的檔案，裡面包含 PV、PVC 和 MySQL Deployment 三個物件，一次 apply 搞定。
+
+流程就是我們在 6-11 講的那五步：PV → PVC → Binding → Pod 掛載 → 資料跟著走。
+
+下一張開始看 YAML 長什麼樣子。 [▶ 下一頁]`,
+  },
+
+  // ── 6-12 實作（2/7）：實作步驟清單 ──
+  {
+    title: '實作步驟',
+    subtitle: '5 個步驟跑完，Alice 還在就成功',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">5 個步驟</p>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">1</div>
+              <div>
+                <p className="text-slate-200 text-sm font-semibold">套用 YAML</p>
+                <p className="font-mono text-xs text-green-400">kubectl apply -f pv-pvc.yaml</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">2</div>
+              <div>
+                <p className="text-slate-200 text-sm font-semibold">確認 Bound 狀態</p>
+                <p className="font-mono text-xs text-green-400">kubectl get pv && kubectl get pvc</p>
+                <p className="text-slate-400 text-xs mt-0.5">PV 和 PVC 的 STATUS 都要是 Bound</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">3</div>
+              <div>
+                <p className="text-slate-200 text-sm font-semibold">進 MySQL 寫資料</p>
+                <p className="text-slate-400 text-xs">CREATE DATABASE testdb → INSERT Alice → SELECT 確認</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">4</div>
+              <div>
+                <p className="text-slate-200 text-sm font-semibold">砍 Pod</p>
+                <p className="font-mono text-xs text-green-400">kubectl delete pod -l app=mysql</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-500/80 flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">5</div>
+              <div>
+                <p className="text-slate-200 text-sm font-semibold">驗資料還在</p>
+                <p className="text-slate-400 text-xs">等新 Pod 起來 → 進 MySQL → SELECT → Alice 還在！</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `這是今天實作的五個步驟，大家照這個順序跑。
+
+第一步，kubectl apply -f pv-pvc.yaml，一次建立 PV、PVC 和 MySQL Deployment。
+
+第二步，kubectl get pv 和 kubectl get pvc，確認兩個都是 Bound。如果有任何一個是 Pending，先不要繼續，排查配對問題。
+
+第三步，進 MySQL 寫資料。建 testdb，建 users 表，插入 Alice，SELECT 確認。
+
+第四步，kubectl delete pod -l app=mysql，砍 Pod。Deployment 會自動重建。
+
+第五步，等新 Pod 起來，再進 MySQL，SELECT，Alice 還在就是成功。
+
+每一步我都會帶著大家做，下面先看 YAML。 [▶ 下一頁]`,
+  },
+
+  // ── 6-12 實作（3/7）：完整 pv-pvc.yaml YAML 說明 ──
+  {
+    title: 'pv-pvc.yaml 完整說明',
+    subtitle: 'PV 2Gi + PVC 1Gi + MySQL Deployment',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">PV 關鍵設定</p>
+          <table className="w-full text-sm">
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-4 text-cyan-400 font-semibold w-44">capacity.storage</td>
+                <td className="py-2">2Gi（PV 的實際大小）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-4 text-cyan-400 font-semibold">storageClassName</td>
+                <td className="py-2 font-mono text-xs">manual（PVC 也要一樣才能配對）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-4 text-cyan-400 font-semibold">hostPath.path</td>
+                <td className="py-2 font-mono text-xs">/tmp/k8s-pv-data（Node 本機目錄）</td>
+              </tr>
+              <tr>
+                <td className="py-2 pr-4 text-cyan-400 font-semibold">reclaimPolicy</td>
+                <td className="py-2">Retain（PVC 刪了資料保留）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">PVC 關鍵設定</p>
+          <table className="w-full text-sm">
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-4 text-cyan-400 font-semibold w-44">requests.storage</td>
+                <td className="py-2">1Gi（申請量，PV 有 2Gi，夠用就配對）</td>
+              </tr>
+              <tr>
+                <td className="py-2 pr-4 text-cyan-400 font-semibold">storageClassName</td>
+                <td className="py-2 font-mono text-xs">manual（跟 PV 完全一致）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">MySQL Deployment 掛載 PVC</p>
+          <div className="font-mono text-xs text-slate-400 space-y-1">
+            <p><span className="text-yellow-400">volumes:</span></p>
+            <p className="ml-4">- name: mysql-storage</p>
+            <p className="ml-6">persistentVolumeClaim:</p>
+            <p className="ml-8 text-green-400">claimName: local-pvc</p>
+            <p className="mt-2"><span className="text-yellow-400">volumeMounts:</span></p>
+            <p className="ml-4">- name: mysql-storage</p>
+            <p className="ml-6 text-green-400">mountPath: /var/lib/mysql</p>
+          </div>
         </div>
       </div>
     ),
@@ -367,143 +636,191 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: manual`,
-    notes: `好，上一支影片講了 PV 和 PVC 的概念，這支影片直接動手做。大家打開終端機，確認叢集還在跑。
-
-首先我們來看 YAML 怎麼寫。先看 PV。
-
-apiVersion 是 v1，kind 是 PersistentVolume，metadata 裡面 name 叫 local-pv。spec 裡面有四個重點。第一個 capacity，storage 是 2Gi，表示這塊 PV 有 2GB 的空間。第二個 accessModes，設 ReadWriteOnce，只能一個 Node 讀寫。第三個 persistentVolumeReclaimPolicy 設 Retain，PVC 刪了資料保留。第四個 hostPath，path 是 /tmp/k8s-pv-data，表示用 Node 本機的這個目錄當儲存空間。hostPath 是最簡單的 PV 類型，就是用 Node 上的一個目錄，學習的時候用來練手。生產環境不會用 hostPath，會用 NFS、雲端磁碟之類的。最後一個 storageClassName 設成 manual，等一下 PVC 要用同一個名字來配對。
-
-再看 PVC。apiVersion 是 v1，kind 是 PersistentVolumeClaim，metadata 裡面 name 叫 local-pvc。spec 裡面 accessModes 設 ReadWriteOnce，跟 PV 一致。resources 的 requests 裡面 storage 是 1Gi，表示我申請 1GB 的空間。storageClassName 是 manual，跟 PV 的 storageClassName 一致。K8s 會根據 storageClassName 和 accessModes 去找合適的 PV。PV 有 2GB，PVC 要 1GB，空間夠，就配對成功。 [▶ 下一頁]`,
-  },
-
-  // ── 6-12 實作（2/2）：MySQL 掛載 PVC + 關鍵實驗 ──
-  {
-    title: 'Lab：MySQL 掛 PVC → 砍 Pod → 資料還在！',
-    subtitle: 'Deployment volumeMounts + PVC 掛載驗證',
-    section: 'Loop 4：PV + PVC',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">操作流程</p>
-          <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
-            <li><code className="text-green-400">kubectl apply -f pv-pvc.yaml</code></li>
-            <li><code className="text-green-400">kubectl get pv</code> -- STATUS: Bound</li>
-            <li><code className="text-green-400">kubectl get pvc</code> -- STATUS: Bound</li>
-            <li>進 MySQL 建 testdb、插入 Alice</li>
-            <li><code className="text-green-400">kubectl delete pod -l app=mysql</code></li>
-            <li>新 Pod 起來 → USE testdb → <span className="text-green-400 font-bold">Alice 還在！</span></li>
-          </ol>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">關鍵對比</p>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-red-900/20 border border-red-500/30 p-3 rounded text-center">
-              <p className="text-red-400 font-semibold mb-1">沒掛 PVC</p>
-              <p className="text-slate-400 text-xs">刪 Pod → 資料消失</p>
-            </div>
-            <div className="bg-green-900/20 border border-green-500/30 p-3 rounded text-center">
-              <p className="text-green-400 font-semibold mb-1">有掛 PVC</p>
-              <p className="text-slate-400 text-xs">刪 Pod → 資料還在！</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Deployment 掛 PVC 的寫法</p>
-          <p className="text-slate-300 text-xs">volumes 引用 PVC，volumeMounts 掛到 /var/lib/mysql</p>
-        </div>
-
-        <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
-          <p className="text-slate-400 text-xs font-semibold mb-1">kubectl get pv,pvc 預期輸出</p>
-          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`NAME         CAPACITY  ACCESS MODES  STATUS  CLAIM
-local-pv     2Gi       RWO           Bound   default/local-pvc
-
-NAME        STATUS  VOLUME    CAPACITY
-local-pvc   Bound   local-pv  2Gi`}</pre>
-          <p className="text-slate-500 text-xs mt-1">PVC 顯示的容量是 PV 的容量（2Gi），不是你申請的 1Gi</p>
-        </div>
-
-        <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
-          <p className="text-red-400 text-xs font-semibold mb-1">PVC 一直 Pending？三個原因</p>
-          <table className="w-full text-xs">
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-1 pr-2 text-red-400">storageClassName 不一致</td>
-                <td className="py-1">PV 和 PVC 要完全相同</td>
-              </tr>
-              <tr className="border-b border-slate-700">
-                <td className="py-1 pr-2 text-red-400">accessModes 不匹配</td>
-                <td className="py-1">PVC 要 RWX 但 PV 只有 RWO</td>
-              </tr>
-              <tr>
-                <td className="py-1 pr-2 text-red-400">容量不夠</td>
-                <td className="py-1">PVC 申請 5Gi 但 PV 只有 2Gi</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    ),
-    code: `# Deployment 掛載 PVC（差異部分）
+  storageClassName: manual
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deploy
 spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
   template:
+    metadata:
+      labels:
+        app: mysql
     spec:
       containers:
         - name: mysql
           image: mysql:8.0
+          envFrom:
+            - secretRef:
+                name: mysql-sts-secret
           volumeMounts:
             - name: mysql-storage
               mountPath: /var/lib/mysql
       volumes:
         - name: mysql-storage
           persistentVolumeClaim:
-            claimName: local-pvc    # 引用 PVC
+            claimName: local-pvc`,
+    notes: `現在來看 YAML。
 
-# 部署 + 驗證
+PV 的部分。kind 是 PersistentVolume，name 叫 local-pv。spec 裡面幾個重點。capacity.storage 是 2Gi，這是這塊 PV 實際的大小。storageClassName 是 manual，等一下 PVC 要填一樣的名字。hostPath.path 是 /tmp/k8s-pv-data，就是用 Node 本機的這個目錄當儲存空間，學習環境用，生產不會這樣做。persistentVolumeReclaimPolicy 是 Retain，PVC 刪了資料還在。
+
+PVC 的部分。kind 是 PersistentVolumeClaim，name 叫 local-pvc。requests.storage 是 1Gi，表示我申請 1GB 的空間。storageClassName 是 manual，跟 PV 完全一樣，這樣 K8s 才能配對。
+
+Deployment 的部分。跟之前的 MySQL Deployment 幾乎一樣，多了 volumes 和 volumeMounts。volumes 裡面有一個 name 叫 mysql-storage，persistentVolumeClaim 的 claimName 是 local-pvc。volumeMounts 把 mysql-storage 掛到 /var/lib/mysql。這樣 MySQL 寫到 /var/lib/mysql 的所有資料就存到 PV 裡面了，不再存在容器的 overlay filesystem。
+
+三個物件用 --- 分隔，一個 apply 全搞定。 [▶ 下一頁]`,
+  },
+
+  // ── 6-12 實作（4/7）：確認指令 ──
+  {
+    title: '確認 PV / PVC 狀態',
+    subtitle: 'kubectl get pv / pvc 預期輸出',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">確認指令</p>
+          <div className="space-y-2">
+            <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl apply -f pv-pvc.yaml</div>
+            <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl get pv</div>
+            <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl get pvc</div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
+          <p className="text-slate-400 text-xs font-semibold mb-2">預期輸出：kubectl get pv</p>
+          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`NAME       CAPACITY  ACCESS MODES  RECLAIM POLICY  STATUS  CLAIM
+local-pv   2Gi       RWO           Retain          Bound   default/local-pvc`}</pre>
+        </div>
+
+        <div className="bg-slate-800/30 border border-slate-600/50 p-3 rounded-lg">
+          <p className="text-slate-400 text-xs font-semibold mb-2">預期輸出：kubectl get pvc</p>
+          <pre className="text-green-400 text-xs font-mono leading-relaxed">{`NAME        STATUS  VOLUME    CAPACITY  ACCESS MODES
+local-pvc   Bound   local-pv  2Gi       RWO`}</pre>
+          <p className="text-slate-500 text-xs mt-1">PVC 顯示的 CAPACITY 是 PV 的大小（2Gi），不是你申請的 1Gi</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 text-xs font-semibold mb-1">等 MySQL Pod 就緒</p>
+          <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl get pods -w</div>
+          <p className="text-slate-400 text-xs mt-1">等 STATUS 變成 Running 再繼續</p>
+        </div>
+      </div>
+    ),
+    notes: `好，apply 之後馬上來確認。
+
 kubectl apply -f pv-pvc.yaml
-kubectl get pv,pvc              # 都是 Bound
+
+然後 kubectl get pv。你應該看到 local-pv，STATUS 是 Bound，CLAIM 欄位顯示 default/local-pvc，表示 PV 已經被 local-pvc 這個 PVC 佔用了。
+
+kubectl get pvc。local-pvc，STATUS 也是 Bound，VOLUME 欄位顯示 local-pv。
+
+注意一個細節，PVC 那一行的 CAPACITY 顯示的是 2Gi，不是你申請的 1Gi。這是 K8s 的設計，PVC 拿到整個 PV，顯示的是 PV 的容量。
+
+如果 STATUS 是 Pending，表示配對失敗了。最常見的原因是 storageClassName 不一致，或者 PV 的容量比 PVC 要求的少。
+
+等 PV 和 PVC 都是 Bound 之後，再等 MySQL Pod 跑起來。
+
+kubectl get pods -w
+
+看到 mysql-deploy 的 Pod STATUS 是 Running，就可以繼續。 [▶ 下一頁]`,
+  },
+
+  // ── 6-12 實作（5/7）：進 MySQL 寫資料 + 砍 Pod ──
+  {
+    title: '進 MySQL 寫資料，砍 Pod',
+    subtitle: 'INSERT Alice → DELETE Pod',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">進 MySQL 寫資料</p>
+          <div className="font-mono text-xs text-slate-400 bg-slate-900 p-3 rounded space-y-0.5">
+            <p className="text-green-400">kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123</p>
+            <p className="mt-1">mysql&gt; CREATE DATABASE testdb;</p>
+            <p>mysql&gt; USE testdb;</p>
+            <p>mysql&gt; CREATE TABLE users (id INT, name VARCHAR(50));</p>
+            <p>mysql&gt; INSERT INTO users VALUES (1, 'Alice');</p>
+            <p>mysql&gt; SELECT * FROM users;</p>
+            <p className="text-green-400 mt-1">-- 看到 Alice → 寫入成功</p>
+            <p>mysql&gt; exit</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">砍 Pod</p>
+          <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl delete pod -l app=mysql</div>
+          <p className="text-slate-300 text-xs mt-2">Deployment 會自動重建一個新的 Pod，等它跑起來。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 text-xs font-semibold mb-1">等新 Pod 就緒</p>
+          <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl get pods -w</div>
+          <p className="text-slate-400 text-xs mt-1">STATUS 變成 Running 後進行下一步驗證</p>
+        </div>
+      </div>
+    ),
+    notes: `MySQL Pod 跑起來之後，進 MySQL。
+
 kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
-> CREATE DATABASE testdb; USE testdb;
-> CREATE TABLE users (id INT, name VARCHAR(50));
-> INSERT INTO users VALUES (1, 'Alice');
-> exit
-kubectl delete pod -l app=mysql  # 砍 Pod
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
-> USE testdb; SELECT * FROM users;  # Alice 還在！`,
-    notes: `最後是 Deployment。跟之前的 MySQL Deployment 幾乎一樣，差別在 volumes 和 volumeMounts 的部分。volumes 裡面有一個 name 叫 mysql-storage，persistentVolumeClaim 的 claimName 是 local-pvc，就是剛才建的那個 PVC。containers 裡面的 volumeMounts，name 是 mysql-storage，mountPath 是 /var/lib/mysql，就是 MySQL 存資料的目錄。這樣 MySQL 寫到 /var/lib/mysql 的資料就會存到 PVC 對應的 PV 上面，不再存在容器的 overlay filesystem 裡面了。
 
-好，部署。
+進去之後，CREATE DATABASE testdb; USE testdb; CREATE TABLE users (id INT, name VARCHAR(50)); INSERT INTO users VALUES (1, 'Alice');
 
-kubectl apply -f pv-pvc.yaml
+SELECT * FROM users，看到 Alice。好，資料寫進去了。exit 退出。
 
-先看 PV 和 PVC 的狀態。
-
-kubectl get pv
-
-你應該看到 local-pv，STATUS 是 Bound，CLAIM 欄位顯示 default/local-pvc。
-
-kubectl get pvc
-
-local-pvc，STATUS 也是 Bound，VOLUME 欄位顯示 local-pv。兩個綁在一起了。
-
-如果你看到 Pending，表示配對失敗了。最常見的原因有兩個：storageClassName 不一致，或者 PV 的容量比 PVC 要求的小。PVC 要 5GB 但 PV 只有 2GB，那就配不上。
-
-等 MySQL Pod 跑起來之後，我們再做一次跟上午一樣的實驗。進 MySQL。
-
-kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
-
-建資料庫，建表，插資料。CREATE DATABASE testdb; USE testdb; CREATE TABLE users (id INT, name VARCHAR(50)); INSERT INTO users VALUES (1, 'Alice'); SELECT * FROM users;
-
-Alice 在。退出。
-
-現在來做關鍵的實驗。砍 Pod。
+現在來做最關鍵的一步，砍 Pod。
 
 kubectl delete pod -l app=mysql
 
-等新 Pod 跑起來，再進 MySQL。
+Pod 被刪了。Deployment 看到 Pod 不見了，馬上重建一個新的。這個新的 Pod 跟剛才那個 Pod 不是同一個，完全是一個全新的容器。
+
+等新 Pod 跑起來。kubectl get pods -w，看到 STATUS 是 Running 就可以了。
+
+好，現在進新的 Pod，看看 Alice 還在不在。 [▶ 下一頁]`,
+  },
+
+  // ── 6-12 實作（6/7）：驗證資料還在 ──
+  {
+    title: '驗證資料還在',
+    subtitle: '新 Pod 起來，Alice 還在！',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">再進 MySQL 確認</p>
+          <div className="font-mono text-xs text-slate-400 bg-slate-900 p-3 rounded space-y-0.5">
+            <p className="text-green-400">kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123</p>
+            <p className="mt-1">mysql&gt; USE testdb;</p>
+            <p>mysql&gt; SELECT * FROM users;</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">預期輸出</p>
+          <pre className="text-green-400 text-xs font-mono">{`+----+-------+
+| id | name  |
++----+-------+
+|  1 | Alice |
++----+-------+
+1 row in set`}</pre>
+          <p className="text-green-300 font-semibold mt-2">Alice 還在！PV/PVC 設定成功！</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">為什麼資料還在？</p>
+          <p className="text-slate-300 text-sm">MySQL 的資料存在 <span className="font-mono text-yellow-400">/var/lib/mysql</span>，這個目錄掛到 PVC，PVC 對應 PV，PV 對應 Node 上的 <span className="font-mono text-yellow-400">/tmp/k8s-pv-data</span>。Pod 刪了，目錄還在。新 Pod 掛同一個 PVC，讀到同一個目錄，資料自然還在。</p>
+        </div>
+      </div>
+    ),
+    notes: `進新的 Pod。
 
 kubectl exec -it deployment/mysql-deploy -- mysql -u root -prootpassword123
 
@@ -513,16 +830,76 @@ USE testdb;
 
 Alice 還在！
 
-大家仔細感受一下這個差別。上午沒掛 PVC 的時候，砍 Pod 資料全消失。現在掛了 PVC，砍 Pod 資料還活著。因為 MySQL 的資料不再存在容器裡面了，而是存在 PV 對應的 hostPath 目錄裡面。Pod 被刪了，新的 Pod 掛載同一個 PVC，讀到同一個目錄，資料自然還在。
+大家仔細感受一下這個差別。沒掛 PVC 的時候，砍 Pod 資料全消失，USE testdb 直接 ERROR。現在掛了 PVC，砍 Pod，Alice 還活著。
 
-這就是 PV/PVC 存在的意義。Docker 的 Volume 做的是一模一樣的事情，只是 K8s 把它拆成 PV 和 PVC 兩層，做了職責分離。 [▶ 下一頁]`,
+為什麼？因為 MySQL 的資料不再存在容器的 overlay filesystem 裡面了。/var/lib/mysql 這個目錄掛到 PVC，PVC 綁到 PV，PV 對應 Node 上的 /tmp/k8s-pv-data 這個實體目錄。Pod 被刪了，但 /tmp/k8s-pv-data 這個目錄還在 Node 上。新的 Pod 起來，掛同一個 PVC，讀到同一個實體目錄，資料自然還在。
+
+這就是 PV/PVC 存在的意義。Docker 的 -v 做的是完全一樣的事，只是 K8s 把它拆成 PV 和 PVC 兩層。 [▶ 下一頁]`,
   },
+
+  // ── 6-12 實作（7/7）：排錯 ──
+  {
+    title: 'PVC Pending 排錯',
+    subtitle: 'kubectl describe pvc local-pvc — 三個常見原因',
+    section: '6-12：PV + PVC 實作',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">排錯指令</p>
+          <div className="font-mono text-xs text-green-400 bg-slate-900 p-2 rounded">kubectl describe pvc local-pvc</div>
+          <p className="text-slate-400 text-xs mt-2">看 Events 欄位，會告訴你為什麼配對失敗。</p>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-3">三個常見 Pending 原因</p>
+          <table className="w-full text-sm">
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-3 text-red-400 font-semibold w-40">storageClassName 不一致</td>
+                <td className="py-2">PV 和 PVC 的 storageClassName 要完全相同，包括大小寫</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-2 pr-3 text-red-400 font-semibold">容量超過</td>
+                <td className="py-2">PVC 申請 5Gi 但 PV 只有 2Gi，找不到合適的 PV</td>
+              </tr>
+              <tr>
+                <td className="py-2 pr-3 text-red-400 font-semibold">accessModes 不匹配</td>
+                <td className="py-2">PVC 要 RWX 但 PV 只支援 RWO，無法配對</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/30 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold text-sm">配對成功的三個條件</p>
+          <p className="text-slate-300 text-sm mt-1">storageClassName 一致 + accessModes 符合 + PV 容量 &ge; PVC 申請量</p>
+        </div>
+      </div>
+    ),
+    notes: `最後講一個排錯技巧。如果你的 PVC 一直是 Pending，表示 K8s 找不到合適的 PV 來配對。
+
+診斷指令是 kubectl describe pvc local-pvc。看 Events 欄位，K8s 會告訴你找不到匹配 PV 的原因。
+
+三個最常見的 Pending 原因：
+
+第一，storageClassName 不一致。PV 寫了 storageClassName: manual，但 PVC 寫了 storageClassName: Manual，M 大寫，就配不上了。要完全相同，包括大小寫。
+
+第二，容量超過。PVC 申請 5Gi，但你的 PV 只有 2Gi，K8s 找不到夠大的 PV，所以 PVC 一直 Pending。
+
+第三，accessModes 不匹配。PVC 要求 RWX，但 PV 只支援 RWO，不符合，配對失敗。
+
+記住配對成功的三個條件：storageClassName 完全一致、accessModes 符合、PV 的容量大於等於 PVC 的申請量。三個條件都滿足，Binding 就會成功。
+
+好，PV/PVC 的概念和實作到這裡結束。下一節是學員實作時間。 [▶ 下一頁]`,
+  },
+
 
   // ── 6-13 學員實作 ──
   {
     title: '學員實作：PV + PVC 故障診斷',
     subtitle: 'Loop 4 練習題 — 找出 broken-pv-pvc.yaml 的三個 bug',
-    section: 'Loop 4：PV + PVC',
+    section: '6-13：回頭操作 Loop 4',
     duration: '10',
     content: (
       <div className="space-y-4">
@@ -556,7 +933,7 @@ Alice 還在！
   {
     title: '解答：PV/PVC 故障診斷 + 常見坑',
     subtitle: '回頭操作 Loop 4',
-    section: 'Loop 4：PV + PVC',
+    section: '6-13：回頭操作 Loop 4',
     duration: '5',
     content: (
       <div className="space-y-4">
@@ -570,24 +947,33 @@ Alice 還在！
             <p className="text-slate-500 mt-1"># 錯誤三：容量超過 PV</p>
             <p><span className="text-red-400">storage: 2Gi（PV 只有 1Gi）</span>  <span className="text-slate-500">→</span>  <span className="text-green-400">1Gi</span></p>
           </div>
-          <p className="text-slate-400 text-xs mt-2">修好後 kubectl apply -f answers/broken-pv-pvc-fixed.yaml，PVC 應該變 Bound</p>
+          <p className="text-slate-400 text-xs mt-2">修好後 kubectl apply -f answers/broken-pv-pvc-fixed.yaml → kubectl get pv,pvc 兩個都 Bound</p>
         </div>
 
-        <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">PVC 一直 Pending？三個坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">1.</span>
-              <p><strong className="text-white">storageClassName 不一致</strong> -- PV 寫 manual，PVC 也要寫 manual</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">2.</span>
-              <p><strong className="text-white">accessModes 不匹配</strong> -- PVC 要 RWX 但 PV 只有 RWO，配不上</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">3.</span>
-              <p><strong className="text-white">容量不夠</strong> -- PVC 要 5Gi 但 PV 只有 2Gi，配不上</p>
-            </div>
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">重要：storageClassName 是 immutable（不可修改）</p>
+          <p className="text-slate-300 text-sm">建立後無法用 kubectl apply 修改 storageClassName，K8s 會拒絕。</p>
+          <p className="text-slate-300 text-sm mt-1">必須先刪除再重建：</p>
+          <div className="font-mono text-xs bg-slate-900 p-2 rounded mt-2 space-y-0.5 text-slate-300">
+            <p><span className="text-yellow-400">kubectl delete pvc local-pvc</span></p>
+            <p><span className="text-yellow-400">kubectl delete pv local-pv</span></p>
+            <p><span className="text-slate-500"># 然後 apply 修好的 YAML</span></p>
+          </div>
+        </div>
+
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
+          <p className="text-yellow-400 font-semibold mb-2">挑戰題解答：local-pvc2 為何 Pending？</p>
+          <p className="text-slate-300 text-sm">一個 PV 同時只能綁一個 PVC。local-pv 已被 local-pvc 佔用，local-pvc2 找不到可用 PV，只能等待。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">清理指令（做完再清）</p>
+          <div className="font-mono text-xs bg-slate-900 p-2 rounded space-y-0.5 text-slate-300">
+            <p><span className="text-red-400">kubectl delete deployment mysql-deploy</span></p>
+            <p><span className="text-red-400">kubectl delete pvc local-pvc</span></p>
+            <p><span className="text-red-400">kubectl delete pv local-pv</span></p>
+            <p className="text-slate-500 mt-1"># 確認全清除</p>
+            <p>kubectl get pv,pvc</p>
           </div>
         </div>
 
@@ -599,105 +985,175 @@ Alice 還在！
     ),
     notes: `好，時間差不多了，我們來回頭確認一下大家都做到了。
 
-如果你的 PV 和 PVC 已經建好了，kubectl get pv,pvc 看一下，兩個都是 Bound 就對了。然後 MySQL Pod 要是 Running 狀態。
+如果你的 PV 和 PVC 已經建好了，kubectl get pv,pvc 看一下，兩個都是 Bound 就對了。
 
-如果你的 PVC 一直 Pending，來看看常見的三個坑。
+三個 bug 的解答。第一，accessModes 要從 ReadWriteMany 改成 ReadWriteOnce，跟 PV 一致。第二，storageClassName 要從 fast 改成 manual。第三，storage 從 2Gi 改成 1Gi，不能超過 PV 容量。
 
-第一個坑，storageClassName 不一致。PV 寫的是 manual，PVC 寫的也要是 manual。如果 PV 寫 manual 但 PVC 忘了寫，或者寫錯了，K8s 就配不上。
+這裡有個重要觀念要記：storageClassName 是 immutable，建立後不能改。如果你 kubectl apply 想修改它，K8s 直接拒絕。正確做法是先 kubectl delete pvc local-pvc，再 kubectl delete pv local-pv，然後重新 apply 修好的 YAML。
 
-第二個坑，accessModes 不匹配。PV 設 ReadWriteOnce，PVC 也要設 ReadWriteOnce。如果 PVC 設了 ReadWriteMany 但 PV 只支援 ReadWriteOnce，也配不上。
+挑戰題：local-pvc2 應該是 Pending 狀態。原因是一個 PV 同時只能綁一個 PVC。local-pv 已經被 local-pvc 佔走了，local-pvc2 找不到可用的 PV，只能等待。
 
-第三個坑，容量不夠。PVC 要 5Gi 但 PV 只有 2Gi，配不上。PV 的容量必須大於等於 PVC 的要求。
+做完之後大家把環境清一下。kubectl delete deployment mysql-deploy，kubectl delete pvc local-pvc，kubectl delete pv local-pv。然後 kubectl get pv,pvc 確認全部清掉。
 
-這三個是最常見的問題，大家記一下。
-
-有做到挑戰題的同學有沒有？你應該看到第二個 PVC 一直 Pending。因為我們只有一個 PV，已經被第一個 PVC 佔走了。一個 PV 同時只能綁一個 PVC。第二個 PVC 找不到 PV，就只能等。
-
-那我問大家一個問題。如果我有十個微服務，每個都需要 PVC，那我是不是要手動建十個 PV？如果以後又多了五個微服務，再手動建五個？管理員每天的工作就是建 PV？
-
-太煩了。有沒有辦法自動建 PV？
-
-有，這就是下一個 Loop 要學的東西 -- StorageClass。 [▶ 下一頁]`,
+好，如果我有十個微服務，每個都要 PVC，管理員要手動建十個 PV？太煩了。下一個 Loop 我們學 StorageClass，讓它自動建 PV。 [▶ 下一頁]`,
   },
 
   // ============================================================
   // Loop 5：StorageClass + StatefulSet（6-14, 6-15, 6-16）
   // ============================================================
 
-  // ── 6-14 概念（1/2）：StorageClass 動態佈建 ──
+  // ── 6-14 概念（1/6）：靜態佈建的問題 ──
   {
-    title: 'StorageClass -- 自動建 PV',
-    subtitle: '靜態佈建太煩 → 動態佈建',
-    section: 'Loop 5：StorageClass + StatefulSet',
-    duration: '8',
+    title: '靜態佈建的問題',
+    subtitle: '手動建 PV 的痛點',
+    section: '6-14：StorageClass + StatefulSet 概念',
+    duration: '5',
     content: (
       <div className="space-y-4">
-        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3 text-center">動態佈建流程</p>
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <div className="bg-green-900/40 border border-green-500/50 px-3 py-2 rounded-lg">
-              <p className="text-green-400 text-xs font-bold">PVC 請求</p>
-              <p className="text-slate-400 text-[10px]">「我要 1Gi」</p>
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-3">靜態佈建的三個痛點</p>
+          <div className="space-y-3 text-sm text-slate-300">
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">1.</span>
+              <div>
+                <p className="font-semibold text-white">手動管理，量大就累</p>
+                <p className="text-slate-400 text-xs mt-0.5">10 個微服務就要手動建 10 個 PV，50 個微服務呢？管理員每天的工作就是建 PV</p>
+              </div>
             </div>
-            <span className="text-slate-400 font-bold text-lg">&rarr;</span>
-            <div className="border-2 border-cyan-500/70 rounded-lg px-3 py-2 bg-cyan-900/20">
-              <p className="text-cyan-400 text-xs font-bold">StorageClass</p>
-              <p className="text-slate-400 text-[10px]">local-path</p>
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">2.</span>
+              <div>
+                <p className="font-semibold text-white">大小猜錯要重建</p>
+                <p className="text-slate-400 text-xs mt-0.5">PV 建 5Gi，結果用了 8Gi；建 20Gi，結果只用 2Gi。大小錯了就要刪掉重建</p>
+              </div>
             </div>
-            <span className="text-slate-400 font-bold text-lg">&rarr;</span>
-            <div className="bg-amber-900/40 border border-amber-500/50 px-3 py-2 rounded-lg">
-              <p className="text-amber-400 text-xs font-bold">自動建 PV</p>
-              <p className="text-slate-400 text-[10px]">不用管理員操作</p>
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">3.</span>
+              <div>
+                <p className="font-semibold text-white">要先建好才能用</p>
+                <p className="text-slate-400 text-xs mt-0.5">開發者建 PVC 前，管理員必須先建好對應的 PV，有時序依賴問題</p>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">靜態佈建 vs 動態佈建</p>
+          <p className="text-cyan-400 font-semibold mb-3">靜態佈建流程回顧</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="bg-slate-700/60 border border-slate-600 px-3 py-2 rounded-lg text-center">
+              <p className="text-slate-300 text-xs font-semibold">管理員</p>
+              <p className="text-slate-400 text-[10px]">手動建 PV</p>
+            </div>
+            <span className="text-slate-400 font-bold">→</span>
+            <div className="bg-slate-700/60 border border-slate-600 px-3 py-2 rounded-lg text-center">
+              <p className="text-slate-300 text-xs font-semibold">開發者</p>
+              <p className="text-slate-400 text-[10px]">建 PVC</p>
+            </div>
+            <span className="text-slate-400 font-bold">→</span>
+            <div className="bg-slate-700/60 border border-slate-600 px-3 py-2 rounded-lg text-center">
+              <p className="text-slate-300 text-xs font-semibold">K8s</p>
+              <p className="text-slate-400 text-[10px]">配對 PV+PVC</p>
+            </div>
+          </div>
+          <p className="text-slate-400 text-xs mt-3">問題：PV 要事先存在，大小和 storageClassName 都要完全匹配</p>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold text-sm">有沒有辦法讓 K8s 自動建 PV？</p>
+          <p className="text-slate-300 text-xs mt-1">有 → 動態佈建（Dynamic Provisioning）+ StorageClass</p>
+        </div>
+      </div>
+    ),
+    notes: `上一個 Loop 我們用靜態佈建解決了持久化的問題。管理員先建 PV，開發者建 PVC，K8s 把兩個配對起來。但這個方式有三個痛點。
+
+第一，手動管理量大就累。你的環境只有一個 MySQL，建一個 PV 還好。但如果你有十個微服務，每個都需要獨立的 PV，管理員就要手動建十個。公司規模再大，五十個微服務，一百個 PV，全部手動建，很不現實。
+
+第二，大小猜錯要重建。建 PV 的時候你要預估容量。建 5Gi，結果應用長大需要 8Gi；建 20Gi，結果只用 2Gi 浪費空間。預估錯了就要刪掉 PVC 和 PV 重建，很麻煩。
+
+第三，要先建好才能用。開發者想建 PVC，前提是管理員已經建好對應的 PV。這有時序依賴問題，開發者不能自主部署。
+
+所以有沒有辦法讓 K8s 自動幫我們建 PV？有，這就是動態佈建，靠 StorageClass 來做。 [▶ 下一頁]`,
+  },
+
+  // ── 6-14 概念（2/6）：動態佈建（Dynamic Provisioning） ──
+  {
+    title: '動態佈建（Dynamic Provisioning）',
+    subtitle: 'PVC → StorageClass → provisioner → 自動建 PV',
+    section: '6-14：StorageClass + StatefulSet 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3 text-center">動態佈建流程</p>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <div className="bg-green-900/40 border border-green-500/50 px-3 py-2 rounded-lg text-center">
+              <p className="text-green-400 text-xs font-bold">① PVC 請求</p>
+              <p className="text-slate-400 text-[10px]">「我要 1Gi」</p>
+            </div>
+            <span className="text-slate-400 font-bold text-lg">→</span>
+            <div className="border-2 border-cyan-500/70 rounded-lg px-3 py-2 bg-cyan-900/20 text-center">
+              <p className="text-cyan-400 text-xs font-bold">② StorageClass</p>
+              <p className="text-slate-400 text-[10px]">選 provisioner</p>
+            </div>
+            <span className="text-slate-400 font-bold text-lg">→</span>
+            <div className="bg-purple-900/40 border border-purple-500/50 px-3 py-2 rounded-lg text-center">
+              <p className="text-purple-400 text-xs font-bold">③ provisioner</p>
+              <p className="text-slate-400 text-[10px]">呼叫 API 建磁碟</p>
+            </div>
+            <span className="text-slate-400 font-bold text-lg">→</span>
+            <div className="bg-amber-900/40 border border-amber-500/50 px-3 py-2 rounded-lg text-center">
+              <p className="text-amber-400 text-xs font-bold">④ 自動建 PV</p>
+              <p className="text-slate-400 text-[10px]">自動綁定</p>
+            </div>
+          </div>
+          <p className="text-slate-400 text-xs text-center mt-3">管理員不用動手，PVC 一建立就自動搞定</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">各雲端 provisioner 對照</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-2 w-20"></th>
-                <th className="text-left py-2">靜態佈建</th>
-                <th className="text-left py-2">動態佈建</th>
+                <th className="text-left py-1.5 font-semibold">環境</th>
+                <th className="text-left py-1.5 font-semibold">provisioner</th>
+                <th className="text-left py-1.5 font-semibold">建立的磁碟</th>
               </tr>
             </thead>
-            <tbody className="text-slate-300">
+            <tbody className="text-slate-300 text-xs">
               <tr className="border-b border-slate-700">
-                <td className="py-2 font-semibold">流程</td>
-                <td className="py-2">管理員先建 PV → PVC 配對</td>
-                <td className="py-2">PVC 建立 → <span className="text-cyan-400 font-semibold">自動建 PV</span></td>
+                <td className="py-1.5 font-semibold text-green-400">k3s（本課程）</td>
+                <td className="py-1.5 font-mono">rancher.io/local-path</td>
+                <td className="py-1.5">本機路徑</td>
               </tr>
               <tr className="border-b border-slate-700">
-                <td className="py-2 font-semibold">適合</td>
-                <td className="py-2">學習、小規模</td>
-                <td className="py-2">生產環境</td>
+                <td className="py-1.5 font-semibold text-orange-400">AWS</td>
+                <td className="py-1.5 font-mono">ebs.csi.aws.com</td>
+                <td className="py-1.5">EBS 磁碟</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-blue-400">GCP</td>
+                <td className="py-1.5 font-mono">pd.csi.storage.gke.io</td>
+                <td className="py-1.5">Persistent Disk</td>
               </tr>
               <tr>
-                <td className="py-2 font-semibold">問題</td>
-                <td className="py-2">要事先建好所有 PV</td>
-                <td className="py-2">需要 StorageClass</td>
+                <td className="py-1.5 font-semibold text-cyan-400">Azure</td>
+                <td className="py-1.5 font-mono">disk.csi.azure.com</td>
+                <td className="py-1.5">Azure Disk</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">k3s 內建 local-path StorageClass</p>
-          <pre className="text-green-400 text-xs font-mono mt-1">{`NAME                   PROVISIONER
-local-path (default)   rancher.io/local-path`}</pre>
-          <p className="text-slate-400 text-xs mt-2">有看到 <code className="text-green-400">local-path (default)</code> 才能繼續</p>
-          <p className="text-red-400 text-xs mt-1">空的 → k3s 沒裝好，PVC 會一直 Pending</p>
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm mb-1">k3s 已內建 local-path StorageClass（default）</p>
+          <p className="text-slate-300 text-xs">不同雲端換個 provisioner，用法完全一樣：開發者建 PVC，StorageClass 自動搞定 PV</p>
         </div>
       </div>
     ),
-    code: `# StorageClass YAML（k3s 已內建，不用自己建）
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: local-path
-provisioner: rancher.io/local-path
-reclaimPolicy: Delete
+    code: `# 查看 k3s 內建的 StorageClass
+kubectl get storageclass
+# NAME                   PROVISIONER                RECLAIMPOLICY
+# local-path (default)   rancher.io/local-path      Delete
 
 # 動態佈建的 PVC（不用事先建 PV！）
 apiVersion: v1
@@ -712,159 +1168,327 @@ spec:
       storage: 1Gi
   storageClassName: local-path   # 指定 StorageClass
 
-# 查看 k3s 內建的 StorageClass
-kubectl get storageclass
-# NAME                   PROVISIONER
-# local-path (default)   rancher.io/local-path`,
-    notes: `上一個 Loop 我們用 PV 和 PVC 解決了資料持久化的問題。Pod 刪了資料還在，非常棒。但是我剛才留了一個問題：如果你有十個微服務，每個都需要 PVC，管理員要手動建十個 PV。以後又多了五個微服務，再建五個。
+# apply 之後 K8s 自動建 PV 並綁定
+kubectl get pv,pvc
+# PV 自動出現，STATUS 都是 Bound`,
+    notes: `動態佈建的流程是這樣的。第一步，開發者建 PVC，在 storageClassName 指定要用哪個 StorageClass。第二步，K8s 根據 StorageClass 找到對應的 provisioner。第三步，provisioner 呼叫底層 API 建立實體磁碟。第四步，K8s 自動建立 PV，並把 PV 和 PVC 綁定。整個過程管理員完全不用動手。
 
-在小規模的環境裡這還能接受，但想像一下企業環境。你的公司有三個叢集、五十個微服務、每個都需要儲存空間。管理員每天的工作就是建 PV、改 PV、刪 PV。而且建 PV 的時候你要預估大小，建太大浪費空間，建太小不夠用。
+不同的環境有不同的 provisioner。我們課程用的 k3s，內建一個叫 local-path 的 StorageClass，provisioner 是 rancher.io/local-path，它在本機路徑上建立 PV。AWS 上面的 provisioner 是 ebs.csi.aws.com，它會自動去建 EBS 磁碟。GCP 是 pd.csi.storage.gke.io，建 Persistent Disk。Azure 是 disk.csi.azure.com，建 Azure Disk。
 
-剛才我們做的叫「靜態佈建」，管理員先建好 PV，開發者再建 PVC 去配對。K8s 還支援另一種方式叫「動態佈建」。開發者只要建 PVC，K8s 自動幫你建一個匹配的 PV。不用管理員動手。
+不管是哪個雲端，你身為開發者的用法都一樣：建 PVC，指定 storageClassName，剩下的交給 StorageClass。換環境只要換 storageClassName 的值，YAML 其他部分不用改。
 
-自動建 PV 的祕密就是 StorageClass。StorageClass 是一個 K8s 資源，它告訴 K8s：「當有人建 PVC 的時候，用什麼方式自動建立 PV。」它就像一個工廠的模板。你告訴工廠「我要做什麼規格的零件」，以後每次有訂單進來，工廠就自動照著模板生產，不用每次都手動畫圖紙。
-
-StorageClass 的 YAML 很簡單。apiVersion 是 storage.k8s.io/v1，kind 是 StorageClass，metadata 裡面 name 叫 local-path。provisioner 是 rancher.io/local-path，這是告訴 K8s「用 Rancher 的 local-path provisioner 來建 PV」。reclaimPolicy 設 Delete。
-
-好消息是，k3s 已經內建了一個 local-path 的 StorageClass，你不用自己建。打 kubectl get storageclass 看看，你會看到一個叫 local-path 的 StorageClass，後面標了 default。default 的意思是如果 PVC 沒有指定 storageClassName，就自動用這個。
-
-用動態佈建的時候，PVC 的 YAML 只要指定 storageClassName 是 local-path，然後寫你要多少空間。K8s 就會根據 StorageClass 的設定自動建一個 PV，自動跟你的 PVC 綁定。管理員完全不用動手。
-
-在 AWS 上，StorageClass 的 provisioner 會去自動建 EBS 磁碟。在 GCP 上會建 Persistent Disk。在 Azure 上會建 Azure Disk。不同的雲端有不同的 provisioner，但用法是一樣的：開發者建 PVC，StorageClass 自動搞定 PV。
-
-用 Docker 來對照，StorageClass 有點像 Docker 的 Volume Driver。你可以用 docker volume create --driver local 或 --driver nfs，告訴 Docker 用什麼方式建 Volume。StorageClass 做的是同樣的事，只是更自動化。 [▶ 下一頁]`,
+你可以用 kubectl get storageclass 看一下 k3s 有沒有 local-path，後面標了 default 的就是預設 StorageClass。 [▶ 下一頁]`,
   },
 
-  // ── 6-14 概念（2/2）：Deployment 不適合跑 DB → StatefulSet ──
+  // ── 6-14 概念（3/6）：Deployment 跑 DB 的四個問題 ──
   {
-    title: 'Deployment 跑 DB？四個問題 → StatefulSet',
-    subtitle: '無狀態 vs 有狀態 + StatefulSet 三保證',
-    section: 'Loop 5：StorageClass + StatefulSet',
-    duration: '8',
+    title: 'Deployment 跑 DB 的四個問題',
+    subtitle: '無狀態 vs 有狀態',
+    section: '6-14：StorageClass + StatefulSet 概念',
+    duration: '5',
     content: (
       <div className="space-y-4">
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">Deployment 跑 MySQL 的四個問題</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">1.</span>
-              <p><strong className="text-white">名稱不固定</strong> -- mysql-deploy-abc-xyz，主庫是哪個？</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">2.</span>
-              <p><strong className="text-white">沒有順序</strong> -- 3 副本同時起，主從架構搞不定</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">3.</span>
-              <p><strong className="text-white">共用 PVC</strong> -- 3 個 MySQL 寫同一塊磁碟，資料衝突</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">4.</span>
-              <p><strong className="text-white">沒有穩定網路</strong> -- Service 隨機分配，寫入送誰？</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">StatefulSet 三保證</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <p><span className="text-green-400 font-semibold">1. 穩定身份</span> -- mysql-0、mysql-1、mysql-2，刪了重建還是同名</p>
-            <p><span className="text-green-400 font-semibold">2. 獨立儲存</span> -- 每個 Pod 自動建獨立 PVC（volumeClaimTemplates）</p>
-            <p><span className="text-green-400 font-semibold">3. 有序生命週期</span> -- 啟動 0→1→2，刪除 2→1→0</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3 text-center">Deployment vs StatefulSet</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="border-2 border-red-500/50 rounded-lg p-3 bg-red-900/10">
-              <p className="text-red-400 text-sm font-bold text-center mb-2">Deployment</p>
-              <div className="space-y-1">
-                <div className="bg-red-900/30 border border-red-500/30 px-2 py-1 rounded text-center">
-                  <p className="text-red-300 text-xs">web-abc-xyz</p>
-                </div>
-                <div className="bg-red-900/30 border border-red-500/30 px-2 py-1 rounded text-center">
-                  <p className="text-red-300 text-xs">web-def-uvw</p>
-                </div>
+          <p className="text-red-400 font-semibold mb-3">Deployment 跑 MySQL 的四個問題</p>
+          <div className="space-y-3 text-sm text-slate-300">
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">1.</span>
+              <div>
+                <p className="font-semibold text-white">Pod 名稱不固定（random hash）</p>
+                <p className="text-slate-400 text-xs mt-0.5">mysql-deploy-<span className="text-red-400">abc-xyz</span>，重建後名字又變。主庫是哪個？</p>
               </div>
-              <p className="text-slate-400 text-[10px] mt-2 text-center">隨機名、同時起、共用 PVC</p>
             </div>
-            <div className="border-2 border-green-500/50 rounded-lg p-3 bg-green-900/10">
-              <p className="text-green-400 text-sm font-bold text-center mb-2">StatefulSet</p>
-              <div className="space-y-1">
-                <div className="bg-green-900/30 border border-green-500/30 px-2 py-1 rounded flex justify-between items-center">
-                  <p className="text-green-300 text-xs font-semibold">mysql-0</p>
-                  <p className="text-slate-400 text-[10px]">PVC-0</p>
-                </div>
-                <div className="bg-green-900/30 border border-green-500/30 px-2 py-1 rounded flex justify-between items-center">
-                  <p className="text-green-300 text-xs font-semibold">mysql-1</p>
-                  <p className="text-slate-400 text-[10px]">PVC-1</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">2.</span>
+              <div>
+                <p className="font-semibold text-white">沒有啟動順序</p>
+                <p className="text-slate-400 text-xs mt-0.5">3 副本同時起。MySQL 主從架構需要主庫先起來，從庫才能同步</p>
               </div>
-              <p className="text-slate-400 text-[10px] mt-2 text-center">固定序號、依序起、獨立 PVC</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">3.</span>
+              <div>
+                <p className="font-semibold text-white">共用 PVC</p>
+                <p className="text-slate-400 text-xs mt-0.5">3 個 MySQL 寫同一塊磁碟，資料衝突，資料庫損毀</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 font-bold text-lg leading-none mt-0.5">4.</span>
+              <div>
+                <p className="font-semibold text-white">沒有穩定網路身份</p>
+                <p className="text-slate-400 text-xs mt-0.5">Service 隨機分配流量。寫入要送主庫，讀取送從庫，怎麼區分？</p>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必須搭配 Headless Service</p>
-          <p className="text-sm text-slate-300"><code className="text-green-400">clusterIP: None</code> -- 不做負載均衡，每個 Pod 有自己的 DNS</p>
-          <p className="text-sm text-slate-400 mt-1 font-mono text-xs">mysql-0.mysql-headless.default.svc.cluster.local</p>
+          <p className="text-cyan-400 font-semibold mb-2">根本原因</p>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="bg-slate-700/50 p-3 rounded">
+              <p className="text-white font-semibold mb-1">Deployment</p>
+              <p className="text-slate-400 text-xs">設計給「無狀態」應用</p>
+              <p className="text-slate-400 text-xs mt-1">API、Web Server：任何一個副本都能回應，沒差</p>
+            </div>
+            <div className="bg-green-900/20 border border-green-500/30 p-3 rounded">
+              <p className="text-green-400 font-semibold mb-1">StatefulSet</p>
+              <p className="text-slate-400 text-xs">設計給「有狀態」應用</p>
+              <p className="text-slate-400 text-xs mt-1">MySQL、Redis：每個副本的資料不同，身份很重要</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/40 p-3 rounded-lg">
+          <p className="text-amber-400 font-semibold text-sm">StatefulSet 是 K8s 專門為有狀態應用設計的控制器</p>
+          <p className="text-slate-300 text-xs mt-1">解決以上四個問題 → 三個保證</p>
         </div>
       </div>
     ),
-    code: `# StatefulSet vs Deployment 差異（只多兩個欄位）
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mysql
-spec:
-  serviceName: mysql-headless     # ← 對應 Headless Service
-  replicas: 2
-  selector:
-    matchLabels:
-      app: mysql-sts
-  template:
-    # ... 跟 Deployment 的 template 一樣
-
-  # ← StatefulSet 獨有
-  volumeClaimTemplates:
-    - metadata:
-        name: mysql-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi
-# mysql-0 → PVC: mysql-data-mysql-0
-# mysql-1 → PVC: mysql-data-mysql-1`,
-    notes: `好，現在我們有了持久化的方案，可以正式跑資料庫了。但我要問一個問題：資料庫適合用 Deployment 跑嗎？
+    notes: `好，現在有了動態佈建，可以輕鬆搞定儲存了。接下來的問題是：資料庫適合用 Deployment 跑嗎？
 
 回想一下第四堂課講的。用 Deployment 跑 MySQL 有四個問題。
 
-第一，Pod 名稱不固定。Deployment 建出來的 Pod 名字是 random hash，mysql-deploy-abc-xyz。每次重建名字都變。你的主庫到底是哪一個？
+第一，Pod 名稱不固定。Deployment 建出來的 Pod 名字帶 random hash，mysql-deploy-abc-xyz。每次重建名字都變。如果你有主從架構，主庫到底是哪個 Pod？
 
-第二，沒有啟動順序。三個副本同時啟動。但 MySQL 主從架構需要主庫先起來，拿到 binlog position，從庫再連上去同步。同時啟動會出問題。
+第二，沒有啟動順序。三個副本同時啟動。但 MySQL 主從架構需要主庫先起來、拿到 binlog position，從庫才能連上去同步。同時啟動，從庫找不到主庫，連線失敗。
 
-第三，共用 PVC。如果三個 Pod 掛同一個 PVC，三個 MySQL 同時寫同一塊磁碟，資料一定亂掉。
+第三，共用 PVC。如果三個 Pod 掛同一個 PVC，三個 MySQL 程序同時寫同一塊磁碟，資料格式衝突，資料庫直接損毀。
 
-第四，沒有穩定的網路身份。Service 做負載均衡，流量隨機分。但寫入操作要送主庫，讀取送從庫，怎麼區分？
+第四，沒有穩定的網路身份。Service 做負載均衡，流量隨機分給後面的 Pod。但你的寫入操作要送主庫，讀取送從庫，根本沒辦法指定。
 
-Deployment 是設計給無狀態應用的，API、Web Server 這種。資料庫是有狀態的，需要 StatefulSet。
+根本原因是：Deployment 設計給無狀態應用，比如 API、Web Server。這類應用每個副本都一樣，隨機哪個回應都行。但資料庫是有狀態的，每個副本的資料不同，身份非常重要。
 
-StatefulSet 給你三個保證。
+K8s 為有狀態應用設計了另一個控制器：StatefulSet。它給你三個保證，剛好解決這四個問題。 [▶ 下一頁]`,
+  },
 
-第一，穩定的身份。Pod 名稱是固定的序號：mysql-0、mysql-1、mysql-2。不管 Pod 被刪幾次重建幾次，mysql-0 永遠叫 mysql-0。
+  // ── 6-14 概念（4/6）：StatefulSet 三個保證 ──
+  {
+    title: 'StatefulSet 三個保證',
+    subtitle: '①穩定身份 ②獨立儲存 ③有序生命週期',
+    section: '6-14：StorageClass + StatefulSet 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-3">StatefulSet 三個保證</p>
+          <div className="space-y-3 text-sm text-slate-300">
+            <div className="bg-slate-800/60 p-3 rounded-lg">
+              <p className="text-green-400 font-semibold">① 穩定身份（固定序號）</p>
+              <p className="text-slate-300 text-xs mt-1">Pod 名稱固定：<span className="text-green-400 font-mono">mysql-0</span> / <span className="text-green-400 font-mono">mysql-1</span> / <span className="text-green-400 font-mono">mysql-2</span></p>
+              <p className="text-slate-400 text-xs mt-0.5">刪了重建還是同名，不會出現 random hash</p>
+            </div>
+            <div className="bg-slate-800/60 p-3 rounded-lg">
+              <p className="text-green-400 font-semibold">② 獨立儲存（volumeClaimTemplates）</p>
+              <p className="text-slate-300 text-xs mt-1">每個 Pod 自動建獨立 PVC：</p>
+              <div className="font-mono text-xs mt-1 space-y-0.5">
+                <p className="text-green-300">mysql-0  →  mysql-data-mysql-0</p>
+                <p className="text-green-300">mysql-1  →  mysql-data-mysql-1</p>
+              </div>
+              <p className="text-slate-400 text-xs mt-1">Pod 刪掉重建，新的 mysql-0 還是掛回同一個 PVC</p>
+            </div>
+            <div className="bg-slate-800/60 p-3 rounded-lg">
+              <p className="text-green-400 font-semibold">③ 有序生命週期</p>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <div className="text-xs">
+                  <p className="text-slate-400 mb-1">啟動順序：</p>
+                  <div className="flex items-center gap-1">
+                    <span className="bg-green-900/50 border border-green-500/40 px-2 py-0.5 rounded text-green-300 font-mono text-xs">0</span>
+                    <span className="text-slate-400">→</span>
+                    <span className="bg-green-900/50 border border-green-500/40 px-2 py-0.5 rounded text-green-300 font-mono text-xs">1</span>
+                    <span className="text-slate-400">→</span>
+                    <span className="bg-green-900/50 border border-green-500/40 px-2 py-0.5 rounded text-green-300 font-mono text-xs">2</span>
+                  </div>
+                </div>
+                <div className="text-xs">
+                  <p className="text-slate-400 mb-1">刪除順序：</p>
+                  <div className="flex items-center gap-1">
+                    <span className="bg-red-900/50 border border-red-500/40 px-2 py-0.5 rounded text-red-300 font-mono text-xs">2</span>
+                    <span className="text-slate-400">→</span>
+                    <span className="bg-red-900/50 border border-red-500/40 px-2 py-0.5 rounded text-red-300 font-mono text-xs">1</span>
+                    <span className="text-slate-400">→</span>
+                    <span className="bg-red-900/50 border border-red-500/40 px-2 py-0.5 rounded text-red-300 font-mono text-xs">0</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-slate-400 text-xs mt-2">每個 Pod 要 Ready 才起下一個，確保主從順序</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `StatefulSet 給你三個保證，剛好解決 Deployment 的四個問題。
 
-第二，獨立的儲存。StatefulSet 用一個叫 volumeClaimTemplates 的機制，自動為每個 Pod 建立獨立的 PVC。mysql-0 的 PVC 叫 mysql-data-mysql-0，mysql-1 的叫 mysql-data-mysql-1。即使 Pod 被刪掉重建，新的 mysql-0 還是會掛回 mysql-data-mysql-0 這個 PVC。
+第一，穩定身份。Pod 名稱是固定的序號：mysql-0、mysql-1、mysql-2。不管 Pod 被刪幾次重建幾次，mysql-0 永遠叫 mysql-0。不會出現 random hash。這樣你的主從架構就知道 mysql-0 是主庫。
 
-第三，有序的生命週期。啟動的時候先起 mysql-0，確認它 Ready 之後再起 mysql-1，再起 mysql-2。刪除的時候反過來，先刪 mysql-2，再 mysql-1，最後 mysql-0。
+第二，獨立儲存。StatefulSet 用 volumeClaimTemplates 機制，自動為每個 Pod 建立獨立的 PVC。mysql-0 的 PVC 叫 mysql-data-mysql-0，mysql-1 的叫 mysql-data-mysql-1。三個 Pod 各自寫自己的磁碟，不會互相衝突。而且 Pod 被刪掉重建之後，新的 mysql-0 還是會掛回 mysql-data-mysql-0 這個 PVC，資料還在。
 
-StatefulSet 必須搭配 Headless Service。什麼是 Headless Service？就是 clusterIP 設成 None 的 Service。普通 Service 做負載均衡，你連到 Service 的 IP，它隨機分配給後面的 Pod。Headless Service 不做負載均衡，它讓每個 Pod 有自己的 DNS 記錄。mysql-0.mysql-headless.default.svc.cluster.local 直接連到 mysql-0，mysql-1.mysql-headless 直接連到 mysql-1。這樣你的應用就可以指定寫入連 mysql-0，讀取連 mysql-1。
+第三，有序的生命週期。啟動的時候先起 mysql-0，等它 Ready 之後再起 mysql-1，再起 mysql-2。刪除的時候反過來，先刪 mysql-2，再 mysql-1，最後 mysql-0。這樣就能保證主庫先起、從庫後起的順序。
 
-StatefulSet 的 YAML 跟 Deployment 非常像。差別只有兩個地方。第一個是 spec 裡面多了一個 serviceName 欄位，指定要搭配的 Headless Service 名稱。第二個是多了 volumeClaimTemplates，定義每個 Pod 的 PVC 範本。其他的 selector、template 寫法跟 Deployment 一模一樣。
+這三個保證直接解決了我們說的四個問題：固定名稱解決問題一、有序啟動解決問題二、獨立 PVC 解決問題三。問題四（穩定網路身份）靠的是 Headless Service，下一張來看。 [▶ 下一頁]`,
+  },
 
-概念講完了，下一支影片我們來實作 StatefulSet 跑 MySQL。 [▶ 下一頁]`,
+  // ── 6-14 概念（5/6）：Headless Service ──
+  {
+    title: 'Headless Service',
+    subtitle: 'clusterIP: None — 每個 Pod 有自己的 DNS',
+    section: '6-14：StorageClass + StatefulSet 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">普通 Service vs Headless Service</p>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="bg-red-900/10 border border-red-500/30 p-3 rounded">
+              <p className="text-red-400 font-semibold mb-2 text-center">普通 Service</p>
+              <p className="text-slate-400 text-xs">clusterIP: 10.96.x.x</p>
+              <p className="text-slate-300 text-xs mt-1">流量 → Service IP → <span className="text-yellow-400">隨機</span>分給 Pod</p>
+              <p className="text-slate-400 text-xs mt-2">無法指定連到哪個 Pod</p>
+            </div>
+            <div className="bg-green-900/10 border border-green-500/30 p-3 rounded">
+              <p className="text-green-400 font-semibold mb-2 text-center">Headless Service</p>
+              <p className="text-slate-400 text-xs">clusterIP: <span className="text-green-400">None</span></p>
+              <p className="text-slate-300 text-xs mt-1">每個 Pod 有<span className="text-green-400">獨立 DNS</span></p>
+              <p className="text-slate-400 text-xs mt-2">可以直接連到指定的 Pod</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">每個 Pod 的 DNS 格式</p>
+          <div className="font-mono text-xs bg-slate-900 p-3 rounded space-y-1.5 text-slate-300">
+            <p><span className="text-green-400">mysql-0</span>.mysql-headless.default.svc.cluster.local</p>
+            <p><span className="text-green-400">mysql-1</span>.mysql-headless.default.svc.cluster.local</p>
+            <p><span className="text-green-400">mysql-2</span>.mysql-headless.default.svc.cluster.local</p>
+          </div>
+          <div className="mt-2 text-xs text-slate-400 space-y-0.5">
+            <p><span className="text-slate-300">格式：</span><span className="font-mono">{'<pod名>.<service名>.<namespace>.svc.cluster.local'}</span></p>
+            <p>同 namespace 內可簡寫：<span className="font-mono text-green-400">mysql-0.mysql-headless</span></p>
+          </div>
+        </div>
+
+        <div className="bg-cyan-900/20 border border-cyan-500/30 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">實際應用場景</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>寫入 → 直連 <span className="font-mono text-green-400">mysql-0.mysql-headless</span>（主庫）</p>
+            <p>讀取 → 直連 <span className="font-mono text-green-400">mysql-1.mysql-headless</span>（從庫）</p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# Headless Service YAML
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-headless
+spec:
+  clusterIP: None          # ← 這就是 Headless 的關鍵
+  selector:
+    app: mysql-sts
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+# 效果：
+# mysql-0.mysql-headless → 直接連到 mysql-0 Pod
+# mysql-1.mysql-headless → 直接連到 mysql-1 Pod
+# StatefulSet spec 裡要指定 serviceName: mysql-headless`,
+    notes: `第四個問題，沒有穩定網路身份，靠 Headless Service 解決。
+
+普通的 Service 有一個 ClusterIP，所有流量先到這個 IP，再隨機分給後面的 Pod。你沒辦法指定連到哪個 Pod。對無狀態應用沒問題，但資料庫需要明確指定主庫。
+
+Headless Service 就是把 clusterIP 設成 None。沒有 ClusterIP，不做負載均衡。它的效果是讓每個 Pod 有自己的 DNS 記錄。
+
+DNS 格式是 Pod名稱.Service名稱.namespace.svc.cluster.local。所以 mysql-0 的 DNS 就是 mysql-0.mysql-headless.default.svc.cluster.local。在同一個 namespace 裡可以簡寫成 mysql-0.mysql-headless。
+
+這樣你的應用程式就可以明確指定：寫入送到 mysql-0.mysql-headless，讀取從 mysql-1.mysql-headless。完全不會搞混。
+
+StatefulSet 的 YAML 裡要在 spec.serviceName 指定要對應的 Headless Service 名稱，這樣 K8s 才知道幫每個 Pod 建立 DNS 記錄。 [▶ 下一頁]`,
+  },
+
+  // ── 6-14 概念（6/6）：StatefulSet vs Deployment 完整比較 ──
+  {
+    title: 'StatefulSet vs Deployment 完整比較',
+    subtitle: '完整對照 + YAML 兩個差異',
+    section: '6-14：StorageClass + StatefulSet 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3">完整比較表</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-400 border-b border-slate-600">
+                <th className="text-left py-1.5 font-semibold">項目</th>
+                <th className="text-left py-1.5 font-semibold text-red-400">Deployment</th>
+                <th className="text-left py-1.5 font-semibold text-green-400">StatefulSet</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-slate-400">適合場景</td>
+                <td className="py-1.5">無狀態（API、Web）</td>
+                <td className="py-1.5">有狀態（DB、Cache）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-slate-400">Pod 名稱</td>
+                <td className="py-1.5 text-red-300">隨機 hash</td>
+                <td className="py-1.5 text-green-300">固定序號（mysql-0/1/2）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-slate-400">啟動順序</td>
+                <td className="py-1.5 text-red-300">同時啟動</td>
+                <td className="py-1.5 text-green-300">0→1→2（依序）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-slate-400">刪除順序</td>
+                <td className="py-1.5 text-red-300">隨機</td>
+                <td className="py-1.5 text-green-300">2→1→0（反序）</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-slate-400">PVC</td>
+                <td className="py-1.5 text-red-300">共用</td>
+                <td className="py-1.5 text-green-300">每 Pod 獨立</td>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <td className="py-1.5 font-semibold text-slate-400">DNS</td>
+                <td className="py-1.5 text-red-300">無獨立 DNS</td>
+                <td className="py-1.5 text-green-300">pod名.svc名</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 font-semibold text-slate-400">Service 類型</td>
+                <td className="py-1.5">普通 Service</td>
+                <td className="py-1.5 text-green-300">Headless Service</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">YAML 兩個差異（其餘與 Deployment 相同）</p>
+          <div className="font-mono text-xs bg-slate-900 p-3 rounded space-y-1 text-slate-300">
+            <p className="text-slate-500">spec:</p>
+            <p className="text-green-400">{'  serviceName: mysql-headless    # ① 對應 Headless Service'}</p>
+            <p className="text-slate-500">{'  replicas: 2'}</p>
+            <p className="text-slate-500">{'  # ... template 跟 Deployment 一樣 ...'}</p>
+            <p className="text-green-400 mt-1">{'  volumeClaimTemplates:          # ② 每 Pod 獨立 PVC'}</p>
+            <p className="text-slate-400">{'    - metadata:'}</p>
+            <p className="text-slate-400">{'        name: mysql-data'}</p>
+            <p className="text-slate-400">{'      spec:'}</p>
+            <p className="text-slate-400">{'        accessModes: ["ReadWriteOnce"]'}</p>
+            <p className="text-slate-400">{'        resources:'}</p>
+            <p className="text-slate-400">{'          requests:'}</p>
+            <p className="text-slate-400">{'            storage: 1Gi'}</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `來做個完整總結。Deployment 和 StatefulSet 的差別在七個地方。
+
+適合場景：Deployment 給無狀態應用，StatefulSet 給有狀態應用。Pod 名稱：Deployment 是隨機 hash，StatefulSet 是固定序號 0、1、2。啟動順序：Deployment 同時啟動，StatefulSet 依序 0→1→2。刪除順序：Deployment 隨機，StatefulSet 反序 2→1→0。PVC：Deployment 共用，StatefulSet 每個 Pod 獨立。DNS：Deployment 沒有獨立 DNS，StatefulSet 每個 Pod 有自己的 DNS。Service 類型：Deployment 搭配普通 Service，StatefulSet 搭配 Headless Service。
+
+YAML 上的差異只有兩個地方。第一個是 spec 裡多了 serviceName，指定要搭配的 Headless Service。第二個是多了 volumeClaimTemplates，定義每個 Pod 的 PVC 範本。其他的 selector、template、容器設定，寫法跟 Deployment 完全一樣。
+
+概念講完了，下一節我們來實際建 StatefulSet 跑 MySQL。 [▶ 下一頁]`,
   },
 
   // ── 6-15 實作（1/2）：StatefulSet MySQL YAML + 部署 ──

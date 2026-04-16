@@ -1491,11 +1491,11 @@ YAML 上的差異只有兩個地方。第一個是 spec 裡多了 serviceName，
 概念講完了，下一節我們來實際建 StatefulSet 跑 MySQL。 [▶ 下一頁]`,
   },
 
-  // ── 6-15 實作（1/2）：StatefulSet MySQL YAML + 部署 ──
+  // ── 6-15 實作（1/5）：確認 StorageClass + 套用 YAML ──
   {
-    title: 'Lab：StatefulSet MySQL 部署',
-    subtitle: 'Headless Service + Secret + StatefulSet YAML',
-    section: 'Loop 5：StorageClass + StatefulSet',
+    title: 'Lab：確認 StorageClass + 套用 YAML',
+    subtitle: 'kubectl get storageclass + kubectl apply statefulset-mysql.yaml',
+    section: '6-15：StatefulSet MySQL 實作',
     duration: '8',
     content: (
       <div className="space-y-4">
@@ -2279,113 +2279,428 @@ helm uninstall my-redis2
 一行指令把所有相關資源清乾淨。對比 kubectl delete -f 要一個一個檔案刪，Helm 方便太多了。 [▶ 下一頁]`,
   },
 
-  // ── 6-19 學員實作 ──
+  // ── 6-19A 學員實作 Part 1 ──
   {
-    title: '學員實作：Helm upgrade 陷阱 + 多環境部署',
-    subtitle: 'Loop 6 練習題',
-    section: 'Loop 6：Helm',
+    title: '學員實作：install → upgrade → rollback 完整流程',
+    subtitle: '回頭操作 Loop 5 Part 1 — 練習題',
+    section: '6-19A：Helm 學員實作 Part 1',
     duration: '10',
     content: (
       <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">必做 1：預測結果</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p>helm install my-mysql bitnami/mysql \</p>
-            <p>{'  '}--set auth.rootPassword=pass123</p>
-            <p className="text-yellow-300 mt-1">helm upgrade my-mysql bitnami/mysql \</p>
-            <p className="text-yellow-300">{'  '}--set secondary.replicaCount=1</p>
-          </div>
-          <p className="text-slate-400 text-xs mt-2">upgrade 沒帶 rootPassword → 會發生什麼？怎麼避免？</p>
+        <div className="bg-blue-900/30 border border-blue-500/50 p-4 rounded-lg">
+          <p className="text-blue-300 font-semibold mb-2">前置確認</p>
+          <p className="text-slate-300 text-sm">先執行 <code className="text-green-400">helm list</code>，確認目前沒有任何 Release（my-ingress 應已在 18A 清理）</p>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做 2：dev + prod 兩套 Redis</p>
-          <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
-            <li>dev-redis-values.yaml（1 副本）</li>
-            <li>prod-redis-values.yaml（3 副本 + 密碼）</li>
-            <li><code className="text-green-400">helm install dev-redis bitnami/redis -f dev-redis-values.yaml</code></li>
-            <li><code className="text-green-400">helm install prod-redis bitnami/redis -f prod-redis-values.yaml</code></li>
-            <li><code className="text-green-400">helm list</code> 看到兩個 Release 互不干擾</li>
-          </ul>
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">Task：用 my-nginx 跑一遍完整流程</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400 font-bold w-5">1.</span>
+              <p>install <code className="text-green-400">my-nginx</code>（replicaCount=1, NodePort）</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400 font-bold w-5">2.</span>
+              <p>upgrade（replicaCount=2）→ 確認 REVISION 2</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400 font-bold w-5">3.</span>
+              <p><code className="text-green-400">helm history my-nginx</code> 看歷史</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400 font-bold w-5">4.</span>
+              <p>rollback to REVISION 1 → 確認 REVISION 3 出現</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400 font-bold w-5">5.</span>
+              <p>uninstall → <code className="text-green-400">helm list</code> 確認空的</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-3 rounded-lg">
+          <p className="text-yellow-400 text-sm font-semibold">重點觀察：rollback 不是回去舊版，而是新增一個 REVISION！</p>
         </div>
       </div>
     ),
-    notes: `接下來是大家的實作時間。必做第一題：先執行 helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123，然後執行 helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1，注意 upgrade 這行沒有帶 rootPassword。預測會發生什麼事？答案：密碼會被重置成 Helm 自動產生的 random 值，原有連線全斷。避免方法：用 --reuse-values。第二題：自己寫兩個 values.yaml，一個 dev 一個 prod，分別裝兩個 Release 的 Redis，確認 helm list 看到兩個互不干擾。大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+    code: `# 前置確認：確認 helm list 為空
+helm list
+# NAME   NAMESPACE   REVISION   STATUS   CHART   APP VERSION
+
+# Step 1: install my-nginx (replicaCount=1, NodePort)
+helm install my-nginx ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=1 \\
+  --set controller.service.type=NodePort
+# NAME: my-nginx
+# STATUS: deployed
+# REVISION: 1
+
+# Step 2: upgrade (replicaCount=2)
+helm upgrade my-nginx ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=2 \\
+  --set controller.service.type=NodePort
+# Release "my-nginx" has been upgraded. Happy Helming!
+# STATUS: deployed
+# REVISION: 2
+
+# Step 3: 看歷史
+helm history my-nginx
+# REVISION  STATUS      DESCRIPTION
+# 1         superseded  Install complete
+# 2         deployed    Upgrade complete
+
+# Step 4: rollback to REVISION 1
+helm rollback my-nginx 1
+# Rollback was a success! Happy Helming!
+
+# rollback 後看歷史 → REVISION 3 出現了！
+helm history my-nginx
+# REVISION  STATUS      DESCRIPTION
+# 1         superseded  Install complete
+# 2         superseded  Upgrade complete
+# 3         deployed    Rollback to 1   ← rollback 是新增一筆！
+
+# Step 5: 清理
+helm uninstall my-nginx
+helm list
+# NAME   NAMESPACE   REVISION   STATUS   CHART   APP VERSION
+# (空的)`,
+    notes: `好，現在換大家上。18A 我剛教了 install、upgrade、rollback，現在你自己用 Release 名稱 my-nginx 從頭到尾跑一遍。
+
+第一步先 helm list，確認目前是空的，my-ingress 應該在 18A 結尾就清掉了。如果沒有清掉，先 helm uninstall 掉。
+
+然後 install my-nginx，記得帶 replicaCount=1 跟 NodePort。裝好之後 upgrade 改成 replicaCount=2。然後 helm history 看一下。接著 rollback 回 REVISION 1。rollback 完之後再 history 看一次。你會看到 REVISION 3 出現了，這是重點——rollback 不是真的「回去」，是「新增一筆 rollback 記錄」。
+
+最後 uninstall，helm list 確認空的。大家動手做，我去巡堂。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
   },
 
-  // ── 6-19 學員實作解答 ──
+  // ── 6-19A 學員實作 Part 1 解答 ──
   {
-    title: '解答：Helm upgrade 陷阱 + 多環境部署',
-    subtitle: '回頭操作 Loop 6',
-    section: 'Loop 6：Helm',
-    duration: '5',
+    title: '解答：install → upgrade → rollback',
+    subtitle: '回頭操作 Loop 5 Part 1 — 解答',
+    section: '6-19A：Helm 學員實作 Part 1',
+    duration: '0',
     content: (
       <div className="space-y-4">
         <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做 1 解答：upgrade 沒帶密碼會怎樣</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 安裝時設了密碼</p>
-            <p>helm install my-mysql bitnami/mysql \</p>
-            <p>{'  '}--set auth.rootPassword=pass123</p>
-            <p className="text-red-400 mt-1"># upgrade 沒帶密碼 → 密碼被清掉！</p>
-            <p>helm upgrade my-mysql bitnami/mysql \</p>
-            <p>{'  '}--set secondary.replicaCount=1</p>
-            <p className="text-green-400 mt-1"># 正確做法：加 --reuse-values</p>
-            <p>helm upgrade my-mysql bitnami/mysql \</p>
-            <p>{'  '}--set secondary.replicaCount=1 \</p>
-            <p>{'  '}--reuse-values</p>
+          <p className="text-cyan-400 font-semibold mb-3">完整指令流程</p>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 font-bold w-6">①</span>
+              <p className="text-slate-300"><code className="text-yellow-300">helm install my-nginx</code> → STATUS: deployed, REVISION: 1</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 font-bold w-6">②</span>
+              <p className="text-slate-300"><code className="text-yellow-300">helm upgrade my-nginx</code> → REVISION: 2</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 font-bold w-6">③</span>
+              <p className="text-slate-300"><code className="text-yellow-300">helm history</code> → 看到 1(superseded) + 2(deployed)</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 font-bold w-6">④</span>
+              <p className="text-slate-300"><code className="text-yellow-300">helm rollback my-nginx 1</code> → Rollback was a success!</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 font-bold w-6">⑤</span>
+              <p className="text-slate-300">history 再看 → <strong className="text-red-300">REVISION 3 出現！</strong>rollback = 新增一筆記錄</p>
+            </div>
           </div>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做 2 解答：dev + prod 兩套 Redis</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># dev-redis-values.yaml</p>
-            <p>master:</p>
-            <p>{'  '}replicaCount: 1</p>
-            <p className="mt-1 text-slate-500"># prod-redis-values.yaml</p>
-            <p>master:</p>
-            <p>{'  '}replicaCount: 3</p>
-            <p>auth:</p>
-            <p>{'  '}password: prod-redis-pass</p>
-            <p className="mt-1 text-slate-500"># 分別安裝</p>
-            <p>helm install dev-redis bitnami/redis -f dev-redis-values.yaml</p>
-            <p>helm install prod-redis bitnami/redis -f prod-redis-values.yaml</p>
-            <p>helm list</p>
-            <p className="text-slate-500"># NAME        STATUS    CHART</p>
-            <p className="text-slate-500"># dev-redis   deployed  redis-x.x.x</p>
-            <p className="text-slate-500"># prod-redis  deployed  redis-x.x.x</p>
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
+          <p className="text-yellow-400 font-semibold mb-2">核心概念：rollback 的本質</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>Helm 永遠<strong className="text-white">只往前</strong>——rollback 是「把舊版設定再跑一次 upgrade」</p>
+            <p>REVISION 號碼只增不減，這讓你隨時可以再 rollback 到任何版本</p>
           </div>
         </div>
 
-        <div className="bg-red-900/30 border border-red-500/30 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">Helm 常見三個坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">1.</span>
-              <p><strong className="text-white">repo 沒 add 就 search</strong> -- 先 helm repo add，再 helm repo update，再 search</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">2.</span>
-              <p><strong className="text-white">install 忘記設密碼</strong> -- 自動產生 random 密碼，後面連不上</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold">3.</span>
-              <p><strong className="text-white">upgrade 沒帶密碼</strong> -- 密碼被清掉，用 --reuse-values 保留上次參數</p>
-            </div>
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 text-sm font-semibold">清理完成 → helm list 應該是空的，準備進 19B</p>
+        </div>
+      </div>
+    ),
+    code: `# 完整解答（複習用）
+
+helm list
+# (空的)
+
+helm install my-nginx ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=1 \\
+  --set controller.service.type=NodePort
+# REVISION: 1
+
+helm upgrade my-nginx ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=2 \\
+  --set controller.service.type=NodePort
+# REVISION: 2
+
+helm history my-nginx
+# REVISION  STATUS      DESCRIPTION
+# 1         superseded  Install complete
+# 2         deployed    Upgrade complete
+
+helm rollback my-nginx 1
+# Rollback was a success!
+
+helm history my-nginx
+# REVISION  STATUS      DESCRIPTION
+# 1         superseded  Install complete
+# 2         superseded  Upgrade complete
+# 3         deployed    Rollback to 1   ← 新增一筆，不是回去！
+
+helm uninstall my-nginx
+helm list
+# (空的) → 準備進 19B`,
+    notes: `來對答案。
+
+安裝 my-nginx REVISION 1，upgrade REVISION 2，history 看到 1 superseded 2 deployed。rollback to 1，Rollback was a success。再看 history，REVISION 3 出現了。這就是重點：rollback 不是把 REVISION 砍掉，而是「以舊版設定為基礎，新增一筆部署記錄」。Helm 的 REVISION 只增不減，這讓你隨時可以 rollback 到任何一個歷史版本。
+
+uninstall 清乾淨，helm list 空的。
+
+好，Part 1 到這裡。下一張進 Part 2，有兩個必做加一個挑戰。 [▶ 下一頁]`,
+  },
+
+  // ── 6-19B 學員實作 Part 2 ──
+  {
+    title: '學員實作：upgrade 陷阱 + 自己的 Chart',
+    subtitle: '回頭操作 Loop 5 Part 2 — 練習題',
+    section: '6-19B：Helm 學員實作 Part 2',
+    duration: '15',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
+          <p className="text-blue-300 font-semibold text-sm mb-1">前置確認（避免 IngressClass 衝突）</p>
+          <p className="text-slate-300 text-xs font-mono">helm uninstall dev-ingress 2&gt;/dev/null || true</p>
+          <p className="text-slate-300 text-xs font-mono">helm list  # 確認空的，沒有 ingress-nginx Release</p>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">必做 1：upgrade 陷阱</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>① install my-ingress（replicaCount=1）</p>
+            <p>② upgrade <strong className="text-red-300">沒帶</strong> replicaCount → replicaCount 會被重置嗎？</p>
+            <p>③ <code className="text-green-400">kubectl get deployment</code> 確認副本數</p>
+            <p>④ 用 <code className="text-yellow-300">--reuse-values</code> 修正</p>
+          </div>
+        </div>
+
+        <div className="bg-purple-900/30 border border-purple-500/30 p-4 rounded-lg">
+          <p className="text-purple-300 font-semibold mb-2">必做 2：自己的 Chart</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>① <code className="text-green-400">helm create my-service</code></p>
+            <p>② 修改 values.yaml → image: httpd, tag: latest</p>
+            <p>③ install → <code className="text-green-400">kubectl describe pod ... | grep Image</code> 確認 httpd:latest</p>
+            <p>④ <code className="text-green-400">helm upgrade my-service ./my-service --set image.tag=2.4</code></p>
+            <p>⑤ 確認 Image 變成 httpd:2.4</p>
           </div>
         </div>
       </div>
     ),
-    notes: `好，回頭看一下答案。
+    code: `# ── 前置確認 ──
+helm uninstall dev-ingress 2>/dev/null || true
+helm list   # 確認空的，避免 IngressClass 衝突
 
-必做第一題。我們執行了 helm install my-mysql bitnami/mysql --set auth.rootPassword=pass123，然後執行 helm upgrade my-mysql bitnami/mysql --set secondary.replicaCount=1。upgrade 這行有沒有帶 rootPassword？沒有。結果是什麼？密碼被清掉了。Helm upgrade 預設不會保留上一次的參數，全部從頭來。解法是加 --reuse-values 這個 flag，它會繼承上一次 install 的所有參數，你只需要帶你要改的那個。
+# ── 必做 1：upgrade 陷阱 ──
+helm install my-ingress ingress-nginx/ingress-nginx \\
+  --set controller.replicaCount=1 \\
+  --set controller.service.type=NodePort
 
-必做第二題。dev-redis-values.yaml 裡面設 replicaCount: 1，prod-redis-values.yaml 裡面設 replicaCount: 3 加密碼。分別用 -f 傳給 helm install，兩個 Release 完全獨立。helm list 可以看到兩行，NAME 不一樣，互不干擾。這就是多環境部署最簡單的做法。
+# upgrade 沒帶 replicaCount，會重置嗎？
+helm upgrade my-ingress ingress-nginx/ingress-nginx \\
+  --set controller.service.type=NodePort
 
-來看三個坑。第一，repo 沒 add 就 search，搜不到東西。要先加倉庫再更新。第二，install 沒設密碼，Chart 自動產生 random 值，你連不上自己的服務。第三，upgrade 沒帶密碼，密碼被清掉，用 --reuse-values 解決。
+kubectl get deployment   # 看 READY 欄位，replicaCount 是否變回預設值？
 
-好，Helm 到這裡。下一個 Loop 我們看叢集管理工具 Rancher。 [▶ 下一頁]`,
+# 正確做法：--reuse-values 保留上次參數
+helm upgrade my-ingress ingress-nginx/ingress-nginx \\
+  --reuse-values \\
+  --set controller.replicaCount=2
+
+# ── 必做 2：自己的 Chart ──
+helm create my-service
+
+# 修改 my-service/values.yaml：
+# image:
+#   repository: httpd
+#   tag: "latest"
+#   pullPolicy: IfNotPresent
+# serviceAccount:
+#   create: false
+#   name: ""
+# httpRoute:
+#   enabled: false
+
+helm install my-service ./my-service
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+# Image:  httpd:latest
+
+helm upgrade my-service ./my-service --set image.tag=2.4
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+# Image:  httpd:2.4`,
+    notes: `19B 有兩個必做加一個挑戰。
+
+先做前置確認，helm uninstall dev-ingress 2>/dev/null || true，這行是預防之前 dev-ingress 沒清乾淨造成 IngressClass 衝突。然後 helm list 確認空的。
+
+必做第一題：upgrade 陷阱。install my-ingress 設 replicaCount=1。然後 upgrade，但這次故意不帶 replicaCount，只帶 service.type=NodePort。upgrade 完之後 kubectl get deployment，看 READY 欄位。你會發現 replicaCount 被重置了。這就是 upgrade 陷阱——Helm upgrade 預設不繼承上次的參數。解法是加 --reuse-values，它會把上次 install 的所有值帶進來，你只需要指定你要改的那個。
+
+必做第二題：自己的 Chart。helm create my-service 產生骨架。打開 my-service/values.yaml，把 image.repository 改成 httpd，tag 改成 latest，serviceAccount.create 改 false，httpRoute.enabled 改 false。install 完之後 kubectl describe pod 搭配 grep Image 確認是 httpd:latest。然後 helm upgrade 把 tag 換成 2.4，再 describe 確認變 httpd:2.4。
+
+大家動手做。 [▶ 下一頁 -- 學員開始做，你去巡堂]`,
+  },
+
+  // ── 6-19B 學員實作解答 ──
+  {
+    title: '解答：upgrade 陷阱 + 自己的 Chart',
+    subtitle: '回頭操作 Loop 5 Part 2 — 解答',
+    section: '6-19B：Helm 學員實作 Part 2',
+    duration: '0',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做 1 解答：--reuse-values 保留上次參數</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="flex items-start gap-2">
+              <span className="text-red-400">✗</span>
+              <p>upgrade 沒帶 replicaCount → 重置成預設值（通常是 1）</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400">✓</span>
+              <p><code className="text-yellow-300">--reuse-values</code> = 繼承上次所有參數，只覆蓋你帶的那個</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做 2 解答：values.yaml 關鍵修改</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-1">
+            <p className="text-slate-500"># my-service/values.yaml 修改處</p>
+            <p>image:</p>
+            <p>{'  '}repository: httpd</p>
+            <p>{'  '}tag: <span className="text-yellow-300">"latest"</span></p>
+            <p>{'  '}pullPolicy: IfNotPresent</p>
+            <p>serviceAccount:</p>
+            <p>{'  '}create: <span className="text-red-300">false</span></p>
+            <p>{'  '}name: <span className="text-slate-500">""</span></p>
+            <p>httpRoute:</p>
+            <p>{'  '}enabled: <span className="text-red-300">false</span></p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 text-sm font-semibold mb-1">驗證結果</p>
+          <p className="text-slate-300 text-xs font-mono">install → Image: httpd:latest</p>
+          <p className="text-slate-300 text-xs font-mono">upgrade --set image.tag=2.4 → Image: httpd:2.4</p>
+        </div>
+      </div>
+    ),
+    code: `# ── 必做 1 解答 ──
+# upgrade 沒帶 replicaCount → 重置！
+helm upgrade my-ingress ingress-nginx/ingress-nginx \\
+  --set controller.service.type=NodePort
+kubectl get deployment
+# READY 可能變回 1/1（被重置）
+
+# 正確：--reuse-values 保留上次所有參數
+helm upgrade my-ingress ingress-nginx/ingress-nginx \\
+  --reuse-values \\
+  --set controller.replicaCount=2
+kubectl get deployment
+# READY 2/2  ← 保留了
+
+# ── 必做 2 解答 ──
+# values.yaml 修改後 install
+helm install my-service ./my-service
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+# Image:  httpd:latest  ← 確認是 httpd
+
+# upgrade 換 tag
+helm upgrade my-service ./my-service --set image.tag=2.4
+kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
+# Image:  httpd:2.4  ← tag 換掉了`,
+    notes: `來對答案。
+
+必做第一題：upgrade 沒帶 replicaCount，Helm 預設不繼承上次的參數，所以 replicaCount 被重置成 Chart 預設值。加上 --reuse-values 之後，Helm 會把上次 install 的全部值帶進來，你只需要帶你要改的那個，其他的都保留。
+
+必做第二題：values.yaml 改 image.repository 為 httpd、tag 為 latest、serviceAccount.create 為 false、httpRoute.enabled 為 false。install 之後 describe pod grep Image，確認 httpd:latest。upgrade --set image.tag=2.4，再 grep Image，確認 httpd:2.4。這就是 Helm 自定義 Chart 的基本流程。
+
+好，接下來是挑戰題，Grafana 監控。 [▶ 下一頁]`,
+  },
+
+  // ── 6-19B 挑戰：Grafana ──
+  {
+    title: '挑戰：用 Grafana 看 my-service Pod 資源',
+    subtitle: '回頭操作 Loop 5 Part 2 — 挑戰題',
+    section: '6-19B：Helm 學員實作 Part 2',
+    duration: '0',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-purple-900/30 border border-purple-500/50 p-4 rounded-lg">
+          <p className="text-purple-300 font-semibold mb-2">挑戰目標</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>① 確認 <code className="text-green-400">monitoring</code> Release 是否存在</p>
+            <p>② 若不存在 → 重新安裝 kube-prometheus-stack</p>
+            <p>③ port-forward Grafana → 開 localhost:3000</p>
+            <p>④ 在 Dashboards 找到 my-service Pod 的資源圖</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">Grafana 導航路徑</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>Dashboards → <strong className="text-white">Kubernetes / Compute Resources / Pod</strong></p>
+            <p>Namespace: <code className="text-yellow-300">default</code> → Pod: <code className="text-yellow-300">my-service-xxx</code></p>
+            <p>查看 CPU / Memory 用量圖表</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">最終清理（全部清乾淨）</p>
+          <div className="font-mono text-xs text-slate-300 space-y-1">
+            <p>helm uninstall my-ingress my-service monitoring 2&gt;/dev/null || true</p>
+            <p>kubectl delete pvc --all</p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# ── 挑戰：Grafana 監控 ──
+
+# Step 1: 確認 monitoring Release 是否存在
+helm list
+# NAME        NAMESPACE   STATUS
+# my-ingress  default     deployed
+# my-service  default     deployed
+# monitoring  default     deployed   ← 有就直接用，沒有就裝
+
+# Step 2: 若 monitoring 不存在 → 重新安裝
+helm install monitoring prometheus-community/kube-prometheus-stack \\
+  --set grafana.adminPassword=admin123
+
+# 等 Pod 就緒（約 2-3 分鐘）
+kubectl get pods | grep monitoring
+
+# Step 3: port-forward Grafana
+kubectl port-forward svc/monitoring-grafana 3000:80
+# Forwarding from 127.0.0.1:3000 -> 3000
+
+# 開瀏覽器：http://localhost:3000
+# 帳號: admin  密碼: admin123
+# Dashboards → Kubernetes / Compute Resources / Pod
+# Namespace: default → Pod: my-service-xxx
+
+# ── 最終清理（全部清乾淨）──
+helm uninstall my-ingress my-service monitoring 2>/dev/null || true
+kubectl delete pvc --all`,
+    notes: `挑戰題：用 Grafana 看 my-service 的 Pod 資源。
+
+先 helm list，確認 monitoring Release 有沒有。如果之前做過 19A 的 Grafana 練習，monitoring 可能還在。如果不在，就 helm install monitoring prometheus-community/kube-prometheus-stack --set grafana.adminPassword=admin123，等個兩三分鐘讓 Pod 起來。
+
+然後 kubectl port-forward svc/monitoring-grafana 3000:80，開瀏覽器 localhost:3000，帳號 admin 密碼 admin123。進去之後找 Dashboards，選 Kubernetes / Compute Resources / Pod，Namespace 選 default，Pod 選 my-service 那個，就可以看到 CPU 跟 Memory 的圖表。
+
+最後清理，helm uninstall my-ingress my-service monitoring 加 2>/dev/null || true，一行清掉三個 Release。再 kubectl delete pvc --all，把 PVC 也清掉。
+
+好，Helm 完整收尾。下一個 Loop 我們看叢集管理工具 Rancher。 [▶ 下一頁]`,
   },
 
   // ============================================================

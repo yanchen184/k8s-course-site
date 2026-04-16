@@ -647,7 +647,29 @@ Password: (not set)
 
 ### ⑤ 學員實作解答
 
-**必做**
+**必做解析**
+
+講師先帶大家建好 shop-deploy 和 shop-svc，這和之前的 frontend-deploy / api-deploy 完全一樣的做法——只是換個名字、換個訊息。
+
+重點在 YAML 那一段。學員要在 `ingress-basic.yaml` 的 `paths` 陣列裡加一個新的 path 物件：
+
+```yaml
+          - path: /shop
+            pathType: Prefix
+            backend:
+              service:
+                name: shop-svc
+                port:
+                  number: 80
+```
+
+**為什麼這樣寫**：
+- `path: /shop` — 比對規則，URL 開頭是 /shop 的請求就轉過來
+- `pathType: Prefix` — 前綴比對，/shop、/shop/xxx 都符合；如果填 Exact 只有精確的 /shop 才符合
+- `backend.service.name` — 要轉去的 Service 名稱，必須和你 expose 出來的 Service 名稱一樣
+- `backend.service.port.number` — Service 的 port，不是容器 port
+
+加完存檔，kubectl apply 更新 Ingress（不需要重建，apply 會合併），curl 驗收。
 
 ```bash
 # 講師示範
@@ -681,6 +703,14 @@ Username: (not set)
 Password: (not set)
 ```
 
+---
+
+**挑戰解析**
+
+挑戰題是在 `ingress-host.yaml` 加第三個 host，邏輯和 www.myapp.local / api.myapp.local 完全相同，只是換成 admin.myapp.local。
+
+注意：`ingress-host.yaml` 裡的 Ingress 名稱是 `app-ingress-host`，和 `ingress-basic.yaml` 裡的 `app-ingress` **刻意不同**。如果名字一樣，後來 apply 的那份會覆蓋前一份，path-based routing 的規則就消失了。
+
 **挑戰解答**
 
 在 `ingress-host.yaml` 加：
@@ -699,16 +729,22 @@ Password: (not set)
 ```
 
 ```bash
+kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
+kubectl expose deployment admin-deploy --name=admin-svc --port=80
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-host.yaml
 sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
 curl http://admin.myapp.local
 ```
 
-**三個坑**
+---
 
-1. `/etc/hosts` 忘記加 → `grep myapp.local /etc/hosts` 確認
-2. `ingressClassName` 填了 nginx → 改成 traefik
-3. `pathType` 沒填 → 每個 path 必填，apply 會報 validation error
+**四個坑**
+
+1. `/etc/hosts` 忘記加 → `grep myapp.local /etc/hosts` 確認，沒加就 `could not resolve host`
+2. `ingressClassName` 填了 nginx → k3s 沒有 nginx Controller，ADDRESS 永遠空白，curl timeout（不是 connection refused）
+3. `ingressClassName` 不寫 → 叢集若沒有 default IngressClass，沒有任何 Controller 認領，同樣 ADDRESS 空白；最安全做法是永遠明確寫 `ingressClassName: traefik`
+4. `pathType` 沒填 → 必填欄位，apply 時 validation error 直接報錯
 
 **清理**
 

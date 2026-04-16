@@ -608,15 +608,12 @@ kubectl expose deployment shop-deploy --name=shop-svc --port=80
 
 **🎯 必做題：讓 /shop 能從外面連到**
 
-> 任務說明（只給學員看這段，不給 YAML 答案）：
->
-> 剛才我們建好了 shop-deploy 和 shop-svc。現在你的任務是：打開 `ingress-basic.yaml`，在 `paths` 陣列裡加一個新的路由規則，讓 `/shop` 這個路徑可以對應到 shop-svc。
->
-> 加完之後執行 `kubectl apply`，再用 `curl http://<NODE-IP>/shop` 驗收，看到 `Message: Hello from shop` 就完成了。
->
-> 提示：參考 `/frontend` 或 `/api` 的寫法，格式一樣，換個 path 名稱和 Service 名稱就好。
+剛才我們建好了 shop-deploy 和 shop-svc。現在你的任務是：打開 `ingress-basic.yaml`，在 `paths` 陣列裡加一個新的路由規則，讓 `/shop` 這個路徑對應到 shop-svc。
 
-驗收指令：
+提示：參考 `/frontend` 或 `/api` 的寫法，格式一樣，換個 path 名稱和 Service 名稱就好。
+
+加完之後執行 apply，再 curl 驗收，看到 `Message: Hello from shop` 就完成了。
+
 ```bash
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
 curl http://192.168.43.130/shop
@@ -627,14 +624,11 @@ curl http://192.168.43.130/shop
 
 **🏆 挑戰題：在 host-based routing 加第三個服務**
 
-> 任務說明（只給學員看這段）：
->
-> 挑戰題分三步：
-> 1. 自己建一個 admin-deploy（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from admin"）和 admin-svc
-> 2. 打開 `ingress-host.yaml`，仿照 www.myapp.local 的寫法，加一個 `admin.myapp.local` 的 host 規則，apply
-> 3. 在 `/etc/hosts` 加入 admin.myapp.local 的映射，`curl http://admin.myapp.local` 驗收
+挑戰題分三步：
+1. 自己建一個 admin-deploy（image: yanchen184/k8s-demo-app:latest，MESSAGE="Hello from admin"）和 admin-svc
+2. 打開 `ingress-host.yaml`，仿照 www.myapp.local 的寫法，加一個 `admin.myapp.local` 的 host 規則，apply
+3. 在 `/etc/hosts` 加入 admin.myapp.local 的映射，`curl http://admin.myapp.local` 驗收
 
-驗收指令：
 ```bash
 curl http://admin.myapp.local
 # 期望：Message: Hello from admin

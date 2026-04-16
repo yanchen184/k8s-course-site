@@ -3955,7 +3955,7 @@ Storage 頁面。看到所有 PV 和 PVC。哪些是 Bound、哪些是 Available
           <p className="text-green-400 font-semibold mb-2">這一包 Helm Chart 幫你建了什麼？</p>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-green-300">WordPress Deployment</span>
-            <span className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-green-300">MySQL StatefulSet</span>
+            <span className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-green-300">MariaDB StatefulSet</span>
             <span className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-green-300">PVC x 2</span>
             <span className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-green-300">Service x 2</span>
             <span className="bg-green-900/40 border border-green-500/30 px-2 py-1 rounded text-green-300">Secret</span>

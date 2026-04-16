@@ -3029,48 +3029,15 @@ kubectl get pods`,
         </div>
       </div>
     ),
-    code: `# 前置確認：確認 helm list 為空
+    code: `# 前置確認
 helm list
-# NAME   NAMESPACE   REVISION   STATUS   CHART   APP VERSION
 
-# Step 1: install my-nginx (replicaCount=1, NodePort)
-helm install my-nginx ingress-nginx/ingress-nginx \\
-  --set controller.replicaCount=1 \\
-  --set controller.service.type=NodePort
-# NAME: my-nginx
-# STATUS: deployed
-# REVISION: 1
-
-# Step 2: upgrade (replicaCount=2)
-helm upgrade my-nginx ingress-nginx/ingress-nginx \\
-  --set controller.replicaCount=2 \\
-  --set controller.service.type=NodePort
-# Release "my-nginx" has been upgraded. Happy Helming!
-# STATUS: deployed
-# REVISION: 2
-
-# Step 3: 看歷史
-helm history my-nginx
-# REVISION  STATUS      DESCRIPTION
-# 1         superseded  Install complete
-# 2         deployed    Upgrade complete
-
-# Step 4: rollback to REVISION 1
-helm rollback my-nginx 1
-# Rollback was a success! Happy Helming!
-
-# rollback 後看歷史 → REVISION 3 出現了！
-helm history my-nginx
-# REVISION  STATUS      DESCRIPTION
-# 1         superseded  Install complete
-# 2         superseded  Upgrade complete
-# 3         deployed    Rollback to 1   ← rollback 是新增一筆！
-
-# Step 5: 清理
-helm uninstall my-nginx
-helm list
-# NAME   NAMESPACE   REVISION   STATUS   CHART   APP VERSION
-# (空的)`,
+# 驗收指令（做完每步後確認）：
+# Step 1 後：helm list（確認 STATUS: deployed）
+# Step 2 後：helm history my-nginx（確認 REVISION 2 出現）
+# Step 3：helm history my-nginx（確認 1 superseded + 2 deployed）
+# Step 4 後：helm history my-nginx（確認 REVISION 3 出現！）
+# Step 5 後：helm list（確認是空的）`,
     notes: `好，現在換大家上。18A 我剛教了 install、upgrade、rollback，現在你自己用 Release 名稱 my-nginx 從頭到尾跑一遍。
 
 第一步先 helm list，確認目前是空的，my-ingress 應該在 18A 結尾就清掉了。如果沒有清掉，先 helm uninstall 掉。
@@ -3208,43 +3175,15 @@ uninstall 清乾淨，helm list 空的。
 helm uninstall dev-ingress 2>/dev/null || true
 helm list   # 確認空的，避免 IngressClass 衝突
 
-# ── 必做 1：upgrade 陷阱 ──
-helm install my-ingress ingress-nginx/ingress-nginx \\
-  --set controller.replicaCount=1 \\
-  --set controller.service.type=NodePort
+# ── 必做 1 驗收 ──
+kubectl get deployment   # install 後看 READY 欄位
+# upgrade（不帶 replicaCount）後再看 READY → 有沒有被重置？
+# 加 --reuse-values 後再看 READY → 有沒有保留？
 
-# upgrade 沒帶 replicaCount，會重置嗎？
-helm upgrade my-ingress ingress-nginx/ingress-nginx \\
-  --set controller.service.type=NodePort
-
-kubectl get deployment   # 看 READY 欄位，replicaCount 是否變回預設值？
-
-# 正確做法：--reuse-values 保留上次參數
-helm upgrade my-ingress ingress-nginx/ingress-nginx \\
-  --reuse-values \\
-  --set controller.replicaCount=2
-
-# ── 必做 2：自己的 Chart ──
-helm create my-service
-
-# 修改 my-service/values.yaml：
-# image:
-#   repository: httpd
-#   tag: "latest"
-#   pullPolicy: IfNotPresent
-# serviceAccount:
-#   create: false
-#   name: ""
-# httpRoute:
-#   enabled: false
-
-helm install my-service ./my-service
+# ── 必做 2 驗收 ──
 kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
-# Image:  httpd:latest
-
-helm upgrade my-service ./my-service --set image.tag=2.4
-kubectl describe pod -l app.kubernetes.io/name=my-service | grep Image
-# Image:  httpd:2.4`,
+# install 後：Image: httpd:latest
+# upgrade tag=2.4 後：Image: httpd:2.4`,
     notes: `19B 有兩個必做加一個挑戰。
 
 先做前置確認，helm uninstall dev-ingress 2>/dev/null || true，這行是預防之前 dev-ingress 沒清乾淨造成 IngressClass 衝突。然後 helm list 確認空的。
@@ -3470,7 +3409,13 @@ kubectl delete pvc --all`,
 
 有，這就是 Rancher。
 
-Rancher 是一個 K8s 叢集管理平台。它提供了一個 Web 介面，讓你用瀏覽器管理 K8s 叢集。你可以同時管理多個叢集，不用切 context。所有叢集的狀態一目了然。 [▶ 下一頁]`,
+Rancher 是一個 K8s 叢集管理平台。它提供了一個 Web 介面，讓你用瀏覽器管理 K8s 叢集。你可以同時管理多個叢集，不用切 context。所有叢集的狀態一目了然。
+
+⚠️ [講師確認] 進入這個 Loop 之前，請先確認 master VM 上 Rancher image 已預先拉好：
+sudo docker pull rancher/rancher:latest
+（image 約 1.5GB，第一次拉需要 10 分鐘，必須在上課前完成，不能當場等）
+
+ [▶ 下一頁]`,
   },
 
   // ── 6-20 概念（2/2）：RKE vs k3s + Rancher 定位 ──
@@ -3577,7 +3522,7 @@ Rancher 能做什麼？很多事情。
           <ol className="text-slate-300 text-sm space-y-1 list-decimal list-inside">
             <li>Docker 啟動 Rancher</li>
             <li>取得 Bootstrap Password</li>
-            <li>瀏覽器打開 https://master-IP</li>
+            <li>瀏覽器打開 https://master-IP:8443</li>
             <li>設定 admin 密碼</li>
             <li>Cluster Management → Import Existing</li>
             <li>在 k3s master 上執行 agent 指令</li>
@@ -3591,22 +3536,21 @@ Rancher 能做什麼？很多事情。
         </div>
       </div>
     ),
-    code: `# 1. Docker 啟動 Rancher
+    code: `# 1. Docker 啟動 Rancher（k3s Traefik 佔了 80/443，改用 8080/8443）
 docker run -d --restart=unless-stopped \\
-  -p 80:80 -p 443:443 --privileged \\
+  -p 8080:80 -p 8443:443 --privileged \\
   rancher/rancher:latest
-# Port 衝突時改用：-p 8443:443 -p 8080:80
 
 # 確認容器跑起來（STATUS 要是 Up，不是 Restarting）
 docker ps
 # CONTAINER ID   IMAGE                    STATUS         PORTS
-# a1b2c3d4e5f6   rancher/rancher:latest   Up 45 seconds  0.0.0.0:80->80/tcp
+# a1b2c3d4e5f6   rancher/rancher:latest   Up 45 seconds  0.0.0.0:8443->443/tcp
 
 # 2. 取得初始密碼（要等 Rancher 初始化約 30~60 秒才會出現）
 docker logs <容器ID> 2>&1 | grep "Bootstrap Password:"
 # Bootstrap Password: abcd1234efgh5678   ← 把這組密碼複製起來
 
-# 3. 瀏覽器打開 https://master-IP
+# 3. 瀏覽器打開 https://master-IP:8443
 #    看到憑證警告 → 點「繼續前往」（自簽憑證，正常）
 #    輸入 Bootstrap Password → 設定新密碼
 

@@ -729,3 +729,273 @@ kubectl delete configmap --all
 kubectl delete secret --all
 kubectl delete ingress --all
 ```
+
+---
+
+## 6-8 整合實作引導（~5 min）
+
+### ① 課程內容
+
+📄 6-8 第 1 張
+
+兩個 Loop 都走完了。Ingress 讓外面的人連進來，ConfigMap 和 Secret 把設定和密碼抽出來。現在我們把三個合在一起，在一個乾淨的 namespace 裡面，從零建起一個完整的系統。
+
+**目標架構**
+
+```
+namespace: my-app
+├── Ingress（traefik）
+│   ├── /frontend → frontend-svc → frontend-deploy（k8s-demo-app）
+│   ├── /api     → api-svc     → api-deploy（k8s-demo-app）
+│   └── mysql    → mysql-svc   → mysql Deployment（ConfigMap + Secret）
+```
+
+**新概念：Namespace**
+
+Namespace 是 K8s 的「資料夾」。同一個叢集裡可以有多個 Namespace，彼此邏輯隔離。公司通常會建 dev、staging、prod 三個 Namespace，同一個叢集跑三個環境，互不干擾。
+
+清理時直接刪整個 Namespace，一行指令，裡面所有資源全部消失，不用一個一個刪。
+
+**九個步驟**
+
+1. 建 Namespace `my-app`
+2. 建 Secret（MySQL root 密碼）
+3. 建 ConfigMap（前端訊息設定）
+4. deploy MySQL + mysql-svc（ClusterIP）
+5. deploy frontend-deploy（注入 ConfigMap + Secret）
+6. deploy api-deploy
+7. 建 Ingress（path-based，traefik）
+8. curl 驗收三個端點
+9. 清理整個 namespace
+
+---
+
+## 6-9 整合示範 + 學員實作（~15 + 15 min）
+
+### ② 所有指令＋講解
+
+📄 6-9 第 1 張（示範）
+
+**Step 1：建 Namespace**
+
+```bash
+kubectl create namespace my-app
+```
+
+預期輸出：
+```
+namespace/my-app created
+```
+
+**Step 2：建 Secret（MySQL 密碼）**
+
+```bash
+kubectl create secret generic mysql-secret \
+  --from-literal=root-password=rootpass123 \
+  -n my-app
+```
+
+預期輸出：
+```
+secret/mysql-secret created
+```
+
+**Step 3：建 ConfigMap**
+
+```bash
+kubectl create configmap app-config \
+  --from-literal=MESSAGE="Hello from frontend" \
+  --from-literal=USERNAME=demo \
+  -n my-app
+```
+
+預期輸出：
+```
+configmap/app-config created
+```
+
+**Step 4-7：apply 所有 YAML**
+
+```bash
+kubectl apply -f mysql-deploy.yaml -n my-app
+kubectl apply -f frontend-deploy.yaml -n my-app
+kubectl apply -f api-deploy.yaml -n my-app
+kubectl apply -f app-ingress.yaml -n my-app
+```
+
+預期輸出：
+```
+deployment.apps/mysql created
+service/mysql-svc created
+deployment.apps/frontend-deploy created
+service/frontend-svc created
+deployment.apps/api-deploy created
+service/api-svc created
+ingress.networking.k8s.io/app-ingress created
+```
+
+**Step 8：驗收**
+
+```bash
+kubectl get all -n my-app
+```
+
+預期輸出：
+```
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/mysql-xxx                           1/1     Running   0          30s
+pod/frontend-deploy-xxx                 1/1     Running   0          25s
+pod/api-deploy-xxx                      1/1     Running   0          20s
+...
+```
+
+```bash
+curl http://<NODE-IP>/frontend
+```
+
+預期輸出：
+```
+Server: 10.42.x.x:80 (frontend-deploy-xxx)
+Message: Hello from frontend
+Username: demo
+```
+
+```bash
+curl http://<NODE-IP>/api
+```
+
+預期輸出：
+```
+Server: 10.42.x.x:80 (api-deploy-xxx)
+Message: Hello from api
+```
+
+**Step 9：清理**
+
+```bash
+kubectl delete namespace my-app
+```
+
+預期輸出：
+```
+namespace "my-app" deleted
+```
+
+確認清乾淨：
+
+```bash
+kubectl get all -n my-app
+# Error from server (NotFound): namespaces "my-app" not found
+```
+
+---
+
+📄 6-9 第 2 張（學員實作）
+
+**必做：自己的 namespace、自己的訊息、自己的密碼**
+
+任務：
+
+1. 建 namespace `my-app`
+2. 建 Secret，密碼換成你自己設定的
+3. 建 ConfigMap，MESSAGE 換成你的名字
+4. apply mysql-deploy.yaml + frontend-deploy.yaml + api-deploy.yaml + app-ingress.yaml（全部加 `-n my-app`）
+5. curl `/frontend` 看到自己的 Username
+6. curl `/api` 看到 Hello from api
+7. 刪整個 namespace
+
+**挑戰：改用 host-based routing**
+
+1. 不用 namespace，直接建在 default namespace
+2. 改 Ingress 加 host-based routing：`myapp.local` → frontend-svc，`api.myapp.local` → api-svc
+3. 修改 `/etc/hosts`，curl 兩個域名驗證
+
+**學員實作解答**
+
+```bash
+# Step 1
+kubectl create namespace my-app
+
+# Step 2
+kubectl create secret generic mysql-secret \
+  --from-literal=root-password=your-own-password \
+  -n my-app
+
+# Step 3
+kubectl create configmap app-config \
+  --from-literal=MESSAGE="Hello from YourName" \
+  --from-literal=USERNAME=YourName \
+  -n my-app
+
+# Step 4
+kubectl apply -f mysql-deploy.yaml -n my-app
+kubectl apply -f frontend-deploy.yaml -n my-app
+kubectl apply -f api-deploy.yaml -n my-app
+kubectl apply -f app-ingress.yaml -n my-app
+
+# Step 5-6：驗收
+kubectl get all -n my-app
+curl http://<NODE-IP>/frontend   # → Message: Hello from YourName, Username: YourName
+curl http://<NODE-IP>/api        # → Message: Hello from api
+
+# Step 7：清理
+kubectl delete namespace my-app
+```
+
+---
+
+## 6-10 回頭操作 + 上午總結（~5 min）
+
+### ④ 上午三個 Loop 因果鏈
+
+📄 6-10 第 1 張
+
+**三個 Loop 回顧**
+
+| Loop | 問題 | 解決方案 |
+|------|------|---------|
+| Loop 1 | NodePort 醜、難記、有限 | Ingress：path/host 路由，80 Port |
+| Loop 2 | 設定寫死洩漏、多環境難管 | ConfigMap（一般設定）+ Secret（敏感資料） |
+| 整合 | 三個服務要一起跑 | Namespace 隔離 + 整合部署 + 一行清理 |
+
+**學了什麼 vs 還沒學什麼**
+
+| 狀態 | 內容 |
+|------|------|
+| ✅ 路由 | Ingress Path-based + Host-based |
+| ✅ 設定管理 | ConfigMap env 注入 + Volume 掛載、Secret |
+| ❌ 資料持久化 | Pod 死掉 MySQL 資料全消失 → 下午 PV/PVC |
+| ❌ 有狀態服務 | MySQL 重啟名字不固定 → 下午 StatefulSet |
+
+**上午環境清理確認**
+
+```bash
+kubectl get all                    # 只剩 kubernetes Service
+kubectl get configmap              # 只剩 kube-root-ca.crt
+kubectl get secret                 # 只剩 default token
+kubectl get ingress                # No resources found
+```
+
+如果有殘留：
+
+```bash
+kubectl delete all --all
+kubectl delete configmap --all
+kubectl delete secret --all
+kubectl delete ingress --all
+```
+
+**銜接下午**
+
+現在的問題：Pod 死掉，資料怎麼辦？
+
+```bash
+kubectl run mysql-test --image=mysql:8.0 \
+  --env=MYSQL_ROOT_PASSWORD=test \
+  --env=MYSQL_DATABASE=mydb
+# 寫入資料...
+kubectl delete pod mysql-test
+# 資料全消失！← 下午 PV/PVC 解決這個問題
+```
+
+下午：PV/PVC（持久化） → StatefulSet（有狀態服務） → Helm（打包部署） → Rancher（叢集管理）

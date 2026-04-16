@@ -1045,31 +1045,14 @@ kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest
 kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
 kubectl expose deployment shop-deploy --name=shop-svc --port=80
 
-# ── 學員任務：在 ingress-basic.yaml 的 paths 加這段 ──
-#          - path: /shop
-#            pathType: Prefix
-#            backend:
-#              service:
-#                name: shop-svc
-#                port:
-#                  number: 80
-
+# ── 學員任務 ──
+# 在 ingress-basic.yaml 的 paths 加 /shop 路由（指向 shop-svc port 80）
+# 存檔後執行：
 kubectl apply -f ingress-basic.yaml
 
 # 驗收
 curl http://<NODE-IP>/shop
-# Server: 10.42.x.x:80 (shop-deploy-xxx)
-# Message: Hello from shop
-
-# ── 挑戰題解答 ──
-kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
-kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
-kubectl expose deployment admin-deploy --name=admin-svc --port=80
-# 在 ingress-host.yaml 加 admin.myapp.local 規則，再 apply
-kubectl apply -f ingress-host.yaml
-sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
-curl http://admin.myapp.local
-# Message: Hello from admin`,
+# 期望看到：Message: Hello from shop`,
     notes: `學員實作時間。必做題：公司說要加一個購物服務。部署 shop-deploy，image 用 yanchen184/k8s-demo-app:latest，env 設 MESSAGE="Hello from shop"，建一個 ClusterIP Service 叫 shop-svc，port 8080，targetPort 80。然後在現有的 app-ingress 裡加一條 /shop 的路由，指向 shop-svc:8080。最後 curl http://<NODE-IP>/shop 看到 Message: Hello from shop 就對了。注意：這裡是在「現有 Ingress 加路由」，不是重新建一個新的 Ingress。挑戰題：在 host routing 再加一個 admin.myapp.local，image 一樣用 yanchen184/k8s-demo-app:latest，MESSAGE 改成 Hello from admin，記得 /etc/hosts 也要加。
 
 [▶ 下一頁 — 學員開始做，你去巡堂]`,
@@ -1111,6 +1094,21 @@ curl http://admin.myapp.local
           <p className="text-slate-400 text-xs mt-2">最安全：永遠明確寫 <code className="text-green-400">ingressClassName: traefik</code></p>
         </div>
 
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-4 rounded-lg">
+          <p className="text-yellow-400 font-semibold mb-2">挑戰題解答</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-3 rounded space-y-1">
+            <p className="text-slate-500"># 1. 建 admin-deploy + admin-svc</p>
+            <p>kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest</p>
+            <p>kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"</p>
+            <p>kubectl expose deployment admin-deploy --name=admin-svc --port=80</p>
+            <p className="text-slate-500 mt-1"># 2. 在 ingress-host.yaml 加 admin.myapp.local 規則，再 apply</p>
+            <p>kubectl apply -f ingress-host.yaml</p>
+            <p className="text-slate-500 mt-1"># 3. /etc/hosts 加域名，驗收</p>
+            <p>sudo sh -c 'echo "192.168.43.130 admin.myapp.local" &gt;&gt; /etc/hosts'</p>
+            <p>curl http://admin.myapp.local  <span className="text-green-400"># → Message: Hello from admin</span></p>
+          </div>
+        </div>
+
         <div className="bg-slate-800/50 p-3 rounded-lg">
           <p className="text-cyan-400 font-semibold text-sm mb-1">清理</p>
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded">
@@ -1122,23 +1120,38 @@ curl http://admin.myapp.local
         </div>
       </div>
     ),
+    code: `# ── 必做題解答 ──
+kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
+kubectl expose deployment shop-deploy --name=shop-svc --port=80
+# 在 ingress-basic.yaml 加 /shop 路由，存檔後：
+kubectl apply -f ingress-basic.yaml
+curl http://<NODE-IP>/shop
+# → Message: Hello from shop
+
+# ── 挑戰題解答 ──
+kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
+kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
+kubectl expose deployment admin-deploy --name=admin-svc --port=80
+# 在 ingress-host.yaml 加 admin.myapp.local 規則，存檔後：
+kubectl apply -f ingress-host.yaml
+sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
+curl http://admin.myapp.local
+# → Message: Hello from admin
+
+# ── 清理 ──
+kubectl delete all --all
+kubectl delete ingress --all
+# 手動刪 /etc/hosts 的測試行`,
     notes: `來帶大家走一遍。
 
-Path-based routing 的部分。kubectl apply -f ingress-basic.yaml，一次建好 Deployment、Service、Ingress。kubectl get ingress 確認規則有建好。curl NODE-IP 斜線看到 nginx，curl NODE-IP 斜線 api 看到 httpd。
+必做題解答。講師先示範建 shop-deploy、shop-svc。然後讓同學自己在 ingress-basic.yaml 的 paths 區塊加一段 /shop 的路由，指向 shop-svc port 80，pathType 要寫 Prefix，ingressClassName 寫 traefik。存檔後 kubectl apply -f ingress-basic.yaml，再 curl NODE-IP/shop，看到 Message: Hello from shop 就對了。
 
-Host-based routing 的部分。kubectl apply -f ingress-host.yaml。改 /etc/hosts 加上域名映射。curl www.myapp.local 看到 nginx，curl api.myapp.local 看到 httpd。
+挑戰題解答。一樣先建 admin-deploy 和 admin-svc。然後在 ingress-host.yaml 加一個新的 host 規則，host 名稱是 admin.myapp.local，backend 指向 admin-svc port 80。/etc/hosts 加入 admin.myapp.local 的映射。kubectl apply -f ingress-host.yaml，curl http://admin.myapp.local，看到 Message: Hello from admin。
 
-三個常見的坑。
+四個常見的坑：/etc/hosts 忘記改、ingressClassName 寫 nginx（k3s 沒有）、ingressClassName 不寫（沒有 default IngressClass 就沒人認領）、pathType 沒填（必填欄位）。最安全做法：永遠明確寫 ingressClassName: traefik。
 
-第一，/etc/hosts 忘記改。你 curl www.myapp.local 的時候如果出現 Could not resolve host，那就是 /etc/hosts 沒有加那一行。這是最常見的。
-
-第二，ingressClassName 寫錯。k3s 的 Ingress Controller 是 Traefik，所以 ingressClassName 要寫 traefik。如果你寫了 nginx，K8s 會去找名字叫 nginx 的 Ingress Controller，k3s 沒有裝，找不到就沒人處理這條 Ingress，ADDRESS 一直空白，curl timeout，不是 connection refused。
-
-還有一種情況是完全不寫 ingressClassName。行為取決於叢集有沒有 default IngressClass。有的話 K8s 自動用那個 Controller 處理；沒有的話，沒有任何 Controller 認領，一樣 ADDRESS 空白。kubectl describe ingress 會看到 Warning: no ingress class annotation or ingressClassName field。所以最安全的做法是永遠明確寫 ingressClassName: traefik，不要靠 default，換環境也不會壞。
-
-第三，pathType 沒加。Ingress YAML 裡面每個 path 都必須指定 pathType，Prefix 或 Exact。這是必填欄位，漏了 kubectl apply 的時候就會報錯。
-
-做完了記得清理。如果你不想讓 /etc/hosts 裡面留著測試用的域名映射，可以手動編輯把那一行刪掉。另外，kubectl delete -f ingress-basic.yaml 和 kubectl delete -f ingress-host.yaml 把資源也清掉。
+做完了記得清理。kubectl delete all --all，kubectl delete ingress --all，手動刪 /etc/hosts 的測試行。
 
 好，Ingress 搞定了。現在使用者可以用漂亮的域名連到你的服務，不用再輸入 IP 加 Port 了。NodePort 的五個問題，Ingress 全部解決了。
 

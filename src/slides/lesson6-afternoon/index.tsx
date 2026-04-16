@@ -655,9 +655,9 @@ spec:
       containers:
         - name: mysql
           image: mysql:8.0
-          envFrom:
-            - secretRef:
-                name: mysql-sts-secret
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "rootpassword123"
           volumeMounts:
             - name: mysql-storage
               mountPath: /var/lib/mysql
@@ -2409,7 +2409,7 @@ helm show values ingress-nginx/ingress-nginx | head -50
 helm install ... -f values-dev.yaml
 
 # ⑥ Prometheus + Grafana
-helm install kube-prometheus prometheus-community/kube-prometheus-stack ...
+helm install monitoring prometheus-community/kube-prometheus-stack ...
 
 # ⑦ 自建 Chart
 helm create my-app
@@ -2843,28 +2843,21 @@ helm uninstall my-ingress-dev`,
       </div>
     ),
     code: `# 安裝 kube-prometheus-stack（Prometheus + Grafana 全家桶）
-helm install kube-prometheus prometheus-community/kube-prometheus-stack \
-  --set grafana.service.type=NodePort \
-  --set prometheus.service.type=NodePort \
-  --set alertmanager.service.type=NodePort
+helm install monitoring prometheus-community/kube-prometheus-stack \
+  --set grafana.adminPassword=admin123
 
 # 安裝需要幾分鐘，等 Pod 都 Running
-kubectl get pods -l app.kubernetes.io/instance=kube-prometheus
+kubectl get pods | grep monitoring
 # NAME                                                READY  STATUS
-# kube-prometheus-grafana-xxx                         2/2    Running
-# kube-prometheus-kube-prometheus-stack-prometheus-0  2/2    Running
-# kube-prometheus-kube-state-metrics-xxx              1/1    Running
+# monitoring-grafana-xxx                              3/3    Running
+# monitoring-kube-prometheus-prometheus-0             2/2    Running
+# monitoring-kube-state-metrics-xxx                   1/1    Running
 
-# 找 Grafana 的 NodePort
-kubectl get svc -l app.kubernetes.io/name=grafana
-# NAME                      TYPE       PORT(S)
-# kube-prometheus-grafana   NodePort   3000:3xxxx/TCP
+# port-forward 打開 Grafana（帳號: admin，密碼: admin123）
+kubectl port-forward svc/monitoring-grafana 3000:80
+# Forwarding from 127.0.0.1:3000 -> 3000
 
-# 取得 Grafana 預設密碼
-kubectl get secret kube-prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d
-# 預設帳密：admin / prom-operator
-
-# 瀏覽器開 http://192.168.43.130:<NodePort>
+# 瀏覽器開 http://localhost:3000
 # 進入後點 Dashboards → 已有預設 K8s 監控 Dashboard`,
     notes: `這頁的重點是「Helm 讓複雜的東西變簡單」。
 
@@ -2969,8 +2962,8 @@ helm install my-release ./my-app \
 helm uninstall my-ingress
 # release "my-ingress" uninstalled
 
-helm uninstall kube-prometheus
-# release "kube-prometheus" uninstalled
+helm uninstall monitoring
+# release "monitoring" uninstalled
 
 helm uninstall my-release  # 自建的 Chart
 # release "my-release" uninstalled

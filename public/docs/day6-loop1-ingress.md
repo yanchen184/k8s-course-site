@@ -651,48 +651,37 @@ Password: (not set)
 
 講師先帶大家建好 shop-deploy 和 shop-svc，這和之前的 frontend-deploy / api-deploy 完全一樣的做法——只是換個名字、換個訊息。
 
-重點在 YAML 那一段。學員要在 `ingress-basic.yaml` 的 `paths` 陣列裡加一個新的 path 物件：
+學員任務的重點是「修改現有 YAML 再 apply」，不是重新建一個 Ingress。`kubectl apply` 會用新的 YAML 合併更新，只要名稱 (`app-ingress`) 一樣，Traefik 就會把新規則加進去，舊的 /frontend、/api 規則不會消失。
 
-```yaml
-          - path: /shop
-            pathType: Prefix
-            backend:
-              service:
-                name: shop-svc
-                port:
-                  number: 80
-```
-
-**為什麼這樣寫**：
-- `path: /shop` — 比對規則，URL 開頭是 /shop 的請求就轉過來
-- `pathType: Prefix` — 前綴比對，/shop、/shop/xxx 都符合；如果填 Exact 只有精確的 /shop 才符合
-- `backend.service.name` — 要轉去的 Service 名稱，必須和你 expose 出來的 Service 名稱一樣
-- `backend.service.port.number` — Service 的 port，不是容器 port
-
-加完存檔，kubectl apply 更新 Ingress（不需要重建，apply 會合併），curl 驗收。
+> `path: /shop` 是前綴比對（Prefix），/shop、/shop/anything 都符合。  
+> `backend.service.port.number` 對的是 Service 的 port，不是容器 port。  
+> `pathType` 是必填欄位，漏掉 apply 時直接報錯。
 
 ```bash
-# 講師示範
+# Step 1：講師示範建新服務（學生跟著做）
 kubectl create deployment shop-deploy --image=yanchen184/k8s-demo-app:latest
 kubectl set env deployment/shop-deploy MESSAGE="Hello from shop"
 kubectl expose deployment shop-deploy --name=shop-svc --port=80
-```
 
-在 `ingress-basic.yaml` 的 `paths` 下加：
+# Step 2：用 nano 或 vi 打開 YAML，在 paths 陣列最後加一段，存檔離開
+nano ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
+# 加入的內容（縮排必須對齊）：
+#           - path: /shop
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: shop-svc
+#                 port:
+#                   number: 80
 
-```yaml
-          - path: /shop
-            pathType: Prefix
-            backend:
-              service:
-                name: shop-svc
-                port:
-                  number: 80
-```
-
-```bash
+# Step 3：apply 更新 Ingress
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-basic.yaml
-curl http://<NODE-IP>/shop
+
+# Step 4：確認 Ingress 規則有更新
+kubectl get ingress app-ingress
+
+# Step 5：驗收
+curl http://192.168.43.130/shop
 ```
 
 預期輸出：
@@ -709,32 +698,45 @@ Password: (not set)
 
 挑戰題是在 `ingress-host.yaml` 加第三個 host，邏輯和 www.myapp.local / api.myapp.local 完全相同，只是換成 admin.myapp.local。
 
-注意：`ingress-host.yaml` 裡的 Ingress 名稱是 `app-ingress-host`，和 `ingress-basic.yaml` 裡的 `app-ingress` **刻意不同**。如果名字一樣，後來 apply 的那份會覆蓋前一份，path-based routing 的規則就消失了。
-
-**挑戰解答**
-
-在 `ingress-host.yaml` 加：
-
-```yaml
-    - host: admin.myapp.local
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: admin-svc
-                port:
-                  number: 80
-```
+> 注意：`ingress-host.yaml` 裡的 Ingress 名稱是 `app-ingress-host`，和 `ingress-basic.yaml` 的 `app-ingress` **刻意不同**。如果名字一樣，後來 apply 的那份會**整個覆蓋**前一份，path-based routing 的規則就消失了。
 
 ```bash
+# Step 1：建 admin-deploy + admin-svc
 kubectl create deployment admin-deploy --image=yanchen184/k8s-demo-app:latest
 kubectl set env deployment/admin-deploy MESSAGE="Hello from admin"
 kubectl expose deployment admin-deploy --name=admin-svc --port=80
+
+# Step 2：打開 ingress-host.yaml，在 rules 陣列最後加一段 host 規則
+nano ~/workspace/k8s-course-labs/lesson6/ingress-host.yaml
+# 加入的內容：
+#     - host: admin.myapp.local
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: admin-svc
+#                 port:
+#                   number: 80
+
+# Step 3：apply
 kubectl apply -f ~/workspace/k8s-course-labs/lesson6/ingress-host.yaml
+
+# Step 4：/etc/hosts 加入域名映射
 sudo sh -c 'echo "192.168.43.130 admin.myapp.local" >> /etc/hosts'
+grep admin.myapp.local /etc/hosts   # 確認有加進去
+
+# Step 5：驗收
 curl http://admin.myapp.local
+```
+
+預期輸出：
+```
+Server: 10.42.x.x:80 (admin-deploy-xxx)
+Message: Hello from admin
+Username: (not set)
+Password: (not set)
 ```
 
 ---

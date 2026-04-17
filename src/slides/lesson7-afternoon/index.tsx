@@ -328,6 +328,22 @@ kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa
         </div>
       </div>
     ),
+    code: `# 驗收指令（做完每步後確認）
+
+# Step 1 後：確認三個資源都建好
+kubectl get serviceaccount viewer-sa
+kubectl get role pod-viewer
+kubectl get rolebinding viewer-binding
+
+# Step 2：模擬 viewer-sa 查看 Pod（應該成功）
+kubectl get pods --as=system:serviceaccount:default:viewer-sa
+
+# Step 3：模擬 viewer-sa 刪除 Pod（應該 Forbidden）
+kubectl delete pod <任意pod名> --as=system:serviceaccount:default:viewer-sa
+
+# 快速確認權限（yes = 有，no = 沒有）
+kubectl auth can-i get pods --as=system:serviceaccount:default:viewer-sa
+kubectl auth can-i delete pods --as=system:serviceaccount:default:viewer-sa`,
     notes: `必做題是跟著我剛才的步驟做一遍。建 ServiceAccount、Role、RoleBinding，然後用 --as 測試。確認 get pods 成功，delete pod 被拒。
 
 挑戰題是自己寫一個新的 Role，允許 get、list、create、update、delete deployments，但不能碰 secrets。然後建一個新的 ServiceAccount 綁上去，用 --as 測試能操作 Deployment 但不能讀 Secret。提示：resources 那個欄位可以寫多條 rule，每條 rule 指定不同的 resources 和 verbs。

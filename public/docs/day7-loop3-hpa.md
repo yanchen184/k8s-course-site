@@ -10,19 +10,25 @@
 
 上一個 Loop 做了 Resource limits，讓每個 Pod 不能無限吃資源。但 Resource limits 解決的是「單一 Pod 吃太多」，還有另一個問題沒解：**流量暴增，一個 Pod 不夠用**。
 
-這時候你要手動下 `kubectl scale`。但問題是，流量暴增往往在凌晨兩點，沒有人盯著。等你發現、登上去下指令，使用者早就一堆 timeout 了。
-
-**你需要一個能自動反應的機制。這就是 HPA：Horizontal Pod Autoscaler。**
-
-HPA 做的事情很簡單：**監控 Pod 的 CPU 使用率，超過你設的閾值就自動加 Pod，低於閾值就自動減 Pod。全自動，不需要人介入。**
+流量暴增往往在凌晨兩點，沒有人盯著。等你發現、登上去手動 `kubectl scale`，使用者早就一堆 timeout 了。這就是 **HPA：Horizontal Pod Autoscaler**，監控 Pod 的 CPU 使用率，超過閾值自動加 Pod，低於閾值自動縮。全自動，不需要人介入。
 
 ---
 
 📄 7-8 第 2 張
 
-**HPA 工作流程**
+HPA 有兩個前提：
+1. **metrics-server**：HPA 靠它取得 CPU 數據。k3s 內建，標準 K8s 要另外裝。
+2. **Pod 一定要設 resources.requests**：`averageUtilization: 50` 的 50% 是相對於 requests。沒有 requests，HPA 算不出百分比，不會動。
 
-metrics-server 是 K8s 的資源監控元件，它定期從每個 Node 收集 CPU 和 Memory 的使用量。HPA 就是靠 metrics-server 拿到數據，才能決定要不要擴縮。k3s 已經內建 metrics-server，標準 K8s 需要另外安裝。
+縮容有 5 分鐘冷卻期，是為了避免**抖動**（Pod 數量頻繁上下變動），確認流量真的穩了才縮。YAML 怎麼寫進實作再看。
+
+---
+
+## 7-9 HPA 實作（~15 min）
+
+### ② 所有指令＋講解
+
+**HPA 工作流程**
 
 ```
 每 15 秒問 metrics-server：Pod 的 CPU 是多少？
@@ -33,16 +39,10 @@ metrics-server 是 K8s 的資源監控元件，它定期從每個 Node 收集 CP
    ↓
 停止壓測，CPU 持續低
    ↓
-等冷卻期 5 分鐘（確認流量真的穩了）
+等冷卻期 5 分鐘（穩定視窗，確認流量真的穩了）
    ↓
 自動縮 Pod
 ```
-
-為什麼要等 5 分鐘才縮？因為怕流量只是短暫下降馬上又上來。如果一降就縮、一升就擴，Pod 會不斷建立又刪除，這叫**抖動**。抖動就是 Pod 數量頻繁上下變動，不停地建 Pod 又刪 Pod，造成服務不穩定和資源浪費。HPA 的 stabilizationWindowSeconds（穩定視窗）就是為了解決這個問題，確認流量真的穩了才動作。
-
----
-
-📄 7-8 第 3 張
 
 **HPA YAML 拆解**
 
@@ -63,11 +63,9 @@ spec:
     resource:
       name: cpu
       target:
-        type: Utilization        # 目標使用率（百分比），相對於 requests 的比例，最常用
+        type: Utilization        # 百分比，相對於 requests，最常用
         averageUtilization: 50   # CPU 超過 50% 就擴容
 ```
-
-`type: Utilization` 代表用百分比作為目標，是最常見的寫法。另外還有 `AverageValue`（絕對值，例如每個 Pod 平均 500m CPU）和 `Value`（全部 Pod 的總量加總）。
 
 四個關鍵欄位：
 
@@ -76,31 +74,11 @@ spec:
 | `scaleTargetRef` | 告訴 HPA 管哪個 Deployment |
 | `minReplicas` | 最少保留幾個 Pod，不能設 0（冷啟動太慢） |
 | `maxReplicas` | 上限，根據 Node 總資源決定 |
-| `averageUtilization` | 相對於 requests 的百分比 |
+| `averageUtilization` | 相對於 requests 的百分比，requests cpu `100m` × 50% = `50m` 就觸發擴容 |
+
+`type` 除了 `Utilization`（百分比，最常用），還有 `AverageValue`（每 Pod 絕對值）和 `Value`（所有 Pod 總量）。
 
 ---
-
-📄 7-8 第 4 張
-
-**前提：Pod 一定要設 requests**
-
-`averageUtilization: 50` 的 50% 是相對於什麼？相對於 **requests**。
-
-- Pod requests cpu = `100m`
-- 50% 就是 `50m`
-- 當 Pod 平均 CPU 超過 50m → HPA 開始擴容
-
-**沒有設 requests，HPA 不知道 100% 是多少，就算不出百分比，HPA 不會動。**
-
-這就是上一個 Loop 為什麼一直強調要設 requests 的原因。Probe → Resource limits → HPA，每一個都環環相扣。
-
-另外，HPA 需要 **metrics-server** 才能取得 Pod 的 CPU 數據。k3s 內建了 metrics-server，不用額外安裝。minikube 需要 `minikube addons enable metrics-server`。
-
----
-
-## 7-9 HPA 實作（~15 min）
-
-### ② 所有指令＋講解
 
 **Step 0：確認 metrics-server 正常**
 

@@ -8,70 +8,40 @@
 
 📄 7-11 第 1 張
 
-場景：你們公司來了一個實習生，第一天上班，好奇心旺盛，在終端機裡打了這行：
+場景：實習生第一天上班，在終端機裡打了 `kubectl delete namespace production`。所有的 Pod、Service、ConfigMap、PVC 全部消失。Production 環境砍掉了。
 
-```bash
-kubectl delete namespace production
-```
-
-所有的 Pod、Service、ConfigMap、PVC 全部消失。Production 環境砍掉了。
-
-這不是假設。K8s 預設的情況就是這樣，只要你能連到叢集，你就可以做任何事。
-
-這個問題 Docker 更糟。Docker 根本沒有內建的權限控制。只要你能連到 Docker Socket，你就等於 root。K8s 至少提供了一套完整的機制來解這個問題，叫 RBAC。
+這不是假設。K8s 預設只要你能連到叢集，就可以做任何事。Docker 更糟，連到 Docker Socket 就等於 root，完全沒有內建權限控制。K8s 提供了一套完整機制來解這個問題，叫 **RBAC**。
 
 ---
 
 📄 7-11 第 2 張
 
-RBAC，全名 Role-Based Access Control，中文叫基於角色的存取控制。
+RBAC 核心邏輯只有一句：**誰 + 能做什麼 = 綁定**。
 
-核心邏輯只有一句話：**誰 + 能做什麼 = 綁定**。
-
-拆開來說：
-
-| 元素 | 英文 | 代表 |
-|------|------|------|
-| 誰 | Subject | User、Group、或 ServiceAccount |
-| 能做什麼 | Role | 允許的操作清單 |
-| 綁定 | Binding | 把 Role 發給 Subject |
-
-RBAC 有四個物件，兩兩一對：
+四個物件兩兩一對：
 
 | 物件 | 作用範圍 | 職責 |
 |------|---------|------|
 | Role | 單一 Namespace | 定義能對什麼資源做什麼動作 |
 | ClusterRole | 整個叢集 | 同上，但跨 Namespace |
-| RoleBinding | 單一 Namespace | 把 Role 綁到某人身上 |
-| ClusterRoleBinding | 整個叢集 | 把 ClusterRole 綁到某人身上 |
+| RoleBinding | 單一 Namespace | 把 Role 發給某人 |
+| ClusterRoleBinding | 整個叢集 | 把 ClusterRole 發給某人 |
 
-用門禁卡來比喻。Role 是張只能進 3 樓研發部的門禁卡。ClusterRole 是萬能卡，所有樓層都能進。RoleBinding 是把這張卡發給某個員工。ClusterRoleBinding 是把萬能卡發給某個員工。
-
-你不會把萬能卡發給每個實習生。但我們現在的叢集就是在做這件事。
+「某人」可以是 User、Group，或是給 Pod 用的 **ServiceAccount**。每個 Namespace 預設有一個 `default` ServiceAccount，Pod 不指定就自動用它。生產環境最佳實踐：每個應用建自己的 ServiceAccount，只給需要的最小權限。YAML 怎麼寫進實作再看。
 
 ---
 
-📄 7-11 第 3 張
+## 7-12 RBAC 實作（~12 min）
 
-再講一個重要概念：**ServiceAccount**。
+### ② 所有指令＋講解
 
-剛才說的 User 和 Group 是給人用的。但 Pod 也需要跟 K8s API Server 溝通。比如監控工具需要列出所有 Pod 的狀態，自動化工具需要建立或刪除資源。Pod 不是人，它的身份用的是 ServiceAccount。
-
-每個 Namespace 預設都有一個叫 `default` 的 ServiceAccount。建 Pod 時不指定，Pod 就自動用 `default`。
-
-生產環境的最佳實踐：每個應用建自己的 ServiceAccount，用 RBAC 給它需要的最小權限。這叫**最小權限原則**。
-
----
-
-📄 7-11 第 4 張
-
-來看 RBAC 的 YAML 怎麼寫。三個物件組合在一起。
+**RBAC 三個物件的 YAML 結構**
 
 **Role：定義能做什麼**
 
-`verbs` 是「動作」，定義這個 Role 允許對資源做什麼操作。常見的有：`get`（讀單一資源）、`list`（列出全部）、`watch`（監聽變化）、`create`、`update`、`patch`、`delete`。只讀角色給 get、list、watch 就夠了；讀寫角色再加上其他的。
+`verbs` 是動作清單：`get`（讀單一）、`list`（列出全部）、`watch`（即時監控）、`create`、`update`、`patch`、`delete`。只讀角色給 get/list/watch 就夠。
 
-`apiGroups` 指定資源所屬的 API 群組。空字串 `""` 代表 core group，包含 Pod、Service、ConfigMap、Secret 這些基本資源。`apps` 群組包含 Deployment、StatefulSet；`networking.k8s.io` 群組包含 Ingress。
+`apiGroups`：空字串 `""` 代表 core group（Pod、Service、ConfigMap）；`apps` 群組包含 Deployment；`networking.k8s.io` 包含 Ingress。
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -80,11 +50,9 @@ metadata:
   name: pod-viewer
   namespace: default
 rules:
-- apiGroups: [""]       # 空字串 = core API group（Pod、Service、ConfigMap）
+- apiGroups: [""]
   resources: ["pods"]
   verbs: ["get", "list", "watch"]
-  # 沒有 create、update、delete、patch
-  # 純粹只讀的 Role
 ```
 
 **ServiceAccount：Pod 的身份**
@@ -112,31 +80,21 @@ subjects:
 roleRef:
   kind: Role
   name: pod-viewer
-  apiGroup: rbac.authorization.k8s.io  # 固定寫法
+  apiGroup: rbac.authorization.k8s.io  # 固定寫法，不能改
 ```
 
-三個 YAML 組合完成一件事：`viewer-sa` 這個 ServiceAccount 在 `default` Namespace 只能 get、list、watch Pod，其他什麼都不能做。
+三個物件組合完成：`viewer-sa` 在 `default` Namespace 只能 get/list/watch Pod，其他什麼都不能做。
 
----
+**企業常見設計**
 
-📄 7-11 第 5 張
-
-企業裡的常見 RBAC 設計方案：
-
-| 角色 | dev Namespace | staging | prod |
-|------|-------------|---------|------|
+| 角色 | dev | staging | prod |
+|------|-----|---------|------|
 | 開發人員 | 完整權限 | 完整權限 | 只讀 |
-| SRE / DevOps | 完整權限 | 完整權限 | 完整權限 |
+| SRE | 完整權限 | 完整權限 | 完整權限 |
 | 實習生 | 只讀 | 無權限 | 無權限 |
-| CI/CD Pipeline | 部署權限 | 部署權限 | 部署權限 |
-
-就算有人手滑，損害也限制在可控範圍內。這就是為什麼要有 RBAC。
+| CI/CD | 部署權限 | 部署權限 | 部署權限 |
 
 ---
-
-## 7-12 RBAC 實作（~12 min）
-
-### ② 所有指令＋講解
 
 **Step 1：部署 ServiceAccount + Role + RoleBinding**
 

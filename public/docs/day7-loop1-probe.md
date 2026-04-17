@@ -10,85 +10,45 @@
 
 上一堂課做了 Ingress、ConfigMap、Secret、PV、StatefulSet、Helm，服務看起來很體面。但我今天要跟大家說一件殘酷的事情：**穿得漂亮不代表扛得住**。
 
-從第四堂到現在，你怎麼確認服務正常？打 `kubectl get pods`，看到 STATUS 是 `Running`、READY 是 `1/1`、RESTARTS 是 `0`，覺得沒事了。
+從第四堂到現在，你怎麼確認服務正常？打 `kubectl get pods`，看到 STATUS 是 `Running`，覺得沒事了。但 **Running 這個狀態在騙你**。Running 只代表一件事：容器裡面的主行程還在跑。process 活著，K8s 就認為你是 Running。
 
-但我要告訴你，**Running 這個狀態在騙你**。Running 只代表一件事：容器裡面的主行程還在跑。process 活著，K8s 就認為你是 Running。
+場景一：**API 死鎖**，process 還活著，但不處理任何請求。場景二：**連線池滿了**，回 500 錯誤但 K8s 照樣顯示 Running。場景三：**Java 啟動要 60 秒**，這 60 秒的請求全部失敗。K8s 不知道你的服務到底正不正常。
 
 ---
 
 📄 7-2 第 2 張
 
-**三個你遇過的場景**
+K8s 用**三種 Probe**（探針）來解這個問題：
 
-場景一：**API 死鎖**。兩個執行緒互相等對方釋放鎖，卡住了。process 還活著，但不處理任何請求。K8s 顯示 Running，使用者看到的是請求超時。
+| Probe | 問的問題 | 失敗怎麼辦 |
+|:------|:---------|:-----------|
+| livenessProbe | 你還活著嗎？ | 重啟容器 |
+| readinessProbe | 準備好接流量了嗎？ | 從 Service 移除 |
+| startupProbe | 啟動完了嗎？ | 重啟容器（慢啟動用） |
 
-場景二：**資料庫連線池滿了**。連線池只有 10 個連線，全部被佔住，每個新請求都拿不到連線，回 500 錯誤。K8s 顯示 Running，使用者看到的是錯誤頁面。
-
-場景三：**Java Spring Boot 啟動太慢**。啟動要 60 秒，但 Pod 建好容器跑起來 K8s 馬上說 Running。前 60 秒的請求全部失敗。
-
-三個場景，同一個問題：**K8s 不知道你的服務到底正不正常**，它只知道 process 有沒有在跑。
-
----
-
-📄 7-2 第 3 張
-
-**Docker 的做法：一種 HEALTHCHECK**
-
-用過 Docker 的人可能用過 `HEALTHCHECK`，可以每 30 秒 curl 一下 `/health`，不成功就標記 unhealthy。但 Docker 的 HEALTHCHECK 只有一種，而且功能很有限，它只能標記 unhealthy，不會幫你重啟，也不會幫你把流量切掉。
-
-K8s 在這方面強大得多。它有**三種 Probe**，探針，每一種負責不同的事情。
-
-| Probe | 問的問題 | 失敗怎麼辦 | 適用場景 |
-|:------|:---------|:-----------|:---------|
-| livenessProbe | 你還活著嗎？ | 重啟容器 | 死鎖、無窮迴圈 |
-| readinessProbe | 準備好接流量了嗎？ | 從 Service 移除 | 啟動中、暫時過載 |
-| startupProbe | 啟動完了嗎？ | 重啟容器 | Java 慢啟動 |
+Docker 的 HEALTHCHECK 只有一種，只會標記 unhealthy，不會幫你重啟也不會切流量。K8s 三種 Probe 各司其職，詳細用法我們進實作再說。
 
 ---
 
-📄 7-2 第 4 張
+## 7-3 Probe 實作（~12 min）
 
-**三種 Probe 詳細說明**
+### ② 所有指令＋講解
 
-**livenessProbe（存活探測）**：K8s 定期去戳你的 Pod，如果連續失敗超過 failureThreshold 次，就直接重啟容器。注意是重啟容器，不是刪 Pod。容器重啟後程式重新初始化，死鎖就解開了。
+**三種 Probe 說明**
 
-**readinessProbe（就緒探測）**：失敗的時候 K8s 不重啟容器，而是把這個 Pod 從 Service 的 Endpoints 裡面移除。白話就是不再把流量轉給它。等它恢復了再加回來。適合「暫時不能服務但會自己恢復」的情況。
+**livenessProbe（存活探測）**：K8s 定期去戳你的 Pod，連續失敗超過 `failureThreshold` 次就重啟容器。容器重啟後程式重新初始化，死鎖就解開了。注意是重啟容器，不是刪 Pod。
 
-**兩者最大的差別**：livenessProbe 失敗是換人（重啟），readinessProbe 失敗是讓你休息（不導流量）。
+**readinessProbe（就緒探測）**：失敗時 K8s 不重啟容器，而是把這個 Pod 從 Service 的 Endpoints 移除，不再導流量給它。等它自己恢復了再加回來。適合「暫時不能服務但會自己恢復」的情況。
 
-**startupProbe（啟動探測）**：專門給啟動特別慢的應用。K8s 會先等 startupProbe 通過，才開始跑 liveness 和 readiness。你可以給 startupProbe 設寬鬆的限制，比如最多等 150 秒。啟動完成後 startupProbe 就不再檢查了，交給 liveness 和 readiness 接手。
-
----
-
-📄 7-2 第 5 張
-
-**餐廳比喻**
-
-- **livenessProbe**：檢查廚師還有沒有心跳。沒心跳就換一個新廚師。
-- **readinessProbe**：問廚師準備好出菜了嗎？還沒好就先不送單給他。
-- **startupProbe**：廚師剛上班還在熱鍋子，等他熱好再讓他接單。
-
----
-
-📄 7-2 第 6 張
+**startupProbe（啟動探測）**：專門給啟動特別慢的應用。K8s 先等 startupProbe 通過，才開始跑 liveness 和 readiness。啟動完成後 startupProbe 就不再執行，交棒給另外兩個。
 
 **三種檢查方式**
 
-| 檢查方式 | 寫法 | 適合 |
-|:---------|:-----|:-----|
-| HTTP GET | `httpGet: path: /health` | Web API（最常用） |
-| TCP Socket | `tcpSocket: port: 3306` | 資料庫、Redis |
-| exec 指令 | `exec: command: [...]` | 自訂檢查邏輯 |
-
-httpGet：K8s 去打那個 URL，回傳 200 到 399 就是成功。最常用，Web API 幾乎都用這個。
-
-tcpSocket：K8s 嘗試連某個 port，連上就是成功。適合資料庫、Redis 這種不是 HTTP 的服務。
-
-exec：在容器裡執行一個指令，回傳值是 0 就是成功。適合需要自訂檢查邏輯的場景。
-
----
-
-📄 7-2 第 7 張
+| 檢查方式 | 適合 |
+|:---------|:-----|
+| `httpGet`：打 URL，200~399 成功 | Web API（最常用） |
+| `tcpSocket`：連 port，連上成功 | 資料庫、Redis |
+| `exec`：執行指令，exit 0 成功 | 自訂檢查邏輯 |
 
 **YAML 四個關鍵參數**
 
@@ -110,11 +70,7 @@ readinessProbe:
   failureThreshold: 2
 ```
 
-readinessProbe 的 periodSeconds 通常比 liveness 短，因為我們希望 Pod 準備好了就趕快接流量。
-
----
-
-📄 7-2 第 8 張
+`readinessProbe` 的 `periodSeconds` 通常比 liveness 短，Pod 準備好了就趕快接流量。
 
 **Docker vs K8s 對照**
 
@@ -124,19 +80,9 @@ readinessProbe 的 periodSeconds 通常比 liveness 短，因為我們希望 Pod
 | `--timeout=3s` | `timeoutSeconds: 3` |
 | `--retries=3` | `failureThreshold: 3` |
 | `--start-period=5s` | `initialDelaySeconds: 5` |
-| 只有一種 | liveness + readiness + startup 三種 |
-
-最大的差別：Docker 只有一種 HEALTHCHECK，K8s 有三種，各負責不同的事。
-
-最後想一下：如果你**完全不設 Probe** 會怎樣？壞掉的 Pod 繼續收請求。程式死鎖了，K8s 不知道，Service 照樣把流量送過去。使用者不斷看到錯誤，直到有人手動去 `kubectl describe pod` 才發現問題。生產環境不設 Probe，就像開車不裝後照鏡。
-
-概念講完了，下一支影片我們來動手做，故意把服務搞壞，看 K8s 怎麼處理。
+| 只有一種，只標記 unhealthy | 三種，各自負責重啟或切流量 |
 
 ---
-
-## 7-3 Probe 實作（~12 min）
-
-### ② 所有指令＋講解
 
 **Step 1：建立 deployment-probe.yaml**
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>K8s 第六堂 — 複習筆記</title>
+  <title>K8s 第七堂 — 複習筆記</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -136,6 +136,21 @@
     }
     #content tr:nth-child(even) td { background: #141820; }
 
+    /* details / summary */
+    #content details {
+      background: #141820;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+    }
+    #content summary {
+      cursor: pointer;
+      color: #fbd38d;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
     /* loading */
     .loading { color: #4a5568; text-align: center; padding: 60px; font-size: 0.9rem; }
   </style>
@@ -143,10 +158,9 @@
 <body>
 
 <header>
-  <h1>K8s 第六堂複習</h1>
+  <h1>K8s 第七堂複習</h1>
   <nav class="tabs" id="tabs"></nav>
-  <a href="index.html" style="color:#f6ad55;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #744210;border-radius:6px;white-space:nowrap;flex-shrink:0;">← 第五堂</a>
-  <a href="day7.html" style="margin-left:8px;color:#68d391;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #2f6b4a;border-radius:6px;white-space:nowrap;flex-shrink:0;">第七堂 →</a>
+  <a href="day6.html" style="margin-left:auto;color:#f6ad55;font-size:0.78rem;text-decoration:none;padding:5px 12px;border:1px solid #744210;border-radius:6px;white-space:nowrap;flex-shrink:0;">← 第六堂</a>
 </header>
 
 <main>
@@ -155,14 +169,14 @@
 
 <script>
   const DOCS = [
-    { label: 'Loop 1 Ingress',              file: '../docs/day6-loop1-ingress.md' },
-    { label: 'Loop 2 ConfigMap + Secret',   file: '../docs/day6-loop2-configmap-secret.md' },
-    { label: 'Loop 3 PV + PVC',             file: '../docs/day6-loop3-pv-pvc.md' },
-    { label: 'Loop 4 StatefulSet',          file: '../docs/day6-loop4-statefulset.md' },
-    { label: 'Loop 5 Helm',                 file: '../docs/day6-loop5-helm.md' },
-    { label: 'Loop 6 Rancher',              file: '../docs/day6-loop6-rancher.md' },
-    { label: 'Loop 7 綜合 + 總結',          file: '../docs/day6-loop7-final.md' },
-    { label: '📋 投影片地圖',               file: '../docs/day6-slide-map.md' },
+    { label: 'Loop 1 Probe 健康檢查',       file: '../docs/day7-loop1-probe.md' },
+    { label: 'Loop 2 Resource Limits',      file: '../docs/day7-loop2-resource-limits.md' },
+    { label: 'Loop 3 HPA 自動擴縮',         file: '../docs/day7-loop3-hpa.md' },
+    { label: 'Loop 4 RBAC 權限控制',        file: '../docs/day7-loop4-rbac.md' },
+    { label: 'Loop 5 NetworkPolicy',        file: '../docs/day7-loop5-networkpolicy.md' },
+    { label: 'Loop 6 從零建系統（上）',     file: '../docs/day7-loop6-deploy-upper.md' },
+    { label: 'Loop 7 從零建系統（下）',     file: '../docs/day7-loop7-deploy-lower.md' },
+    { label: 'Loop 8 總結',                 file: '../docs/day7-loop8-final.md' },
   ];
 
   const tabsEl = document.getElementById('tabs');

@@ -2,7 +2,7 @@
 
 ---
 
-## 7-8 HPA 概念（~15 min）
+## 7-8 HPA 概念（~5 min）
 
 ### ① 課程內容
 
@@ -214,7 +214,7 @@ nginx-resource-demo    Deployment/nginx-resource-demo    1%/50%    2         10 
 開第二個終端機，先建立 Service 讓壓測流量有地方打（如果還沒建）：
 
 ```bash
-kubectl get svc nginx-svc    # 確認 Service 存在
+kubectl get svc nginx-resource-svc    # 確認 Service 存在
 ```
 
 開一個 load-generator Pod 持續發請求：
@@ -223,7 +223,7 @@ kubectl get svc nginx-svc    # 確認 Service 存在
 kubectl run -it load-generator \
   --image=busybox \
   --restart=Never \
-  -- sh -c "while true; do wget -q -O- http://nginx-svc/; done"
+  -- sh -c "while true; do wget -q -O- http://nginx-resource-svc/; done"
 ```
 
 - `--restart=Never`：只跑一次，跑完就刪
@@ -314,9 +314,15 @@ A：要根據你的 Node 總資源決定。簡單算法：Node 總 CPU 除以每
 
 ### ④ 學員實作
 
-**必做：建 HPA 壓測觀察**
+> 📢 **講師說話口吻**
+>
+> 好，換你們自己建 HPA 跑一次壓測。這個流量暴增自動擴的過程，你要親眼看一次才有感覺。
+
+**🎯 必做題：建 HPA 壓測觀察**
 
 對 `nginx-resource-demo` 建 HPA，觀察自動擴縮：
+
+使用的 lab 檔案：`~/workspace/k8s-course-labs/lesson7/nginx-resource-demo.yaml`（含 Service）
 
 1. 確認 `nginx-resource-demo` Deployment 有設 `resources.requests`
 2. 建 HPA：min=2、max=5、CPU 50%
@@ -325,7 +331,7 @@ A：要根據你的 Node 總資源決定。簡單算法：Node 總 CPU 除以每
 5. 停止壓測，等 5 分鐘觀察 REPLICAS 縮回 2
 6. 用 `kubectl describe hpa nginx-resource-demo` 看 Events 記錄
 
-**挑戰：改更低的閾值**
+**🏆 挑戰題：改更低的閾值**
 
 1. 刪掉剛才的 HPA
 2. 重新建，但 `targetCPUUtilizationPercentage` 改成 **30%**
@@ -359,7 +365,7 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:1.25
+        image: nginx:1.27
         ports:
         - containerPort: 80
         resources:
@@ -373,7 +379,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-svc
+  name: nginx-resource-svc
 spec:
   selector:
     app: nginx-resource
@@ -426,7 +432,7 @@ kubectl apply -f hpa.yaml
 kubectl run -it load-generator \
   --image=busybox \
   --restart=Never \
-  -- sh -c "while true; do wget -q -O- http://nginx-svc/; done"
+  -- sh -c "while true; do wget -q -O- http://nginx-resource-svc/; done"
 ```
 
 觀察指令：

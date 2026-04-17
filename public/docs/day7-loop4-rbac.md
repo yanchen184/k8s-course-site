@@ -2,7 +2,7 @@
 
 ---
 
-## 7-11 RBAC 概念（~15 min）
+## 7-11 RBAC 概念（~5 min）
 
 ### ① 課程內容
 
@@ -278,9 +278,15 @@ A：ServiceAccount 是給 Pod（程式）用的，存在 K8s 裡面，有 Token 
 
 ### ④ 學員實作
 
-**必做：建只讀角色並驗證**
+> 📢 **講師說話口吻**
+>
+> 好，換你們自己建一個 ServiceAccount、Role、RoleBinding 的組合，然後用 `--as` 測試看 get 能不能動、delete 有沒有被擋。
+
+**🎯 必做題：建只讀角色並驗證**
 
 你要從零開始，建立以下資源：
+
+使用的 lab 檔案：`~/workspace/k8s-course-labs/lesson7/rbac-viewer.yaml`（參考格式）
 
 1. 建一個 ServiceAccount，名字自訂（例如 `my-viewer`）
 2. 建一個 Role，只允許 `get`、`list` pods 這兩個動作
@@ -293,7 +299,7 @@ A：ServiceAccount 是給 Pod（程式）用的，存在 K8s 裡面，有 Token 
 
 ---
 
-**挑戰：Deployment 管理者角色（不能碰 Secret）**
+**🏆 挑戰題：Deployment 管理者角色（不能碰 Secret）**
 
 建一個新的 Role，條件如下：
 - 可以 `get`、`list`、`create`、`update`、`delete` deployments

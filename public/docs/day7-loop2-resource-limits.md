@@ -2,7 +2,7 @@
 
 ---
 
-## 7-5 Resource limits 概念（~15 min）
+## 7-5 Resource limits 概念（~5 min）
 
 ### ① 課程內容
 

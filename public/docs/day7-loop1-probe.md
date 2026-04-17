@@ -2,7 +2,7 @@
 
 ---
 
-## 7-2 Probe 概念（~15 min）
+## 7-2 Probe 概念（~5 min）
 
 ### ① 課程內容
 
@@ -134,7 +134,7 @@ readinessProbe 的 periodSeconds 通常比 liveness 短，因為我們希望 Pod
 
 ---
 
-## 7-3 Probe 實作（~15 min）
+## 7-3 Probe 實作（~12 min）
 
 ### ② 所有指令＋講解
 

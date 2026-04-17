@@ -271,6 +271,44 @@ docker logs <容器ID> 2>&1 | grep "Bootstrap Password:"
 - `2>&1`：把 stderr 合併進 stdout，因為 Rancher 的初始密碼輸出在 stderr
 - `grep "Bootstrap Password:"`：篩出包含密碼的那行
 
+**補充：stdout / stderr 是什麼？**
+
+**Q1：為什麼有兩條（stdout 和 stderr）？**
+
+每個程式啟動時，作業系統會給它三條預設的資料通道：
+- `0`（stdin）：輸入，預設從鍵盤讀
+- `1`（stdout）：正常輸出，預設印到終端機
+- `2`（stderr）：錯誤/警告/log 輸出，也預設印到終端機
+
+設計上分兩條是為了讓你可以分開處理：把正常輸出存進檔案、但錯誤訊息還是印在畫面上，兩件事同時做。
+
+```bash
+ls /tmp          # 正常輸出 → stdout（條1）
+ls /不存在的目錄  # 錯誤訊息 → stderr（條2）
+```
+
+**Q2：`2>&1` 語法怎麼讀？**
+
+- `2>` = 把 stderr（編號2）重新導向
+- `&1` = 導向「和 stdout（編號1）一樣的地方」
+
+所以 `2>&1` 的意思是：「把 stderr 合併進 stdout 的輸出流」。
+合併後，`|` pipe 才能一起拿到，`grep` 才搜尋得到。
+
+```bash
+docker logs abc 2>/dev/null   # 只看 stdout，stderr 丟掉
+docker logs abc 1>/dev/null   # 只看 stderr，stdout 丟掉
+docker logs abc 2>&1          # 兩條合併，都看得到
+```
+
+**Q3：為什麼 Rancher 要把密碼寫在 stderr？**
+
+Rancher 把 Bootstrap Password 寫在 stderr 是刻意的設計：
+- stdout 是給「程式正常流程的資料輸出」
+- stderr 是給「給人看的訊息、警告、log」
+
+Bootstrap Password 是給管理員看的提示訊息，不是程式資料，所以寫在 stderr。很多程式都這樣設計，例如 `curl -v` 的進度也是 stderr，只有最終下載內容才是 stdout。
+
 打完要看：
 ```
 Bootstrap Password: abcd1234efgh5678

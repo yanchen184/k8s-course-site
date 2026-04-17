@@ -2228,13 +2228,26 @@ function App() {
             </div>
             <p className="text-sm text-slate-400 md:text-base">{lesson.label} · {lesson.title}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(false)}
-            className="rounded-xl border border-slate-700/70 bg-slate-800/80 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white md:hidden"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Collapse sidebar"
+              title="切換側邊欄 (B)"
+              className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-800/80 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white md:inline-flex"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M12.5 4.5L7 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="rounded-xl border border-slate-700/70 bg-slate-800/80 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white md:hidden"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div
@@ -2583,6 +2596,20 @@ function App() {
           </button>
         )}
 
+        {shouldRenderSidebar && !sidebarOpen && !isMobileViewport && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Expand sidebar"
+            title="切換側邊欄 (B)"
+            className="fixed left-0 top-24 z-40 hidden h-14 w-11 items-center justify-center rounded-r-2xl border border-l-0 border-slate-700/80 bg-slate-900/95 text-slate-200 shadow-lg shadow-slate-950/30 transition-colors hover:bg-slate-800 hover:text-white md:inline-flex"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M7.5 4.5L13 10l-5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+
         {/* 課程選擇浮層 */}
         {showMenu && (
           <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-4" onClick={() => setShowMenu(false)}>
@@ -2839,8 +2866,8 @@ function App() {
         {/* Slide area */}
         <div className={`min-w-0 text-white ${
           isAdmin && isPresenterModeEnabled
-            ? 'w-full px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))] sm:px-6 xl:h-[calc(100dvh-4.5rem)] xl:overflow-hidden xl:px-8 xl:pb-24 xl:pt-6'
-            : 'min-h-screen w-full px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))] sm:px-6 md:flex md:flex-col md:items-center md:justify-center md:px-8 md:pb-24 md:pt-8'
+            ? 'w-full px-4 pb-[calc(8.75rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))] sm:px-6 xl:h-[calc(100dvh-4.5rem)] xl:overflow-hidden xl:px-8 xl:pb-[calc(8.5rem+env(safe-area-inset-bottom))] xl:pt-6'
+            : 'min-h-screen w-full px-4 pb-[calc(8.75rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))] sm:px-6 md:flex md:flex-col md:items-center md:justify-center md:px-8 md:pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pt-8'
         }`}>
           {loading ? (
             <div className="text-center">
@@ -3069,19 +3096,6 @@ function App() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-1 flex-wrap items-center gap-2 sm:flex-none">
                 <div className="flex items-center gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/70 p-1.5 shadow-lg shadow-slate-950/20">
-                  {shouldRenderSidebar && (
-                    <button
-                      onClick={() => setSidebarOpen(prev => !prev)}
-                      aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-                      title="切換側邊欄 (B)"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 text-slate-200 transition-colors hover:border-slate-500/80 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                        <path d={sidebarOpen ? 'M12.5 4.5L7 10l5.5 5.5' : 'M7.5 4.5L13 10l-5.5 5.5'} strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
-
                   <button
                     onClick={prevSlide}
                     disabled={currentSlide === 0}

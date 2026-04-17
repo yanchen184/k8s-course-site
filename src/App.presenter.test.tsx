@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { usePresentationChannel } from './hooks/usePresentationChannel'
 
@@ -453,4 +453,82 @@ describe('App presenter reconnect status', () => {
       expect(screen.getByRole('img', { name: 'Audience connected' })).toBeTruthy()
     })
   }, PRESENTER_TEST_TIMEOUT)
+})
+
+describe('App desktop sidebar toggle placement', () => {
+  beforeEach(() => {
+    cleanup()
+    window.history.replaceState({}, '', '/admin')
+
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+    })
+
+    sendMessageMock = vi.fn(() => true)
+    vi.mocked(usePresentationChannel).mockReturnValue({
+      latestMessage: null,
+      transportStatus: 'ready',
+      transportKind: 'broadcast',
+      transportIssue: null,
+      syncCapability: 'same-browser',
+      sendMessage: sendMessageMock,
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('renders the desktop toggle in the sidebar/header and not inside the footer nav', async () => {
+    render(<App />)
+
+    const collapseButton = screen.getByRole('button', { name: /collapse sidebar/i })
+    expect(collapseButton).toBeTruthy()
+
+    const footer = screen.getByRole('button', { name: /previous slide/i }).closest('.fixed.bottom-0.left-0.right-0')
+    expect(footer).toBeTruthy()
+    expect(within(footer as HTMLElement).queryByRole('button', { name: /collapse sidebar/i })).toBeNull()
+
+    fireEvent.click(collapseButton)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeTruthy()
+    })
+
+    expect(within(footer as HTMLElement).queryByRole('button', { name: /expand sidebar/i })).toBeNull()
+  })
+
+  it('keeps the B shortcut working after moving the desktop sidebar toggle', async () => {
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'b' })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeTruthy()
+    })
+
+    fireEvent.keyDown(window, { key: 'B' })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeTruthy()
+    })
+  })
 })

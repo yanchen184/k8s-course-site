@@ -2419,6 +2419,68 @@ helm uninstall my-ingress`,
     notes: `這張是路線圖。學員看完知道今天要做什麼。不需要解釋細節，等一下實作時會一步一步來。 [▶ 下一頁]`,
   },
 
+  // ── 6-18A 實作（0/4）：去哪裡找 Chart ──
+  {
+    title: '去哪裡找 Helm Chart？',
+    subtitle: '三個管道，找到就能一行安裝',
+    section: '6-18A：Helm 實作 Part 1',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-blue-900/30 border border-blue-500/50 p-4 rounded-lg">
+          <p className="text-blue-300 font-semibold mb-2">① Artifact Hub（最全、最推薦）</p>
+          <p className="text-slate-300 text-xs mb-2">官方 Chart 搜尋引擎，幾乎所有 Chart 都在這裡</p>
+          <p className="text-cyan-400 text-xs font-mono">https://artifacthub.io</p>
+          <p className="text-slate-400 text-xs mt-1">搜尋 nginx / mysql / redis / prometheus → 直接複製安裝指令</p>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-slate-200 font-semibold mb-2">② helm search（命令列搜尋）</p>
+          <div className="space-y-1 font-mono text-xs text-slate-300">
+            <p><span className="text-yellow-400">helm search repo</span> nginx          <span className="text-slate-500"># 搜尋已加入的 repo</span></p>
+            <p><span className="text-yellow-400">helm search hub</span>  nginx          <span className="text-slate-500"># 搜尋 Artifact Hub</span></p>
+          </div>
+        </div>
+        <div className="bg-purple-900/30 border border-purple-500/50 p-3 rounded-lg">
+          <p className="text-purple-300 font-semibold mb-2">③ OCI Registry（不需要 repo add）</p>
+          <div className="font-mono text-xs text-slate-300 space-y-1">
+            <p><span className="text-slate-500"># Docker Hub OCI</span></p>
+            <p>helm install my-blog <span className="text-green-400">oci://registry-1.docker.io/bitnamicharts/wordpress</span></p>
+            <p className="text-slate-500 mt-1"># GitHub Container Registry (GHCR) 也支援 OCI</span></p>
+          </div>
+        </div>
+        <div className="bg-amber-900/20 border border-amber-500/30 p-3 rounded-lg">
+          <p className="text-amber-300 text-xs font-semibold">常見可以用 Helm 裝的東西</p>
+          <div className="grid grid-cols-3 gap-1 mt-2 text-xs text-slate-300">
+            <span>nginx-ingress</span><span>cert-manager</span><span>prometheus</span>
+            <span>grafana</span><span>mysql / redis</span><span>wordpress</span>
+            <span>argo-cd</span><span>vault</span><span>elasticsearch</span>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# 方法 1：命令列搜尋（需先 repo add）
+helm search repo nginx
+helm search hub  nginx        # 直接搜尋 Artifact Hub
+
+# 方法 2：Artifact Hub 網站
+# https://artifacthub.io  →  搜尋關鍵字 → 複製指令
+
+# 方法 3：OCI（不需要 repo add）
+helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress
+
+# 看 Chart 有哪些參數可以改
+helm show values ingress-nginx/ingress-nginx | head -50`,
+    notes: `先問學員：「你們覺得 nginx、mysql、redis 這些東西，有沒有現成的 Helm Chart？」
+
+答案：全部都有，而且不只一個版本。
+
+Artifact Hub 是最方便的入口，就像 npm registry 之於 Node.js。搜尋 nginx 會出現 ingress-nginx、nginx-ingress、bitnami-nginx... 選 star 最多、維護活躍的。
+
+helm search hub 是在命令列直接查 Artifact Hub，helm search repo 是查本機已加入的 repo。
+
+OCI 是新趨勢，不需要 repo add，直接 oci:// 開頭就能裝，Bitnami 現在就是用這個格式。 [▶ 下一頁]`,
+  },
+
   // ── 6-18A 實作（1/4）：安裝 Helm ──
   {
     title: '安裝 Helm v3.20.2',

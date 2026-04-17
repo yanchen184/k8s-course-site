@@ -132,6 +132,50 @@ Helm 會記錄每次安裝和升級的歷史。升級之後發現有問題？`he
 
 ### ② 所有指令＋講解
 
+📄 6-18 第 1 張（新增）
+
+**去哪裡找 Helm Chart？**
+
+先問學員：「nginx、mysql、redis 有沒有現成的 Helm Chart？」答案是全部都有，而且不只一個版本。
+
+三個管道：
+
+**① Artifact Hub（最推薦）**
+
+官方 Chart 搜尋引擎，網址：`https://artifacthub.io`
+
+搜尋關鍵字就能找到安裝指令，就像 npm registry 之於 Node.js。常見的有：
+- `nginx-ingress`、`cert-manager`、`prometheus`、`grafana`
+- `mysql`、`redis`、`postgresql`、`mongodb`
+- `wordpress`、`argo-cd`、`vault`、`elasticsearch`
+
+**② helm search（命令列搜尋）**
+
+```bash
+helm search repo nginx        # 搜尋已加入的 repo
+helm search hub  nginx        # 直接搜尋 Artifact Hub（不需要先 repo add）
+```
+
+`helm search hub` 是查 Artifact Hub，`helm search repo` 是查本機已加入的 repo。
+
+**③ OCI Registry（不需要 repo add）**
+
+```bash
+# Docker Hub OCI 格式，直接 oci:// 開頭
+helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress
+
+# GitHub Container Registry (GHCR) 也支援 OCI
+helm install argocd oci://ghcr.io/argoproj/argo-helm/argo-cd
+```
+
+OCI 是新趨勢，不需要先 `helm repo add`，Bitnami 現在就是用這個格式。
+
+找到 Chart 之後，先看有哪些參數可以改：
+
+```bash
+helm show values ingress-nginx/ingress-nginx | head -50
+```
+
 📄 6-18 第 2 張
 
 **Step 1：安裝 Helm**

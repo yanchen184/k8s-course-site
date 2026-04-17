@@ -548,16 +548,18 @@ monitoring-kube-state-metrics-xxx         1/1   Running   2m
 打開 Grafana Dashboard：
 
 ```bash
-kubectl port-forward svc/monitoring-grafana 3000:80
+kubectl port-forward svc/monitoring-grafana 3000:80 --address=0.0.0.0
 ```
 
 預期輸出：
 ```
-Forwarding from 127.0.0.1:3000 -> 3000
+Forwarding from 0.0.0.0:3000 -> 3000
 Forwarding from [::1]:3000 -> 3000
 ```
 
-瀏覽器開 `http://localhost:3000`，帳號 `admin`，密碼 `admin123`。
+- `--address=0.0.0.0`：讓 port-forward 綁在所有網卡，宿主機才能從外部連進來。不加的話只綁 127.0.0.1，只有 VM 本機能用。
+
+瀏覽器開 `http://192.168.43.130:3000`，帳號 `admin`，密碼 `admin123`。
 
 點進去 **Dashboards → Kubernetes / Compute Resources / Pod**，你可以看到每個 Pod 的 CPU、Memory 使用率即時圖表。
 
@@ -926,10 +928,10 @@ kubectl get pods | grep monitoring   # 等 2-3 分鐘，看到 Running 再繼續
 
 Port-forward 打開 Grafana：
 ```bash
-kubectl port-forward svc/monitoring-grafana 3000:80
+kubectl port-forward svc/monitoring-grafana 3000:80 --address=0.0.0.0
 ```
 
-打開 `http://localhost:3000`，在 Dashboards 找到 **Kubernetes / Compute Resources / Pod**，找到你剛才跑的 `my-service` Pod 的 CPU 和 Memory 圖表。
+打開 `http://192.168.43.130:3000`，在 Dashboards 找到 **Kubernetes / Compute Resources / Pod**，找到你剛才跑的 `my-service` Pod 的 CPU 和 Memory 圖表。
 
 ---
 

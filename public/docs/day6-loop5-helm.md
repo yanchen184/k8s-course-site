@@ -594,14 +594,16 @@ my-app/
     └── ingress.yaml
 ```
 
-打開 `values.yaml`，找到 image 的部分並修改，同時加上必要的欄位（新版 Helm 骨架預設包含 serviceAccount 和 httpRoute）：
+用 heredoc 直接覆寫 `values.yaml`（新版 Helm 骨架預設包含 serviceAccount、httpRoute、autoscaling，這裡全部關掉避免課程環境報錯）：
 
-```yaml
-# values.yaml（關鍵設定）
+```bash
+cat <<EOF > values.yaml
 image:
   repository: nginx
   tag: "alpine"
   pullPolicy: IfNotPresent
+
+replicaCount: 1
 
 service:
   type: ClusterIP
@@ -611,12 +613,20 @@ ingress:
   enabled: false
 
 serviceAccount:
-  create: false    # 關掉，避免需要額外權限
+  create: false
   name: ""
 
 httpRoute:
-  enabled: false   # 關掉，避免需要 Gateway API CRD
+  enabled: false
+
+autoscaling:
+  enabled: false
+EOF
 ```
+
+- `autoscaling.enabled: false`：新版骨架有 HPA template，沒有這個欄位會報 `nil pointer` 錯誤
+- `serviceAccount.create: false`：關掉，避免 k3s 環境需要額外權限
+- `httpRoute.enabled: false`：關掉，k3s 預設沒裝 Gateway API CRD，開著會報錯
 
 打開 `templates/deployment.yaml`，看到：
 
@@ -962,11 +972,21 @@ helm upgrade my-ingress ingress-nginx/ingress-nginx \
 **必做 2：自己的 Chart**
 
 修改 `my-service/values.yaml`：
-```yaml
+```bash
+cat <<EOF > my-service/values.yaml
 image:
   repository: httpd
   tag: "latest"
   pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
 
 serviceAccount:
   create: false
@@ -974,6 +994,10 @@ serviceAccount:
 
 httpRoute:
   enabled: false
+
+autoscaling:
+  enabled: false
+EOF
 ```
 ```bash
 helm install my-service ./my-service

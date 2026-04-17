@@ -205,11 +205,15 @@ spec:
 **`pathType: Prefix`** — 前綴匹配，`/api` 可以匹配 `/api/users`、`/api/orders`。要精確匹配改成 `Exact`。
 
 ```bash
+kubectl create namespace my-app
 kubectl apply -f ingress-basic.yaml
 ```
 
+- `kubectl create namespace my-app`：Lab YAML 指定 `namespace: my-app`，必須先建，否則 apply 會報 `namespaces "my-app" not found`
+
 預期輸出：
 ```
+namespace/my-app created
 deployment.apps/frontend-deploy created
 service/frontend-svc created
 deployment.apps/api-deploy created

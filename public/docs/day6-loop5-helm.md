@@ -256,6 +256,14 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update
 ```
 
+**這兩個 URL 怎麼找到的？** 跟 Bitnami OCI 一樣，從 Artifact Hub 頁面左側的 **Repository URL** 找：
+1. 去 `https://artifacthub.io` 搜尋 `ingress-nginx`
+2. 點進去官方那個（CNCF 認證的）
+3. 左側看到 `Repository URL: https://kubernetes.github.io/ingress-nginx`
+4. 組合成 `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx`
+
+`ingress-nginx` 是你自己取的本機別名，可以取任何名字，之後 `helm install` 時用這個別名找 chart。
+
 預期輸出：
 ```
 "ingress-nginx" has been added to your repositories

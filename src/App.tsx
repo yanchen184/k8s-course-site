@@ -391,6 +391,139 @@ function getLessonIndexFromHash(): number {
   return idx >= 0 ? idx : 0
 }
 
+const OUTLINE_STATE_STORAGE_KEY = 'k8s-course-outline-state'
+const LESSON_PROGRESS_STORAGE_KEY = 'k8s-course-lesson-progress'
+
+type PersistedOutlineState = {
+  collapsedDays: string[]
+  expandedLessons: string[]
+  expandedSectionsByLesson: Record<string, string[]>
+}
+
+function readOutlineState(initialLessonIndex: number): {
+  collapsedDays: Set<string>
+  expandedLessons: Set<string>
+  expandedSectionsByLesson: Record<string, Set<string>>
+} {
+  const currentLesson = LESSONS[initialLessonIndex]
+  const fallback = {
+    collapsedDays: new Set<string>(),
+    expandedLessons: new Set<string>([currentLesson.id]),
+    expandedSectionsByLesson: {},
+  }
+
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+
+  try {
+    const raw = window.localStorage.getItem(OUTLINE_STATE_STORAGE_KEY)
+    if (!raw) {
+      return fallback
+    }
+
+    const parsed = JSON.parse(raw) as Partial<PersistedOutlineState> | null
+    if (!parsed || typeof parsed !== 'object') {
+      return fallback
+    }
+
+    const validDays = new Set(LESSONS.map(({ day }) => day))
+    const validLessonIds = new Set(LESSONS.map(({ id }) => id))
+    const collapsedDays = new Set((parsed.collapsedDays ?? []).filter((day): day is string => typeof day === 'string' && validDays.has(day)))
+    const expandedLessons = new Set((parsed.expandedLessons ?? []).filter((lessonId): lessonId is string => typeof lessonId === 'string' && validLessonIds.has(lessonId)))
+    const expandedSectionsByLesson = Object.fromEntries(
+      Object.entries(parsed.expandedSectionsByLesson ?? {}).flatMap(([lessonId, sectionKeys]) => (
+        validLessonIds.has(lessonId) && Array.isArray(sectionKeys)
+          ? [[lessonId, new Set(sectionKeys.filter((sectionKey): sectionKey is string => typeof sectionKey === 'string' && sectionKey.length > 0))]]
+          : []
+      )),
+    ) as Record<string, Set<string>>
+
+    collapsedDays.delete(currentLesson.day)
+    expandedLessons.add(currentLesson.id)
+
+    return {
+      collapsedDays,
+      expandedLessons,
+      expandedSectionsByLesson,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function persistOutlineState(
+  collapsedDays: ReadonlySet<string>,
+  expandedLessons: ReadonlySet<string>,
+  expandedSectionsByLesson: Record<string, Set<string>>,
+): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    const payload: PersistedOutlineState = {
+      collapsedDays: Array.from(collapsedDays),
+      expandedLessons: Array.from(expandedLessons),
+      expandedSectionsByLesson: Object.fromEntries(
+        Object.entries(expandedSectionsByLesson).map(([lessonId, sectionKeys]) => [lessonId, Array.from(sectionKeys)]),
+      ),
+    }
+    window.localStorage.setItem(OUTLINE_STATE_STORAGE_KEY, JSON.stringify(payload))
+  } catch {
+    // Ignore storage failures and keep the in-memory UI state.
+  }
+}
+
+function readLessonProgress(): Record<string, number> {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LESSON_PROGRESS_STORAGE_KEY)
+    if (!raw) {
+      return {}
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, unknown> | null
+    if (!parsed || typeof parsed !== 'object') {
+      return {}
+    }
+
+    const validLessonIds = new Set(LESSONS.map(({ id }) => id))
+    return Object.fromEntries(
+      Object.entries(parsed).flatMap(([lessonId, slideIndex]) => (
+        validLessonIds.has(lessonId) && Number.isInteger(slideIndex) && Number(slideIndex) >= 0
+          ? [[lessonId, Number(slideIndex)]]
+          : []
+      )),
+    )
+  } catch {
+    return {}
+  }
+}
+
+function readPersistedSlideIndex(lessonId: string): number {
+  return readLessonProgress()[lessonId] ?? 0
+}
+
+function persistSlideProgress(lessonId: string, slideIndex: number): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    const nextProgress = {
+      ...readLessonProgress(),
+      [lessonId]: Math.max(0, Math.trunc(slideIndex)),
+    }
+    window.localStorage.setItem(LESSON_PROGRESS_STORAGE_KEY, JSON.stringify(nextProgress))
+  } catch {
+    // Ignore storage failures and keep the in-memory slide position.
+  }
+}
+
 function createSessionId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -525,6 +658,7 @@ function armScrollSyncSuppression(flagRef: { current: boolean }, frameRef: { cur
 
 function App() {
   const initialLessonIndex = getLessonIndexFromHash()
+  const initialOutlineState = readOutlineState(initialLessonIndex)
   const [isAdmin] = useState(isAdminPath)
   const [viewMode, setViewMode] = useState<ViewMode>(() => parseViewMode(window.location.search))
   const [sessionId, setSessionId] = useState<string | null>(() => parseSessionId(window.location.search))
@@ -543,15 +677,15 @@ function App() {
     return null
   })
   const [currentLesson, setCurrentLesson] = useState(initialLessonIndex)
-  const [currentSlide, setCurrentSlide] = useState(0)
+  const [currentSlide, setCurrentSlide] = useState(() => readPersistedSlideIndex(LESSONS[initialLessonIndex].id))
   const [showNotes, setShowNotes] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= MOBILE_BREAKPOINT)
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < MOBILE_BREAKPOINT)
   const [showQA, setShowQA] = useState(false)
-  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
-  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => new Set([LESSONS[initialLessonIndex].id]))
-  const [expandedSectionsByLesson, setExpandedSectionsByLesson] = useState<Record<string, Set<string>>>({})
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(() => initialOutlineState.collapsedDays)
+  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => initialOutlineState.expandedLessons)
+  const [expandedSectionsByLesson, setExpandedSectionsByLesson] = useState<Record<string, Set<string>>>(() => initialOutlineState.expandedSectionsByLesson)
   const [outlineExpandingAll, setOutlineExpandingAll] = useState(false)
   const [lessonSectionStates, setLessonSectionStates] = useState<Record<string, {
     status: 'idle' | 'loading' | 'ready' | 'error'
@@ -770,6 +904,22 @@ function App() {
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
 
+  useEffect(() => {
+    if (isRemoteConsumerView) {
+      return
+    }
+
+    persistOutlineState(collapsedDays, expandedLessons, expandedSectionsByLesson)
+  }, [collapsedDays, expandedLessons, expandedSectionsByLesson, isRemoteConsumerView])
+
+  useEffect(() => {
+    if (isRemoteConsumerView || loading) {
+      return
+    }
+
+    persistSlideProgress(LESSONS[currentLesson].id, currentSlide)
+  }, [currentLesson, currentSlide, isRemoteConsumerView, loading])
+
   useEffect(() => () => {
     if (presenterScrollSyncFrameRef.current !== null) {
       window.cancelAnimationFrame(presenterScrollSyncFrameRef.current)
@@ -849,9 +999,10 @@ function App() {
     lessonLoadRequestRef.current = requestId
     setLoading(true)
     const pendingSidebarSection = pendingSidebarSectionRef.current
+    const persistedSlideIndex = readPersistedSlideIndex(lesson.id)
     if ((!isRemoteConsumerView || pendingAudienceSlideRef.current === null)
       && pendingSidebarSection?.lessonId !== lesson.id) {
-      setCurrentSlide(0)
+      setCurrentSlide(persistedSlideIndex)
     }
     lesson.getSlides()
       .then((s) => {
@@ -873,6 +1024,12 @@ function App() {
           )
           setCurrentSlide(nextIndex)
           pendingSidebarSectionRef.current = null
+        } else if (!isRemoteConsumerView) {
+          const nextIndex = Math.min(
+            Math.max(persistedSlideIndex, 0),
+            Math.max(loadedSlides.length - 1, 0),
+          )
+          setCurrentSlide(nextIndex)
         }
         setLoading(false)
       })

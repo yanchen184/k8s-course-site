@@ -23,6 +23,25 @@ let popupWindow: Window & {
 }
 let popupWindowState: { closed: boolean }
 
+function installMockLocalStorage() {
+  const storage = new Map<string, string>()
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => storage.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        storage.set(key, String(value))
+      }),
+      removeItem: vi.fn((key: string) => {
+        storage.delete(key)
+      }),
+      clear: vi.fn(() => {
+        storage.clear()
+      }),
+    },
+  })
+}
+
 async function startPresenter(): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: /start presenter \(p\)/i }))
 
@@ -86,6 +105,7 @@ const PRESENTER_TEST_TIMEOUT = 10000
 describe('App presenter end confirmation', () => {
   beforeEach(() => {
     cleanup()
+    installMockLocalStorage()
     window.history.replaceState({}, '', '/admin')
 
     popupWindowState = { closed: false }
@@ -200,6 +220,7 @@ describe('App presenter end confirmation', () => {
 describe('App presenter control modes', () => {
   beforeEach(() => {
     cleanup()
+    installMockLocalStorage()
     window.history.replaceState({}, '', '/admin')
 
     popupWindowState = { closed: false }
@@ -317,6 +338,7 @@ describe('App presenter control modes', () => {
 describe('App presenter sync conflict handling', () => {
   beforeEach(() => {
     cleanup()
+    installMockLocalStorage()
     window.history.replaceState({}, '', '/admin?view=presenter&session=session-1&control=control-1#lesson1-morning')
 
     Object.defineProperty(window, 'matchMedia', {
@@ -399,6 +421,7 @@ describe('App presenter sync conflict handling', () => {
 describe('App presenter reconnect status', () => {
   beforeEach(() => {
     cleanup()
+    installMockLocalStorage()
     window.history.replaceState({}, '', '/admin?view=presenter&session=session-1&control=control-1#lesson1-morning')
 
     Object.defineProperty(window, 'matchMedia', {
@@ -458,6 +481,7 @@ describe('App presenter reconnect status', () => {
 describe('App desktop sidebar toggle placement', () => {
   beforeEach(() => {
     cleanup()
+    installMockLocalStorage()
     window.history.replaceState({}, '', '/admin')
 
     Object.defineProperty(window, 'matchMedia', {
@@ -530,5 +554,32 @@ describe('App desktop sidebar toggle placement', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeTruthy()
     })
+  })
+
+  it('restores the saved slide progress for the current lesson on reload', async () => {
+    window.localStorage.setItem('k8s-course-lesson-progress', JSON.stringify({
+      'lesson1-morning': 1,
+    }))
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /go to slide 2: 47 小時完整課程大綱/i }).getAttribute('aria-current'),
+      ).toBe('page')
+    })
+  })
+
+  it('restores the saved outline collapse state on reload', async () => {
+    window.localStorage.setItem('k8s-course-outline-state', JSON.stringify({
+      collapsedDays: ['第二天'],
+      expandedLessons: ['lesson1-morning'],
+      expandedSectionsByLesson: {},
+    }))
+
+    render(<App />)
+
+    expect(screen.queryByRole('button', { name: /第二堂 早上· docker 基礎/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /第一堂 早上· linux 操作入門/i })).toBeTruthy()
   })
 })

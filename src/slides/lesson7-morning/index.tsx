@@ -1475,8 +1475,8 @@ metrics 裡面 averageUtilization 設 50。意思是當所有 Pod 的平均 CPU 
             <p className="text-slate-400"># → 確認 Running</p>
             <p>$ kubectl top pods</p>
             <p className="text-slate-400"># → 有數字 = metrics-server 正常</p>
-            <p>$ kubectl expose deployment nginx-resource-demo \</p>
-            <p>    --port=80 --target-port=80 --name=nginx-resource-svc</p>
+            <p>$ kubectl apply -f nginx-resource-demo.yaml</p>
+            <p className="text-slate-400"># → Deployment + Service 一起建好（含 nginx-resource-svc）</p>
             <p>$ kubectl autoscale deployment nginx-resource-demo \</p>
             <p>    --min=2 --max=10 --cpu=50%</p>
             <p>$ kubectl get hpa</p>
@@ -1500,10 +1500,10 @@ kubectl get pods -n kube-system -l k8s-app=metrics-server
 kubectl top nodes
 kubectl top pods
 
-# Step 1：確認 Deployment + 建 Service
+# Step 1：部署 Deployment + Service（yaml 已含 nginx-resource-svc）
+kubectl apply -f ~/workspace/k8s-course-labs/lesson7/nginx-resource-demo.yaml
 kubectl get deploy nginx-resource-demo
-kubectl expose deployment nginx-resource-demo \\
-  --port=80 --target-port=80 --name=nginx-resource-svc
+kubectl get svc nginx-resource-svc
 
 # Step 2：建 HPA
 kubectl autoscale deployment nginx-resource-demo \\
@@ -1519,13 +1519,9 @@ kubectl run load-test --image=busybox:1.36 --rm -it \\
 
 確認之後，打一下 kubectl top nodes 和 kubectl top pods。如果能看到 CPU 和 MEMORY 的數字，表示 metrics-server 正常運作。
 
-好，接下來確認上一個 Loop 建的 nginx Deployment 還在。kubectl get deploy nginx-resource-demo。如果你之前清掉了，重新 apply 一下 resource-ok.yaml。記住那個 Deployment 有設 resources.requests，這是 HPA 的前提。
-
-然後建一個 Service。壓測的時候我們要透過 Service 的 DNS 名稱去打流量。kubectl expose deployment nginx-resource-demo --port=80 --target-port=80 --name=nginx-resource-svc。
+好，接下來部署 HPA 用的 nginx。kubectl apply -f ~/workspace/k8s-course-labs/lesson7/nginx-resource-demo.yaml。這個 yaml 裡面同時包含了 Deployment 和 Service，一次建好。確認一下：kubectl get deploy nginx-resource-demo、kubectl get svc nginx-resource-svc。記住 Deployment 有設 resources.requests，這是 HPA 的前提。
 
 好，現在建 HPA。kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu=50%。看看 HPA 的狀態。kubectl get hpa。
-
-如果 nginx-resource-demo 沒有 Service，先建一個：kubectl expose deployment nginx-resource-demo --name=nginx-resource-svc --port=80 --target-port=80。
 
 好，重頭戲來了。開另一個終端機，跑一個壓測 Pod。kubectl run load-test --image=busybox:1.36 --rm -it --restart=Never -- sh -c "while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; done"。
 
@@ -1617,11 +1613,11 @@ kubectl describe hpa nginx-resource-demo`,
           <div className="space-y-2 text-sm text-slate-300">
             <div className="flex items-start gap-2">
               <span className="text-green-400 font-bold shrink-0">1.</span>
-              <span>確認 nginx-resource-demo Deployment 有設 requests</span>
+              <span>apply nginx-resource-demo.yaml（含 Deployment + Service）</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-green-400 font-bold shrink-0">2.</span>
-              <span>建 Service + HPA（--min=2 --max=10 --cpu=50%）</span>
+              <span>建 HPA（--min=2 --max=10 --cpu=50%）</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-green-400 font-bold shrink-0">3.</span>

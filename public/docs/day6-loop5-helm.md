@@ -331,7 +331,7 @@ kubectl get all -l app.kubernetes.io/instance=my-ingress
 ```
 
 - 用 label selector 篩出這個 Release 建立的所有資源
-- Helm 安裝的資源都帶 `app.kubernetes.io/instance=<Release名稱>` 這個 label
+- Helm 安裝的資源都帶 `app.kubernetes.io/instance=<Release名稱>` 這個 label，這是 Helm 的慣例，不是 ingress-nginx 特有的。Release 名稱就是 `helm install` 第一個參數（這裡是 `my-ingress`），所以 label 就是 `app.kubernetes.io/instance=my-ingress`。任何 Helm 裝的東西都可以用這個方式過濾。
 
 預期輸出：
 ```

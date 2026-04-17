@@ -347,6 +347,14 @@ Bootstrap Password: abcd1234efgh5678
 kubectl apply -f https://<rancher-IP>/v3/import/xxxxxxxxxxxxxxxx.yaml
 ```
 
+⚠️ 如果出現 `x509: certificate signed by unknown authority`，代表 kubectl 不認識 Rancher 的自簽憑證。改用 curl 繞過：
+
+```bash
+curl --insecure -sfL https://<rancher-IP>/v3/import/xxxxxxxxxxxxxxxx.yaml | kubectl apply -f -
+```
+
+- `curl --insecure`：不驗證 TLS 憑證，直接下載 YAML
+- `| kubectl apply -f -`：把下載的內容直接 pipe 給 kubectl 套用（`-` 代表從 stdin 讀）
 - `-f https://...`：從 URL 下載 YAML 並套用（這個 YAML 會在 k3s 叢集裡安裝 Rancher agent）
 
 打完要看：

@@ -170,6 +170,30 @@ helm install argocd oci://ghcr.io/argoproj/argo-helm/argo-cd
 
 OCI 是新趨勢，不需要先 `helm repo add`，Bitnami 現在就是用這個格式。
 
+**什麼是 OCI？**
+
+OCI（Open Container Initiative）原本是定義 Docker image 格式的標準。後來這個標準被擴展，除了 container image，也可以用來儲存 Helm Chart。
+
+以前 Helm Chart 有自己的儲存格式（`.tgz` + `index.yaml`），放在專屬的 Helm repo server 上，所以要先 `helm repo add` 告訴 Helm 去哪裡找。
+
+現在 Helm Chart 可以直接放在 Docker Hub、GHCR 這些 OCI registry 上，跟 Docker image 放在同一個地方。好處是：
+- 不需要 `helm repo add`，直接 `oci://` 開頭就能裝
+- 利用現有的 Docker registry 基礎設施，不需要額外的 Helm repo server
+- Docker Hub、GHCR、AWS ECR、Azure ACR 都支援
+
+**為什麼 Bitnami 改用 OCI？**
+
+2025/8/28 起，Bitnami 的 Helm repo（`https://charts.bitnami.com/bitnami`）需要付費訂閱才能使用。但 OCI 格式放在 Docker Hub 的 `registry-1.docker.io/bitnamicharts/` 路徑下目前還是免費的，所以課程改用 OCI 格式：
+
+```bash
+# 舊方式（2025/8/28 後需要付費）
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm install my-blog bitnami/wordpress
+
+# 新方式（免費，用 OCI）
+helm install my-blog oci://registry-1.docker.io/bitnamicharts/wordpress
+```
+
 找到 Chart 之後，先看有哪些參數可以改：
 
 ```bash

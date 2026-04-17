@@ -3919,8 +3919,8 @@ kubectl get pods -w
 
 # 找 NodePort
 kubectl get svc my-blog-wordpress
-# NAME                TYPE           CLUSTER-IP    PORT(S)
-# my-blog-wordpress   LoadBalancer   10.43.x.x     80:31234/TCP
+# NAME                TYPE       CLUSTER-IP    PORT(S)
+# my-blog-wordpress   NodePort   10.43.x.x     80:31234/TCP,443:30xxx/TCP
 
 # 瀏覽器打開 http://<Node-IP>:31234 → WordPress 歡迎頁面
 

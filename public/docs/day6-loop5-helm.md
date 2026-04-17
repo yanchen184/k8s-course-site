@@ -298,6 +298,14 @@ ingress-nginx/ingress-nginx     4.15.1          1.15.1        Ingress controller
 >
 > 解法：加 `--set controller.service.type=NodePort`，讓 nginx 用 NodePort 跑，不跟 Traefik 搶 port。示範 install/upgrade/rollback 的流程完全不受影響。
 
+⚠️ **k3s 權限問題**：helm 需要讀 `/etc/rancher/k3s/k3s.yaml`，預設只有 root 能讀。第一次跑 helm 前先執行一次：
+
+```bash
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+```
+
+之後所有 helm 指令都不需要 sudo。
+
 ```bash
 helm install my-ingress ingress-nginx/ingress-nginx \
   --set controller.replicaCount=1 \

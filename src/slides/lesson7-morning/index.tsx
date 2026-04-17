@@ -1432,7 +1432,7 @@ spec:
 
 # 或用一行指令：
 # kubectl autoscale deployment nginx-resource-demo \\
-#   --min=2 --max=10 --cpu-percent=50`,
+#   --min=2 --max=10 --cpu=50%`,
     notes: `HPA 做的事情用一句話說就是：監控 Pod 的 CPU 使用率，超過你設的閾值就自動加 Pod，低於閾值就自動減 Pod。全自動，不需要人介入。
 
 HPA 的工作流程是這樣的。它每 15 秒去問 metrics-server：目前每個 Pod 的 CPU 使用率是多少？拿到數據之後做計算。如果平均 CPU 使用率超過你設的目標值，比如 50%，HPA 就會增加 Pod 的數量。新的 Pod 啟動之後，流量分攤到更多 Pod 上面，每個 Pod 的 CPU 使用率就降下來了。
@@ -1478,7 +1478,7 @@ metrics 裡面 averageUtilization 設 50。意思是當所有 Pod 的平均 CPU 
             <p>$ kubectl expose deployment nginx-resource-demo \</p>
             <p>    --port=80 --target-port=80 --name=nginx-resource-svc</p>
             <p>$ kubectl autoscale deployment nginx-resource-demo \</p>
-            <p>    --min=2 --max=10 --cpu-percent=50</p>
+            <p>    --min=2 --max=10 --cpu=50%</p>
             <p>$ kubectl get hpa</p>
             <p className="text-slate-400"># → TARGETS: 1%/50%, REPLICAS: 2</p>
           </div>
@@ -1507,7 +1507,7 @@ kubectl expose deployment nginx-resource-demo \\
 
 # Step 2：建 HPA
 kubectl autoscale deployment nginx-resource-demo \\
-  --min=2 --max=10 --cpu-percent=50
+  --min=2 --max=10 --cpu=50%
 
 # Step 3：壓測（另開終端機）
 kubectl run load-test --image=busybox:1.36 --rm -it \\
@@ -1523,7 +1523,7 @@ kubectl run load-test --image=busybox:1.36 --rm -it \\
 
 然後建一個 Service。壓測的時候我們要透過 Service 的 DNS 名稱去打流量。kubectl expose deployment nginx-resource-demo --port=80 --target-port=80 --name=nginx-resource-svc。
 
-好，現在建 HPA。kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu-percent=50。看看 HPA 的狀態。kubectl get hpa。
+好，現在建 HPA。kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu=50%。看看 HPA 的狀態。kubectl get hpa。
 
 如果 nginx-resource-demo 沒有 Service，先建一個：kubectl expose deployment nginx-resource-demo --name=nginx-resource-svc --port=80 --target-port=80。
 
@@ -1621,7 +1621,7 @@ kubectl describe hpa nginx-resource-demo`,
             </div>
             <div className="flex items-start gap-2">
               <span className="text-green-400 font-bold shrink-0">2.</span>
-              <span>建 Service + HPA（--min=2 --max=10 --cpu-percent=50）</span>
+              <span>建 Service + HPA（--min=2 --max=10 --cpu=50%）</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-green-400 font-bold shrink-0">3.</span>
@@ -1639,7 +1639,7 @@ kubectl describe hpa nginx-resource-demo`,
           <div className="space-y-2 text-sm text-slate-300">
             <div className="flex items-start gap-2">
               <span className="text-amber-400 font-bold shrink-0">A.</span>
-              <span>刪掉 HPA → 重建一個 --cpu-percent=30</span>
+              <span>刪掉 HPA → 重建一個 --cpu=30%</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-amber-400 font-bold shrink-0">B.</span>
@@ -1777,7 +1777,7 @@ kubectl get hpa 看一下。你的 HPA 有建好嗎？TARGETS 欄位有數字不
           <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
             <p className="text-slate-500"># 方法 1：指令建立（min=2, max=5, CPU 50%）</p>
             <p>kubectl autoscale deployment nginx-resource-demo \</p>
-            <p>{'  '}--cpu-percent=50 --min=2 --max=5</p>
+            <p>{'  '}--cpu=50% --min=2 --max=5</p>
             <p className="text-slate-500 mt-1"># 確認 HPA 建好</p>
             <p>kubectl get hpa</p>
             <p className="text-slate-500"># NAME                     REFERENCE          TARGETS   MINPODS  MAXPODS</p>
@@ -1807,7 +1807,7 @@ kubectl get hpa 看一下。你的 HPA 有建好嗎？TARGETS 欄位有數字不
     ),
     notes: `來看解答。
 
-建 HPA 最簡單的方式是 kubectl autoscale。一行指令：kubectl autoscale deployment nginx-resource-demo --cpu-percent=50 --min=2 --max=5。建完之後 kubectl get hpa 確認。TARGETS 欄位如果顯示數字不是 unknown，就是設對了。
+建 HPA 最簡單的方式是 kubectl autoscale。一行指令：kubectl autoscale deployment nginx-resource-demo --cpu=50% --min=2 --max=5。建完之後 kubectl get hpa 確認。TARGETS 欄位如果顯示數字不是 unknown，就是設對了。
 
 壓測的部分：kubectl run load-gen 開一個 busybox Pod，進去之後跑 while true 迴圈一直打請求。在另一個 terminal 用 kubectl get hpa -w 監看，-w 是 watch 模式，有變化就更新。當 CPU 使用率超過 50%，你會看到 REPLICAS 開始增加，從 2 變 3、4，最多到 5。
 

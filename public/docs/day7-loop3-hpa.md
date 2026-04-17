@@ -134,7 +134,7 @@ kubectl apply -f resource-ok.yaml
 
 ```bash
 kubectl autoscale deployment nginx-resource-demo \
-  --min=2 --max=10 --cpu-percent=50
+  --min=2 --max=10 --cpu=50%
 ```
 
 翻譯成白話：幫 `nginx-resource-demo` 建一個 HPA，最少 2 個 Pod，最多 10 個，CPU 超過 50% 就擴。
@@ -375,7 +375,7 @@ kubectl apply -f nginx-resource-demo.yaml
 ```bash
 # 方式一：指令
 kubectl autoscale deployment nginx-resource-demo \
-  --min=2 --max=5 --cpu-percent=50
+  --min=2 --max=5 --cpu=50%
 ```
 
 ```yaml

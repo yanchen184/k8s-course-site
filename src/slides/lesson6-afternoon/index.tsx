@@ -2445,7 +2445,7 @@ helm uninstall my-ingress`,
           <div className="font-mono text-xs text-slate-300 space-y-1">
             <p><span className="text-slate-500"># Docker Hub OCI</span></p>
             <p>helm install my-blog <span className="text-green-400">oci://registry-1.docker.io/bitnamicharts/wordpress</span></p>
-            <p className="text-slate-500 mt-1"># GitHub Container Registry (GHCR) 也支援 OCI</span></p>
+            <p className="text-slate-500 mt-1"># GitHub Container Registry (GHCR) 也支援 OCI</p>
           </div>
         </div>
         <div className="bg-amber-900/20 border border-amber-500/30 p-3 rounded-lg">

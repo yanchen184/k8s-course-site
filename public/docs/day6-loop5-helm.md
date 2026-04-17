@@ -464,25 +464,27 @@ controller:
 
 建立兩個環境的 values 檔：
 
-```yaml
-# values-dev.yaml
+```bash
+cat <<EOF > values-dev.yaml
 controller:
   replicaCount: 1
   resources:
     requests:
       cpu: 100m
       memory: 90Mi
-```
+EOF
 
-```yaml
-# values-prod.yaml
+cat <<EOF > values-prod.yaml
 controller:
   replicaCount: 2
   resources:
     requests:
       cpu: 200m
       memory: 256Mi
+EOF
 ```
+
+- `cat <<EOF > filename` ... `EOF`：heredoc 語法，把多行文字一次寫入檔案，不需要開編輯器
 
 用 `-f` 帶入 values 檔安裝：
 

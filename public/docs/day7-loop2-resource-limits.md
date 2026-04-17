@@ -373,7 +373,11 @@ A：看情況。設一樣（Guaranteed）的好處是 Pod 最不容易被殺，K
 
 ### ④ 學員實作
 
-**必做**
+> 📢 **講師說話口吻**
+>
+> 好，換你們來觸發 OOMKilled。這是很難忘的體驗，建議大家都自己跑一次。
+
+**🎯 必做題：OOMKilled → 改 limits → Running**
 
 寫一個 oom-demo Pod，設 `limits.memory: 128Mi`，讓 stress 工具吃 256MB，觀察 OOMKilled。然後把 limits 改成 `512Mi`，重新部署，觀察 Pod 正常 Running。
 
@@ -386,7 +390,7 @@ A：看情況。設一樣（Guaranteed）的好處是 Pod 最不容易被殺，K
 
 ---
 
-**挑戰**
+**🏆 挑戰題：比較三種 QoS 等級**
 
 建三個不同的 Pod，一個 Guaranteed、一個 Burstable、一個 BestEffort。用 `kubectl describe pod` 看 QoS Class 欄位，確認三者不同。
 

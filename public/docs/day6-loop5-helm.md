@@ -651,6 +651,18 @@ NAME                       READY   STATUS    RESTARTS   AGE
 my-app-6d8f9b7c4d-xk9pj   1/1     Running   0          30s
 ```
 
+確認可以連到 nginx：
+
+```bash
+POD_NAME=$(kubectl get pods -l app.kubernetes.io/instance=my-app -o jsonpath="{.items[0].metadata.name}")
+kubectl port-forward $POD_NAME 8080:80 --address=0.0.0.0
+```
+
+- `app.kubernetes.io/instance=my-app`：Helm release 名稱，取出對應的 Pod 名稱
+- `--address=0.0.0.0`：讓宿主機可以從外部連進來
+
+瀏覽器開 `http://192.168.43.130:8080`，看到 nginx 歡迎頁就成功。port-forward 跑著的時候按 `Ctrl+C` 結束。
+
 升級，換一個 image tag：
 
 ```bash

@@ -145,6 +145,14 @@ Helm 會記錄每次安裝和升級的歷史。升級之後發現有問題？`he
 官方 Chart 搜尋引擎，網址：`https://artifacthub.io`
 
 搜尋關鍵字就能找到安裝指令，就像 npm registry 之於 Node.js。常見的有：
+
+⚠️ **Bitnami 的 OCI 網址陷阱**：Artifact Hub 上 Bitnami 的頁面會顯示 `helm install my-release oci://MY-OCI-REGISTRY/wordpress`，`MY-OCI-REGISTRY` 是佔位符，頁面上不會告訴你要填什麼。正確的完整指令是：
+
+```bash
+helm install my-release oci://registry-1.docker.io/bitnamicharts/wordpress
+```
+
+Bitnami 所有 chart 的 OCI prefix 都是 `registry-1.docker.io/bitnamicharts/`，後面接 chart 名稱（wordpress、mysql、redis...）。
 - `nginx-ingress`、`cert-manager`、`prometheus`、`grafana`
 - `mysql`、`redis`、`postgresql`、`mongodb`
 - `wordpress`、`argo-cd`、`vault`、`elasticsearch`

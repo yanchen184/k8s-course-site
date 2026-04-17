@@ -397,6 +397,36 @@ A：`kubectl exec -it <pod-name> -- /bin/sh`（或 `/bin/bash`，看容器裡有
 
 ---
 
+### 課後清理（課程結束後執行）
+
+Rancher image 約 2.6GB，加上停止的容器和 volume，磁碟很容易塞滿（24G 的 VM 只要跑完 Rancher 就會到 89%+）。課程結束後執行以下清理：
+
+```bash
+# 停止並移除 Rancher 容器
+docker stop $(docker ps -q --filter 'ancestor=rancher/rancher')
+docker rm   $(docker ps -aq --filter 'ancestor=rancher/rancher')
+
+# 清除所有停止的容器
+docker container prune -f
+
+# 清除沒有被使用的 image（dangling）
+docker image prune -f
+
+# 確認空間釋放
+df -h /
+docker system df
+```
+
+如果要更徹底清理（連 Rancher image 一起刪）：
+
+```bash
+docker rmi rancher/rancher:latest
+```
+
+下次課程要再示範時重新 `docker run` 即可，image 會自動重新拉取（需要等待拉取時間）。
+
+---
+
 ## 6-22 回頭操作 Loop 7（~5 min）
 
 ### ④ 學員實作

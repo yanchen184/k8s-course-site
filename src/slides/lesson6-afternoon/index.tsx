@@ -2488,42 +2488,20 @@ OCI 是新趨勢，不需要 repo add，直接 oci:// 開頭就能裝，Bitnami 
     section: '6-18A：Helm 實作 Part 1',
     duration: '5',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3">安裝方式</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="bg-slate-700/50 p-3 rounded font-mono text-xs">
-              curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-            </div>
-            <p className="text-slate-400 text-xs">下載官方安裝腳本，自動偵測平台（Linux/macOS），安裝最新穩定版</p>
-          </div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-slate-400 text-xs mb-1">安裝</p>
+          <p className="text-green-300 font-mono text-sm">curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash</p>
         </div>
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-300 font-semibold mb-2">安裝完成確認</p>
-          <div className="space-y-1 text-sm font-mono">
-            <p className="text-slate-300">helm version</p>
-            <p className="text-slate-400 text-xs"># version.BuildInfo&#123;Version:"v3.20.2", ...&#125;</p>
-          </div>
-        </div>
-        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
-          <p className="text-blue-300 text-sm font-semibold">現在是 v3，不是 v2</p>
-          <p className="text-slate-300 text-xs mt-1">Helm v2 需要在 cluster 裡安裝 Tiller server，v3 移除了，只有 client CLI，更安全簡單</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認版本</p>
+          <p className="text-green-300 font-mono text-sm">helm version</p>
         </div>
       </div>
     ),
-    code: `# 安裝 Helm
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-# Downloading https://get.helm.sh/helm-v3.20.2-linux-amd64.tar.gz
-# Preparing to install helm into /usr/local/bin
-# helm installed into /usr/local/bin/helm
+    code: `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-# 確認版本
-helm version
-# version.BuildInfo{Version:"v3.20.2", GitCommit:"...", GoVersion:"go1.24.3"}
-
-# Helm v3 vs v2 差異
-# v2: 需要在 cluster 安裝 Tiller（麻煩且有安全問題）
-# v3: 只有 client CLI，不需要 server 端元件`,
+helm version`,
     notes: `直接跑安裝指令。安裝很快，30 秒左右。
 
 版本確認是重要步驟，讓學員知道他們裝了什麼版本。今天跑的是 v3.20.2。 [▶ 下一頁]`,
@@ -2537,55 +2515,28 @@ helm version
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-red-900/40 border border-red-500/60 p-3 rounded-lg">
-          <p className="text-red-400 font-bold text-sm mb-1">⚠️ 不能用 Bitnami！</p>
-          <p className="text-slate-300 text-xs">Bitnami 於 <span className="text-yellow-300 font-semibold">2025/8/28</span> 起 image registry 改為付費方案</p>
-          <p className="text-slate-300 text-xs mt-1">→ 安裝會出現 <span className="text-red-400 font-mono">Init:ImagePullBackOff</span>，Pod 永遠起不來</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">加 ingress-nginx repo</p>
+          <p className="text-green-300 font-mono text-sm">helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx</p>
         </div>
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">今天用的兩個官方 Repo</p>
-          <div className="space-y-2 text-xs">
-            <div className="bg-slate-700/50 p-2 rounded">
-              <p className="text-green-400 font-semibold">ingress-nginx（K8s 官方）</p>
-              <p className="text-slate-300 font-mono">https://kubernetes.github.io/ingress-nginx</p>
-              <p className="text-slate-400 mt-1">來源：github.com/kubernetes/ingress-nginx → README</p>
-            </div>
-            <div className="bg-slate-700/50 p-2 rounded">
-              <p className="text-blue-400 font-semibold">prometheus-community</p>
-              <p className="text-slate-300 font-mono">https://prometheus-community.github.io/helm-charts</p>
-              <p className="text-slate-400 mt-1">來源：github.com/prometheus-community/helm-charts → README</p>
-            </div>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">加 prometheus-community repo</p>
+          <p className="text-green-300 font-mono text-sm">helm repo add prometheus-community https://prometheus-community.github.io/helm-charts</p>
         </div>
-        <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
-          <p className="text-yellow-300 text-sm font-semibold">CHART VERSION vs APP VERSION</p>
-          <p className="text-slate-300 text-xs mt-1">CHART VERSION = Chart 打包版本（Helm 維護者管的）</p>
-          <p className="text-slate-300 text-xs">APP VERSION = 實際軟體版本（Nginx / Prometheus 本身）</p>
-          <p className="text-slate-400 text-xs mt-1">例：ingress-nginx Chart 4.15.1 打包的是 Nginx Ingress Controller 1.15.1</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">更新索引</p>
+          <p className="text-green-300 font-mono text-sm">helm repo update</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">搜尋確認</p>
+          <p className="text-green-300 font-mono text-sm">helm search repo ingress-nginx</p>
         </div>
       </div>
     ),
-    code: `# 新增官方 Repo（URL 都在各自 GitHub README 裡）
-# ingress-nginx: github.com/kubernetes/ingress-nginx
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-
-# prometheus-community: github.com/prometheus-community/helm-charts
+    code: `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-
-# 更新索引
 helm repo update
-# ...Successfully got an update from the "ingress-nginx" chart repository
-# ...Successfully got an update from the "prometheus-community" chart repository
-# Update Complete. Happy Helming!
-
-# 搜尋可用的 Chart
-helm search repo ingress-nginx
-# NAME                            CHART VERSION  APP VERSION  DESCRIPTION
-# ingress-nginx/ingress-nginx     4.15.1         1.15.1       Ingress controller for K8s...
-
-# ⚠️  Bitnami 從 2025/8/28 起 image 改付費
-# helm repo add bitnami https://charts.bitnami.com/bitnami
-# → helm install bitnami/mysql 會出現 Init:ImagePullBackOff！`,
+helm search repo ingress-nginx`,
     notes: `這頁有三個重點，都要講清楚：
 
 1. URL 從哪來：去 GitHub 搜尋 ingress-nginx，找到官方 repo，README 第一行就有 helm repo add 指令
@@ -2601,51 +2552,32 @@ helm search repo ingress-nginx
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">安裝指令（k3s 用 NodePort）</p>
-          <div className="bg-slate-700/50 p-2 rounded font-mono text-xs text-slate-300">
-            <p>helm install my-ingress ingress-nginx/ingress-nginx \</p>
-            <p className="pl-4">--set controller.replicaCount=1 \</p>
-            <p className="pl-4">--set controller.service.type=NodePort</p>
-          </div>
-          <p className="text-slate-400 text-xs mt-2">k3s 內建 Traefik 已佔用 80/443，用 NodePort 避免衝突</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">安裝（k3s 用 NodePort 避免跟 Traefik 衝突）</p>
+          <p className="text-green-300 font-mono text-sm">sudo chmod 644 /etc/rancher/k3s/k3s.yaml</p>
+          <p className="text-green-300 font-mono text-sm">helm install my-ingress ingress-nginx/ingress-nginx \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">--set controller.replicaCount=1 \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">--set controller.service.type=NodePort</p>
         </div>
-        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg">
-          <p className="text-green-300 font-semibold text-sm mb-2">用 instance label 查所有資源</p>
-          <p className="text-slate-300 text-xs font-mono">kubectl get all -l app.kubernetes.io/instance=my-ingress</p>
-          <p className="text-slate-400 text-xs mt-1">Helm 會自動為所有資源加上這個 label</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認所有資源</p>
+          <p className="text-green-300 font-mono text-sm">kubectl get all -l app.kubernetes.io/instance=my-ingress</p>
         </div>
-        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
-          <p className="text-blue-300 font-semibold text-sm mb-1">helm list 確認 Release 狀態</p>
-          <p className="text-slate-300 text-xs">REVISION: 1（第一次安裝），STATUS: deployed</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認 Release 狀態</p>
+          <p className="text-green-300 font-mono text-sm">helm list</p>
         </div>
       </div>
     ),
-    code: `# 安裝 Nginx Ingress Controller
-# k3s 有 Traefik，所以用 NodePort
+    code: `sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+
 helm install my-ingress ingress-nginx/ingress-nginx \
   --set controller.replicaCount=1 \
   --set controller.service.type=NodePort
-# NAME: my-ingress
-# LAST DEPLOYED: ...
-# STATUS: deployed
-# REVISION: 1
 
-# 驗證：用 instance label 查出所有相關資源
 kubectl get all -l app.kubernetes.io/instance=my-ingress
-# NAME                                               READY  STATUS   AGE
-# pod/my-ingress-ingress-nginx-controller-xxx        1/1    Running  1m
-#
-# NAME                                               TYPE       CLUSTER-IP    PORT(S)
-# service/my-ingress-ingress-nginx-controller        NodePort   10.43.x.x     80:3xxxx/TCP,443:3xxxx/TCP
-#
-# NAME                                               READY  UP-TO-DATE  AVAILABLE
-# deployment.apps/my-ingress-ingress-nginx-controller  1/1  1           1
 
-# 查看所有 Release
-helm list
-# NAME        NAMESPACE  REVISION  UPDATED    STATUS    CHART                    APP VERSION
-# my-ingress  default    1         2026-...   deployed  ingress-nginx-4.15.1     1.15.1`,
+helm list`,
     notes: `重點示範兩件事：
 
 1. kubectl get all -l app.kubernetes.io/instance=my-ingress：Helm 自動幫所有資源加上這個 label，一個指令查出全部資源
@@ -2662,60 +2594,35 @@ k3s 為什麼用 NodePort：因為 k3s 內建 Traefik，已經在 80/443 上了�
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">REVISION 流程</p>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="bg-green-900/50 border border-green-500/50 px-3 py-2 rounded text-center">
-              <p className="text-green-400 font-bold">REVISION 1</p>
-              <p className="text-slate-400 text-xs">install</p>
-            </div>
-            <span className="text-slate-500">→</span>
-            <div className="bg-blue-900/50 border border-blue-500/50 px-3 py-2 rounded text-center">
-              <p className="text-blue-400 font-bold">REVISION 2</p>
-              <p className="text-slate-400 text-xs">upgrade</p>
-            </div>
-            <span className="text-slate-500">→</span>
-            <div className="bg-yellow-900/50 border border-yellow-500/50 px-3 py-2 rounded text-center">
-              <p className="text-yellow-400 font-bold">REVISION 3</p>
-              <p className="text-slate-400 text-xs">rollback</p>
-            </div>
-          </div>
-          <p className="text-slate-400 text-xs mt-2">rollback 本身也會產生新的 REVISION（不是刪除記錄）</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">升級（replica 改成 2）</p>
+          <p className="text-green-300 font-mono text-sm">helm upgrade my-ingress ingress-nginx/ingress-nginx \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">--set controller.replicaCount=2 \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">--set controller.service.type=NodePort</p>
         </div>
-        <div className="bg-purple-900/30 border border-purple-500/50 p-3 rounded-lg">
-          <p className="text-purple-300 font-semibold text-sm">helm rollback vs kubectl rollout undo</p>
-          <div className="mt-1 space-y-1 text-xs text-slate-300">
-            <p>kubectl rollout undo → 只回滾單一 Deployment</p>
-            <p>helm rollback → 整個 Release 所有資源一起回滾 ✅</p>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">看版本歷史</p>
+          <p className="text-green-300 font-mono text-sm">helm history my-ingress</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">回滾到 REVISION 1</p>
+          <p className="text-green-300 font-mono text-sm">helm rollback my-ingress 1</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認 REVISION 3 出現</p>
+          <p className="text-green-300 font-mono text-sm">helm history my-ingress</p>
         </div>
       </div>
     ),
-    code: `# upgrade（修改 replica 數量）
-helm upgrade my-ingress ingress-nginx/ingress-nginx \
+    code: `helm upgrade my-ingress ingress-nginx/ingress-nginx \
   --set controller.replicaCount=2 \
   --set controller.service.type=NodePort
-# Release "my-ingress" has been upgraded. Happy Helming!
-# REVISION: 2
 
-# 查看版本歷史
 helm history my-ingress
-# REVISION  UPDATED    STATUS      CHART                    DESCRIPTION
-# 1         2026-...   superseded  ingress-nginx-4.15.1     Install complete
-# 2         2026-...   deployed    ingress-nginx-4.15.1     Upgrade complete
 
-# rollback 到 REVISION 1
 helm rollback my-ingress 1
-# Rollback was a success! Happy Helming!
 
-helm history my-ingress
-# REVISION  STATUS      DESCRIPTION
-# 1         superseded  Install complete
-# 2         superseded  Upgrade complete
-# 3         deployed    Rollback to 1    ← rollback 本身是新的 REVISION
-
-# 確認 replica 回到 1
-kubectl get deploy -l app.kubernetes.io/instance=my-ingress`,
+helm history my-ingress`,
     notes: `最重要的概念：rollback 不是「刪除 REVISION 2」，而是新增 REVISION 3（內容和 REVISION 1 一樣）。這樣歷史記錄完整保留。
 
 再次強調 helm rollback 和 kubectl rollout undo 的差異。 [▶ 下一頁]`,
@@ -2729,57 +2636,13 @@ kubectl get deploy -l app.kubernetes.io/instance=my-ingress`,
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">為什麼要先看 values？</p>
-          <p className="text-slate-300 text-xs">參數名稱不能亂猜。拼錯了 helm 不會報錯，只是靜默不生效。先看輸出，再決定要改哪個。</p>
-        </div>
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">從輸出讀出 --set 怎麼打</p>
-          <div className="font-mono text-xs bg-slate-900 p-2 rounded text-slate-300 space-y-0.5">
-            <p className="text-slate-500"># helm show values 輸出（節錄）：</p>
-            <p>controller:</p>
-            <p className="pl-4 text-yellow-300">replicaCount: 1</p>
-            <p className="pl-4">service:</p>
-            <p className="pl-8 text-yellow-300">type: LoadBalancer</p>
-          </div>
-          <div className="mt-2 space-y-1 text-xs text-slate-300">
-            <p><span className="text-slate-500">↓ 看到 controller.replicaCount: 1，所以：</span></p>
-            <p className="font-mono text-green-400">--set controller.replicaCount=2</p>
-            <p><span className="text-slate-500">↓ 看到 controller.service.type: LoadBalancer，所以：</span></p>
-            <p className="font-mono text-green-400">--set controller.service.type=NodePort</p>
-          </div>
-        </div>
-        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
-          <p className="text-blue-300 font-semibold text-xs mb-1">-f 和 --set 都可以覆蓋參數</p>
-          <p className="text-slate-400 text-xs">--set：單一參數快速改 &nbsp;|&nbsp; -f values.yaml：多個參數統一管（推薦）</p>
-          <p className="text-slate-400 text-xs mt-1">混用時：-f 先套用，--set 後覆蓋（優先級更高）</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">看 Chart 有哪些參數</p>
+          <p className="text-green-300 font-mono text-sm">helm show values ingress-nginx/ingress-nginx | head -50</p>
         </div>
       </div>
     ),
-    code: `# 查看 Chart 有哪些可設定的參數（輸出很長，| head -50 只看前半）
-helm show values ingress-nginx/ingress-nginx | head -50
-# 實際輸出（節錄關鍵部分）：
-# controller:
-#   name: controller
-#   replicaCount: 1          ← 這就是 --set controller.replicaCount=? 的來源
-#   image:
-#     registry: registry.k8s.io
-#     tag: ""
-#   service:
-#     type: LoadBalancer      ← 這就是 --set controller.service.type=NodePort 的來源
-#     ports:
-#       http: 80
-#       https: 443
-#
-# 規則：YAML 巢狀結構 → 用「.」連接 → 變成 --set 的參數名稱
-# controller.service.type 對應 controller: → service: → type:
-
-# 知道參數名後，--set 覆蓋：
-helm install my-ingress ingress-nginx/ingress-nginx \
-  --set controller.replicaCount=1 \
-  --set controller.service.type=NodePort
-
-# 或用 -f 把多個參數寫在 yaml 檔裡（下一張示範）`,
+    code: `helm show values ingress-nginx/ingress-nginx | head -50`,
     notes: `這張的重點不是指令，是「怎麼讀懂輸出」。
 
 helm show values 印出幾百行 YAML。大家看到這個通常傻眼。
@@ -2798,69 +2661,49 @@ helm show values 印出幾百行 YAML。大家看到這個通常傻眼。
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">兩個環境的設定差異</p>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-blue-900/30 border border-blue-500/50 p-2 rounded">
-              <p className="text-blue-300 font-semibold mb-1">values-dev.yaml</p>
-              <p className="text-slate-300 font-mono">replicaCount: 1</p>
-              <p className="text-slate-300 font-mono">resources:</p>
-              <p className="text-slate-300 font-mono pl-2">limits:</p>
-              <p className="text-slate-300 font-mono pl-4">memory: 256Mi</p>
-            </div>
-            <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
-              <p className="text-green-300 font-semibold mb-1">values-prod.yaml</p>
-              <p className="text-slate-300 font-mono">replicaCount: 3</p>
-              <p className="text-slate-300 font-mono">resources:</p>
-              <p className="text-slate-300 font-mono pl-2">limits:</p>
-              <p className="text-slate-300 font-mono pl-4">memory: 512Mi</p>
-            </div>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">先清掉前面的 Release</p>
+          <p className="text-green-300 font-mono text-sm">helm uninstall my-ingress</p>
         </div>
-        <div className="bg-yellow-900/30 border border-yellow-500/50 p-3 rounded-lg">
-          <p className="text-yellow-300 text-sm font-semibold">對比沒有 Helm 的痛點</p>
-          <p className="text-slate-300 text-xs mt-1">沒有 Helm：dev-deployment.yaml, staging-deployment.yaml, prod-deployment.yaml → 3 套 YAML 同步維護</p>
-          <p className="text-green-300 text-xs mt-1">有 Helm：一個 Chart + 兩個 values 檔 → 解決了</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">建立 dev values</p>
+          <p className="text-green-300 font-mono text-sm">{'cat <<EOF > values-dev.yaml'}</p>
+          <p className="text-green-300 font-mono text-sm">controller:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">replicaCount: 1</p>
+          <p className="text-green-300 font-mono text-sm pl-4">resources:</p>
+          <p className="text-green-300 font-mono text-sm pl-8">requests:</p>
+          <p className="text-green-300 font-mono text-sm pl-12">cpu: 100m</p>
+          <p className="text-green-300 font-mono text-sm pl-12">memory: 90Mi</p>
+          <p className="text-green-300 font-mono text-sm">EOF</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">安裝 dev 環境</p>
+          <p className="text-green-300 font-mono text-sm">helm install dev-ingress ingress-nginx/ingress-nginx \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">-f values-dev.yaml \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">--set controller.service.type=NodePort</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認</p>
+          <p className="text-green-300 font-mono text-sm">helm list</p>
         </div>
       </div>
     ),
-    code: `# 建立 dev 環境 values
-cat > values-dev.yaml << 'EOF'
+    code: `helm uninstall my-ingress
+
+cat <<EOF > values-dev.yaml
 controller:
   replicaCount: 1
-  service:
-    type: NodePort
   resources:
-    limits:
-      memory: 256Mi
-      cpu: 200m
+    requests:
+      cpu: 100m
+      memory: 90Mi
 EOF
 
-# 建立 prod 環境 values
-cat > values-prod.yaml << 'EOF'
-controller:
-  replicaCount: 3
-  service:
-    type: LoadBalancer
-  resources:
-    limits:
-      memory: 512Mi
-      cpu: 500m
-EOF
+helm install dev-ingress ingress-nginx/ingress-nginx \
+  -f values-dev.yaml \
+  --set controller.service.type=NodePort
 
-# 部署 dev
-helm install my-ingress-dev ingress-nginx/ingress-nginx -f values-dev.yaml
-
-# 部署 prod（只示範，不實際裝）
-# helm install my-ingress-prod ingress-nginx/ingress-nginx -f values-prod.yaml
-
-# 確認 Release
-helm list
-# NAME              REVISION  STATUS    CHART
-# my-ingress-dev    1         deployed  ingress-nginx-4.15.1
-
-# 清理 dev（練習完）
-helm uninstall my-ingress-dev`,
+helm list`,
     notes: `這是 Helm 參數化部署的核心用法。
 
 重點強調：「同一個 Chart 安裝多次，每次是獨立的 Release」，這和之前講的概念呼應。 [▶ 下一頁]`,
@@ -2874,53 +2717,27 @@ helm uninstall my-ingress-dev`,
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">kube-prometheus-stack 包含什麼</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-green-400">✓</span> Prometheus（指標收集）
-            </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-green-400">✓</span> Grafana（視覺化）
-            </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-green-400">✓</span> AlertManager（告警）
-            </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-green-400">✓</span> Node Exporter（節點指標）
-            </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-green-400">✓</span> kube-state-metrics
-            </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-green-400">✓</span> 預設 K8s Dashboard
-            </div>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">安裝監控全家桶（等 2-3 分鐘）</p>
+          <p className="text-green-300 font-mono text-sm">helm install monitoring prometheus-community/kube-prometheus-stack \</p>
+          <p className="text-green-300 font-mono text-sm pl-4">--set grafana.adminPassword=admin123</p>
         </div>
-        <div className="bg-blue-900/30 border border-blue-500/50 p-3 rounded-lg">
-          <p className="text-blue-300 text-sm font-semibold">如果沒有 Helm</p>
-          <p className="text-slate-300 text-xs mt-1">手動安裝：Prometheus operator + CRD + Grafana + AlertManager + Exporter = 幾十個 YAML，幾小時</p>
-          <p className="text-green-300 text-xs mt-1">有 Helm：helm install ... → 5 分鐘全搞定</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">等 Pod 起來</p>
+          <p className="text-green-300 font-mono text-sm">kubectl get pods | grep monitoring</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">打開 Grafana（帳號 admin / admin123）</p>
+          <p className="text-green-300 font-mono text-sm">kubectl port-forward svc/monitoring-grafana 3000:80 --address=0.0.0.0</p>
         </div>
       </div>
     ),
-    code: `# 安裝 kube-prometheus-stack（Prometheus + Grafana 全家桶）
-helm install monitoring prometheus-community/kube-prometheus-stack \
+    code: `helm install monitoring prometheus-community/kube-prometheus-stack \
   --set grafana.adminPassword=admin123
 
-# 安裝需要幾分鐘，等 Pod 都 Running
 kubectl get pods | grep monitoring
-# NAME                                                READY  STATUS
-# monitoring-grafana-xxx                              3/3    Running
-# monitoring-kube-prometheus-prometheus-0             2/2    Running
-# monitoring-kube-state-metrics-xxx                   1/1    Running
 
-# port-forward 打開 Grafana（帳號: admin，密碼: admin123）
-kubectl port-forward svc/monitoring-grafana 3000:80
-# Forwarding from 127.0.0.1:3000 -> 3000
-
-# 瀏覽器開 http://localhost:3000
-# 進入後點 Dashboards → 已有預設 K8s 監控 Dashboard`,
+kubectl port-forward svc/monitoring-grafana 3000:80 --address=0.0.0.0`,
     notes: `這頁的重點是「Helm 讓複雜的東西變簡單」。
 
 kube-prometheus-stack 手動安裝要幾小時，用 Helm 只要一行。這是說服學員在正式環境用 Helm 最有力的例子。
@@ -2935,46 +2752,45 @@ kube-prometheus-stack 手動安裝要幾小時，用 Helm 只要一行。這是�
     section: '6-18B：Helm 實作 Part 2',
     duration: '5',
     content: (
-      <div className="space-y-2">
-        <div className="flex items-start gap-3 bg-slate-800/50 p-3 rounded-lg">
-          <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-1 rounded shrink-0 mt-0.5">Step 1</span>
-          <div className="flex-1">
-            <p className="text-slate-400 text-xs mb-1">建立 Chart 骨架</p>
-            <p className="text-green-300 font-mono text-sm">helm create my-app</p>
-          </div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-slate-400 text-xs mb-1">建立 Chart 骨架</p>
+          <p className="text-green-300 font-mono text-sm">helm create my-app</p>
         </div>
-        <div className="flex items-start gap-3 bg-slate-800/50 p-3 rounded-lg">
-          <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-1 rounded shrink-0 mt-0.5">Step 2</span>
-          <div className="flex-1">
-            <p className="text-slate-400 text-xs mb-1">覆寫 values.yaml（貼右側 code block 的內容）</p>
-            <p className="text-green-300 font-mono text-sm">{"cat <<EOF > my-app/values.yaml"}</p>
-            <p className="text-slate-400 font-mono text-xs pl-2">image.repository: nginx</p>
-            <p className="text-slate-400 font-mono text-xs pl-2">image.tag: "alpine"</p>
-            <p className="text-slate-400 font-mono text-xs pl-2">serviceAccount.create: false ...</p>
-            <p className="text-green-300 font-mono text-sm">EOF</p>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">覆寫 values.yaml</p>
+          <p className="text-green-300 font-mono text-sm">{'cat <<EOF > my-app/values.yaml'}</p>
+          <p className="text-green-300 font-mono text-sm">image:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">repository: nginx</p>
+          <p className="text-green-300 font-mono text-sm pl-4">tag: "alpine"</p>
+          <p className="text-green-300 font-mono text-sm pl-4">pullPolicy: IfNotPresent</p>
+          <p className="text-green-300 font-mono text-sm">replicaCount: 1</p>
+          <p className="text-green-300 font-mono text-sm">service:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">type: ClusterIP</p>
+          <p className="text-green-300 font-mono text-sm pl-4">port: 80</p>
+          <p className="text-green-300 font-mono text-sm">ingress:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">enabled: false</p>
+          <p className="text-green-300 font-mono text-sm">serviceAccount:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">create: false</p>
+          <p className="text-green-300 font-mono text-sm pl-4">name: ""</p>
+          <p className="text-green-300 font-mono text-sm">httpRoute:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">enabled: false</p>
+          <p className="text-green-300 font-mono text-sm">autoscaling:</p>
+          <p className="text-green-300 font-mono text-sm pl-4">enabled: false</p>
+          <p className="text-green-300 font-mono text-sm">EOF</p>
         </div>
-        <div className="flex items-start gap-3 bg-slate-800/50 p-3 rounded-lg">
-          <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-1 rounded shrink-0 mt-0.5">Step 3</span>
-          <div className="flex-1">
-            <p className="text-slate-400 text-xs mb-1">安裝</p>
-            <p className="text-green-300 font-mono text-sm">helm install my-app ./my-app</p>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">安裝</p>
+          <p className="text-green-300 font-mono text-sm">helm install my-app ./my-app</p>
         </div>
-        <div className="flex items-start gap-3 bg-slate-800/50 p-3 rounded-lg">
-          <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-1 rounded shrink-0 mt-0.5">Step 4</span>
-          <div className="flex-1">
-            <p className="text-slate-400 text-xs mb-1">升級（換 image tag）</p>
-            <p className="text-green-300 font-mono text-sm">helm upgrade my-app ./my-app --set image.tag=1.25</p>
-          </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">升級（換 image tag）</p>
+          <p className="text-green-300 font-mono text-sm">helm upgrade my-app ./my-app --set image.tag=1.25</p>
         </div>
       </div>
     ),
-    code: `# ① 建骨架
-helm create my-app
-# 產生：my-app/Chart.yaml, values.yaml, templates/
+    code: `helm create my-app
 
-# ② 改 values.yaml（把預設值換成我們要的）
 cat <<EOF > my-app/values.yaml
 image:
   repository: nginx
@@ -2995,20 +2811,13 @@ autoscaling:
   enabled: false
 EOF
 
-# ③ 安裝（從本地目錄裝）
 helm install my-app ./my-app
 
-# 確認跑起來
 kubectl get pods
-# NAME                       READY   STATUS    AGE
-# my-app-xxx                 1/1     Running   30s
 
-# ④ 升級（換 image tag）
 helm upgrade my-app ./my-app --set image.tag=1.25
 
-# 確認 image 換了
-kubectl describe pod -l app.kubernetes.io/instance=my-app | grep Image
-# Image: nginx:1.25`,
+kubectl describe pod -l app.kubernetes.io/name=my-app | grep Image`,
     notes: `重點是讓學員理解「Chart 就是你自己的 YAML 模板包」。
 
 values.yaml 的值會被注入到 templates/ 裡的 YAML 模板，生成最終的 K8s 資源。這就是 Helm 的核心機制。
@@ -3023,45 +2832,35 @@ values.yaml 的值會被注入到 templates/ 裡的 YAML 模板，生成最終�
     section: '6-18B：Helm 實作 Part 2',
     duration: '5',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold text-sm mb-2">helm uninstall 會刪除什麼</p>
-          <div className="space-y-1 text-xs text-slate-300">
-            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> Deployment / ReplicaSet / Pod</div>
-            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> Service / Ingress</div>
-            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> ConfigMap / Secret（Helm 建立的）</div>
-            <div className="flex items-center gap-2"><span className="text-red-400">✗</span> ServiceAccount / RBAC</div>
-          </div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-slate-400 text-xs mb-1">清掉所有 Release</p>
+          <p className="text-green-300 font-mono text-sm">helm uninstall my-ingress dev-ingress monitoring my-app 2&gt;/dev/null || true</p>
         </div>
-        <div className="bg-red-900/40 border border-red-500/60 p-3 rounded-lg">
-          <p className="text-red-400 font-semibold text-sm">⚠️ PVC 預設不會被刪除！</p>
-          <p className="text-slate-300 text-xs mt-1">有狀態應用（MySQL / Redis）的資料卷 PVC 刻意保留，防止誤刪資料</p>
-          <p className="text-yellow-300 text-xs mt-1">要手動刪：<span className="font-mono">kubectl delete pvc --all</span> 或指定名稱</p>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認空的</p>
+          <p className="text-green-300 font-mono text-sm">helm list</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">清掉 PVC</p>
+          <p className="text-green-300 font-mono text-sm">kubectl delete pvc --all</p>
+        </div>
+        <div>
+          <p className="text-slate-400 text-xs mb-1">確認 Pod 都停了</p>
+          <p className="text-green-300 font-mono text-sm">kubectl get pods</p>
         </div>
       </div>
     ),
-    code: `# 清理本節所有 Release
-helm uninstall my-ingress
-# release "my-ingress" uninstalled
-
+    code: `helm uninstall my-ingress
+helm uninstall dev-ingress
 helm uninstall monitoring
-# release "monitoring" uninstalled
+helm uninstall my-app
 
-helm uninstall my-release  # 自建的 Chart
-# release "my-release" uninstalled
-
-# 確認全部清除
 helm list
-# NAME  NAMESPACE  REVISION  STATUS
-# （應該是空的）
 
-# ⚠️ 確認 PVC 情況
-kubectl get pvc
-# 如果有 PVC 殘留，手動刪除
-# kubectl delete pvc <pvc-name>
+kubectl get pods
 
-# 確認 Pod 全部停止
-kubectl get pods`,
+kubectl delete pvc --all`,
     notes: `最後的清理步驟。
 
 重點提醒 PVC 不會自動刪除，這是刻意設計的（保護資料）。在 lab 環境如果 PVC 沒刪，下次安裝可能會用到舊資料，造成困惑。 [▶ 下一頁]`,

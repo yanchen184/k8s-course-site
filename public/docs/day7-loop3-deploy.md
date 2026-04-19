@@ -1,6 +1,6 @@
 # Loop 3 — 從零建完整系統（任務排程系統）
 
-> 系統架構：Frontend → Backend API → Redis Queue → Worker → PostgreSQL
+> 系統架構：Frontend → Backend API → Redis Queue → Task Runner → PostgreSQL
 > 涵蓋 12 個 K8s 組件：Deployment, StatefulSet, PVC, ConfigMap, Secret, Service, Ingress, HPA, RBAC, Job, CronJob, DaemonSet（對比說明）
 
 ---
@@ -13,13 +13,13 @@
 
 **系統功能**
 
-使用者建立任務（每天早上九點寄出報表 Email）→ Backend API 把任務丟進 Redis Queue → Worker 從 Queue 拿任務執行 → 結果存進 PostgreSQL。CronJob 定時觸發，把到期的排程任務撈出來丟進 Queue。
+使用者建立任務（每天早上九點寄出報表 Email）→ Backend API 把任務丟進 Redis Queue → Task Runner 從 Queue 拿任務執行 → 結果存進 PostgreSQL。CronJob 定時觸發，把到期的排程任務撈出來丟進 Queue。
 
 **12 個組件對應位置**
 
 | 組件 | 用在哪裡 | 為什麼 |
 |------|---------|--------|
-| Deployment | Frontend / Backend / Worker | 無狀態，Pod 隨時可重建 |
+| Deployment | Frontend / Backend / Task Runner | 無狀態，Pod 隨時可重建 |
 | StatefulSet | PostgreSQL | 需要穩定 Pod 名稱和固定儲存 |
 | PVC | PostgreSQL | 持久化資料 |
 | ConfigMap | DB 主機名 / Port / DB 名稱 | 非機密設定 |
@@ -30,7 +30,7 @@
 | RBAC | Backend SA | 最小讀取 ConfigMap 權限 |
 | Job | DB migration | 一次性任務 |
 | CronJob | 定時排程觸發 | 每分鐘掃一次到期任務 |
-| DaemonSet | 對比說明（Worker 為什麼不用） | 跟 Node 數量綁定才用 |
+| DaemonSet | 對比說明（Task Runner 為什麼不用） | 跟 Node 數量綁定才用 |
 
 ---
 
@@ -39,10 +39,10 @@
 ### Namespace
 
 ```
-指令：kubectl create namespace taskscheduler
+指令：kubectl create namespace tasks
 ```
 
-隔離這套系統，所有指令之後都加 `-n taskscheduler`。
+隔離這套系統，所有指令之後都加 `-n tasks`。
 
 ### Secret
 
@@ -51,7 +51,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: app-secrets
-  namespace: taskscheduler
+  namespace: tasks
 type: Opaque
 stringData:
   postgres-password: "MyPostgresP@ssw0rd"
@@ -61,7 +61,7 @@ stringData:
 
 ```
 指令：kubectl apply -f secret.yaml
-指令：kubectl get secret app-secrets -n taskscheduler
+指令：kubectl get secret app-secrets -n tasks
 ```
 
 `stringData` 填明文，K8s 幫你 base64 encode。這個 YAML 不要推進 git。
@@ -73,7 +73,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app-config
-  namespace: taskscheduler
+  namespace: tasks
 data:
   POSTGRES_HOST: "postgres-service"
   POSTGRES_PORT: "5432"
@@ -105,7 +105,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   serviceName: "postgres-service"
   replicas: 1
@@ -155,7 +155,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   selector:
     app: postgres
@@ -169,14 +169,14 @@ Headless Service 沒有虛擬 IP，DNS 直接回傳 Pod 真實 IP，讓你可以
 
 ```
 指令：kubectl apply -f postgres.yaml
-指令：kubectl get statefulset -n taskscheduler
-指令：kubectl get pvc -n taskscheduler
+指令：kubectl get statefulset -n tasks
+指令：kubectl get pvc -n tasks
 ```
 
 等 READY 1/1，PVC STATUS 是 Bound。
 
 ```
-指令：kubectl exec -it postgres-0 -n taskscheduler -- psql -U postgres -d taskdb
+指令：kubectl exec -it postgres-0 -n tasks -- psql -U postgres -d taskdb
 ```
 
 ### Redis（Deployment）
@@ -192,7 +192,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   replicas: 1
   selector:
@@ -220,7 +220,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis-service
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   selector:
     app: redis
@@ -243,8 +243,8 @@ Redis 用普通 ClusterIP Service，不需要 Headless。
 
 ```
 指令：kubectl apply -f redis.yaml
-指令：kubectl get pods -n taskscheduler
-指令：kubectl exec -it postgres-0 -n taskscheduler -- psql -U postgres -d taskdb
+指令：kubectl get pods -n tasks
+指令：kubectl exec -it postgres-0 -n tasks -- psql -U postgres -d taskdb
 ```
 
 ### Job — 一次性 DB Migration
@@ -258,7 +258,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: db-migrate
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   template:
     spec:
@@ -290,8 +290,8 @@ spec:
 
 ```
 指令：kubectl apply -f db-migrate-job.yaml
-指令：kubectl get job -n taskscheduler
-指令：kubectl logs job/db-migrate -n taskscheduler
+指令：kubectl get job -n tasks
+指令：kubectl logs job/db-migrate -n tasks
 ```
 
 等 COMPLETIONS 1/1。
@@ -303,13 +303,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: backend-sa
-  namespace: taskscheduler
+  namespace: tasks
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: backend-role
-  namespace: taskscheduler
+  namespace: tasks
 rules:
 - apiGroups: [""]
   resources: ["configmaps"]
@@ -319,11 +319,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: backend-rolebinding
-  namespace: taskscheduler
+  namespace: tasks
 subjects:
 - kind: ServiceAccount
   name: backend-sa
-  namespace: taskscheduler
+  namespace: tasks
 roleRef:
   kind: Role
   name: backend-role
@@ -341,7 +341,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   replicas: 2
   selector:
@@ -395,7 +395,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: backend-service
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   selector:
     app: backend
@@ -413,8 +413,8 @@ spec:
 
 ```
 指令：kubectl apply -f backend.yaml
-指令：kubectl get pods -n taskscheduler -l app=backend
-指令：kubectl port-forward service/backend-service 3000:3000 -n taskscheduler
+指令：kubectl get pods -n tasks -l app=backend
+指令：kubectl port-forward service/backend-service 3000:3000 -n tasks
 ```
 
 ### Frontend
@@ -424,7 +424,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   replicas: 2
   selector:
@@ -452,7 +452,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend-service
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   selector:
     app: frontend
@@ -465,11 +465,11 @@ spec:
 指令：kubectl apply -f frontend.yaml
 ```
 
-### Worker — 為什麼沒有 Service，為什麼不是 DaemonSet
+### Task Runner — 為什麼沒有 Service，為什麼不是 DaemonSet
 
 **為什麼沒有 Service？**
 
-Service 的作用是讓別人連進來。Worker 是主動去 Redis Queue 拉任務，沒有人要連到它。方向是反的，Worker 不需要 Service。
+Service 的作用是讓別人連進來。Task Runner 是主動去 Redis Queue 拉任務，沒有人要連到它。方向是反的，Task Runner 不需要 Service。
 
 **為什麼不是 DaemonSet？**
 
@@ -479,28 +479,28 @@ DaemonSet：保證每個 Node 上都跑一個 Pod。Node 數量決定 Pod 數量
 
 **判斷原則：跟 Node 數量綁定就用 DaemonSet，不綁定就用 Deployment。**
 
-Worker 消費 Redis Queue，跟 Node 數量無關。三個 Node 不代表要三個 Worker。叢集擴到 100 個 Node 不應該有 100 個 Worker。
+Task Runner 消費 Redis Queue，跟 Node 數量無關。三個 Node 不代表要三個 Task Runner。叢集擴到 100 個 Node 不應該有 100 個 Task Runner。
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: worker
-  namespace: taskscheduler
+  name: task-runner
+  namespace: tasks
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: worker
+      app: task-runner
   template:
     metadata:
       labels:
-        app: worker
+        app: task-runner
     spec:
       containers:
-      - name: worker
-        image: your-registry/task-worker:v1
-        command: ["node", "worker.js"]
+      - name: task-runner
+        image: your-registry/task-task-runner:v1
+        command: ["node", "task-runner.js"]
         envFrom:
         - configMapRef:
             name: app-config
@@ -524,10 +524,10 @@ spec:
             memory: "512Mi"
 ```
 
-三個副本同時從 Queue 拉任務，Redis 的 BLPOP 是原子操作，同一個任務只會被一個 Worker 拿走，不重複執行。
+三個副本同時從 Queue 拉任務，Redis 的 BLPOP 是原子操作，同一個任務只會被一個 Task Runner 拿走，不重複執行。
 
 ```
-指令：kubectl apply -f worker.yaml
+指令：kubectl apply -f task-runner.yaml
 ```
 
 ### CronJob
@@ -537,7 +537,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: task-scheduler
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   schedule: "* * * * *"
   concurrencyPolicy: Forbid
@@ -583,7 +583,7 @@ spec:
 
 ```
 指令：kubectl apply -f cronjob.yaml
-指令：kubectl get job -n taskscheduler
+指令：kubectl get job -n tasks
 ```
 
 等一分鐘，CronJob 自動建立 Job，COMPLETIONS 1/1。
@@ -597,7 +597,7 @@ apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: strip-api-prefix
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   stripPrefix:
     prefixes:
@@ -606,10 +606,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: taskscheduler-ingress
-  namespace: taskscheduler
+  name: tasks-ingress
+  namespace: tasks
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: taskscheduler-strip-api-prefix@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: tasks-strip-api-prefix@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
@@ -636,7 +636,7 @@ Middleware 把 /api 前綴剝掉，Backend 收到的是 /tasks 而不是 /api/ta
 
 ```
 指令：kubectl apply -f ingress.yaml
-指令：kubectl get ingress -n taskscheduler
+指令：kubectl get ingress -n tasks
 ```
 
 ### HPA
@@ -646,7 +646,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: backend-hpa
-  namespace: taskscheduler
+  namespace: tasks
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -665,18 +665,18 @@ spec:
 
 ```
 指令：kubectl apply -f hpa.yaml
-指令：kubectl get hpa -n taskscheduler
+指令：kubectl get hpa -n tasks
 ```
 
 ### 全系統驗收
 
 ```
-指令：kubectl get all -n taskscheduler
-指令：kubectl get pvc -n taskscheduler
-指令：kubectl get secret,configmap,serviceaccount,role,rolebinding -n taskscheduler
+指令：kubectl get all -n tasks
+指令：kubectl get pvc -n tasks
+指令：kubectl get secret,configmap,serviceaccount,role,rolebinding -n tasks
 ```
 
-StatefulSet postgres READY 1/1、Deployment redis/backend/frontend/worker 都 READY、CronJob 存在、PVC Bound。
+StatefulSet postgres READY 1/1、Deployment redis/backend/frontend/task-runner 都 READY、CronJob 存在、PVC Bound。
 
 ---
 
@@ -690,7 +690,7 @@ StatefulSet postgres READY 1/1、Deployment redis/backend/frontend/worker 都 RE
 
 > Q：Pod 一直 CrashLoopBackOff？
 
-`kubectl logs pod名稱 -n taskscheduler` 看最後幾行。常見三個原因：
+`kubectl logs pod名稱 -n tasks` 看最後幾行。常見三個原因：
 1. 資料庫還沒準備好就部署 Backend（順序要對，先等 postgres Running 跑完 migration）
 2. Secret 名稱拼錯（secretKeyRef.name 要完全對應）
 3. ConfigMap 的 key 打錯（configMapKeyRef.key 要完全一樣）
@@ -699,9 +699,9 @@ StatefulSet postgres READY 1/1、Deployment redis/backend/frontend/worker 都 RE
 
 Pod 沒設 resources.requests.cpu，或 metrics-server 剛啟動還在收集，等一分鐘。
 
-> Q：Worker 啟動但 Queue 裡的任務沒被消費？
+> Q：Task Runner 啟動但 Queue 裡的任務沒被消費？
 
-`kubectl logs -l app=worker -n taskscheduler` 看 log。最常見是 Redis 連線失敗，確認 redis-service 存在、Redis Pod Running、ConfigMap 和 Secret 的值正確。
+`kubectl logs -l app=task-runner -n tasks` 看 log。最常見是 Redis 連線失敗，確認 redis-service 存在、Redis Pod Running、ConfigMap 和 Secret 的值正確。
 
 **學員題目：短網址服務**
 

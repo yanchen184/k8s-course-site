@@ -272,7 +272,7 @@ spec:
       containers:
       - name: redis
         image: redis:7
-        command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)"]
+        command: ["/bin/sh", "-c", "redis-server --requirepass $REDIS_PASSWORD"]
         env:
         - name: REDIS_PASSWORD
           valueFrom:
@@ -697,21 +697,35 @@ Frontend 和 Backend 的 Service 都是 ClusterIP，外面連不進來。用 Ing
 
 為什麼是 Ingress 不是 NodePort？NodePort 的 Port 號在 30000 以上，地址醜、沒有域名、沒有 SSL、沒有路由功能。你有五個服務就要開五個 NodePort，管理起來是噩夢。Ingress 統一入口，一個 Ingress Controller 在叢集裡跑，所有對外流量都打它，它根據域名和路徑路由到不同的 Service。TLS、rewrite、IP 白名單全部集中在這裡處理。
 
+k3s 內建的 Ingress Controller 是 Traefik，不是 nginx。所以 ingressClassName 要寫 traefik，不是 nginx。
+
+Traefik 的 path strip 要用 Middleware 做。先建一個 Middleware 把 /api 前綴剝掉：
+
 ```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-api-prefix
+  namespace: taskscheduler
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: taskscheduler-ingress
   namespace: taskscheduler
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    traefik.ingress.kubernetes.io/router.middlewares: taskscheduler-strip-api-prefix@kubernetescrd
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   rules:
   - host: task.example.com
     http:
       paths:
-      - path: /api(/|$)(.*)
+      - path: /api
         pathType: Prefix
         backend:
           service:
@@ -727,7 +741,9 @@ spec:
               number: 80
 ```
 
-path rewrite 說明。使用者打 task.example.com/api/tasks。path pattern 是 /api(/|$)(.*) ，第二個括號 (.*) 捕捉到 tasks。rewrite-target 是 /$2，把路徑改成 /tasks 再轉發給 Backend。如果沒有 rewrite，Backend 收到的是 /api/tasks，但你的 API route 是 /tasks，就 404 了。
+path rewrite 說明。使用者打 task.example.com/api/tasks，Traefik 先比對 /api 這條規則，然後 Middleware strip-api-prefix 把 /api 剝掉，Backend 收到的是 /tasks。如果沒有 strip，Backend 收到的是 /api/tasks，你的 API route 是 /tasks，就 404 了。
+
+Middleware 的 annotation 格式是 namespace-middleware名稱@kubernetescrd，這是 Traefik CRD 的固定寫法，記住這個格式。
 
 指令：kubectl apply -f ingress.yaml
 

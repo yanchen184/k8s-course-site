@@ -96,40 +96,57 @@ roleRef:
 
 ```
 指令：kubectl apply -f rbac-viewer.yaml
+```
+
+你會看到三行輸出：`serviceaccount/viewer-sa created`、`role.rbac.authorization.k8s.io/pod-viewer created`、`rolebinding.rbac.authorization.k8s.io/viewer-binding created`。三個資源一次建好。
+
+```
 指令：kubectl get serviceaccount viewer-sa
+```
+
+確認 ServiceAccount 存在。
+
+```
 指令：kubectl get role pod-viewer
+```
+
+確認 Role 存在，CREATED AT 欄位顯示建立時間。
+
+```
 指令：kubectl get rolebinding viewer-binding
 ```
 
+確認 RoleBinding 存在，ROLE 欄位顯示綁定的是 `Role/pod-viewer`。
+
 **驗證：--as 旗標模擬身份**
 
-格式：`system:serviceaccount:namespace:名稱`
+`--as` 可以模擬用其他身份操作，不需要真的切換 kubeconfig。格式固定是 `system:serviceaccount:namespace:名稱`。
 
 ```
 指令：kubectl get pods --as=system:serviceaccount:default:viewer-sa
 ```
 
-成功，因為 pod-viewer 有 get 和 list 的權限。
+成功，可以看到 Pod 列表。因為 pod-viewer 的 verbs 有 get 和 list，這個操作被允許。
 
 ```
 指令：kubectl delete pod nginx-resource-demo-隨便一個hash --as=system:serviceaccount:default:viewer-sa
 ```
 
-Error from server (Forbidden)。Role 沒有 delete 這個 verb。
+`nginx-resource-demo-隨便一個hash` 換成你實際的 Pod 名稱（從上面 get pods 的輸出複製）。你會看到 `Error from server (Forbidden): pods "..." is forbidden: User "system:serviceaccount:default:viewer-sa" cannot delete resource "pods"`。被拒了，因為 Role 的 verbs 只有 get、list、watch，沒有 delete。
 
-**快速確認**
+**快速確認權限**
 
 ```
 指令：kubectl auth can-i get pods --as=system:serviceaccount:default:viewer-sa
 ```
 
-回傳 yes。
+回傳 `yes`，代表這個身份有 get pods 的權限。
 
 ```
 指令：kubectl auth can-i delete pods --as=system:serviceaccount:default:viewer-sa
 ```
 
-回傳 no。
+回傳 `no`，代表這個身份沒有 delete pods 的權限。`auth can-i` 是快速確認某個身份有沒有某個操作的權限，不用真的去執行那個操作。
 
 **QA**
 

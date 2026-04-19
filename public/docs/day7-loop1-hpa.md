@@ -2,6 +2,41 @@
 
 ---
 
+## 環境準備（上課前先清理叢集）
+
+上課前確認叢集是乾淨的，把前幾堂練習留下的資源全部清掉：
+
+```
+指令：helm uninstall monitoring -n default
+指令：helm uninstall my-app -n default
+指令：helm uninstall my-blog -n default
+指令：helm uninstall my-ingress -n default
+```
+
+如果還有其他 Deployment 或 StatefulSet 殘留：
+
+```
+指令：kubectl delete all --all -n default
+指令：kubectl delete pvc --all -n default
+```
+
+清理 journal log 釋放磁碟空間：
+
+```
+指令：sudo journalctl --vacuum-size=100M
+```
+
+確認環境乾淨：
+
+```
+指令：kubectl get pods -n default
+指令：df -h /
+```
+
+pods 列表應該是空的（或只剩本次要用的），磁碟空間至少 3G 以上才夠拉 image。
+
+---
+
 ## 7-1 第六堂回顧 + 今天的挑戰
 
 好，歡迎回來。今天是我們 Kubernetes 課程的第七堂，也是最後一堂。在開始新的內容之前，先花幾分鐘把第六堂的因果鏈快速串一遍。

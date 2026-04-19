@@ -28,26 +28,27 @@ HPA，Horizontal Pod Autoscaler，每 15 秒去問 metrics-server：現在每個
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: backend-hpa
+  name: nginx-resource-demo
 spec:
-  scaleTargetRef:
+  scaleTargetRef:              # ★ 重點 1：告訴 HPA 要管哪個 Deployment
     apiVersion: apps/v1
     kind: Deployment
-    name: backend
-  minReplicas: 2
-  maxReplicas: 10
+    name: nginx-resource-demo  # ← 對應 Deployment 的 name
+  minReplicas: 2               # ★ 重點 2：最少保持 2 個 Pod（基本高可用）
+  maxReplicas: 10              # ★ 重點 3：最多擴到 10 個，超過不再擴
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 50
+        averageUtilization: 50 # ★ 重點 4：CPU 超過 requests 的 50% 就擴容
 ```
 
-- `scaleTargetRef`：告訴 HPA 要擴縮哪個 Deployment
-- `minReplicas` / `maxReplicas`：最少 / 最多幾個 Pod
-- `averageUtilization: 50`：平均 CPU 超過 requests 的 50% 就擴容
+- **`scaleTargetRef`**：告訴 HPA 要擴縮哪個 Deployment，name 要跟 Deployment 的 metadata.name 完全一致
+- **`minReplicas: 2`**：就算沒有流量，也至少保持 2 個 Pod。設 1 的話縮容後只剩 1 個，那個 Pod 掛掉就服務中斷
+- **`maxReplicas: 10`**：防止流量暴增時無限擴容把 Node 資源吃光，要根據 Node 總資源設上限
+- **`averageUtilization: 50`**：50% 是相對於 requests 的比例。Pod requests 設 100m，50% 就是 50m，現在平均用超過 50m 就擴容
 
 **前提：Pod 必須設 resources.requests**
 
@@ -76,19 +77,66 @@ k3s 內建，minikube 用 `minikube addons enable metrics-server` 啟用。
 指令：kubectl apply -f nginx-resource-demo.yaml
 ```
 
-這個 YAML 同時包含 Deployment 和 Service，一次建好。重點是 Deployment 有設 `resources.requests`，cpu 100m、memory 128Mi。這是 HPA 的前提，沒有 requests，HPA 算不出 CPU 百分比，TARGETS 一直顯示 unknown。
+這個 YAML 同時包含 Deployment 和 Service，一次建好。完整內容如下：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-resource-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-resource
+  template:
+    metadata:
+      labels:
+        app: nginx-resource
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:          # ★ 重點 1：一定要設，HPA 才能運作
+            requests:
+              cpu: "100m"     # ★ 重點 2：HPA 的分母，50% = 50m
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-resource-svc
+spec:
+  selector:
+    app: nginx-resource
+  ports:
+    - port: 80
+      targetPort: 80
+  # type 預設 ClusterIP，不用明確寫，叢集內部可連
+```
+
+**重點介紹**
+
+- **`resources.requests.cpu: "100m"`**：這是 HPA 的分母。HPA 看的是「現在用了多少 / requests 是多少」，算出百分比。沒設 requests，分母是零，算不出來，TARGETS 永遠顯示 `unknown`。
+- **`resources.limits`**：Pod 最多能用多少資源。Limit 比 Request 高，讓 Pod 有彈性空間，但不至於把 Node 吃乾。
+- **Service 名稱 `nginx-resource-svc`**：後面壓測指令 `wget -qO- http://nginx-resource-svc` 就是打這個名字，K8s DNS 自動解析。
 
 ```
 指令：kubectl get deploy nginx-resource-demo
 ```
 
-確認 Deployment 存在，READY 欄位會顯示幾個 Pod 已經 Running。
+確認 Deployment 存在，READY 欄位顯示幾個 Pod 已經 Running（應該是 2/2）。
 
 ```
 指令：kubectl get svc nginx-resource-svc
 ```
 
-確認 Service 存在，TYPE 是 ClusterIP，後面壓測指令要打這個 Service 名稱。
+確認 Service 存在，TYPE 是 ClusterIP，CLUSTER-IP 有分配到 IP 就代表 DNS 可以解析。
 
 **Step 3：建 HPA**
 

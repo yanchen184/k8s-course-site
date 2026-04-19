@@ -74,51 +74,71 @@ k3s 內建，minikube 用 `minikube addons enable metrics-server` 啟用。
 
 ```
 指令：kubectl apply -f nginx-resource-demo.yaml
+```
+
+這個 YAML 同時包含 Deployment 和 Service，一次建好。重點是 Deployment 有設 `resources.requests`，cpu 100m、memory 128Mi。這是 HPA 的前提，沒有 requests，HPA 算不出 CPU 百分比，TARGETS 一直顯示 unknown。
+
+```
 指令：kubectl get deploy nginx-resource-demo
+```
+
+確認 Deployment 存在，READY 欄位會顯示幾個 Pod 已經 Running。
+
+```
 指令：kubectl get svc nginx-resource-svc
 ```
 
-nginx-resource-demo.yaml 的重點：
-
-```yaml
-resources:
-  requests:
-    cpu: "100m"
-    memory: 128Mi
-  limits:
-    cpu: "500m"
-    memory: 256Mi
-```
+確認 Service 存在，TYPE 是 ClusterIP，後面壓測指令要打這個 Service 名稱。
 
 **Step 3：建 HPA**
 
 ```
 指令：kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu=50%
+```
+
+這一行指令等於手動寫 HPA YAML。`--min=2` 是最少保持 2 個 Pod，`--max=10` 是最多擴到 10 個，`--cpu=50%` 是 CPU 使用率超過 requests 的 50% 就擴容。
+
+```
 指令：kubectl get hpa
 ```
 
-剛建好 TARGETS 顯示 `unknown/50%`，等 30 秒到 1 分鐘會變成數字。
+看 TARGETS 欄位。剛建好會顯示 `unknown/50%`，等 30 秒到 1 分鐘讓 metrics-server 收集數據，就會變成實際數字，比如 `1%/50%`。
 
 **Step 4：壓測**
+
+開另一個終端機，跑這個指令：
 
 ```
 指令：kubectl run load-test --image=busybox:1.36 --rm -it --restart=Never -- sh -c "while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; done"
 ```
 
+這個指令建了一個 busybox Pod，在裡面跑無限迴圈，一直對 nginx-resource-svc 發請求。`--rm` 是結束後自動刪掉這個 Pod，`-it` 是互動模式讓你可以按 Ctrl+C 停止。每秒幾十到上百次請求，模擬流量暴增。
+
 **Step 5：觀察**
+
+回到原本的終端機：
 
 ```
 指令：kubectl get hpa -w
+```
+
+`-w` 是 watch 模式，有變化就自動更新，不用一直手動輸入。你會看到 TARGETS 的 CPU 使用率慢慢上升，超過 50% 之後 REPLICAS 開始增加，2 變 3、3 變 4。
+
+```
 指令：kubectl get pods -w
 ```
 
-CPU 超過 50% 後 REPLICAS 開始增加。停止壓測後等 5 分鐘，REPLICAS 縮回 2。
+同時看 Pod 的狀態，新的 Pod 一個一個冒出來：Pending → ContainerCreating → Running。這就是 HPA 在自動加 Pod。
+
+壓測跑兩三分鐘感受擴容過程，然後回到壓測終端機按 Ctrl+C 停止。
+
+停止之後 CPU 降到接近 0%，但 REPLICAS 不會馬上縮。等 5 分鐘冷卻期過了，REPLICAS 才開始減少，最終回到 2。
 
 ```
 指令：kubectl describe hpa nginx-resource-demo
 ```
 
-Events 裡看到 `New size: 3; reason: cpu resource utilization above target` 和 `New size: 2; reason: All metrics below target`。
+找 Events 部分，你會看到 `New size: 3; reason: cpu resource utilization above target`，然後 `New size: 2; reason: All metrics below target`。完整的擴縮記錄都在這裡，生產環境排查 HPA 問題就靠這個。
 
 **QA**
 

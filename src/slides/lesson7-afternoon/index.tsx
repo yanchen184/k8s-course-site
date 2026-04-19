@@ -11,947 +11,6 @@ export interface Slide {
 }
 
 export const slides: Slide[] = [
-  // ============================================================
-  // Loop 4：RBAC（7-11, 7-12, 7-13）
-  // ============================================================
-
-  // ── 7-11 概念（1/2）：誰都能刪 Pod ──
-  {
-    title: '誰都能刪 Pod？',
-    subtitle: '實習生 kubectl delete namespace production',
-    section: 'Loop 4：RBAC',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">恐怖故事</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <p>十個開發者，全拿 <code className="text-red-400">cluster-admin</code> 的 kubeconfig</p>
-            <p>某天有人跑清理腳本：</p>
-            <div className="bg-slate-900 p-2 rounded font-mono text-red-400 text-xs">
-              kubectl delete namespace production
-            </div>
-            <p>Deployment、Pod、Service、Secret、PVC → <span className="text-red-400 font-bold">全部瞬間消失</span></p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Docker vs K8s</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>Docker → 沒有內建權限控制，連到 Socket 就等於 root</p>
-            <p>K8s → <span className="text-cyan-400 font-bold">RBAC</span>（Role-Based Access Control）</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">RBAC 核心邏輯</p>
-          <div className="flex items-center justify-center gap-2 text-sm">
-            <span className="bg-blue-900/40 border border-blue-500/50 px-3 py-1 rounded text-blue-400">誰 Subject</span>
-            <span className="text-slate-400 font-bold">+</span>
-            <span className="bg-green-900/40 border border-green-500/50 px-3 py-1 rounded text-green-400">能做什麼 Role</span>
-            <span className="text-slate-400 font-bold">=</span>
-            <span className="bg-amber-900/40 border border-amber-500/50 px-3 py-1 rounded text-amber-400">綁定 Binding</span>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `好，大家午休回來了。我們接著上午的因果鏈繼續往下走。
-
-上午我們解決了三個問題。第一個，Pod Running 但服務卡死，用 Probe 解決。第二個，一個 Pod 吃光整台機器資源，用 Resource limits 解決。第三個，流量暴增手動 scale 來不及，用 HPA 解決。三條因果鏈串下來，你的服務已經具備了健康檢查、資源隔離、自動彈性擴縮的能力。
-
-但我在上午結尾的時候提了一個問題，不知道大家還記不記得。你的叢集上有十個開發者，每個人都拿到了 admin 權限的 kubeconfig。某天有個人在跑清理腳本的時候，不小心打了 kubectl delete namespace production。猜猜怎麼了？production Namespace 底下的所有東西，Deployment、Pod、Service、Secret、PVC，全部瞬間消失。整個生產環境掛掉。
-
-這不是我編的。這種事在業界真的發生過。2017 年 GitLab 就出過一次大事故，工程師在操作資料庫的時候誤刪了生產環境的資料，導致服務中斷了好幾個小時。雖然那次不是 K8s 的問題，但道理是一樣的：不該有那麼大權限的人拿到了那麼大的權限。
-
-我們來想想，現在你的叢集是什麼狀態。你用 k3s 或 minikube 建的叢集，所有人用同一個 kubeconfig，所有人都是 cluster-admin。cluster-admin 是什麼？就是上帝權限，什麼都能做。建、改、刪，所有 Namespace、所有資源，通通可以。
-
-Docker 有沒有這個問題？Docker 更糟。Docker 根本沒有內建的權限控制。只要你能連到 Docker Socket，你就等於 root。所有容器你都能停、都能刪、都能進去看。K8s 至少提供了一套完整的權限控制機制，叫做 RBAC。
-
-RBAC，全名 Role-Based Access Control，中文叫基於角色的存取控制。它的核心邏輯只有一句話：誰加上能做什麼等於綁定。用更具體的方式說就是三個元素。第一個是 Subject，就是「誰」，可以是一個使用者 User、一個群組 Group、或者一個 ServiceAccount。第二個是 Role，就是「能做什麼」，定義了允許的操作清單。第三個是 Binding，把 Role 綁到 Subject 身上。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-11 概念（2/2）：四個物件 + ServiceAccount ──
-  {
-    title: 'RBAC 四個物件',
-    subtitle: '門禁卡比喻：Role = 門禁卡，Binding = 發卡',
-    section: 'Loop 4：RBAC',
-    duration: '7',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-cyan-400 border-b border-slate-600">
-                <th className="text-left py-1 pr-2">物件</th>
-                <th className="text-left py-1 pr-2">作用範圍</th>
-                <th className="text-left py-1">職責</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-2 font-mono text-green-400 text-xs">Role</td>
-                <td className="py-1 pr-2">單一 Namespace</td>
-                <td className="py-1">定義能對什麼資源做什麼動作</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-2 font-mono text-green-400 text-xs">ClusterRole</td>
-                <td className="py-1 pr-2">整個叢集</td>
-                <td className="py-1">同上，但跨 Namespace</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-2 font-mono text-amber-400 text-xs">RoleBinding</td>
-                <td className="py-1 pr-2">單一 Namespace</td>
-                <td className="py-1">把 Role 綁到某人身上</td>
-              </tr>
-              <tr>
-                <td className="py-1 pr-2 font-mono text-amber-400 text-xs">ClusterRoleBinding</td>
-                <td className="py-1 pr-2">整個叢集</td>
-                <td className="py-1">把 ClusterRole 綁到某人身上</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">ServiceAccount：Pod 的身份</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>User / Group → 給<span className="text-blue-400">人</span>用</p>
-            <p>ServiceAccount → 給<span className="text-green-400">程式（Pod）</span>用</p>
-            <p className="text-slate-400 text-xs mt-2">每個 Namespace 預設有 default SA；生產環境建議每個應用建自己的 SA → 最小權限原則</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">常見 RBAC 設計</p>
-          <div className="text-xs text-slate-300 space-y-1">
-            <p>開發人員 → dev/staging 完整權限，prod <span className="text-amber-400">只讀</span></p>
-            <p>SRE/DevOps → 所有 Namespace 完整權限</p>
-            <p>實習生 → dev 只讀，staging/prod <span className="text-red-400">不可碰</span></p>
-            <p>部署 → 交給 CI/CD（ArgoCD）</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `RBAC 一共有四個物件。Role 和 ClusterRole 負責定義「能做什麼」，差別是作用範圍。Role 只在一個 Namespace 裡面有效。比如你建了一個 Role 叫 pod-viewer，放在 default Namespace，那這個 Role 只能控制 default Namespace 裡的資源。ClusterRole 是整個叢集有效的，不限 Namespace。
-
-RoleBinding 和 ClusterRoleBinding 負責「把權限給誰」，差別也是作用範圍。RoleBinding 只在一個 Namespace 裡面有效，ClusterRoleBinding 是整個叢集。
-
-我用公司門禁卡來比喻。Role 就像一張門禁卡，上面寫著「可以進出 3 樓研發部」。ClusterRole 就像萬能卡，所有樓層都能進出。RoleBinding 就是把門禁卡發給某個員工。ClusterRoleBinding 就是把萬能卡發給某個員工。你不會把萬能卡發給每個新來的實習生，對吧？但我們現在的叢集就是在做這件事。
-
-好，再講一個重要的概念叫 ServiceAccount。剛才說的 User 和 Group 是給人用的。但 Pod 也需要跟 K8s API Server 溝通。比如有些監控工具需要列出所有 Pod 的狀態，有些自動化工具需要建立或刪除資源。Pod 不是人，它的身份用的就是 ServiceAccount。
-
-每個 Namespace 預設都有一個叫 default 的 ServiceAccount。如果你建 Pod 的時候不指定 ServiceAccount，Pod 就會自動使用 default。在生產環境裡，建議每個應用建自己的 ServiceAccount，然後用 RBAC 給它需要的最小權限。這叫最小權限原則。
-
-來看 Role 的 YAML 怎麼寫。kind 是 Role，metadata 裡面指定名字叫 pod-viewer，namespace 是 default。rules 是重點，它定義了允許的操作。apiGroups 設空字串，代表 core API group，就是 Pod、Service、ConfigMap 這些最基礎的資源。resources 設 pods 和 services，代表能操作 Pod 和 Service。verbs 設 get、list、watch，代表能查看單個、列出全部、即時監控。注意，沒有 create、update、delete、patch 這些動詞。所以這是一個純粹只讀的 Role，能看不能改。
-
-ServiceAccount 的 YAML 非常簡單，就是 kind 是 ServiceAccount，給個名字 viewer-sa，指定 namespace。
-
-RoleBinding 稍微複雜一點，但邏輯很清楚。subjects 指定「綁給誰」，這裡綁給 ServiceAccount viewer-sa。roleRef 指定「綁哪個 Role」，這裡綁 pod-viewer。apiGroup 要寫 rbac.authorization.k8s.io，這是固定寫法。
-
-三個 YAML 組合在一起，就完成了一件事：viewer-sa 這個 ServiceAccount 擁有 pod-viewer 這個 Role 的權限，也就是在 default Namespace 裡面可以 get、list、watch Pod 和 Service。僅此而已，其他什麼都不能做。
-
-常見的 RBAC 設計方案是這樣的。開發人員在 dev Namespace 有完整權限，在 staging 有完整權限，在 prod 只有只讀。SRE 或 DevOps 在所有 Namespace 都有完整權限。實習生只能在 dev 看看，staging 和 prod 碰都不能碰。真正的部署操作交給 CI/CD Pipeline，比如 ArgoCD。這樣就算有人手滑，損害也限制在可控範圍內。
-
-好，概念講完了。接下來我們實際建一個只讀使用者，然後驗證它真的不能刪東西。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-12 實作（1/2）：RBAC YAML + 操作 ──
-  {
-    title: 'RBAC 實作：只讀使用者',
-    subtitle: 'ServiceAccount + Role + RoleBinding',
-    section: 'Loop 4：RBAC',
-    duration: '6',
-    content: (
-      <div className="space-y-3">
-        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm mb-1">① Role — 定義能做什麼</p>
-          <div className="text-xs text-slate-300 space-y-0.5">
-            <p><span className="text-slate-400">resources:</span> <code className="text-amber-400">pods, services</code></p>
-            <p><span className="text-slate-400">verbs:</span> <code className="text-green-400">get, list, watch</code>（只讀，無 delete/create）</p>
-          </div>
-        </div>
-        <div className="bg-blue-900/20 border border-blue-500/40 p-3 rounded-lg">
-          <p className="text-blue-400 font-semibold text-sm mb-1">② ServiceAccount — Pod 的身份</p>
-          <div className="text-xs text-slate-300">
-            <p><span className="text-slate-400">name:</span> <code className="text-blue-400">viewer-sa</code>　namespace: default</p>
-          </div>
-        </div>
-        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded-lg">
-          <p className="text-amber-400 font-semibold text-sm mb-1">③ RoleBinding — 把 Role 給 SA</p>
-          <div className="text-xs text-slate-300">
-            <p><span className="text-slate-400">subjects:</span> <code className="text-blue-400">viewer-sa</code>　→　<span className="text-slate-400">roleRef:</span> <code className="text-green-400">pod-viewer</code></p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center gap-2 text-xs mt-1">
-          <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">viewer-sa</span>
-          <span className="text-amber-400 font-bold">→ RoleBinding →</span>
-          <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">pod-viewer Role</span>
-          <span className="text-slate-400 font-bold">=</span>
-          <span className="text-slate-300">只能讀 Pod/Service</span>
-        </div>
-      </div>
-    ),
-    code: `# Role — 只讀：get / list / watch
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: pod-viewer
-  namespace: default
-rules:
-  - apiGroups: [""]
-    resources: ["pods", "services"]
-    verbs: ["get", "list", "watch"]
----
-# ServiceAccount
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: viewer-sa
-  namespace: default
----
-# RoleBinding — 把 Role 綁到 SA
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: viewer-binding
-  namespace: default
-subjects:
-  - kind: ServiceAccount
-    name: viewer-sa
-    namespace: default
-roleRef:
-  kind: Role
-  name: pod-viewer
-  apiGroup: rbac.authorization.k8s.io`,
-    notes: `好，來動手做。我們要建三個資源：一個 ServiceAccount、一個 Role、一個 RoleBinding。把它們組合起來，做出一個只能看不能改的使用者。
-
-先部署。rbac-viewer.yaml 這個檔案裡面包含了剛才講的三個 YAML，用三個橫線分隔開。
-
-kubectl apply -f rbac-viewer.yaml
-
-你會看到三行輸出。serviceaccount/viewer-sa created。role.rbac.authorization.k8s.io/pod-viewer created。rolebinding.rbac.authorization.k8s.io/viewer-binding created。三個都建好了。
-
-確認一下。kubectl get serviceaccount viewer-sa 看到了，AGE 是幾秒。kubectl get role pod-viewer 看到了。kubectl get rolebinding viewer-binding 也看到了。三個資源都在。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-12 實作（2/2）：--as 測試驗證 ──
-  {
-    title: 'RBAC 驗證：--as 模擬身份',
-    subtitle: 'get 成功 ✓　delete 被拒 ✗',
-    section: 'Loop 4：RBAC',
-    duration: '6',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">✓ 查看成功</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl get pods --as=system:serviceaccount:default:viewer-sa</p>
-            <pre className="text-green-400 whitespace-pre-wrap">{`NAME        READY  STATUS   RESTARTS
-nginx-xxx   1/1    Running  0`}</pre>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">✗ 刪除被拒</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl delete pod nginx-xxx --as=system:serviceaccount:default:viewer-sa</p>
-            <p className="text-red-400">Error from server (Forbidden): pods "nginx-xxx" is forbidden:</p>
-            <p className="text-red-400">User cannot delete resource "pods" in namespace "default"</p>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">✗ 建立被拒</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa</p>
-            <p className="text-red-400">Error from server (Forbidden): cannot create resource "pods"</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg text-sm text-slate-300">
-          <p>不加 <code className="text-cyan-400">--as</code> → 用預設 admin 身份 → 什麼都能做</p>
-          <p className="mt-1 text-slate-400">企業：開發人員綁只讀 Role、CI/CD 綁部署 Role、只有 SRE 拿完整權限</p>
-        </div>
-      </div>
-    ),
-    notes: `好，現在來測試。K8s 提供了一個非常好用的旗標叫 --as，可以模擬用其他身份來操作。格式是 system:serviceaccount: 加上 namespace 加上冒號加上名字。
-
-先試用 viewer-sa 的身份查看 Pod。
-
-kubectl get pods --as=system:serviceaccount:default:viewer-sa
-
-大家看，成功了。你可以看到 Pod 的列表。因為 pod-viewer 這個 Role 有 get 和 list 的權限。
-
-好，現在試刪除。隨便找一個 Pod 的名字。
-
-kubectl delete pod nginx-resource-demo-隨便一個hash --as=system:serviceaccount:default:viewer-sa
-
-大家猜結果是什麼？
-
-看，Error from server (Forbidden)。完整的錯誤訊息是 pods 某某某 is forbidden: User "system:serviceaccount:default:viewer-sa" cannot delete resource "pods" in API group "" in the namespace "default"。被拒絕了。因為我們的 Role 沒有 delete 這個 verb。K8s 很精確地告訴你：你沒有刪除 Pod 的權限。
-
-再試建立一個新的 Pod。
-
-kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa
-
-一樣被拒。cannot create resource "pods"。沒有 create 權限。
-
-那如果我們不加 --as 呢？那就是用你預設的 admin 身份。kubectl get pods 正常。kubectl run test-admin --image=nginx 成功建立了。因為你的 admin 有所有權限。kubectl delete pod test-admin 成功刪除。
-
-看到差別了吧。同一個叢集，同一個 Namespace，但不同的身份有不同的權限。viewer-sa 只能看，admin 什麼都能做。這就是 RBAC 的威力。
-
-在企業環境裡，你不會讓每個人都用 admin。你會根據角色建不同的 ServiceAccount 或 User，綁定不同的 Role。開發人員綁只讀的 Role，CI/CD 綁有部署權限的 Role，只有 SRE 才拿完整權限。
-
-好，接下來是大家的實作時間。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-12 學員實作 ──
-  {
-    title: '學員實作：RBAC',
-    subtitle: '⏱ 巡堂確認',
-    section: 'Loop 4：RBAC',
-    duration: '10',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">必做</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>1. 建 ServiceAccount + Role + RoleBinding</p>
-            <p>2. <code className="text-cyan-400 text-xs">kubectl get pods --as=system:serviceaccount:default:viewer-sa</code> → 成功</p>
-            <p>3. <code className="text-cyan-400 text-xs">kubectl delete pod xxx --as=system:serviceaccount:default:viewer-sa</code> → Forbidden</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">挑戰</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>寫一個新 Role：</p>
-            <p>- 允許 get / list / create / update / delete <code className="text-green-400">deployments</code></p>
-            <p>- 不能碰 <code className="text-red-400">secrets</code></p>
-            <p>- 提示：rules 可以寫多條，每條指定不同 resources 和 verbs</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">巡堂檢查清單</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>□ kubectl get role pod-viewer → 存在</p>
-            <p>□ kubectl get rolebinding viewer-binding → 存在</p>
-            <p>□ --as get pods → 成功</p>
-            <p>□ --as delete pod → Forbidden</p>
-          </div>
-        </div>
-      </div>
-    ),
-    code: `# 驗收指令（做完每步後確認）
-
-# Step 1 後：確認三個資源都建好
-kubectl get serviceaccount viewer-sa
-kubectl get role pod-viewer
-kubectl get rolebinding viewer-binding
-
-# Step 2：模擬 viewer-sa 查看 Pod（應該成功）
-kubectl get pods --as=system:serviceaccount:default:viewer-sa
-
-# Step 3：模擬 viewer-sa 刪除 Pod（應該 Forbidden）
-kubectl delete pod <任意pod名> --as=system:serviceaccount:default:viewer-sa
-
-# 快速確認權限（yes = 有，no = 沒有）
-kubectl auth can-i get pods --as=system:serviceaccount:default:viewer-sa
-kubectl auth can-i delete pods --as=system:serviceaccount:default:viewer-sa`,
-    notes: `必做題是跟著我剛才的步驟做一遍。建 ServiceAccount、Role、RoleBinding，然後用 --as 測試。確認 get pods 成功，delete pod 被拒。
-
-挑戰題是自己寫一個新的 Role，允許 get、list、create、update、delete deployments，但不能碰 secrets。然後建一個新的 ServiceAccount 綁上去，用 --as 測試能操作 Deployment 但不能讀 Secret。提示：resources 那個欄位可以寫多條 rule，每條 rule 指定不同的 resources 和 verbs。
-
-大家動手做，有問題舉手。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-13 回頭操作：RBAC ──
-  {
-    title: '回頭操作：RBAC 常見坑',
-    subtitle: 'Loop 4 小結',
-    section: 'Loop 4：RBAC',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">常見坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">1.</span>
-              <div>
-                <p><code className="text-xs text-red-400">--as</code> 格式寫錯</p>
-                <p className="text-xs text-slate-400">✗ --as=viewer-sa | ✓ --as=system:serviceaccount:default:viewer-sa</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">2.</span>
-              <div>
-                <p>Role 和 SA 不在同一個 Namespace</p>
-                <p className="text-xs text-slate-400">Role 在 default、SA 在 dev → dev 裡毫無權限</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">3.</span>
-              <div>
-                <p>roleRef 的 kind / name / apiGroup 寫錯</p>
-                <p className="text-xs text-slate-400">apiGroup 固定 rbac.authorization.k8s.io</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">Loop 4 因果鏈</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>上午：Probe 管健康 → Resource 管資源 → HPA 管容量</p>
-            <p>→ 都是管「<span className="text-cyan-400">服務</span>」的</p>
-            <p className="text-green-400 font-bold mt-2">下午 Loop 4：RBAC 管「人」→ 誰能看、誰能改、誰能刪</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm text-amber-300">
-          <p>下一個問題：人管住了，但 Pod 之間呢？</p>
-          <p>所有 Pod 預設全通 → 前端被入侵 → 攻擊者直通 DB</p>
-        </div>
-      </div>
-    ),
-    notes: `好，回頭確認一下大家的 RBAC 做到了。
-
-kubectl get role pod-viewer 看一下。有沒有？kubectl get rolebinding viewer-binding 有沒有？
-
-然後最重要的測試，用 --as 模擬。
-
-kubectl get pods --as=system:serviceaccount:default:viewer-sa
-
-這行能看到 Pod 列表嗎？能。好。
-
-kubectl delete pod 隨便一個名字 --as=system:serviceaccount:default:viewer-sa
-
-有被拒絕嗎？看到 Forbidden 了嗎？看到了。好，RBAC 就做對了。
-
-來看幾個常見的坑。
-
-第一個坑，--as 的格式寫錯。最常見的錯誤是忘了前面的 system:serviceaccount: 前綴。你不能直接寫 --as=viewer-sa，要寫完整的 system:serviceaccount:default:viewer-sa。冒號分隔，namespace 是 default。如果你的 ServiceAccount 在其他 Namespace，記得把 default 換成對應的 Namespace 名字。
-
-第二個坑，Role 和 ServiceAccount 不在同一個 Namespace。比如 Role 建在 default，ServiceAccount 建在 dev，RoleBinding 也在 default。結果在 dev 裡面這個 ServiceAccount 一點權限都沒有。Role、RoleBinding、和 ServiceAccount 的 Namespace 要配對。
-
-第三個坑，RoleBinding 的 roleRef 寫錯。roleRef 裡面的 kind 要寫 Role 不是 ClusterRole，name 要跟你的 Role 名字完全一樣，apiGroup 固定是 rbac.authorization.k8s.io。如果你用 ClusterRole 搭配 RoleBinding，kind 就要寫 ClusterRole。
-
-好，Loop 4 結束。我們用一句話串一下因果鏈。上午的最後，Probe 確保服務健康、Resource limits 確保資源公平、HPA 確保容量彈性。但這三個都是管「服務」的。下午第一個 Loop，RBAC 開始管「人」。誰能看、誰能改、誰能刪，權限分明。
-
-那下一個問題是什麼？人管住了，但 Pod 之間呢？你的叢集裡面，所有 Pod 預設是全部互通的。前端 Pod 可以直接連資料庫。如果前端被入侵了，攻擊者可以橫向移動到資料庫。這就是下一個 Loop 要解決的問題。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-13 學員實作解答：RBAC ──
-  {
-    title: '解答：只讀 Role + ServiceAccount + RoleBinding',
-    subtitle: 'Loop 4 完成',
-    section: 'Loop 4：RBAC',
-    duration: '3',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做解答：YAML 關鍵片段</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># Role：只讀，沒有 delete</p>
-            <p>rules:</p>
-            <p>{'- '}apiGroups: [""]</p>
-            <p>{'  '}resources: ["pods"]</p>
-            <p className="text-green-400">{'  '}verbs: ["get", "list", "watch"]{'  '}# 沒有 delete！</p>
-            <p className="text-slate-500 mt-1"># ServiceAccount + RoleBinding 也要建</p>
-            <p>subjects:</p>
-            <p>{'- '}kind: ServiceAccount</p>
-            <p>{'  '}name: viewer-sa</p>
-            <p>{'  '}namespace: default</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 成功（有 get 權限）</p>
-            <p>kubectl --as=system:serviceaccount:default:viewer-sa get pods</p>
-            <p className="text-slate-500 mt-1"># 失敗（沒有 delete 權限）→ Forbidden</p>
-            <p>kubectl --as=system:serviceaccount:default:viewer-sa delete pod {'<任意 pod 名>'}</p>
-            <p className="text-slate-500 mt-1"># 清理</p>
-            <p>kubectl delete sa viewer-sa</p>
-            <p>kubectl delete role pod-viewer</p>
-            <p>kubectl delete rolebinding viewer-binding</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">預期結果</p>
-          <p className="text-xs text-slate-300 mt-1">get pods 成功列出 Pod；delete pod 回傳 Forbidden（403）</p>
-        </div>
-      </div>
-    ),
-    notes: `來看解答。
-
-RBAC 的核心是 verbs。這個 Role 只給了 get、list、watch，沒有 delete。有了 delete 才能刪，沒有就被拒。
-
-驗證方式是用 --as 模擬 ServiceAccount 的身份。格式一定要是 system:serviceaccount:namespace:名稱，不能省略前綴。get pods 應該成功，delete pod 應該看到 Error from server (Forbidden)。
-
-如果 get pods 也失敗，最常見的原因是 RoleBinding 的 subjects 裡面 namespace 寫錯，或者 roleRef 的 name 跟 Role 名字不匹配。
-
-清理三個資源：kubectl delete sa viewer-sa、delete role pod-viewer、delete rolebinding viewer-binding。 [▶ 下一頁]`,
-  },
-
-  // ============================================================
-  // Loop 5：NetworkPolicy（7-14, 7-15, 7-16）
-  // ============================================================
-
-  // ── 7-14 概念（1/2）：全通不安全 ──
-  {
-    title: '叢集內全通不安全',
-    subtitle: 'K8s 預設：所有 Pod 互通 → 橫向移動攻擊',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">問題：預設全通</p>
-          <div className="bg-slate-900/60 border border-slate-700 p-3 rounded-lg mt-2">
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              <div className="border-2 border-blue-500/70 rounded-lg p-2 bg-blue-900/20 text-center min-w-[80px]">
-                <p className="text-blue-400 text-sm font-bold">Frontend</p>
-              </div>
-              <span className="text-green-400 font-bold">→</span>
-              <div className="border-2 border-cyan-500/70 rounded-lg p-2 bg-cyan-900/20 text-center min-w-[80px]">
-                <p className="text-cyan-400 text-sm font-bold">API</p>
-              </div>
-              <span className="text-green-400 font-bold">→</span>
-              <div className="border-2 border-amber-500/70 rounded-lg p-2 bg-amber-900/20 text-center min-w-[80px]">
-                <p className="text-amber-400 text-sm font-bold">DB</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-center mt-2 gap-2">
-              <span className="text-blue-400 text-xs">Frontend</span>
-              <span className="text-red-400 font-bold text-sm">── 也能直連 ──→</span>
-              <span className="text-amber-400 text-xs">DB</span>
-              <span className="text-red-400 text-xs ml-1">危險！</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">橫向移動攻擊</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>1. 前端 Pod 有安全漏洞，被入侵</p>
-            <p>2. 網路全通 → 攻擊者從前端直連 DB</p>
-            <p>3. 讀取或修改資料 → 完蛋</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">解法：NetworkPolicy</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>Docker → <code className="text-xs">docker network create</code> 隔離（以 network 為單位）</p>
-            <p>K8s → <span className="text-green-400 font-bold">NetworkPolicy</span>（Pod 等級防火牆，用 label 篩選，更精細）</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `好，我們繼續因果鏈。上一個 Loop 用 RBAC 管住了「人」。開發人員只能看不能刪，實習生碰不到生產環境。人的問題解決了。
-
-但是 Pod 之間呢？
-
-K8s 預設的網路策略是什麼？全通。叢集裡面所有的 Pod，不管在哪個 Namespace，不管掛什麼 label，都可以互相通訊。前端 Pod 可以連 API Pod，API Pod 可以連 MySQL Pod。這很合理。但同時，前端 Pod 也可以直接連 MySQL Pod。這就不合理了。
-
-前端為什麼需要直連資料庫？正常架構下不需要。前端只需要連 API，API 再去連資料庫。但預設情況下，K8s 不會阻止前端直連資料庫。
-
-這有什麼問題？假設你的前端 Pod 有一個安全漏洞，被攻擊者入侵了。如果網路是全通的，攻擊者可以從前端 Pod 直接連到資料庫 Pod，讀取或者修改資料。這叫橫向移動，是安全攻擊裡最常見的手法之一。入侵一個弱點之後，在內部網路裡面橫著走，一路打到高價值目標。
-
-用 Docker 的經驗來想。Docker 有 network 隔離的概念。你建一個 frontend-net、一個 backend-net，把前端容器放在 frontend-net，把資料庫放在 backend-net。不同 network 的容器不能互相連線。Docker Compose 裡面你也可以用 networks 欄位做隔離。
-
-K8s 的做法比 Docker 更靈活，叫 NetworkPolicy。NetworkPolicy 是 Pod 等級的防火牆。你可以用 label 篩選目標 Pod，然後指定只有哪些 Pod 才能連進來或連出去。比 Docker 的 network 隔離更精細，因為 Docker 的隔離是以整個 network 為單位，K8s 可以做到以單個 Pod 為單位。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-14 概念（2/2）：ingress/egress 規則 + YAML ──
-  {
-    title: 'NetworkPolicy YAML 結構',
-    subtitle: 'podSelector + policyTypes + ingress/egress',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '7',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">四個區塊</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><code className="text-cyan-400 text-xs">podSelector</code> → 這條規則套用在誰身上</p>
-            <p><code className="text-cyan-400 text-xs">policyTypes</code> → 管 Ingress（進）還是 Egress（出）</p>
-            <p><code className="text-cyan-400 text-xs">ingress.from</code> → 允許誰連進來</p>
-            <p><code className="text-cyan-400 text-xs">egress.to</code> → 允許連出去到哪</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm">
-          <p className="text-amber-400 font-semibold">注意別搞混！</p>
-          <p className="text-slate-300 text-xs mt-1">NetworkPolicy 的 Ingress（L3/L4 進入流量）≠ Ingress Controller（L7 HTTP 路由）</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-1 text-sm">重要觀念</p>
-          <p className="text-sm text-slate-300">被 Ingress / Egress policy 選中的方向 → 預設拒絕未允許流量（方向別白名單）</p>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm">
-          <p className="text-amber-400 font-semibold">CNI 支援注意</p>
-          <div className="text-xs text-slate-300 mt-1 space-y-1">
-            <p>✓ k3s 預設安裝 → 有內建 network policy controller</p>
-            <p>✓ <span className="text-green-400">Calico</span>、<span className="text-green-400">Cilium</span>、Weave → 明確支援；minikube 做 Lab 常用 Calico</p>
-          </div>
-        </div>
-      </div>
-    ),
-    code: `# 保護 DB：只讓 API Pod 連進來
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: db-allow-api-only
-spec:
-  podSelector:
-    matchLabels:
-      role: database        # 套用在 DB Pod
-  policyTypes:
-    - Ingress               # 只管進來的流量
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              role: api      # 只有 API 能連
-      ports:
-        - protocol: TCP
-          port: 3306         # 只開 MySQL port`,
-    notes: `來看 NetworkPolicy 的 YAML 結構。一共四個區塊。
-
-第一個是 podSelector，指定「這條規則套用在誰身上」。比如 matchLabels role: database，就是套用在所有帶 role=database 這個 label 的 Pod 上面。
-
-第二個是 policyTypes，指定管「進來的流量」還是「出去的流量」。Ingress 是進入 Pod 的流量，Egress 是離開 Pod 的流量。你可以只管其中一種，也可以兩種都管。
-
-這裡要特別注意一個容易混淆的點。NetworkPolicy 裡面的 Ingress 跟我們第六堂學的 Ingress Controller 完全是兩回事。NetworkPolicy 的 Ingress 是指「進入 Pod 的網路流量」，是 Layer 3 和 Layer 4 的概念。Ingress Controller 是 HTTP 路由器，是 Layer 7 的概念。名字碰巧一樣而已，不要搞混。
-
-第三個區塊是 ingress 規則。from 裡面用 podSelector 指定「允許誰連進來」。ports 裡面指定允許的 port 和 protocol。
-
-第四個區塊是 egress 規則，格式類似，用 to 和 ports 指定「允許連出去到哪裡」。
-
-來看一個具體的例子。我要保護資料庫 Pod，只讓 API Pod 連進來。podSelector 設 matchLabels role: database，表示這條規則套用在帶 role=database 的 Pod 上。policyTypes 設 Ingress，只管進來的流量。ingress from podSelector matchLabels role: api，表示只有帶 role=api 的 Pod 才能連進來。ports 設 TCP 3306，只允許 MySQL 的 port。
-
-翻譯成白話：資料庫只接受 API 的連線，而且只接受 3306 port。其他任何 Pod 想連資料庫的任何 port，全部擋掉。
-
-這裡有一個非常重要的觀念。NetworkPolicy 不是「一加就全部鎖死」，而是看你宣告哪個方向。如果某個 Pod 被帶有 Ingress 的 policy 選中，它的 ingress 會變成白名單模式；如果被帶有 Egress 的 policy 選中，它的 egress 也會變成白名單模式。只寫 Ingress，不會順便把 Egress 也鎖住；反過來也一樣。
-
-最後提一個很重要的實務注意事項。NetworkPolicy 這個東西是 K8s 的 API 規格，但實際執行還是要靠底層網路外掛或對應 controller。Calico、Cilium、Weave 都是常見選項。k3s 的預設安裝本身有 network policy controller，所以不是「Flannel 就一定不支援」這麼簡單；如果你在安裝時額外把它關掉，policy 才會存在但不生效。
-
-如果你想在 minikube 上做最可預期的 Lab，常見做法是用 minikube start --cni=calico 重新建叢集。實際排錯時，如果你 apply 成功但流量還是全通，第一步先確認目前叢集到底用哪個 CNI / controller，第二步再檢查 selector、policyTypes 和 ports 有沒有寫對。
-
-好，接下來我們實際操作一下。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-15 實作（1/2）：部署三服務 + 驗證全通 ──
-  {
-    title: 'NetworkPolicy 實作：部署 + 驗證全通',
-    subtitle: '三個服務：frontend / api / database',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '6',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 1-2：部署 + 驗證預設全通</p>
-        </div>
-      </div>
-    ),
-    code: `# Step 1：部署三個服務（都用 nginx 模擬，差別只是 label）
-kubectl apply -f networkpolicy-lab.yaml
-kubectl get pods -l "role in (frontend,api,database)"
-kubectl get svc
-
-# Step 2：驗證預設全通（還沒套 NetworkPolicy）
-# frontend → db（不應該通，但預設全通）
-FRONTEND_POD=$(kubectl get pods -l role=frontend \\
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✓ 有回應 = 全通（不安全！）
-
-# api → db（應該通）
-API_POD=$(kubectl get pods -l role=api \\
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✓ 有回應 = 全通`,
-    notes: `好，我們來實作。這個實驗要部署三個服務：frontend、api、database。然後先驗證預設全通，再套上 NetworkPolicy，驗證隔離效果。
-
-先部署。networkpolicy-lab.yaml 裡面有三個 Deployment 和三個 Service。三個 Deployment 都用 nginx 來模擬，差別只是 label 不同。frontend 的 Pod 帶 role=frontend，api 的帶 role=api，database 的帶 role=database。
-
-kubectl apply -f networkpolicy-lab.yaml
-
-等 Pod 跑起來。kubectl get pods -l "role in (frontend,api,database)" 六個 Pod 都是 Running。好。看一下 Service。kubectl get svc 有 frontend-svc、api-svc、db-svc 三個 ClusterIP Service。
-
-現在還沒套 NetworkPolicy，所有 Pod 之間應該是全通的。我們來驗證。
-
-先從 frontend Pod 連 database。你會看到 nginx 的預設歡迎頁面。有回應，表示 frontend 可以連到 database。在正常的安全架構下，這不應該被允許。
-
-再從 api Pod 連 database。一樣有回應。api 也能連 database。這個是合理的，因為 API 需要存取資料庫。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-15 實作（2/2）：套 NetworkPolicy + 驗證隔離 ──
-  {
-    title: 'NetworkPolicy 驗證：隔離生效',
-    subtitle: 'api → db ✓　frontend → db ✗',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '6',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 3-5：套 NetworkPolicy + 重新測試</p>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">✓ api → db：通過</p>
-          <p className="text-xs text-slate-300">role=api 在允許清單 → 正常回應</p>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">✗ frontend → db：被擋（CNI 支援時）</p>
-          <p className="text-xs text-slate-300">role=frontend 不在允許清單 → 3 秒後 timeout</p>
-          <p className="text-xs text-slate-400 mt-1">CNI 不支援 → 還是會通，概念理解即可</p>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">✓ frontend → api：不受影響</p>
-          <p className="text-xs text-slate-300">NetworkPolicy 只套在 DB Pod，API Pod 沒有限制</p>
-        </div>
-      </div>
-    ),
-    code: `# Step 3：套上 NetworkPolicy
-kubectl apply -f networkpolicy-db-only-api.yaml
-kubectl get networkpolicy
-# NAME                POD-SELECTOR     AGE
-# db-allow-api-only   role=database    5s
-
-# Step 4：重新測試
-# api → db（應該通）
-kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✓ 有回應
-
-# frontend → db（CNI 支援 → timeout；不支援 → 還是通）
-kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✗ wget: download timed out（被擋了！）
-
-# Step 5：frontend → api 不受影響
-kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://api-svc:80
-# ✓ 有回應`,
-    notes: `好，現在套上 NetworkPolicy。
-
-kubectl apply -f networkpolicy-db-only-api.yaml
-
-這個 NetworkPolicy 的內容就是剛才概念講的那個 YAML。podSelector 選 role=database 的 Pod，只允許 role=api 的 Pod 透過 TCP port 80 連進來。
-
-kubectl get networkpolicy 你會看到 db-allow-api-only 這條 NetworkPolicy，POD-SELECTOR 顯示 role=database。
-
-好，現在重新測試。先從 api 連 database。kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80 還是有回應。因為 api Pod 帶 role=api label，在允許清單裡面。
-
-再從 frontend 連 database。kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80 如果你的 CNI 支援 NetworkPolicy，這個指令會在 3 秒後 timeout。因為 frontend Pod 的 label 是 role=frontend，不在 NetworkPolicy 的允許清單裡面，流量被擋掉了。
-
-如果你的 CNI 不支援，這邊還是會成功。不用擔心，概念你已經理解了。在生產環境用 Calico 或 Cilium 就會生效。
-
-最後確認一下 frontend 連 api 還是通的。有回應。因為我們的 NetworkPolicy 只套在 database Pod 上面，api Pod 沒有任何 NetworkPolicy 限制，所以 frontend 連 api 不受影響。
-
-這就是 NetworkPolicy 的效果。database 被保護起來了，只有 api 能連。frontend 連 database 被擋，但 frontend 連 api 不受影響。三層架構的網路隔離就是這樣做的。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-15 學員實作 ──
-  {
-    title: '學員實作：NetworkPolicy',
-    subtitle: '⏱ 巡堂確認',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '10',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">必做</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>1. 部署 frontend + api + db 三個服務</p>
-            <p>2. 驗證預設全通：frontend → db 有回應</p>
-            <p>3. apply NetworkPolicy</p>
-            <p>4. 驗證：api → db ✓、frontend → db ✗（或理解概念）</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">挑戰</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>在 API Pod 加一條 <code className="text-cyan-400">egress</code> 規則：</p>
-            <p>- API 只能連 DB，不能連外網</p>
-            <p>- 提示：policyTypes 加 Egress，egress 區塊用 podSelector 指定目標</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">巡堂檢查清單</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>□ kubectl get networkpolicy → db-allow-api-only 存在</p>
-            <p>□ POD-SELECTOR 顯示 role=database</p>
-            <p>□ api → db 測試通過</p>
-            <p>□ frontend → db 測試被擋（或 CNI 不支援已理解）</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `接下來是大家的實作時間。必做題是跟著剛才的步驟做一遍，確認 api 能連 db、frontend 不能連 db。挑戰題是在 api Pod 上面加一條 egress 規則，限制 api 只能連 database，不能連外網。提示：在 policyTypes 裡面加 Egress，然後在 egress 區塊裡用 podSelector 指定目標。大家動手做。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-16 回頭操作：NetworkPolicy ──
-  {
-    title: '回頭操作：NetworkPolicy 常見坑',
-    subtitle: 'Loop 5 小結 — 下午因果鏈回顧',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">常見坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">1.</span>
-              <div>
-                <p>CNI 不支援</p>
-                <p className="text-xs text-slate-400">先確認 CNI / controller；minikube 做 Lab 常用 Calico：minikube start --cni=calico</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">2.</span>
-              <div>
-                <p>podSelector label 不匹配</p>
-                <p className="text-xs text-slate-400">Pod 帶 app=database，Policy 寫 role=database → 沒套到任何 Pod</p>
-                <p className="text-xs text-slate-400">用 kubectl get pods --show-labels 確認</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">3.</span>
-              <div>
-                <p>忘了寫 policyTypes</p>
-                <p className="text-xs text-slate-400">K8s 會自動推斷，但明確寫出來是好習慣</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">下午因果鏈回顧</p>
-          <div className="text-sm text-slate-300">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400 text-xs">RBAC 管人</span>
-              <span className="text-slate-400">+</span>
-              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400 text-xs">NetworkPolicy 管網路</span>
-            </div>
-            <p className="mt-2 text-slate-400 text-xs">誰能操作 → 限制了，Pod 間通訊 → 隔離了</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm text-amber-300">
-          <p>接下來：把四堂課學的所有東西串在一起</p>
-          <p>從一個完全空的 Namespace → 一步一步建出完整系統</p>
-        </div>
-      </div>
-    ),
-    notes: `好，回頭確認一下大家的 NetworkPolicy 做到了。
-
-kubectl get networkpolicy 看一下。有 db-allow-api-only 這條嗎？POD-SELECTOR 欄位顯示的是 role=database 嗎？好。
-
-如果你的 CNI 支援 NetworkPolicy，你應該看到 api 連 db 成功、frontend 連 db 被擋。如果 CNI 不支援，兩個都能連也沒關係，重點是你理解了 YAML 在寫什麼。
-
-常見的坑。第一個，CNI 不支援。這是最常碰到的。你 apply 了 NetworkPolicy，kubectl get networkpolicy 也看得到，但流量照通。因為底層的 CNI 沒有執行這條規則。解法是換支援的 CNI，比如 minikube start --cni=calico。
-
-第二個坑，podSelector 的 label 寫錯。比如你的 Pod 帶的是 app=database，但 NetworkPolicy 的 podSelector 寫的是 role=database。label 不匹配，NetworkPolicy 根本沒有套到任何 Pod 上面。用 kubectl get pods --show-labels 確認 Pod 的 label 跟 NetworkPolicy 裡寫的一致。
-
-第三個坑，忘了寫 policyTypes。如果你不寫 policyTypes，K8s 會根據你有沒有寫 ingress 和 egress 區塊來自動推斷。但明確寫出來是好習慣，避免搞混。
-
-好，Loop 5 結束。到目前為止下午的兩個 Loop 解決了兩個問題。RBAC 管住了人，不該有權限的人做不了危險操作。NetworkPolicy 管住了 Pod 之間的網路，不該連的連不到。
-
-接下來進入今天最重頭戲的部分。我們要把四堂課學的所有東西串在一起，從一個完全空的 Namespace 開始，一步一步建出一套完整的系統。準備好了嗎？
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-16 學員實作解答：NetworkPolicy ──
-  {
-    title: '解答：只允許 api → database（port 3306）',
-    subtitle: 'Loop 5 完成',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '3',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做解答：NetworkPolicy YAML 關鍵片段</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p>spec:</p>
-            <p className="text-green-400">{'  '}podSelector:</p>
-            <p>{'    '}matchLabels:</p>
-            <p>{'      '}app: database{'  '}# 套用到 database Pod</p>
-            <p>{'  '}policyTypes: [Ingress]</p>
-            <p>{'  '}ingress:</p>
-            <p>{'  - '}from:</p>
-            <p>{'    - '}podSelector:</p>
-            <p>{'        '}matchLabels:</p>
-            <p className="text-green-400">{'          '}app: api{'  '}# 只允許 api Pod 連進來</p>
-            <p>{'    '}ports:</p>
-            <p>{'    - '}port: 3306</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 從 frontend pod exec，連 database（應該超時被擋）</p>
-            <p>kubectl exec {'<frontend-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
-            <p className="text-slate-500 mt-1"># 從 api pod exec，連 database（應該成功）</p>
-            <p>kubectl exec {'<api-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
-            <p className="text-slate-500 mt-1"># 清理</p>
-            <p>kubectl delete networkpolicy allow-api-to-db</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">預期結果</p>
-          <p className="text-xs text-slate-300 mt-1">frontend → database：超時（Connection timed out）；api → database：成功連線</p>
-        </div>
-      </div>
-    ),
-    notes: `來看解答。
-
-NetworkPolicy 的 podSelector 決定「這條規則套到哪個 Pod」，這裡是 app: database。ingress 的 from.podSelector 決定「誰可以連進來」，這裡是 app: api。ports 限制只開 3306。
-
-驗證的方式是 kubectl exec 進去不同的 Pod，用 curl 或 wget 去試連 database-svc:3306。從 frontend Pod 連應該超時，從 api Pod 連應該成功。超時就表示 NetworkPolicy 有效果。
-
-如果兩個都能連，最常見的原因是 CNI 不支援 NetworkPolicy，或者 label 不匹配，Policy 沒有套到正確的 Pod。用 kubectl get pods --show-labels 確認 label。
-
-清理：kubectl delete networkpolicy allow-api-to-db。 [▶ 下一頁]`,
-  },
-
-  // ============================================================
   // Loop 6：從零部署上（7-17, 7-18, 7-19）
   // ============================================================
 
@@ -2195,5 +1254,449 @@ CKA 的考試形式是線上實作。不是選擇題，是給你一個真實的 
 我們後會有期。
 
 [▶ 課程結束]`,
+  },
+
+  // ============================================================
+  // 附錄：NetworkPolicy（選讀，可跳過）
+  // ============================================================
+
+// Loop 5：NetworkPolicy（7-14, 7-15, 7-16）
+  // ============================================================
+
+  // ── 7-14 概念（1/2）：全通不安全 ──
+  {
+    title: '叢集內全通不安全',
+    subtitle: 'K8s 預設：所有 Pod 互通 → 橫向移動攻擊',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '8',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">問題：預設全通</p>
+          <div className="bg-slate-900/60 border border-slate-700 p-3 rounded-lg mt-2">
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              <div className="border-2 border-blue-500/70 rounded-lg p-2 bg-blue-900/20 text-center min-w-[80px]">
+                <p className="text-blue-400 text-sm font-bold">Frontend</p>
+              </div>
+              <span className="text-green-400 font-bold">→</span>
+              <div className="border-2 border-cyan-500/70 rounded-lg p-2 bg-cyan-900/20 text-center min-w-[80px]">
+                <p className="text-cyan-400 text-sm font-bold">API</p>
+              </div>
+              <span className="text-green-400 font-bold">→</span>
+              <div className="border-2 border-amber-500/70 rounded-lg p-2 bg-amber-900/20 text-center min-w-[80px]">
+                <p className="text-amber-400 text-sm font-bold">DB</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-center mt-2 gap-2">
+              <span className="text-blue-400 text-xs">Frontend</span>
+              <span className="text-red-400 font-bold text-sm">── 也能直連 ──→</span>
+              <span className="text-amber-400 text-xs">DB</span>
+              <span className="text-red-400 text-xs ml-1">危險！</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">橫向移動攻擊</p>
+          <div className="text-sm text-slate-300 space-y-1">
+            <p>1. 前端 Pod 有安全漏洞，被入侵</p>
+            <p>2. 網路全通 → 攻擊者從前端直連 DB</p>
+            <p>3. 讀取或修改資料 → 完蛋</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">解法：NetworkPolicy</p>
+          <div className="text-sm text-slate-300 space-y-1">
+            <p>Docker → <code className="text-xs">docker network create</code> 隔離（以 network 為單位）</p>
+            <p>K8s → <span className="text-green-400 font-bold">NetworkPolicy</span>（Pod 等級防火牆，用 label 篩選，更精細）</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `好，我們繼續因果鏈。上一個 Loop 用 RBAC 管住了「人」。開發人員只能看不能刪，實習生碰不到生產環境。人的問題解決了。
+
+但是 Pod 之間呢？
+
+K8s 預設的網路策略是什麼？全通。叢集裡面所有的 Pod，不管在哪個 Namespace，不管掛什麼 label，都可以互相通訊。前端 Pod 可以連 API Pod，API Pod 可以連 MySQL Pod。這很合理。但同時，前端 Pod 也可以直接連 MySQL Pod。這就不合理了。
+
+前端為什麼需要直連資料庫？正常架構下不需要。前端只需要連 API，API 再去連資料庫。但預設情況下，K8s 不會阻止前端直連資料庫。
+
+這有什麼問題？假設你的前端 Pod 有一個安全漏洞，被攻擊者入侵了。如果網路是全通的，攻擊者可以從前端 Pod 直接連到資料庫 Pod，讀取或者修改資料。這叫橫向移動，是安全攻擊裡最常見的手法之一。入侵一個弱點之後，在內部網路裡面橫著走，一路打到高價值目標。
+
+用 Docker 的經驗來想。Docker 有 network 隔離的概念。你建一個 frontend-net、一個 backend-net，把前端容器放在 frontend-net，把資料庫放在 backend-net。不同 network 的容器不能互相連線。Docker Compose 裡面你也可以用 networks 欄位做隔離。
+
+K8s 的做法比 Docker 更靈活，叫 NetworkPolicy。NetworkPolicy 是 Pod 等級的防火牆。你可以用 label 篩選目標 Pod，然後指定只有哪些 Pod 才能連進來或連出去。比 Docker 的 network 隔離更精細，因為 Docker 的隔離是以整個 network 為單位，K8s 可以做到以單個 Pod 為單位。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-14 概念（2/2）：ingress/egress 規則 + YAML ──
+  {
+    title: 'NetworkPolicy YAML 結構',
+    subtitle: 'podSelector + policyTypes + ingress/egress',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '7',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">四個區塊</p>
+          <div className="text-sm text-slate-300 space-y-1">
+            <p><code className="text-cyan-400 text-xs">podSelector</code> → 這條規則套用在誰身上</p>
+            <p><code className="text-cyan-400 text-xs">policyTypes</code> → 管 Ingress（進）還是 Egress（出）</p>
+            <p><code className="text-cyan-400 text-xs">ingress.from</code> → 允許誰連進來</p>
+            <p><code className="text-cyan-400 text-xs">egress.to</code> → 允許連出去到哪</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm">
+          <p className="text-amber-400 font-semibold">注意別搞混！</p>
+          <p className="text-slate-300 text-xs mt-1">NetworkPolicy 的 Ingress（L3/L4 進入流量）≠ Ingress Controller（L7 HTTP 路由）</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-1 text-sm">重要觀念</p>
+          <p className="text-sm text-slate-300">被 Ingress / Egress policy 選中的方向 → 預設拒絕未允許流量（方向別白名單）</p>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm">
+          <p className="text-amber-400 font-semibold">CNI 支援注意</p>
+          <div className="text-xs text-slate-300 mt-1 space-y-1">
+            <p>✓ k3s 預設安裝 → 有內建 network policy controller</p>
+            <p>✓ <span className="text-green-400">Calico</span>、<span className="text-green-400">Cilium</span>、Weave → 明確支援；minikube 做 Lab 常用 Calico</p>
+          </div>
+        </div>
+      </div>
+    ),
+    code: `# 保護 DB：只讓 API Pod 連進來
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-api-only
+spec:
+  podSelector:
+    matchLabels:
+      role: database        # 套用在 DB Pod
+  policyTypes:
+    - Ingress               # 只管進來的流量
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: api      # 只有 API 能連
+      ports:
+        - protocol: TCP
+          port: 3306         # 只開 MySQL port`,
+    notes: `來看 NetworkPolicy 的 YAML 結構。一共四個區塊。
+
+第一個是 podSelector，指定「這條規則套用在誰身上」。比如 matchLabels role: database，就是套用在所有帶 role=database 這個 label 的 Pod 上面。
+
+第二個是 policyTypes，指定管「進來的流量」還是「出去的流量」。Ingress 是進入 Pod 的流量，Egress 是離開 Pod 的流量。你可以只管其中一種，也可以兩種都管。
+
+這裡要特別注意一個容易混淆的點。NetworkPolicy 裡面的 Ingress 跟我們第六堂學的 Ingress Controller 完全是兩回事。NetworkPolicy 的 Ingress 是指「進入 Pod 的網路流量」，是 Layer 3 和 Layer 4 的概念。Ingress Controller 是 HTTP 路由器，是 Layer 7 的概念。名字碰巧一樣而已，不要搞混。
+
+第三個區塊是 ingress 規則。from 裡面用 podSelector 指定「允許誰連進來」。ports 裡面指定允許的 port 和 protocol。
+
+第四個區塊是 egress 規則，格式類似，用 to 和 ports 指定「允許連出去到哪裡」。
+
+來看一個具體的例子。我要保護資料庫 Pod，只讓 API Pod 連進來。podSelector 設 matchLabels role: database，表示這條規則套用在帶 role=database 的 Pod 上。policyTypes 設 Ingress，只管進來的流量。ingress from podSelector matchLabels role: api，表示只有帶 role=api 的 Pod 才能連進來。ports 設 TCP 3306，只允許 MySQL 的 port。
+
+翻譯成白話：資料庫只接受 API 的連線，而且只接受 3306 port。其他任何 Pod 想連資料庫的任何 port，全部擋掉。
+
+這裡有一個非常重要的觀念。NetworkPolicy 不是「一加就全部鎖死」，而是看你宣告哪個方向。如果某個 Pod 被帶有 Ingress 的 policy 選中，它的 ingress 會變成白名單模式；如果被帶有 Egress 的 policy 選中，它的 egress 也會變成白名單模式。只寫 Ingress，不會順便把 Egress 也鎖住；反過來也一樣。
+
+最後提一個很重要的實務注意事項。NetworkPolicy 這個東西是 K8s 的 API 規格，但實際執行還是要靠底層網路外掛或對應 controller。Calico、Cilium、Weave 都是常見選項。k3s 的預設安裝本身有 network policy controller，所以不是「Flannel 就一定不支援」這麼簡單；如果你在安裝時額外把它關掉，policy 才會存在但不生效。
+
+如果你想在 minikube 上做最可預期的 Lab，常見做法是用 minikube start --cni=calico 重新建叢集。實際排錯時，如果你 apply 成功但流量還是全通，第一步先確認目前叢集到底用哪個 CNI / controller，第二步再檢查 selector、policyTypes 和 ports 有沒有寫對。
+
+好，接下來我們實際操作一下。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-15 實作（1/2）：部署三服務 + 驗證全通 ──
+  {
+    title: 'NetworkPolicy 實作：部署 + 驗證全通',
+    subtitle: '三個服務：frontend / api / database',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '6',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">Step 1-2：部署 + 驗證預設全通</p>
+        </div>
+      </div>
+    ),
+    code: `# Step 1：部署三個服務（都用 nginx 模擬，差別只是 label）
+kubectl apply -f networkpolicy-lab.yaml
+kubectl get pods -l "role in (frontend,api,database)"
+kubectl get svc
+
+# Step 2：驗證預設全通（還沒套 NetworkPolicy）
+# frontend → db（不應該通，但預設全通）
+FRONTEND_POD=$(kubectl get pods -l role=frontend \\
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80
+# ✓ 有回應 = 全通（不安全！）
+
+# api → db（應該通）
+API_POD=$(kubectl get pods -l role=api \\
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80
+# ✓ 有回應 = 全通`,
+    notes: `好，我們來實作。這個實驗要部署三個服務：frontend、api、database。然後先驗證預設全通，再套上 NetworkPolicy，驗證隔離效果。
+
+先部署。networkpolicy-lab.yaml 裡面有三個 Deployment 和三個 Service。三個 Deployment 都用 nginx 來模擬，差別只是 label 不同。frontend 的 Pod 帶 role=frontend，api 的帶 role=api，database 的帶 role=database。
+
+kubectl apply -f networkpolicy-lab.yaml
+
+等 Pod 跑起來。kubectl get pods -l "role in (frontend,api,database)" 六個 Pod 都是 Running。好。看一下 Service。kubectl get svc 有 frontend-svc、api-svc、db-svc 三個 ClusterIP Service。
+
+現在還沒套 NetworkPolicy，所有 Pod 之間應該是全通的。我們來驗證。
+
+先從 frontend Pod 連 database。你會看到 nginx 的預設歡迎頁面。有回應，表示 frontend 可以連到 database。在正常的安全架構下，這不應該被允許。
+
+再從 api Pod 連 database。一樣有回應。api 也能連 database。這個是合理的，因為 API 需要存取資料庫。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-15 實作（2/2）：套 NetworkPolicy + 驗證隔離 ──
+  {
+    title: 'NetworkPolicy 驗證：隔離生效',
+    subtitle: 'api → db ✓　frontend → db ✗',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '6',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">Step 3-5：套 NetworkPolicy + 重新測試</p>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">✓ api → db：通過</p>
+          <p className="text-xs text-slate-300">role=api 在允許清單 → 正常回應</p>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">✗ frontend → db：被擋（CNI 支援時）</p>
+          <p className="text-xs text-slate-300">role=frontend 不在允許清單 → 3 秒後 timeout</p>
+          <p className="text-xs text-slate-400 mt-1">CNI 不支援 → 還是會通，概念理解即可</p>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">✓ frontend → api：不受影響</p>
+          <p className="text-xs text-slate-300">NetworkPolicy 只套在 DB Pod，API Pod 沒有限制</p>
+        </div>
+      </div>
+    ),
+    code: `# Step 3：套上 NetworkPolicy
+kubectl apply -f networkpolicy-db-only-api.yaml
+kubectl get networkpolicy
+# NAME                POD-SELECTOR     AGE
+# db-allow-api-only   role=database    5s
+
+# Step 4：重新測試
+# api → db（應該通）
+kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80
+# ✓ 有回應
+
+# frontend → db（CNI 支援 → timeout；不支援 → 還是通）
+kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80
+# ✗ wget: download timed out（被擋了！）
+
+# Step 5：frontend → api 不受影響
+kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://api-svc:80
+# ✓ 有回應`,
+    notes: `好，現在套上 NetworkPolicy。
+
+kubectl apply -f networkpolicy-db-only-api.yaml
+
+這個 NetworkPolicy 的內容就是剛才概念講的那個 YAML。podSelector 選 role=database 的 Pod，只允許 role=api 的 Pod 透過 TCP port 80 連進來。
+
+kubectl get networkpolicy 你會看到 db-allow-api-only 這條 NetworkPolicy，POD-SELECTOR 顯示 role=database。
+
+好，現在重新測試。先從 api 連 database。kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80 還是有回應。因為 api Pod 帶 role=api label，在允許清單裡面。
+
+再從 frontend 連 database。kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80 如果你的 CNI 支援 NetworkPolicy，這個指令會在 3 秒後 timeout。因為 frontend Pod 的 label 是 role=frontend，不在 NetworkPolicy 的允許清單裡面，流量被擋掉了。
+
+如果你的 CNI 不支援，這邊還是會成功。不用擔心，概念你已經理解了。在生產環境用 Calico 或 Cilium 就會生效。
+
+最後確認一下 frontend 連 api 還是通的。有回應。因為我們的 NetworkPolicy 只套在 database Pod 上面，api Pod 沒有任何 NetworkPolicy 限制，所以 frontend 連 api 不受影響。
+
+這就是 NetworkPolicy 的效果。database 被保護起來了，只有 api 能連。frontend 連 database 被擋，但 frontend 連 api 不受影響。三層架構的網路隔離就是這樣做的。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-15 學員實作 ──
+  {
+    title: '學員實作：NetworkPolicy',
+    subtitle: '⏱ 巡堂確認',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '10',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">必做</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>1. 部署 frontend + api + db 三個服務</p>
+            <p>2. 驗證預設全通：frontend → db 有回應</p>
+            <p>3. apply NetworkPolicy</p>
+            <p>4. 驗證：api → db ✓、frontend → db ✗（或理解概念）</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/50 p-4 rounded-lg">
+          <p className="text-amber-400 font-semibold mb-2">挑戰</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>在 API Pod 加一條 <code className="text-cyan-400">egress</code> 規則：</p>
+            <p>- API 只能連 DB，不能連外網</p>
+            <p>- 提示：policyTypes 加 Egress，egress 區塊用 podSelector 指定目標</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">巡堂檢查清單</p>
+          <div className="text-sm text-slate-300 space-y-1">
+            <p>□ kubectl get networkpolicy → db-allow-api-only 存在</p>
+            <p>□ POD-SELECTOR 顯示 role=database</p>
+            <p>□ api → db 測試通過</p>
+            <p>□ frontend → db 測試被擋（或 CNI 不支援已理解）</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `接下來是大家的實作時間。必做題是跟著剛才的步驟做一遍，確認 api 能連 db、frontend 不能連 db。挑戰題是在 api Pod 上面加一條 egress 規則，限制 api 只能連 database，不能連外網。提示：在 policyTypes 裡面加 Egress，然後在 egress 區塊裡用 podSelector 指定目標。大家動手做。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-16 回頭操作：NetworkPolicy ──
+  {
+    title: '回頭操作：NetworkPolicy 常見坑',
+    subtitle: 'Loop 5 小結 — 下午因果鏈回顧',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '5',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+          <p className="text-red-400 font-semibold mb-2">常見坑</p>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div className="flex items-start gap-2">
+              <span className="text-red-400 font-bold shrink-0">1.</span>
+              <div>
+                <p>CNI 不支援</p>
+                <p className="text-xs text-slate-400">先確認 CNI / controller；minikube 做 Lab 常用 Calico：minikube start --cni=calico</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-400 font-bold shrink-0">2.</span>
+              <div>
+                <p>podSelector label 不匹配</p>
+                <p className="text-xs text-slate-400">Pod 帶 app=database，Policy 寫 role=database → 沒套到任何 Pod</p>
+                <p className="text-xs text-slate-400">用 kubectl get pods --show-labels 確認</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-400 font-bold shrink-0">3.</span>
+              <div>
+                <p>忘了寫 policyTypes</p>
+                <p className="text-xs text-slate-400">K8s 會自動推斷，但明確寫出來是好習慣</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
+          <p className="text-green-400 font-semibold mb-2">下午因果鏈回顧</p>
+          <div className="text-sm text-slate-300">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400 text-xs">RBAC 管人</span>
+              <span className="text-slate-400">+</span>
+              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400 text-xs">NetworkPolicy 管網路</span>
+            </div>
+            <p className="mt-2 text-slate-400 text-xs">誰能操作 → 限制了，Pod 間通訊 → 隔離了</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm text-amber-300">
+          <p>接下來：把四堂課學的所有東西串在一起</p>
+          <p>從一個完全空的 Namespace → 一步一步建出完整系統</p>
+        </div>
+      </div>
+    ),
+    notes: `好，回頭確認一下大家的 NetworkPolicy 做到了。
+
+kubectl get networkpolicy 看一下。有 db-allow-api-only 這條嗎？POD-SELECTOR 欄位顯示的是 role=database 嗎？好。
+
+如果你的 CNI 支援 NetworkPolicy，你應該看到 api 連 db 成功、frontend 連 db 被擋。如果 CNI 不支援，兩個都能連也沒關係，重點是你理解了 YAML 在寫什麼。
+
+常見的坑。第一個，CNI 不支援。這是最常碰到的。你 apply 了 NetworkPolicy，kubectl get networkpolicy 也看得到，但流量照通。因為底層的 CNI 沒有執行這條規則。解法是換支援的 CNI，比如 minikube start --cni=calico。
+
+第二個坑，podSelector 的 label 寫錯。比如你的 Pod 帶的是 app=database，但 NetworkPolicy 的 podSelector 寫的是 role=database。label 不匹配，NetworkPolicy 根本沒有套到任何 Pod 上面。用 kubectl get pods --show-labels 確認 Pod 的 label 跟 NetworkPolicy 裡寫的一致。
+
+第三個坑，忘了寫 policyTypes。如果你不寫 policyTypes，K8s 會根據你有沒有寫 ingress 和 egress 區塊來自動推斷。但明確寫出來是好習慣，避免搞混。
+
+好，Loop 5 結束。到目前為止下午的兩個 Loop 解決了兩個問題。RBAC 管住了人，不該有權限的人做不了危險操作。NetworkPolicy 管住了 Pod 之間的網路，不該連的連不到。
+
+接下來進入今天最重頭戲的部分。我們要把四堂課學的所有東西串在一起，從一個完全空的 Namespace 開始，一步一步建出一套完整的系統。準備好了嗎？
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-16 學員實作解答：NetworkPolicy ──
+  {
+    title: '解答：只允許 api → database（port 3306）',
+    subtitle: 'Loop 5 完成',
+    section: 'Loop 5：NetworkPolicy',
+    duration: '3',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">必做解答：NetworkPolicy YAML 關鍵片段</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p>spec:</p>
+            <p className="text-green-400">{'  '}podSelector:</p>
+            <p>{'    '}matchLabels:</p>
+            <p>{'      '}app: database{'  '}# 套用到 database Pod</p>
+            <p>{'  '}policyTypes: [Ingress]</p>
+            <p>{'  '}ingress:</p>
+            <p>{'  - '}from:</p>
+            <p>{'    - '}podSelector:</p>
+            <p>{'        '}matchLabels:</p>
+            <p className="text-green-400">{'          '}app: api{'  '}# 只允許 api Pod 連進來</p>
+            <p>{'    '}ports:</p>
+            <p>{'    - '}port: 3306</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p className="text-slate-500"># 從 frontend pod exec，連 database（應該超時被擋）</p>
+            <p>kubectl exec {'<frontend-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
+            <p className="text-slate-500 mt-1"># 從 api pod exec，連 database（應該成功）</p>
+            <p>kubectl exec {'<api-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
+            <p className="text-slate-500 mt-1"># 清理</p>
+            <p>kubectl delete networkpolicy allow-api-to-db</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
+          <p className="text-green-400 font-semibold text-sm">預期結果</p>
+          <p className="text-xs text-slate-300 mt-1">frontend → database：超時（Connection timed out）；api → database：成功連線</p>
+        </div>
+      </div>
+    ),
+    notes: `來看解答。
+
+NetworkPolicy 的 podSelector 決定「這條規則套到哪個 Pod」，這裡是 app: database。ingress 的 from.podSelector 決定「誰可以連進來」，這裡是 app: api。ports 限制只開 3306。
+
+驗證的方式是 kubectl exec 進去不同的 Pod，用 curl 或 wget 去試連 database-svc:3306。從 frontend Pod 連應該超時，從 api Pod 連應該成功。超時就表示 NetworkPolicy 有效果。
+
+如果兩個都能連，最常見的原因是 CNI 不支援 NetworkPolicy，或者 label 不匹配，Policy 沒有套到正確的 Pod。用 kubectl get pods --show-labels 確認 label。
+
+清理：kubectl delete networkpolicy allow-api-to-db。 [▶ 下一頁]`,
   },
 ]

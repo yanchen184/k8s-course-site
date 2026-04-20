@@ -735,15 +735,22 @@ ADDRESS 欄位出現 Node IP（`192.168.43.131,192.168.43.133`）代表 Traefik 
 
 **本機測試**：在你的電腦加一行 hosts 對應（不是在 VM 上）：
 
-- Windows：用系統管理員開記事本編輯 `C:\Windows\System32\drivers\etc\hosts`
-- Mac/Linux：`sudo nano /etc/hosts`
-
-加入：
+Windows（PowerShell 系統管理員）：
 ```
-192.168.43.133  task.local
+指令：Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "192.168.43.133  task.local"
 ```
 
-然後開瀏覽器 `http://task.local` 就能看到 Frontend 畫面，`http://task.local/api/tasks` 打到 Backend API。
+確認有加進去：
+```
+指令：Get-Content "C:\Windows\System32\drivers\etc\hosts" | Select-String "task.local"
+```
+
+Mac/Linux：
+```
+指令：echo "192.168.43.133  task.local" | sudo tee -a /etc/hosts
+```
+
+加完開瀏覽器 `http://task.local` 就能看到 Frontend 畫面，`http://task.local/api/tasks` 打到 Backend API。
 
 ### HPA
 

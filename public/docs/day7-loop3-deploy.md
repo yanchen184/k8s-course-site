@@ -73,6 +73,10 @@
 
 ---
 
+### 第一段：基礎層（00~03）
+
+---
+
 ### Namespace
 
 ```yaml
@@ -293,6 +297,40 @@ StatefulSet 的 Pod 命名規則固定是 `StatefulSet名稱-序號`：第一個
 ```
 
 進去後輸入 `\q` 退出。
+
+---
+
+## ⏸ 巡堂驗收 — 第一段
+
+確認 00~03 全部跑成功後再繼續。
+
+```
+kubectl get namespace tasks
+kubectl get secret app-secrets -n tasks
+kubectl get configmap app-config -n tasks
+kubectl get statefulset -n tasks
+kubectl get pvc -n tasks
+kubectl get pods -n tasks
+```
+
+**每個指令要看什麼：**
+
+| 指令 | 看什麼欄位 | 期待輸出 |
+|------|-----------|---------|
+| `kubectl get namespace tasks` | STATUS | `Active` |
+| `kubectl get secret app-secrets -n tasks` | DATA | `3`（postgres-password、redis-password、jwt-secret） |
+| `kubectl get configmap app-config -n tasks` | DATA | `7`（POSTGRES_HOST 等七個 key） |
+| `kubectl get statefulset -n tasks` | READY | `1/1` |
+| `kubectl get pvc -n tasks` | STATUS | `Bound`（postgres-storage-postgres-0） |
+| `kubectl get pods -n tasks` | STATUS / READY | `postgres-0` Running `1/1` |
+
+全部確認才喊繼續，有任何一個不對先停下來。
+
+---
+
+### 第二段：資料層（04~07）
+
+---
 
 ### Redis（Deployment）
 
@@ -555,6 +593,42 @@ spec:
 ```
 
 另一個終端機打：`curl http://localhost:3000/health`，回傳 `{"status":"ok"}` 代表正常。`Ctrl+C` 停掉 port-forward。
+
+---
+
+## ⏸ 巡堂驗收 — 第二段
+
+確認 04~07 全部跑成功後再繼續。
+
+```
+kubectl get pods -n tasks
+kubectl get job -n tasks
+kubectl logs job/db-migrate -n tasks
+kubectl get serviceaccount,role,rolebinding -n tasks
+kubectl auth can-i get configmaps --as=system:serviceaccount:tasks:backend-sa -n tasks
+kubectl auth can-i delete pods --as=system:serviceaccount:tasks:backend-sa -n tasks
+curl -H "Host: task.local" http://192.168.43.133/health
+```
+
+**每個指令要看什麼：**
+
+| 指令 | 看什麼欄位 | 期待輸出 |
+|------|-----------|---------|
+| `kubectl get pods -n tasks` | STATUS / READY | `redis-xxxxx` Running `1/1`；`backend-xxxxx` x2 Running `1/1` |
+| `kubectl get job -n tasks` | COMPLETIONS | `db-migrate` 顯示 `1/1` |
+| `kubectl logs job/db-migrate -n tasks` | log 內容 | 出現 `Migration complete: tasks table ready` |
+| `kubectl get serviceaccount,role,rolebinding -n tasks` | 三個資源 | `backend-sa`、`backend-role`、`backend-rolebinding` 全部存在 |
+| `can-i get configmaps` | 輸出 | `yes` |
+| `can-i delete pods` | 輸出 | `no` |
+| `curl ... /health` | HTTP 回傳 | `{"status":"ok"}` |
+
+全部確認才喊繼續，有任何一個不對先停下來。
+
+---
+
+### 第三段：應用層（08~12）
+
+---
 
 ### Frontend
 
@@ -842,6 +916,34 @@ spec:
 ```
 
 TARGETS 欄位看到 `cpu: X%/70%`（有數字不是 unknown）才算正常，代表 metrics-server 收到了 backend 的 CPU 數據。
+
+---
+
+## ⏸ 巡堂驗收 — 第三段
+
+確認 08~12 全部跑成功後再繼續。
+
+```
+kubectl get pods -n tasks
+kubectl get cronjob -n tasks
+kubectl get hpa -n tasks
+kubectl get ingress -n tasks
+kubectl logs -l app=task-runner -n tasks --tail=20
+```
+
+**每個指令要看什麼：**
+
+| 指令 | 看什麼欄位 | 期待輸出 |
+|------|-----------|---------|
+| `kubectl get pods -n tasks` | STATUS / READY | `frontend-xxxxx` x2 Running `2/2`；`task-runner-xxxxx` x3 Running `3/3` |
+| `kubectl get cronjob -n tasks` | LAST SCHEDULE | 有時間戳（等一分鐘後出現），SUSPEND 是 `False` |
+| `kubectl get hpa -n tasks` | TARGETS | `cpu: X%/70%`，有數字不是 `unknown` |
+| `kubectl get ingress -n tasks` | ADDRESS | 出現 Node IP（例如 `192.168.43.131,192.168.43.133`） |
+| `kubectl logs -l app=task-runner ...` | log 內容 | 出現 `task-runner started, waiting for tasks...` |
+
+全部確認才喊繼續，有任何一個不對先停下來。
+
+---
 
 ### 全系統驗收
 

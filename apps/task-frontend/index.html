@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任務排程系統</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #1a73e8; color: white; padding: 16px 24px; }
+    header h1 { font-size: 20px; }
+    .container { max-width: 800px; margin: 32px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .card h2 { font-size: 16px; margin-bottom: 16px; color: #444; }
+    input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 12px; }
+    textarea { height: 80px; resize: vertical; }
+    button { background: #1a73e8; color: white; border: none; padding: 10px 24px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button:hover { background: #1557b0; }
+    #msg { margin-top: 12px; font-size: 14px; color: #1a73e8; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 8px; background: #f0f4ff; border-bottom: 2px solid #ddd; }
+    td { padding: 8px; border-bottom: 1px solid #eee; }
+    .status-pending { color: #f59e0b; }
+    .status-done { color: #10b981; }
+    .refresh { float: right; font-size: 13px; cursor: pointer; color: #1a73e8; background: none; border: none; padding: 0; }
+  </style>
+</head>
+<body>
+  <header><h1>任務排程系統</h1></header>
+  <div class="container">
+    <div class="card">
+      <h2>建立新任務</h2>
+      <input id="title" type="text" placeholder="任務名稱（必填）">
+      <textarea id="desc" placeholder="任務描述（選填）"></textarea>
+      <input id="scheduled" type="datetime-local" title="排程時間（選填，留空立即執行）">
+      <button onclick="createTask()">送出任務</button>
+      <div id="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>任務列表 <button class="refresh" onclick="loadTasks()">重新整理</button></h2>
+      <table>
+        <thead><tr><th>ID</th><th>標題</th><th>狀態</th><th>建立時間</th><th>執行時間</th></tr></thead>
+        <tbody id="task-list"><tr><td colspan="5">載入中...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin + '/api';
+
+    async function createTask() {
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('desc').value.trim();
+      const scheduled_at = document.getElementById('scheduled').value;
+      if (!title) { showMsg('請輸入任務名稱'); return; }
+
+      try {
+        const res = await fetch(`${API}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description, scheduled_at: scheduled_at || null })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showMsg(`任務 #${data.task.id} 建立成功`);
+          document.getElementById('title').value = '';
+          document.getElementById('desc').value = '';
+          document.getElementById('scheduled').value = '';
+          loadTasks();
+        } else {
+          showMsg(`錯誤：${data.error}`);
+        }
+      } catch (e) {
+        showMsg('無法連線到 API');
+      }
+    }
+
+    async function loadTasks() {
+      try {
+        const res = await fetch(`${API}/tasks`);
+        const data = await res.json();
+        const tbody = document.getElementById('task-list');
+        if (!data.tasks.length) {
+          tbody.innerHTML = '<tr><td colspan="5">尚無任務</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.tasks.map(t => `
+          <tr>
+            <td>${t.id}</td>
+            <td>${t.title}</td>
+            <td class="status-${t.status}">${t.status}</td>
+            <td>${new Date(t.created_at).toLocaleString('zh-TW')}</td>
+            <td>${t.executed_at ? new Date(t.executed_at).toLocaleString('zh-TW') : '—'}</td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        document.getElementById('task-list').innerHTML = '<tr><td colspan="5">載入失敗</td></tr>';
+      }
+    }
+
+    function showMsg(text) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    loadTasks();
+    setInterval(loadTasks, 10000);
+  </script>
+</body>
+</html>

@@ -265,7 +265,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: migrate
-        image: your-registry/task-api:v1
+        image: ghcr.io/yanchen184/task-api:v1
         command: ["node", "migrate.js"]
         env:
         - name: POSTGRES_HOST
@@ -355,7 +355,7 @@ spec:
       serviceAccountName: backend-sa
       containers:
       - name: backend
-        image: your-registry/task-api:v1
+        image: ghcr.io/yanchen184/task-api:v1
         ports:
         - containerPort: 3000
         envFrom:
@@ -437,7 +437,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/task-frontend:v1
+        image: ghcr.io/yanchen184/task-frontend:v1
         ports:
         - containerPort: 80
         env:
@@ -499,7 +499,7 @@ spec:
     spec:
       containers:
       - name: task-runner
-        image: your-registry/task-task-runner:v1
+        image: ghcr.io/yanchen184/task-runner:v1
         command: ["node", "task-runner.js"]
         envFrom:
         - configMapRef:
@@ -550,7 +550,7 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: scheduler
-            image: your-registry/task-scheduler:v1
+            image: ghcr.io/yanchen184/task-scheduler:v1
             command: ["node", "enqueue-due-tasks.js"]
             envFrom:
             - configMapRef:

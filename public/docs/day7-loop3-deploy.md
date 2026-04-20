@@ -75,6 +75,13 @@
 
 ### Namespace
 
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tasks
+```
+
 ```
 指令：kubectl apply -f 00-namespace.yaml
 ```

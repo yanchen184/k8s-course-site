@@ -21,8 +21,8 @@ db:
 
 ingress:
   enabled: true
-  className: traefik     # minikube 改成 nginx
-  host: task.example.com
+  className: nginx
+  host: task.local
 
 hpa:
   enabled: true

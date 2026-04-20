@@ -36,13 +36,50 @@
 
 ## 7-9 從零到完成 — 邊建邊解釋
 
+### 前置確認：兩個 Node 都要 Ready
+
+```
+指令：kubectl get nodes
+```
+
+確認 ubuntu-master 和 ubuntu-worker 都是 Ready 狀態。如果 worker 是 NotReady，可能是 master IP 換過（VM 重啟後 IP 飄移），worker 的 k3s-agent 還連著舊 IP。
+
+**修復 worker NotReady（IP 飄移）：**
+
+在 master 取得新的 token：
+```
+指令（在 master 上）：sudo cat /var/lib/rancher/k3s/server/node-token
+```
+
+在 worker 重新設定：
+```
+指令（在 worker 上）：sudo systemctl stop k3s-agent
+指令（在 worker 上）：sudo nano /etc/systemd/system/k3s-agent.service.env
+```
+
+把 `K3S_URL` 改成 master 現在的 IP，例如 `https://192.168.43.133:6443`，`K3S_TOKEN` 填剛才拿到的 token，然後：
+
+```
+指令（在 worker 上）：sudo systemctl daemon-reload
+指令（在 worker 上）：sudo systemctl start k3s-agent
+```
+
+回到 master 確認：
+```
+指令：kubectl get nodes -w
+```
+
+等兩個 Node 都是 Ready 再繼續。
+
+---
+
 ### Namespace
 
 ```
-指令：kubectl create namespace tasks
+指令：kubectl apply -f 00-namespace.yaml
 ```
 
-隔離這套系統，所有指令之後都加 `-n tasks`。
+建立 `tasks` namespace，隔離這套系統，所有後續指令都加 `-n tasks`。
 
 ### Secret
 
@@ -60,11 +97,11 @@ stringData:
 ```
 
 ```
-指令：kubectl apply -f secret.yaml
+指令：kubectl apply -f 01-secret.yaml
 指令：kubectl get secret app-secrets -n tasks
 ```
 
-`stringData` 填明文，K8s 幫你 base64 encode。這個 YAML 不要推進 git。
+`stringData` 填明文，K8s 幫你 base64 encode。這個 YAML 不要推進 git。輸出顯示 `secret/app-secrets created`，`DATA 3` 代表三個欄位（postgres-password、redis-password、jwt-secret）都存進去了。
 
 ### ConfigMap
 
@@ -84,7 +121,7 @@ data:
 ```
 
 ```
-指令：kubectl apply -f configmap.yaml
+指令：kubectl apply -f 02-configmap.yaml
 ```
 
 POSTGRES_HOST 的值是 Service 名稱，K8s 內建 DNS 自動解析，Pod 重啟換 IP 也不影響。
@@ -168,16 +205,34 @@ spec:
 Headless Service 沒有虛擬 IP，DNS 直接回傳 Pod 真實 IP，讓你可以用穩定名稱定址到特定 Pod。StatefulSet 標準做法。
 
 ```
-指令：kubectl apply -f postgres.yaml
+指令：kubectl apply -f 03-postgres.yaml
 指令：kubectl get statefulset -n tasks
 指令：kubectl get pvc -n tasks
 ```
 
-等 READY 1/1，PVC STATUS 是 Bound。
+你會看到 `statefulset.apps/postgres created` 和 `service/postgres-service created` 兩行。
 
+等 READY 顯示 1/1，PVC STATUS 從 Pending 變成 Bound（local-path provisioner 在 Pod 實際排到某個 Node 後才 bind，要等一下）。
+
+```
+指令：kubectl get pods -n tasks -w
+```
+
+等 `postgres-0` 從 `ContainerCreating` 變成 `Running`，READY 從 `0/1` 變成 `1/1`（readinessProbe 通過才算真的好）。
+
+也可以用這個直接等到 Ready：
+```
+指令：kubectl wait pod/postgres-0 -n tasks --for=condition=Ready --timeout=60s
+```
+
+輸出 `pod/postgres-0 condition met` 才繼續下一步，否則 migration 會連不上 DB。
+
+確認進得去資料庫：
 ```
 指令：kubectl exec -it postgres-0 -n tasks -- psql -U postgres -d taskdb
 ```
+
+進去後輸入 `\q` 退出。
 
 ### Redis（Deployment）
 
@@ -242,10 +297,11 @@ Redis 用普通 ClusterIP Service，不需要 Headless。
 這套系統對外用 Ingress，不用 NodePort。Ingress 統一入口，域名路由、SSL 都集中在這裡。
 
 ```
-指令：kubectl apply -f redis.yaml
+指令：kubectl apply -f 04-redis.yaml
 指令：kubectl get pods -n tasks
-指令：kubectl exec -it postgres-0 -n tasks -- psql -U postgres -d taskdb
 ```
+
+看到 `redis-xxxxx` Pod Running 就好。Redis 是 Deployment，不需要 PVC，啟動比 postgres 快很多。
 
 ### Job — 一次性 DB Migration
 
@@ -289,14 +345,33 @@ spec:
 `restartPolicy: Never`：Pod 失敗不重啟這個 Pod，Job 建一個新 Pod 重試，舊的留著看 log。`backoffLimit: 3`：最多重試三次。
 
 ```
-指令：kubectl apply -f db-migrate-job.yaml
+指令：kubectl apply -f 06-rbac.yaml
+```
+
+三行輸出：`serviceaccount/backend-sa created`、`role.rbac.authorization.k8s.io/backend-role created`、`rolebinding.rbac.authorization.k8s.io/backend-rolebinding created`。
+
+```
+指令：kubectl apply -f 05-db-migrate-job.yaml
 指令：kubectl get job -n tasks
+```
+
+COMPLETIONS 欄位從 `0/1` 變成 `1/1` 才算成功。Job 有 init container 先等 postgres ready，再跑 migrate.js。
+
+```
 指令：kubectl logs job/db-migrate -n tasks
 ```
 
-等 COMPLETIONS 1/1。
+成功的 log 是：
+```
+Connected to PostgreSQL
+Migration complete: tasks table ready
+```
+
+如果看到 `Error`，檢查 ConfigMap 的 POSTGRES_HOST 是否對應 postgres-service，以及 Secret 的 postgres-password 是否正確。
 
 ### RBAC — Backend 最小權限
+
+> RBAC 已在上面 `06-rbac.yaml` 一起 apply，這裡是說明 YAML 內容。
 
 ```yaml
 apiVersion: v1
@@ -328,10 +403,6 @@ roleRef:
   kind: Role
   name: backend-role
   apiGroup: rbac.authorization.k8s.io
-```
-
-```
-指令：kubectl apply -f backend-rbac.yaml
 ```
 
 ### Backend API
@@ -412,10 +483,18 @@ spec:
 - `readinessProbe`：Pod Running 不等於可以接流量。只有 /health 回傳 200，K8s 才把這個 Pod 加進 Service 後端列表
 
 ```
-指令：kubectl apply -f backend.yaml
+指令：kubectl apply -f 07-backend.yaml
 指令：kubectl get pods -n tasks -l app=backend
+```
+
+等兩個 backend Pod 都 READY 1/1（readinessProbe `/health` 通過才算好）。
+
+快速驗證 Backend API：
+```
 指令：kubectl port-forward service/backend-service 3000:3000 -n tasks
 ```
+
+另一個終端機打：`curl http://localhost:3000/health`，回傳 `{"status":"ok"}` 代表正常。`Ctrl+C` 停掉 port-forward。
 
 ### Frontend
 
@@ -462,7 +541,7 @@ spec:
 ```
 
 ```
-指令：kubectl apply -f frontend.yaml
+指令：kubectl apply -f 08-frontend.yaml
 ```
 
 ### Task Runner — 為什麼沒有 Service，為什麼不是 DaemonSet
@@ -527,8 +606,11 @@ spec:
 三個副本同時從 Queue 拉任務，Redis 的 BLPOP 是原子操作，同一個任務只會被一個 Task Runner 拿走，不重複執行。
 
 ```
-指令：kubectl apply -f task-runner.yaml
+指令：kubectl apply -f 09-task-runner.yaml
+指令：kubectl get pods -n tasks -l app=task-runner
 ```
+
+三個 task-runner Pod 全部 Running，三個同時從 Redis Queue 拉任務。
 
 ### CronJob
 
@@ -582,11 +664,21 @@ spec:
 - `Replace`：砍掉上一個，起一個新的
 
 ```
-指令：kubectl apply -f cronjob.yaml
+指令：kubectl apply -f 10-cronjob.yaml
+指令：kubectl get cronjob -n tasks
+```
+
+SCHEDULE 顯示 `* * * * *`，SUSPEND 是 False，LAST SCHEDULE 等一分鐘後會出現時間。
+
+等一分鐘後，CronJob 自動建 Job，用這個觀察：
+```
 指令：kubectl get job -n tasks
 ```
 
-等一分鐘，CronJob 自動建立 Job，COMPLETIONS 1/1。
+COMPLETIONS 1/1 代表第一次觸發成功。看 log：
+```
+指令：kubectl logs -l job-name -n tasks --selector=job-name=$(kubectl get jobs -n tasks --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+```
 
 ### Ingress — k3s 用 Traefik
 
@@ -664,19 +756,40 @@ spec:
 ```
 
 ```
-指令：kubectl apply -f hpa.yaml
+指令：kubectl apply -f 11-hpa.yaml
 指令：kubectl get hpa -n tasks
 ```
+
+TARGETS 欄位看到 `cpu: X%/70%`（有數字不是 unknown）才算正常，代表 metrics-server 收到了 backend 的 CPU 數據。
 
 ### 全系統驗收
 
 ```
 指令：kubectl get all -n tasks
+```
+
+期待看到：
+- `pod/postgres-0` READY 1/1
+- `pod/redis-xxxxx` READY 1/1
+- `pod/backend-xxxxx` x2 READY 1/1
+- `pod/frontend-xxxxx` x2 READY 1/1
+- `pod/task-runner-xxxxx` x3 READY 1/1
+- `pod/db-migrate-xxxxx` STATUS Completed
+- `statefulset.apps/postgres` READY 1/1
+- `horizontalpodautoscaler.autoscaling/backend-hpa` TARGETS `cpu: X%/70%`
+- `cronjob.batch/task-scheduler` ACTIVE 有數字
+
+```
 指令：kubectl get pvc -n tasks
+```
+
+`postgres-storage-postgres-0` STATUS 是 Bound。
+
+```
 指令：kubectl get secret,configmap,serviceaccount,role,rolebinding -n tasks
 ```
 
-StatefulSet postgres READY 1/1、Deployment redis/backend/frontend/task-runner 都 READY、CronJob 存在、PVC Bound。
+`secret/app-secrets`、`configmap/app-config`、`serviceaccount/backend-sa`、`role/backend-role`、`rolebinding/backend-rolebinding` 全部存在。
 
 ---
 

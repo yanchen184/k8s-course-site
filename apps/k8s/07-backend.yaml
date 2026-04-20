@@ -16,12 +16,9 @@ spec:
       serviceAccountName: backend-sa
       containers:
       - name: backend
-        image: yanchen184/task-api:v1
+        image: yanchen184/task-api:v2
         ports:
         - containerPort: 3000
-        envFrom:
-        - configMapRef:
-            name: app-config
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:

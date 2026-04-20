@@ -1,23 +1,49 @@
 const express = require('express');
 const { Pool } = require('pg');
 const Redis = require('ioredis');
+const k8s = require('@kubernetes/client-node');
 
 const app = express();
 app.use(express.json());
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
-  database: process.env.POSTGRES_DB || 'taskdb',
-  user: process.env.POSTGRES_USER || 'postgres',
-  password: process.env.POSTGRES_PASSWORD,
-});
+let pool;
+let redis;
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
-});
+async function loadConfigFromK8s() {
+  const kc = new k8s.KubeConfig();
+  kc.loadFromCluster();
+  const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+
+  const namespace = 'tasks';
+  const result = await k8sApi.readNamespacedConfigMap('app-config', namespace);
+  const data = result.body.data;
+
+  console.log('Loaded ConfigMap from K8s API:', Object.keys(data));
+  return data;
+}
+
+async function init() {
+  const config = await loadConfigFromK8s();
+
+  pool = new Pool({
+    host: config.POSTGRES_HOST,
+    port: parseInt(config.POSTGRES_PORT),
+    database: config.POSTGRES_DB,
+    user: 'postgres',
+    password: process.env.POSTGRES_PASSWORD,
+  });
+
+  redis = new Redis({
+    host: config.REDIS_HOST,
+    port: parseInt(config.REDIS_PORT),
+    password: process.env.REDIS_PASSWORD,
+  });
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`task-api listening on port ${PORT}`);
+  });
+}
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -59,7 +85,7 @@ app.post('/tasks', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`task-api listening on port ${PORT}`);
+init().catch(err => {
+  console.error('Failed to initialize:', err.message);
+  process.exit(1);
 });

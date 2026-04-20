@@ -897,6 +897,13 @@ Migration complete: tasks table ready
 
 三個 task-runner Pod 都輸出 `task-runner started, waiting for tasks...`，代表正常連到 Redis Queue 等待任務。
 
+持續監看（有新任務進來就即時顯示）：
+```
+指令：kubectl logs -l app=task-runner -n tasks -f
+```
+
+`-f` 是 follow 模式，新 log 一出來就即時印出，按 `Ctrl+C` 停止。
+
 ---
 
 **8. Ingress + Backend API — 對外可用**

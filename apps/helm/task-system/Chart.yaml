@@ -1,0 +1,6 @@
+apiVersion: v2
+name: task-system
+description: 任務排程系統 — K8s 課程 Loop 3 示範
+type: application
+version: 1.0.0
+appVersion: "v1"

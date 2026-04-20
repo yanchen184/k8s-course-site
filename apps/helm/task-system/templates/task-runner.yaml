@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-runner
+  namespace: tasks
+spec:
+  replicas: {{ .Values.replicas.taskRunner }}
+  selector:
+    matchLabels:
+      app: task-runner
+  template:
+    metadata:
+      labels:
+        app: task-runner
+    spec:
+      containers:
+      - name: task-runner
+        image: {{ .Values.image.registry }}/task-runner:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        envFrom:
+        - configMapRef:
+            name: app-config
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: postgres-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: redis-password
+        resources:
+          {{- toYaml .Values.resources.taskRunner | nindent 10 }}

@@ -1,0 +1,14 @@
+# 示範 upgrade 用：v2 版本，擴大副本數，調高資源
+image:
+  tag: v2
+
+replicas:
+  backend: 3
+  frontend: 3
+  taskRunner: 5
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  cpuPercent: 60

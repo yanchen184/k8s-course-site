@@ -1,0 +1,54 @@
+# 預設值 — 可用 --set 或 -f values-prod.yaml 覆蓋
+
+image:
+  registry: yanchen184
+  tag: v1
+  pullPolicy: IfNotPresent
+
+replicas:
+  backend: 2
+  frontend: 2
+  taskRunner: 3
+
+secrets:
+  postgresPassword: "MyPostgresP@ssw0rd"
+  redisPassword: "MyRedisP@ssw0rd"
+  jwtSecret: "MyJwtSuperSecret"
+
+db:
+  name: taskdb
+  user: postgres
+
+ingress:
+  enabled: true
+  className: traefik     # minikube 改成 nginx
+  host: task.example.com
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  cpuPercent: 70
+
+resources:
+  backend:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  frontend:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+  taskRunner:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"

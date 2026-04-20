@@ -892,7 +892,7 @@ Migration complete: tasks table ready
 **7. Task Runner — 等待任務**
 
 ```
-指令：kubectl logs -l app=task-runner -n tasks --tail=5
+指令：kubectl logs -l app=task-runner -n tasks --tail=20
 ```
 
 三個 task-runner Pod 都輸出 `task-runner started, waiting for tasks...`，代表正常連到 Redis Queue 等待任務。

@@ -405,12 +405,6 @@ spec:
 `restartPolicy: Never`：Pod 失敗不重啟這個 Pod，Job 建一個新 Pod 重試，舊的留著看 log。`backoffLimit: 3`：最多重試三次。
 
 ```
-指令：kubectl apply -f 06-rbac.yaml
-```
-
-三行輸出：`serviceaccount/backend-sa created`、`role.rbac.authorization.k8s.io/backend-role created`、`rolebinding.rbac.authorization.k8s.io/backend-rolebinding created`。
-
-```
 指令：kubectl apply -f 05-db-migrate-job.yaml
 指令：kubectl get job -n tasks
 ```
@@ -431,7 +425,7 @@ Migration complete: tasks table ready
 
 ### RBAC — Backend 最小權限
 
-> RBAC 已在上面 `06-rbac.yaml` 一起 apply，這裡是說明 YAML 內容。
+Backend API 需要在執行時讀取 ConfigMap（取得 DB 連線資訊）。這個 SA 就是給 Backend Pod 用的身份，限制它只能讀 ConfigMap，其他什麼都不能做。
 
 ```yaml
 apiVersion: v1
@@ -464,6 +458,12 @@ roleRef:
   name: backend-role        # ★ 重點 3：名字要跟上面 Role 的 metadata.name 完全一致，拼錯不會報錯但權限不會生效
   apiGroup: rbac.authorization.k8s.io
 ```
+
+```
+指令：kubectl apply -f 06-rbac.yaml
+```
+
+三行輸出：`serviceaccount/backend-sa created`、`role.rbac.authorization.k8s.io/backend-role created`、`rolebinding.rbac.authorization.k8s.io/backend-rolebinding created`。
 
 ### Backend API
 

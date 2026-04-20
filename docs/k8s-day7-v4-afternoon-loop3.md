@@ -1,6 +1,6 @@
 # 第七堂下午逐字稿 v4 — Loop 3：從零部署（任務排程系統，講師示範）
 
-> 影片：7-8（系統設計 + 為什麼）、7-9（邊打指令邊講，所有組件一路建到完成）、7-10（QA + 學員題目 + 解答）
+> 影片：7-8（系統設計 + 為什麼）、7-9（邊打指令邊講，所有組件一路建到完成）、7-10（QA + Helm 示範 install/upgrade/rollback/values + 學員題目 + 解答）
 > 主線：用一套真實系統，把四堂課所有核心組件全部串起來
 > 系統架構：Frontend → Backend API → Redis Queue → Task Runner → PostgreSQL
 
@@ -828,6 +828,99 @@ A：兩個原因。第一，Pod 沒有設 resources.requests.cpu，HPA 算不出
 Q：Task Runner 啟動了，但 Queue 裡的任務沒有被消費？
 
 A：kubectl logs -l app=task-runner -n tasks 看 Task Runner 的 log。最常見是 Redis 連線失敗，通常是 REDIS_HOST 或 REDIS_PASSWORD 設錯。確認 redis-service 存在、Redis Pod 是 Running 狀態，然後確認 ConfigMap 和 Secret 的值對不對。
+
+---
+
+### Helm 示範 — 同一套系統，用 Helm 管理
+
+好，QA 結束。在進入學員題目之前，我要用剛才這套系統示範一件事。
+
+你剛才用 kubectl apply 一個一個把 YAML 打上去。這在管理一套系統的時候有個問題：版本怎麼追蹤？rollback 怎麼做？要換一個設定值，你要去找哪個 YAML 改，apply 之後怎麼知道有沒有漏掉？
+
+這就是 Helm 要解決的問題。我把這套任務排程系統包成一個 Helm Chart，接下來示範四件事：install、upgrade、rollback、換 values。
+
+---
+
+先清掉剛才用 kubectl apply 建的東西：
+
+指令：kubectl delete namespace tasks
+
+等 namespace 刪乾淨：
+
+指令：kubectl get ns
+
+---
+
+**Step 1 — helm install**
+
+一行部署整套系統：
+
+指令：helm install task-system ./apps/helm/task-system
+
+這一行做的事，等於你剛才打的所有 kubectl apply 加起來。
+
+看部署狀態：
+
+指令：helm list
+
+指令：kubectl get all -n tasks
+
+等所有 Pod READY，migration Job 也跑完。
+
+---
+
+**Step 2 — helm upgrade（換 image tag + 擴副本）**
+
+現在假設你出了 v2，backend 副本要從 2 擴到 3：
+
+指令：helm upgrade task-system ./apps/helm/task-system -f apps/helm/values-v2.yaml
+
+Helm 只更新有變的資源，沒變的不動。
+
+看 history：
+
+指令：helm history task-system
+
+你會看到兩個 REVISION，REVISION 1 是 install，REVISION 2 是這次 upgrade。
+
+---
+
+**Step 3 — helm rollback**
+
+upgrade 之後發現 v2 有問題，一行 rollback：
+
+指令：helm rollback task-system 1
+
+rollback 不是覆蓋 REVISION 1，它建立一個新的 REVISION 3，內容跟 REVISION 1 一樣。history 完整保留，你知道每一次動了什麼。
+
+指令：helm history task-system
+
+---
+
+**Step 4 — --set 換單一 value**
+
+不用改 values.yaml，直接 --set 覆蓋單一值：
+
+指令：helm upgrade task-system ./apps/helm/task-system --set replicas.backend=5
+
+指令：kubectl get pods -n tasks -l app=backend
+
+backend Pod 從 2 個變 5 個。--set 適合臨時調整，正式環境還是用 values 檔記錄。
+
+---
+
+四個操作總結：
+
+| 操作 | 指令 |
+|------|------|
+| 部署整套系統 | `helm install task-system ./apps/helm/task-system` |
+| 升級版本 | `helm upgrade task-system ./apps/helm/task-system -f values-v2.yaml` |
+| 查歷史 | `helm history task-system` |
+| Rollback | `helm rollback task-system 1` |
+| 換單一值 | `helm upgrade task-system ./apps/helm/task-system --set replicas.backend=5` |
+| 清除整套 | `helm uninstall task-system` |
+
+這就是為什麼生產環境都用 Helm 管理，不用裸 YAML。版本有歷史、rollback 一行、設定值集中在一個地方。
 
 ---
 

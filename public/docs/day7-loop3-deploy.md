@@ -79,7 +79,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: tasks
+  name: tasks        # ★ 重點 1：所有後續 -n tasks 都對應這個名稱，改這裡全部要跟著改
 ```
 
 ```
@@ -96,8 +96,8 @@ kind: Secret
 metadata:
   name: app-secrets
   namespace: tasks
-type: Opaque
-stringData:
+type: Opaque        # ★ 重點 1：Opaque 是通用型 Secret，適合任意 key-value 機密資料
+stringData:         # ★ 重點 2：填明文，K8s 自動 base64 encode；若用 data 欄位則要自己先 encode
   postgres-password: "MyPostgresP@ssw0rd"
   redis-password: "MyRedisP@ssw0rd"
   jwt-secret: "MyJwtSuperSecret"
@@ -119,12 +119,12 @@ metadata:
   name: app-config
   namespace: tasks
 data:
-  POSTGRES_HOST: "postgres-service"
+  POSTGRES_HOST: "postgres-service"   # ★ 重點 1：值是 Service 名稱不是 IP，K8s DNS 自動解析，Pod 換 IP 不受影響
   POSTGRES_PORT: "5432"
   POSTGRES_DB: "taskdb"
   REDIS_HOST: "redis-service"
   REDIS_PORT: "6379"
-  API_URL: "http://backend-service:3000"
+  API_URL: "http://backend-service:3000"  # ★ 重點 2：叢集內部 URL，用 Service 名稱通訊，不需要真實 IP
 ```
 
 ```
@@ -151,7 +151,7 @@ metadata:
   name: postgres
   namespace: tasks
 spec:
-  serviceName: "postgres-service"
+  serviceName: "postgres-service"   # ★ 重點 1：對應 Headless Service 名稱，K8s 用這個組出穩定 DNS（postgres-0.postgres-service）
   replicas: 1
   selector:
     matchLabels:
@@ -180,11 +180,16 @@ spec:
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
+        readinessProbe:              # ★ 重點 2：通過才算 Ready，migration Job 要等這個，否則 DB 還沒好就連線會失敗
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:             # ★ 重點 3：StatefulSet 特有，自動幫每個 Pod 建專屬 PVC，重啟後還是同一個磁碟
   - metadata:
       name: postgres-storage
     spec:
-      accessModes: ["ReadWriteOnce"]
+      accessModes: ["ReadWriteOnce"]   # ★ 重點 4：同時只能一個 Node 掛載，單一 PostgreSQL 標準做法
       resources:
         requests:
           storage: 5Gi
@@ -206,10 +211,26 @@ spec:
   ports:
   - port: 5432
     targetPort: 5432
-  clusterIP: None
+  clusterIP: None   # ★ 重點 1：Headless，DNS 直接回 Pod IP 而非虛擬 IP，StatefulSet 才能用穩定名稱定址特定 Pod
 ```
 
 Headless Service 沒有虛擬 IP，DNS 直接回傳 Pod 真實 IP，讓你可以用穩定名稱定址到特定 Pod。StatefulSet 標準做法。
+
+**K8s 自動幫你建 DNS，不需要你寫任何設定。**
+
+只要 StatefulSet 設了 `serviceName: "postgres-service"`，K8s 內建的 CoreDNS 就自動建立這條記錄：
+
+```
+postgres-0.postgres-service.tasks.svc.cluster.local
+```
+
+格式是：`Pod名稱.Service名稱.Namespace.svc.cluster.local`
+
+**為什麼是 `postgres-0`？**
+
+StatefulSet 的 Pod 命名規則固定是 `StatefulSet名稱-序號`：第一個 Pod 叫 `postgres-0`，第二個叫 `postgres-1`，以此類推。重啟後名字不變。
+
+這跟 Deployment 完全不同——Deployment 的 Pod 名稱是隨機的（例如 `backend-7c8b85c4ff-w7rxm`），每次重啟換一個新名字。StatefulSet 的 Pod 有固定身份，Deployment 的 Pod 是無名氏。這就是為什麼資料庫要用 StatefulSet：名字固定，DNS 才能穩定定址。
 
 ```
 指令：kubectl apply -f 03-postgres.yaml
@@ -268,7 +289,7 @@ spec:
       containers:
       - name: redis
         image: redis:7
-        command: ["/bin/sh", "-c", "redis-server --requirepass $REDIS_PASSWORD"]
+        command: ["/bin/sh", "-c", "redis-server --requirepass $REDIS_PASSWORD"]  # ★ 重點 1：exec form 不走 shell，用 /bin/sh -c 包才能做 $REDIS_PASSWORD 環境變數替換
         env:
         - name: REDIS_PASSWORD
           valueFrom:
@@ -325,11 +346,11 @@ metadata:
 spec:
   template:
     spec:
-      restartPolicy: Never
+      restartPolicy: Never   # ★ 重點 1：Pod 失敗不重啟舊 Pod，Job 另建新 Pod 重試，舊的留著方便看 log
       containers:
       - name: migrate
         image: yanchen184/task-api:v1
-        command: ["node", "migrate.js"]
+        command: ["node", "migrate.js"]   # ★ 重點 2：只跑一次就結束，跟 Deployment 持續存活的設計相反
         env:
         - name: POSTGRES_HOST
           valueFrom:
@@ -346,7 +367,7 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: postgres-password
-  backoffLimit: 3
+  backoffLimit: 3   # ★ 重點 3：最多重試三次，超過就標記 Job 失敗，不無限重試
 ```
 
 `restartPolicy: Never`：Pod 失敗不重啟這個 Pod，Job 建一個新 Pod 重試，舊的留著看 log。`backoffLimit: 3`：最多重試三次。
@@ -393,9 +414,9 @@ metadata:
   name: backend-role
   namespace: tasks
 rules:
-- apiGroups: [""]
+- apiGroups: [""]          # ★ 重點 1：空字串代表 core group，ConfigMap、Pod、Service 都在這裡
   resources: ["configmaps"]
-  verbs: ["get", "list"]
+  verbs: ["get", "list"]   # ★ 重點 2：只允許讀，不給寫入或刪除，落實最小權限原則
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -408,7 +429,7 @@ subjects:
   namespace: tasks
 roleRef:
   kind: Role
-  name: backend-role
+  name: backend-role        # ★ 重點 3：名字要跟上面 Role 的 metadata.name 完全一致，拼錯不會報錯但權限不會生效
   apiGroup: rbac.authorization.k8s.io
 ```
 
@@ -430,7 +451,7 @@ spec:
       labels:
         app: backend
     spec:
-      serviceAccountName: backend-sa
+      serviceAccountName: backend-sa   # ★ 重點 1：Pod 用這個身份跟 API Server 溝通，沒設會用 default SA（通常無任何權限）
       containers:
       - name: backend
         image: yanchen184/task-api:v1
@@ -438,7 +459,7 @@ spec:
         - containerPort: 3000
         envFrom:
         - configMapRef:
-            name: app-config
+            name: app-config            # ★ 重點 2：整包 ConfigMap 一次注入所有 key 為環境變數，Secret 不建議這樣做
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:
@@ -457,14 +478,14 @@ spec:
               key: jwt-secret
         resources:
           requests:
-            cpu: "100m"
+            cpu: "100m"          # ★ 重點 3：HPA 的分母，沒設這行 HPA 算不出 CPU 百分比，TARGETS 會顯示 unknown
             memory: "128Mi"
           limits:
             cpu: "500m"
             memory: "256Mi"
         readinessProbe:
           httpGet:
-            path: /health
+            path: /health        # ★ 重點 4：Pod Running 不等於可接流量，/health 回 200 才加入 Service 後端列表
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 10
@@ -512,7 +533,7 @@ metadata:
   name: frontend
   namespace: tasks
 spec:
-  replicas: 2
+  replicas: 2       # ★ 重點 1：兩個副本，一個 Pod 掛掉另一個繼續服務，避免單點故障
   selector:
     matchLabels:
       app: frontend
@@ -574,7 +595,7 @@ metadata:
   name: task-runner
   namespace: tasks
 spec:
-  replicas: 3
+  replicas: 3       # ★ 重點 1：三個 Task Runner 同時消費 Queue，數量跟業務量有關，跟 Node 數量無關（這就是不用 DaemonSet 的原因）
   selector:
     matchLabels:
       app: task-runner
@@ -628,15 +649,15 @@ metadata:
   name: task-scheduler
   namespace: tasks
 spec:
-  schedule: "* * * * *"
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
+  schedule: "* * * * *"           # ★ 重點 1：Cron 語法「分 時 日 月 週」，五個星號 = 每分鐘觸發
+  concurrencyPolicy: Forbid        # ★ 重點 2：上一個 Job 還沒跑完就跳過，防止同一批任務被重複入隊
+  successfulJobsHistoryLimit: 3    # ★ 重點 3：只保留最近 3 次成功記錄，防止 Job 物件無限堆積佔用 etcd
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
       template:
         spec:
-          restartPolicy: OnFailure
+          restartPolicy: OnFailure  # ★ 重點 4：失敗在同一個 Pod 原地重試，跟 Job 的 Never（建新 Pod）不同
           containers:
           - name: scheduler
             image: yanchen184/task-scheduler:v1
@@ -700,7 +721,7 @@ metadata:
 spec:
   stripPrefix:
     prefixes:
-      - /api
+      - /api    # ★ 重點 1：剝掉 /api 前綴，Backend 收到的是 /tasks 而非 /api/tasks，否則路由 404
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -708,14 +729,14 @@ metadata:
   name: tasks-ingress
   namespace: tasks
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: tasks-strip-api-prefix@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: tasks-strip-api-prefix@kubernetescrd   # ★ 重點 2：格式固定是 namespace-名稱@kubernetescrd，少一個字都不認
 spec:
-  ingressClassName: traefik
+  ingressClassName: traefik   # ★ 重點 3：指定用 Traefik，k3s 預設 Ingress Controller，若用 k8s 標準版改成 nginx
   rules:
   - host: task.example.com
     http:
       paths:
-      - path: /api
+      - path: /api             # ★ 重點 4：/api 路由到 backend-service，/ 路由到 frontend-service，順序不能反
         pathType: Prefix
         backend:
           service:
@@ -771,8 +792,8 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: backend
-  minReplicas: 2
+    name: backend    # ★ 重點 1：管理哪個 Deployment，名稱要跟 Backend Deployment 的 metadata.name 完全一致
+  minReplicas: 2     # ★ 重點 2：最少保持 2 個副本，低負載時不會縮到 0，維持基本可用性
   maxReplicas: 10
   metrics:
   - type: Resource
@@ -780,7 +801,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: 70   # ★ 重點 3：CPU 超過 requests 的 70% 就擴容，分母是 requests.cpu（100m），一定要設
 ```
 
 ```

@@ -727,9 +727,23 @@ spec:
 Middleware 把 /api 前綴剝掉，Backend 收到的是 /tasks 而不是 /api/tasks，否則 404。Annotation 格式：`namespace-middleware名稱@kubernetescrd`。
 
 ```
-指令：kubectl apply -f ingress.yaml
+指令：kubectl apply -f 12-ingress.yaml
 指令：kubectl get ingress -n tasks
 ```
+
+ADDRESS 欄位出現 Node IP（`192.168.43.131,192.168.43.133`）代表 Traefik 已經接管這個 Ingress。
+
+**本機測試**：在你的電腦加一行 hosts 對應（不是在 VM 上）：
+
+- Windows：用系統管理員開記事本編輯 `C:\Windows\System32\drivers\etc\hosts`
+- Mac/Linux：`sudo nano /etc/hosts`
+
+加入：
+```
+192.168.43.133  task.local
+```
+
+然後開瀏覽器 `http://task.local` 就能看到 Frontend 畫面，`http://task.local/api/tasks` 打到 Backend API。
 
 ### HPA
 

@@ -10,1693 +10,2408 @@ export interface Slide {
   duration?: string
 }
 
+// ============================================================
+// 第七堂下午 v4 — Loop 3：從零建完整系統（任務排程系統）
+// 影片：7-8（系統設計）、7-9（邊建邊解釋）、7-10（QA + Helm + 學員題目）
+// 架構：Frontend → Backend API → Redis Queue → Task Runner → PostgreSQL
+// ============================================================
+
 export const slides: Slide[] = [
-  // Loop 6：從零部署上（7-17, 7-18, 7-19）
+  // ============================================================
+  // 7-8：我們要建什麼？（~8min）
   // ============================================================
 
-  // ── 7-17 概念（1/2）：12 步引導上（步驟 1-6）──
+  // ── 7-8 封面 ──
   {
-    title: '從零部署完整系統：12 步（上）',
-    subtitle: '步驟 1-6：底層到上層，一步步疊上去',
-    section: 'Loop 6：從零部署（上）',
-    duration: '12',
+    title: 'Loop 3：從零建完整系統',
+    subtitle: '任務排程系統 — 把四堂課所有組件串起來',
+    section: '7-8 為什麼做這個 Demo',
+    duration: '1',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">目標架構</p>
-          <div className="bg-slate-900/60 border border-slate-700 p-3 rounded-lg">
-            <div className="flex items-center gap-2 flex-wrap justify-center text-sm">
-              <span className="text-slate-400">使用者</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-purple-900/40 border border-purple-500/50 px-2 py-1 rounded text-purple-400">Ingress</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">Frontend x2</span>
-              <span className="text-slate-400">/</span>
-              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400">API x3~10</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-amber-900/40 border border-amber-500/50 px-2 py-1 rounded text-amber-400">MySQL (StatefulSet)</span>
-            </div>
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-cyan-900/40 to-purple-900/40 border border-cyan-500/50 p-6 rounded-lg text-center">
+          <p className="text-cyan-300 text-lg font-semibold mb-3">下午的總複習</p>
+          <p className="text-slate-300 text-sm">學了這麼多組件，從來沒有全部串在一起過</p>
+          <p className="text-slate-300 text-sm mt-1">今天，一套真實系統 → 12 個 K8s 組件 → 從零開始</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-slate-800/60 border border-slate-700 p-3 rounded text-center">
+            <p className="text-cyan-400 font-semibold text-sm">7-8</p>
+            <p className="text-slate-300 text-xs mt-1">為什麼選這個 Demo</p>
+            <p className="text-slate-500 text-xs mt-1">8 分鐘</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-700 p-3 rounded text-center">
+            <p className="text-cyan-400 font-semibold text-sm">7-9</p>
+            <p className="text-slate-300 text-xs mt-1">邊建邊解釋</p>
+            <p className="text-slate-500 text-xs mt-1">40 分鐘</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-700 p-3 rounded text-center">
+            <p className="text-cyan-400 font-semibold text-sm">7-10</p>
+            <p className="text-slate-300 text-xs mt-1">QA + Helm + 題目</p>
+            <p className="text-slate-500 text-xs mt-1">15 分鐘</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/50 p-3 rounded-lg">
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded-lg text-sm text-amber-300 text-center">
+          不是在背指令，是在練習做選擇
+        </div>
+      </div>
+    ),
+    notes: `好，上午解決了 HPA 和 RBAC。現在進入今天最後一個部分，也是整個課程最重要的環節。
+
+我想先問大家一個問題。到目前為止你學了 Deployment、StatefulSet、PVC、ConfigMap、Secret、Service、Ingress、HPA、RBAC、Job、CronJob。每個組件你應該都知道它是什麼。
+
+但如果我現在叫你從零建一套完整的系統，你知道要從哪裡開始嗎？第一步做什麼、第二步做什麼、這裡用哪個組件、那裡為什麼不用另一個？
+
+這就是今天下午要做的事。我親自示範一套完整系統從零建起來，你跟著看，看每一個選擇的背後是什麼原因。
+
+這個 Loop 分三段。7-8 先講為什麼選這個系統、架構長什麼樣、組件怎麼分配，大約 8 分鐘。7-9 我打開 terminal 一步一步建，每建一個組件就解釋為什麼用它，大約 40 分鐘。7-10 是 QA、Helm 示範、還有學員題目，大約 15 分鐘。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-8 系統功能 + 架構圖 ──
+  {
+    title: '系統功能 — 任務排程系統',
+    subtitle: '業界標準非同步任務架構',
+    section: '7-8 為什麼做這個 Demo',
+    duration: '2',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-2 text-sm">使用者情境</p>
+          <p className="text-slate-300 text-sm">建立一個任務：「每天早上九點寄出報表 Email」→ 點送出 → 馬上得到「任務已建立」的回應</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold mb-3 text-sm text-center">資料流</p>
+          <div className="flex items-center gap-2 flex-wrap justify-center text-xs">
+            <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-300">Frontend (React)</span>
+            <span className="text-cyan-400">→</span>
+            <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-300">Backend API</span>
+            <span className="text-cyan-400">→</span>
+            <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-300">Redis Queue</span>
+            <span className="text-cyan-400">→</span>
+            <span className="bg-purple-900/40 border border-purple-500/50 px-2 py-1 rounded text-purple-300">Task Runner</span>
+            <span className="text-cyan-400">→</span>
+            <span className="bg-amber-900/40 border border-amber-500/50 px-2 py-1 rounded text-amber-300">PostgreSQL</span>
+          </div>
+          <div className="flex items-center gap-2 justify-center text-xs mt-3 pt-3 border-t border-slate-700">
+            <span className="text-slate-500">定時觸發：</span>
+            <span className="bg-orange-900/40 border border-orange-500/50 px-2 py-1 rounded text-orange-300">CronJob</span>
+            <span className="text-cyan-400">→</span>
+            <span className="text-slate-400">掃到期任務丟進 Queue</span>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded-lg text-sm">
+          <p className="text-green-300 font-semibold mb-1">為什麼這個架構</p>
+          <p className="text-slate-300 text-xs">這是非同步任務系統的標準架構。業界的 Celery、Bull、Sidekiq，都是這個模式。</p>
+        </div>
+      </div>
+    ),
+    notes: `先說明系統的功能。
+
+使用者打開瀏覽器，建立一個任務：每天早上九點寄出報表 Email。點送出，請求打到 Backend API，API 把任務丟進 Redis Queue，馬上回應使用者任務已建立。
+
+有一個 Task Runner 一直在跑，不斷從 Queue 拿任務出來執行，執行完把結果存進 PostgreSQL。另外有一個 CronJob 定時觸發，把到期的排程任務撈出來丟進 Queue，Task Runner 去執行。
+
+這是非同步任務系統的標準架構。業界的 Celery、Bull、Sidekiq，都是這個模式。你以後在公司看到的任務系統，大概都長這樣。
+
+為什麼選這個系統？因為它能覆蓋最多的 K8s 組件。等一下會逐一說明每個組件怎麼對應到這個系統。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 7-8 12 組件對照表 ──
+  {
+    title: '12 個 K8s 組件 — 每個用在哪裡、為什麼',
+    subtitle: '一套系統，覆蓋你學過的所有組件',
+    section: '7-8 為什麼做這個 Demo',
+    duration: '3',
+    content: (
+      <div className="space-y-2">
+        <div className="bg-slate-800/50 p-2 rounded-lg">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-cyan-400 border-b border-slate-600">
-                <th className="text-left py-1 pr-1 w-8">#</th>
-                <th className="text-left py-1 pr-2">做什麼</th>
-                <th className="text-left py-1 pr-2">對應概念</th>
-                <th className="text-left py-1 w-16">堂次</th>
+                <th className="text-left py-1 pr-2 w-24">組件</th>
+                <th className="text-left py-1 pr-2 w-40">用在哪裡</th>
+                <th className="text-left py-1">為什麼</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">1</td>
-                <td className="py-1 pr-2">建 Namespace（prod）</td>
-                <td className="py-1 pr-2 font-mono text-green-400">Namespace</td>
-                <td className="py-1">第五堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">2</td>
-                <td className="py-1 pr-2">建 Secret（DB 密碼）</td>
-                <td className="py-1 pr-2 font-mono text-green-400">Secret</td>
-                <td className="py-1">第六堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">3</td>
-                <td className="py-1 pr-2">建 ConfigMap（API 設定）</td>
-                <td className="py-1 pr-2 font-mono text-green-400">ConfigMap</td>
-                <td className="py-1">第六堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">4</td>
-                <td className="py-1 pr-2">MySQL StatefulSet + PVC</td>
-                <td className="py-1 pr-2 font-mono text-green-400">StatefulSet</td>
-                <td className="py-1">第六堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">5</td>
-                <td className="py-1 pr-2">API Deployment + Probe</td>
-                <td className="py-1 pr-2 font-mono text-green-400">Deploy+Probe</td>
-                <td className="py-1">五+七</td>
-              </tr>
-              <tr>
-                <td className="py-1 pr-1 text-cyan-400 font-bold">6</td>
-                <td className="py-1 pr-2">Frontend Deployment</td>
-                <td className="py-1 pr-2 font-mono text-green-400">Deployment</td>
-                <td className="py-1">第五堂</td>
-              </tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">Deployment</td><td className="py-1">Frontend / Backend / Task Runner</td><td className="py-1 text-slate-400">無狀態，Pod 隨時可重建</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">StatefulSet</td><td className="py-1">PostgreSQL</td><td className="py-1 text-slate-400">需要穩定 Pod 名稱和固定儲存</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">PVC</td><td className="py-1">PostgreSQL 儲存</td><td className="py-1 text-slate-400">持久化資料</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">ConfigMap</td><td className="py-1">DB 主機名 / Port / DB 名稱</td><td className="py-1 text-slate-400">非機密設定</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">Secret</td><td className="py-1">DB 密碼 / Redis 密碼 / JWT</td><td className="py-1 text-slate-400">機密資料</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">Service</td><td className="py-1">所有服務</td><td className="py-1 text-slate-400">叢集內部互連</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">Ingress</td><td className="py-1">Frontend / Backend 對外</td><td className="py-1 text-slate-400">域名路由</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">HPA</td><td className="py-1">Backend API</td><td className="py-1 text-slate-400">流量高自動擴 Pod</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">RBAC</td><td className="py-1">Backend SA</td><td className="py-1 text-slate-400">最小權限讀 ConfigMap</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">Job</td><td className="py-1">DB schema migration</td><td className="py-1 text-slate-400">一次性任務</td></tr>
+              <tr className="border-b border-slate-700/50"><td className="py-1 font-mono text-green-400">CronJob</td><td className="py-1">排程觸發器</td><td className="py-1 text-slate-400">定時掃描到期任務</td></tr>
+              <tr><td className="py-1 font-mono text-slate-500">DaemonSet</td><td className="py-1 text-slate-500">對比說明</td><td className="py-1 text-slate-500">Task Runner 為什麼不用它</td></tr>
             </tbody>
           </table>
         </div>
 
-        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded-lg text-sm text-amber-300">
-          順序不能亂：Secret → ConfigMap → MySQL → API → Frontend，每一步依賴前一步
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center">
+          12 個組件，一套系統。每個選擇背後都有原因。
         </div>
       </div>
     ),
-    notes: `好，從這個 Loop 開始，我們進入今天最核心的部分：從零部署一套完整的生產級系統。
+    notes: `來數一下這套系統用了哪些組件，同時說明每個組件用在哪裡、為什麼用它。
 
-四堂課下來，你學了 Pod、Deployment、Service、Ingress、ConfigMap、Secret、PV、PVC、StatefulSet、Helm、Probe、Resource limits、HPA、RBAC、NetworkPolicy。一大堆概念，每個都分開學過，每個都做過實作。但你有沒有試過把它們全部串在一起？從一個完全空的叢集開始，一步一步建出一個完整的系統？
+Deployment 用在 Frontend、Backend API、Task Runner。這三個服務都是無狀態的，Pod 隨時可以砍掉重建，不怕資料丟。
 
-這就是我們接下來要做的事情。
+StatefulSet 用在 PostgreSQL，不是 Deployment。因為資料庫需要穩定的 Pod 名稱和固定的儲存，Pod 重啟之後還是要接回同一個磁碟。Deployment 做不到這件事。
 
-先看目標架構。使用者透過瀏覽器輸入 myapp.local 這個域名。請求先到 Ingress Controller，Ingress 根據路徑做路由。根路徑 / 導到前端 Service，/api 開頭的導到 API Service。前端有兩個副本。API 有三個副本，加上 HPA 可以自動擴到十個。API 連 MySQL 資料庫，MySQL 用 StatefulSet 跑一個實例，掛 PVC 做持久化。
+PVC 給 PostgreSQL 持久化儲存。
 
-所有 Pod 都有 Probe 做健康檢查，都有 Resource limits 做資源控制。NetworkPolicy 限制前端只能連 API、API 只能連 MySQL，三層隔離。Secret 存資料庫密碼，ConfigMap 存 API 的設定。
+ConfigMap 存 DB 主機名、Redis 位址、Port 號這些設定值。
 
-一共 12 個步驟。大家看投影片上的表格。每一步我都標了對應的概念和對應哪堂課學的。
+Secret 存 DB 密碼、Redis 密碼、JWT secret 這些機密資料。
 
-步驟一，建 Namespace。我們不用 default，建一個叫 prod 的 Namespace，把所有資源放在裡面。為什麼？第五堂學的，Namespace 做環境隔離，生產環境有自己的 Namespace。
+Service，每個服務都要有，讓叢集內部的服務可以互相連。
 
-步驟二，建 Secret。MySQL 需要 root 密碼，這個密碼不能明文寫在 YAML 裡面，用 Secret 存。第六堂學的。
+Ingress 對外暴露 Frontend 和 Backend API，走域名路由。
 
-步驟三，建 ConfigMap。API 需要知道資料庫的地址和 Port，這些設定用 ConfigMap 存。第六堂學的。
+HPA 給 Backend API，流量高的時候自動擴 Pod。
 
-步驟四，部署 MySQL。用 StatefulSet 加 PVC 加 Headless Service。為什麼用 StatefulSet 不用 Deployment？第六堂學的，因為資料庫需要穩定的網路標識和獨立的儲存。為什麼用 Headless Service？因為 StatefulSet 的每個 Pod 需要自己的 DNS 名稱，像 mysql-0.mysql-headless.prod.svc.cluster.local。
+RBAC 給 Backend，讓它有讀取 ConfigMap 的最小權限。這等一下會詳細示範。
 
-步驟五，部署 API。用 Deployment 跑三個副本。YAML 裡面同時配了 livenessProbe、readinessProbe、startupProbe 三種健康檢查。設了 resources requests 和 limits 做資源控制。從 Secret 讀取資料庫密碼，從 ConfigMap 讀取資料庫地址。一個 Deployment 的 YAML 裡面用到了五六個概念。
+Job 跑一次性的資料庫 schema migration。
 
-步驟六，部署前端。也是用 Deployment，跑兩個副本。前端用 nginx 加上自訂的 ConfigMap 做反向代理，把 /api 開頭的請求轉給 API Service。
+CronJob 定時觸發排程任務。
 
-這是前六步。從 Namespace 到 Secret 到 ConfigMap 到 MySQL 到 API 到前端，底層到上層，一步一步疊上去。每一步都依賴前一步。Secret 要先建好 MySQL 才能讀到密碼。ConfigMap 要先建好 API 才能讀到設定。MySQL 要先跑起來 API 才能連。順序不能亂。
+DaemonSet 我不會真的用，但會在過程中解釋 Task Runner 為什麼不用 DaemonSet，DaemonSet 真正適合的場景是什麼。
 
-下一個影片我們就來實際敲指令，把步驟一到六做出來。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-17 概念（2/2）：步驟 1-6 細節 ──
-  {
-    title: '步驟 1-6 的 YAML 重點',
-    subtitle: '每一步用到哪些概念、為什麼這樣設計',
-    section: 'Loop 6：從零部署（上）',
-    duration: '10',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 4：MySQL YAML 三合一</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><span className="text-green-400 font-mono">Headless Service</span> → clusterIP: None，給 Pod 獨立 DNS</p>
-            <p><span className="text-green-400 font-mono">StatefulSet</span> → 穩定序號 mysql-0，有序啟動</p>
-            <p><span className="text-green-400 font-mono">volumeClaimTemplates</span> → 每個 Pod 自己的 PVC</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 5：API YAML 五合一</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><span className="text-green-400 font-mono">Deployment</span> replicas: 3</p>
-            <p><span className="text-green-400 font-mono">Probe</span> → liveness + readiness + startup 三種</p>
-            <p><span className="text-green-400 font-mono">Resources</span> → requests + limits</p>
-            <p><span className="text-green-400 font-mono">Secret</span> → envFrom secretRef 讀密碼</p>
-            <p><span className="text-green-400 font-mono">ConfigMap</span> → envFrom configMapRef 讀設定</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold mb-1 text-sm">依賴鏈</p>
-          <div className="flex items-center gap-1 flex-wrap justify-center text-xs">
-            <span className="bg-slate-800 px-2 py-1 rounded text-slate-300">Namespace</span>
-            <span className="text-green-400 font-bold">→</span>
-            <span className="bg-slate-800 px-2 py-1 rounded text-slate-300">Secret</span>
-            <span className="text-green-400 font-bold">→</span>
-            <span className="bg-slate-800 px-2 py-1 rounded text-slate-300">ConfigMap</span>
-            <span className="text-green-400 font-bold">→</span>
-            <span className="bg-slate-800 px-2 py-1 rounded text-slate-300">MySQL</span>
-            <span className="text-green-400 font-bold">→</span>
-            <span className="bg-slate-800 px-2 py-1 rounded text-slate-300">API</span>
-            <span className="text-green-400 font-bold">→</span>
-            <span className="bg-slate-800 px-2 py-1 rounded text-slate-300">Frontend</span>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `我再補充一下各步驟 YAML 的重點，讓大家在動手之前先有個心理地圖。
-
-步驟四的 MySQL YAML 是最複雜的，裡面有三個資源寫在一個檔案裡。第一個是 Headless Service，clusterIP 設成 None。為什麼？因為 StatefulSet 的每個 Pod 需要自己的 DNS 名稱。普通 Service 只有一個 ClusterIP，所有 Pod 共用。Headless Service 讓每個 Pod 有獨立的 DNS，像 mysql-0.mysql-headless.prod.svc.cluster.local。第二個是 StatefulSet 本身。第三個是 volumeClaimTemplates，寫在 StatefulSet 裡面，自動幫每個 Pod 建一個 PVC。
-
-步驟五的 API YAML 是概念最密集的。一個 Deployment 的 YAML 裡面同時用到了五六個概念。replicas 3 是 Deployment 的基本功能。livenessProbe、readinessProbe、startupProbe 是第七堂上午學的。resources requests 和 limits 也是第七堂上午學的。envFrom secretRef 讀 Secret 裡的密碼，envFrom configMapRef 讀 ConfigMap 裡的設定，這兩個是第六堂學的。
-
-依賴鏈要特別注意。Namespace 要最先建，因為後面所有資源都在這個 Namespace 裡面。Secret 和 ConfigMap 要在 MySQL 和 API 之前建好，因為 Pod 啟動時會去讀它們。如果 Secret 不存在，Pod 會出現 CreateContainerConfigError 錯誤。MySQL 要在 API 之前跑起來，因為 API 啟動時會連資料庫。如果資料庫還沒 Ready，API 的 readinessProbe 會一直失敗。
-
-好，概念清楚了，下一支影片我們動手敲指令。
+十二個組件，一套系統。我們開始。
 
 [▶ 下一頁]`,
   },
 
-  // ── 7-18 實作示範上（1/2）：步驟 1-4 ──
+  // ── 7-8 判斷心法總覽 ──
   {
-    title: '實作示範：步驟 1-4',
-    subtitle: 'Namespace → Secret → ConfigMap → MySQL',
-    section: 'Loop 6：從零部署（上）',
-    duration: '12',
-    code: `# Step 1：建 Namespace
-kubectl apply -f final-project/01-namespace.yaml
-kubectl get ns prod
-
-# Step 2：建 Secret
-kubectl apply -f final-project/02-secret.yaml
-kubectl get secret -n prod
-
-# Step 3：建 ConfigMap
-kubectl apply -f final-project/03-configmap.yaml
-kubectl get configmap -n prod
-
-# Step 4：部署 MySQL（三合一：Headless Service + StatefulSet + PVC）
-kubectl apply -f final-project/04-mysql.yaml
-kubectl get pods -n prod -w          # 等 mysql-0 → 1/1 Running
-kubectl get pvc -n prod              # mysql-data-mysql-0 → Bound
-kubectl get svc -n prod              # mysql-headless → clusterIP: None`,
-    notes: `好，動手做。大家打開終端機。final-project 目錄裡面有 12 個編了號的 YAML 檔案，從 01 到 12。我們按順序來。
-
-步驟一，建 Namespace。
-
-kubectl apply -f final-project/01-namespace.yaml
-
-看一下。
-
-kubectl get ns prod
-
-Status 是 Active。好，我們有了一個乾淨的 prod Namespace。接下來所有資源都放在裡面。
-
-步驟二，建 Secret。
-
-kubectl apply -f final-project/02-secret.yaml
-
-kubectl get secret -n prod
-
-你會看到 mysql-secret 這個 Secret。注意每個指令都要加 -n prod，因為我們的東西在 prod Namespace。如果你覺得每次加 -n prod 很煩，可以用 kubectl config set-context --current --namespace=prod 把預設 Namespace 切成 prod。但我建議上課的時候還是手動加，養成好習慣。生產環境不小心在預設 Namespace 操作是很危險的。
-
-步驟三，建 ConfigMap。
-
-kubectl apply -f final-project/03-configmap.yaml
-
-kubectl get configmap -n prod
-
-你會看到 api-config 這個 ConfigMap。裡面存了資料庫的地址 mysql-0.mysql-headless.prod.svc.cluster.local、port 3306、database 名字。這些設定等一下 API 會用環境變數的方式讀進去。
-
-步驟四，部署 MySQL。這是六步裡面最關鍵的一步。
-
-kubectl apply -f final-project/04-mysql.yaml
-
-這個檔案裡面有三個資源：一個 Headless Service、一個 StatefulSet、一個包含在 StatefulSet 裡的 volumeClaimTemplate。一次 apply 就全部建好。
-
-kubectl get pods -n prod -w
-
-看 mysql-0 的狀態。它會從 Pending 變成 ContainerCreating 變成 Running。MySQL 啟動比較慢，可能要 30 到 60 秒。等到 READY 變成 1/1 就好了。
-
-按 Ctrl+C 停止 watch。看一下 PVC。
-
-kubectl get pvc -n prod
-
-你會看到 mysql-data-mysql-0 這個 PVC，Status 是 Bound。這是 StatefulSet 的 volumeClaimTemplates 自動建的。每個 Pod 有自己的 PVC。
-
-看一下 Service。
-
-kubectl get svc -n prod
-
-有 mysql-headless。clusterIP 是 None，因為它是 Headless Service。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-18 實作示範上（2/2）：步驟 5-6 ──
-  {
-    title: '實作示範：步驟 5-6',
-    subtitle: 'API Deployment → Frontend Deployment',
-    section: 'Loop 6：從零部署（上）',
-    duration: '10',
-    code: `# Step 5：部署 API（五合一：Deploy + Probe + Resource + Secret + ConfigMap）
-kubectl apply -f final-project/05-api.yaml
-kubectl get pods -n prod -l app=api   # 等 3 個 Pod 都 1/1 Running
-kubectl get svc -n prod               # api-svc
-
-# Step 6：部署 Frontend
-kubectl apply -f final-project/06-frontend.yaml
-kubectl get pods -n prod -l app=frontend   # 等 2 個 Pod 都 Running
-
-# 確認目前狀態
-kubectl get all -n prod
-# 預期：1 StatefulSet + 2 Deployment + 6 Pod + 3 Service`,
-    notes: `步驟五，部署 API。
-
-kubectl apply -f final-project/05-api.yaml
-
-這個 YAML 很豐富。Deployment 裡面設了 replicas 3、設了 livenessProbe、readinessProbe、startupProbe、設了 resources requests 和 limits、從 Secret 讀密碼用 envFrom secretRef、從 ConfigMap 讀設定用 envFrom configMapRef。同時還建了一個 ClusterIP Service 叫 api-svc。
-
-kubectl get pods -n prod -l app=api
-
-等三個 Pod 都是 Running 1/1。如果有 Pod 卡在 0/1，可能是 readinessProbe 還沒通過。等一下就好了。
-
-步驟六，部署前端。
-
-kubectl apply -f final-project/06-frontend.yaml
-
-kubectl get pods -n prod -l app=frontend
-
-兩個 Pod 都是 Running。前端用 nginx 加上 ConfigMap 掛載的自訂設定檔，裡面設定了 /api/ 的反向代理規則，會把 /api 開頭的請求轉給 api-svc。
-
-到這裡，步驟一到六全部做完了。我們來看一下目前的狀態。
-
-kubectl get all -n prod
-
-你會看到一個 StatefulSet、兩個 Deployment、五個以上的 Pod、三個 Service。功能面上，你的系統已經可以跑了。但還少了 Ingress 讓外面連進來、HPA 做自動擴縮、NetworkPolicy 做網路隔離。這些是下半場的步驟七到十二。
-
-好，大家先跟到步驟六。做完的人可以先歇一下，等一下我們繼續步驟七。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-19 回頭操作 ──
-  {
-    title: '回頭操作：確認步驟 1-6',
-    subtitle: '常見坑 + 中場打氣',
-    section: 'Loop 6：從零部署（上）',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">確認清單</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>{'✓'} <code className="text-xs">statefulset.apps/mysql</code> READY 1/1</p>
-            <p>{'✓'} <code className="text-xs">deployment.apps/api</code> READY 3/3</p>
-            <p>{'✓'} <code className="text-xs">deployment.apps/frontend</code> READY 2/2</p>
-            <p>{'✓'} <code className="text-xs">service/mysql-headless, api-svc, frontend-svc</code></p>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">常見的坑</p>
-          <div className="text-sm text-slate-300 space-y-2">
-            <p><span className="text-red-400 font-bold">1.</span> 忘了 <code className="text-xs">-n prod</code> → 在 default 裡面找不到東西</p>
-            <p><span className="text-red-400 font-bold">2.</span> MySQL Pod 一直 Pending → <code className="text-xs">describe pod</code> 看 PVC/StorageClass</p>
-            <p><span className="text-red-400 font-bold">3.</span> API Pod 0/1 → startupProbe 還在跑，等幾十秒</p>
-          </div>
-        </div>
-
-        <div className="bg-cyan-900/30 border border-cyan-500/50 p-3 rounded-lg text-center">
-          <p className="text-cyan-400 font-semibold">你已經完成了整個系統最核心的部分</p>
-          <p className="text-sm text-slate-300 mt-1">資料庫在跑、API 在跑、前端在跑 -- 接下來是錦上添花</p>
-        </div>
-      </div>
-    ),
-    notes: `好，中場確認一下。
-
-kubectl get all -n prod
-
-大家看一下你的輸出。
-
-有 statefulset.apps/mysql 嗎？READY 是 1/1 嗎？
-有 deployment.apps/api 嗎？READY 是 3/3 嗎？
-有 deployment.apps/frontend 嗎？READY 是 2/2 嗎？
-有 service/mysql-headless、service/api-svc、service/frontend-svc 嗎？
-
-如果以上全部是的，你的進度就對了。
-
-常見的坑。第一個，忘了加 -n prod。你在 default Namespace 裡面看不到東西，不是因為沒建，是因為你看錯地方了。kubectl get pods -n prod，記得加 -n prod。
-
-第二個，MySQL Pod 一直卡在 Pending。kubectl describe pod mysql-0 -n prod 看一下 Events。如果看到 no persistent volumes available for this claim，表示 StorageClass 沒有設好。k3s 和 minikube 預設都有一個 local-path 或 standard 的 StorageClass，通常不會有問題。如果你自己搭的叢集可能需要手動建 StorageClass。
-
-第三個，API Pod 的 READY 是 0/1 不是 1/1。不要緊張，等一下。可能是 startupProbe 還在跑。startupProbe 設了 initialDelaySeconds 加上 periodSeconds 乘以 failureThreshold，可能要等幾十秒才會通過。等它變成 1/1 就好了。如果等了兩分鐘還是 0/1，describe pod 看 Events。
-
-好，做到這裡的同學，我要跟你們說，你已經完成了整個系統最核心的部分。資料庫在跑了，API 在跑了，前端也在跑了。接下來的步驟七到十二是加上外部入口、自動擴縮、安全策略。是錦上添花。但核心骨架已經搭好了。
-
-繼續往下走。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-19 學員實作解答：從零部署上（步驟 1-6）──
-  {
-    title: '解答：步驟 1-6 驗收指令',
-    subtitle: 'Loop 6 完成',
-    section: 'Loop 6：從零部署（上）',
-    duration: '3',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做解答：驗收三個指令</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 1. 確認 Pod 狀態</p>
-            <p>kubectl get pods -n prod</p>
-            <p className="text-slate-500"># mysql-0  Running  → StatefulSet 正常</p>
-            <p className="text-slate-500 mt-1"># 2. 確認 PVC 已綁定</p>
-            <p>kubectl get pvc -n prod</p>
-            <p className="text-slate-500"># STATUS: Bound  → 資料不會丟</p>
-            <p className="text-slate-500 mt-1"># 3. 進 MySQL 確認能連線</p>
-            <p>kubectl exec -n prod mysql-0 -- \</p>
-            <p>{'  '}mysql -u root -pmy-secret-password \</p>
-            <p>{'  '}-e "SHOW DATABASES;"</p>
-            <p className="text-slate-500 mt-1"># 清理（做完全部步驟再清）</p>
-            <p>kubectl delete namespace prod</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">步驟 1-6 清單</p>
-          <div className="text-xs text-slate-300 space-y-1">
-            <p><span className="text-green-400">1.</span> Namespace prod</p>
-            <p><span className="text-green-400">2.</span> Secret（mysql-secret）</p>
-            <p><span className="text-green-400">3.</span> ConfigMap（mysql-config）</p>
-            <p><span className="text-green-400">4.</span> PVC（mysql-pvc）</p>
-            <p><span className="text-green-400">5.</span> MySQL StatefulSet + Headless Service</p>
-            <p><span className="text-green-400">6.</span> 驗證 mysql-0 Running + PVC Bound</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">預期結果</p>
-          <p className="text-xs text-slate-300 mt-1">mysql-0 Running、PVC Bound、SHOW DATABASES 顯示資料庫列表</p>
-        </div>
-      </div>
-    ),
-    notes: `來看步驟 1 到 6 的驗收。
-
-三個關鍵指令。第一個，kubectl get pods -n prod，確認 mysql-0 是 Running。第二個，kubectl get pvc -n prod，確認 STATUS 是 Bound，代表 PVC 成功掛載了 PV，資料不會因為 Pod 重啟而消失。第三個，kubectl exec 進去 mysql-0，執行 SHOW DATABASES，能看到資料庫列表就表示 MySQL 本身是正常的。
-
-步驟 1 到 6 是整個系統的核心基礎：Namespace 隔離環境、Secret 保存密碼、ConfigMap 放設定、PVC 持久化資料、StatefulSet 管理有狀態的資料庫。這五個層次缺一不可。
-
-注意：kubectl delete namespace prod 這個清理指令留到步驟 7 到 12 全部做完再執行，現在先不要清理。 [▶ 下一頁]`,
-  },
-
-  // ============================================================
-  // Loop 7：從零部署下（7-20, 7-21, 7-22）
-  // ============================================================
-
-  // ── 7-20 概念（1/2）：12 步下（步驟 7-12）──
-  {
-    title: '12 步（下）：步驟 7-12',
-    subtitle: '功能完整 → 安全加固 → 彈性擴縮 → 驗證',
-    section: 'Loop 7：從零部署（下）',
-    duration: '12',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-cyan-400 border-b border-slate-600">
-                <th className="text-left py-1 pr-1 w-8">#</th>
-                <th className="text-left py-1 pr-2">做什麼</th>
-                <th className="text-left py-1 pr-2">對應概念</th>
-                <th className="text-left py-1 w-16">堂次</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">7</td>
-                <td className="py-1 pr-2">建 Ingress</td>
-                <td className="py-1 pr-2 font-mono text-green-400">Ingress</td>
-                <td className="py-1">第六堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">8</td>
-                <td className="py-1 pr-2">建 HPA</td>
-                <td className="py-1 pr-2 font-mono text-green-400">HPA</td>
-                <td className="py-1">第七堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">9</td>
-                <td className="py-1 pr-2">建 NetworkPolicy</td>
-                <td className="py-1 pr-2 font-mono text-green-400">NetworkPolicy</td>
-                <td className="py-1">第七堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-amber-400 font-bold">10</td>
-                <td className="py-1 pr-2">建 RBAC（選做）</td>
-                <td className="py-1 pr-2 font-mono text-green-400">RBAC</td>
-                <td className="py-1">第七堂</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-1 text-cyan-400 font-bold">11</td>
-                <td className="py-1 pr-2">完整驗證</td>
-                <td className="py-1 pr-2 font-mono text-green-400">全部</td>
-                <td className="py-1">全部</td>
-              </tr>
-              <tr>
-                <td className="py-1 pr-1 text-amber-400 font-bold">12</td>
-                <td className="py-1 pr-2">壓測 + 故障模擬（選做）</td>
-                <td className="py-1 pr-2 font-mono text-green-400">HPA+自癒</td>
-                <td className="py-1">五+七</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">NetworkPolicy 三層隔離</p>
-          <div className="bg-slate-900/60 border border-slate-700 p-3 rounded-lg">
-            <div className="flex items-center gap-2 flex-wrap justify-center text-xs">
-              <span className="bg-purple-900/40 border border-purple-500/50 px-2 py-1 rounded text-purple-400">Ingress</span>
-              <span className="text-green-400 font-bold">→</span>
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">Frontend</span>
-              <span className="text-green-400 font-bold">→</span>
-              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400">API</span>
-              <span className="text-green-400 font-bold">→</span>
-              <span className="bg-amber-900/40 border border-amber-500/50 px-2 py-1 rounded text-amber-400">MySQL</span>
-            </div>
-            <p className="text-center text-xs text-red-400 mt-2">Frontend → MySQL 被擋 / 外部 → API 被擋</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `好，繼續。步驟七到十二。
-
-步驟七，建 Ingress。
-
-kubectl apply -f final-project/07-ingress.yaml
-
-kubectl get ingress -n prod
-
-你會看到 myapp-ingress，HOST 是 myapp.local。path / 導到 frontend-svc，path /api 導到 api-svc。如果你想在本機測試，需要在 /etc/hosts 裡面加一行 127.0.0.1 myapp.local，然後用 minikube tunnel 或者 port-forward 來連。不過在課堂上我們主要確認 Ingress 有建好就行。
-
-步驟八，建 HPA。
-
-kubectl apply -f final-project/08-hpa.yaml
-
-kubectl get hpa -n prod
-
-API 的 HPA 設定是 CPU 超過 50% 就自動擴容，最少 3 個、最多 10 個。TARGETS 欄位現在可能顯示 unknown，等 metrics-server 收集到數據就會有數字。
-
-步驟九，建 NetworkPolicy。
-
-kubectl apply -f final-project/09-networkpolicy.yaml
-
-kubectl get networkpolicy -n prod
-
-你會看到三條 NetworkPolicy。db-policy 保護 MySQL，只讓 api 連。api-policy 保護 API，只讓 frontend 和 Ingress Controller 連。frontend-policy 保護前端，只讓 Ingress Controller 連。三層隔離，非常嚴謹。
-
-步驟十是選做的 RBAC。建一個 prod-viewer Role，讓某個 ServiceAccount 只能在 prod Namespace 裡面看東西不能改。這個跟 Loop 4 做的一樣，只是 Namespace 不同。有興趣的同學可以做，時間不夠的跳過。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-20 概念（2/2）：完整驗證 ──
-  {
-    title: '步驟 11：完整驗證',
-    subtitle: '12 步全部到位，一個一個確認',
-    section: 'Loop 7：從零部署（下）',
-    duration: '8',
-    code: `# Step 11：完整驗證 — 確認所有資源都在
-kubectl get all -n prod
-# Pod x6+, Deployment x2, StatefulSet x1, Service x3
-
-kubectl get pvc -n prod              # mysql-data-mysql-0 → Bound
-kubectl get ingress -n prod          # myapp-ingress → myapp.local
-kubectl get hpa -n prod              # api-hpa → CPU 目標 50%
-kubectl get networkpolicy -n prod    # 三條 policy
-kubectl get secret -n prod           # mysql-secret
-kubectl get configmap -n prod        # api-config`,
-    notes: `步驟十一，完整驗證。這一步最重要，我們要確認所有東西都在。
-
-kubectl get all -n prod
-
-你會看到很多東西。我來一個一個確認。Pod 至少有 6 個：mysql-0、api 的三個、frontend 的兩個。Deployment 有兩個：api 和 frontend。StatefulSet 有一個：mysql。Service 有三個：mysql-headless、api-svc、frontend-svc。ReplicaSet 也會列出來。
-
-kubectl get pvc -n prod
-
-mysql-data-mysql-0，Bound。
-
-kubectl get ingress -n prod
-
-myapp-ingress，HOST 是 myapp.local。
-
-kubectl get hpa -n prod
-
-api-hpa，TARGETS 有數字了（或 unknown 也沒關係）。
-
-kubectl get networkpolicy -n prod
-
-三條 policy。
-
-kubectl get secret -n prod
-
-mysql-secret。
-
-kubectl get configmap -n prod
-
-api-config。
-
-全部都在。恭喜，你剛才從一個空的 Namespace 開始，部署了一套完整的生產級系統。用到了 Namespace、Secret、ConfigMap、StatefulSet、PVC、Deployment、Probe、Resource limits、Service、Ingress、HPA、NetworkPolicy。四堂課學的核心概念全部串在一起了。
-
-步驟十二是選做的壓測。跟上午做 HPA 實作一樣，跑一個 busybox Pod 不斷打 api-svc，觀察 HPA 自動擴容。有時間的同學可以做，能看到 Pod 數量從 3 自動增加到 5、6、7 是很有成就感的。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-21 壓測 + 故障模擬（1/2）──
-  {
-    title: '壓測：HPA 自動擴縮',
-    subtitle: '親眼看到 Pod 從 3 自動增加到 5、6、7',
-    section: 'Loop 7：從零部署（下）',
-    duration: '8',
-    code: `# 壓測：開另一個終端機跑 busybox 不斷打 API
-kubectl run load-test -n prod --image=busybox:1.36 --rm -it --restart=Never -- \\
-  sh -c "while true; do wget -qO- http://api-svc > /dev/null 2>&1; done"
-
-# 原終端機觀察 HPA
-kubectl get hpa -n prod -w
-# TARGETS: 20% → 40% → 60% → 超過 50% 開始擴容
-# REPLICAS: 3 → 4 → 5 → ...
-
-# 第三個終端機觀察 Pod 變化
-kubectl get pods -n prod -l app=api -w
-# 新 Pod：Pending → ContainerCreating → Running`,
-    notes: `好，步驟七到十在上一支影片已經帶著做完了。這支影片我們來做步驟十二的壓測和故障模擬，然後讓大家自由練習。
-
-先做壓測。跟上午 HPA 的實作方式一模一樣，只是這次是在 prod Namespace 裡面。
-
-開另一個終端機，跑壓測 Pod。
-
-kubectl run load-test -n prod --image=busybox:1.36 --rm -it --restart=Never -- sh -c "while true; do wget -qO- http://api-svc > /dev/null 2>&1; done"
-
-回到原來的終端機，觀察 HPA。
-
-kubectl get hpa -n prod -w
-
-大家看 TARGETS 欄位。CPU 使用率在爬。20%、40%、60%。超過 50% 的時候，REPLICAS 開始增加。3 變 4、4 變 5。
-
-同時你可以開第三個終端機看 Pod 的變化。
-
-kubectl get pods -n prod -l app=api -w
-
-新的 Pod 一個一個冒出來。Pending、ContainerCreating、Running。全自動的。
-
-壓測跑個一兩分鐘就好。回到壓測終端機按 Ctrl+C 停止。然後繼續 watch HPA。CPU 使用率會慢慢降，大概五分鐘後 REPLICAS 自動縮回 3。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-21 故障模擬（2/2）──
-  {
-    title: '故障模擬：砍 Pod + 砍 Node',
-    subtitle: 'Deployment 自我修復 + 多節點容錯',
-    section: 'Loop 7：從零部署（下）',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">故障模擬 1：砍 Pod</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-green-400 space-y-1">
-            <p>kubectl delete pod api-xxx -n prod</p>
-            <p>kubectl get pods -n prod -l app=api -w</p>
-            <p className="text-slate-400"># 幾秒內 Deployment 自動補一個新的</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">故障模擬 2：砍 Node（多節點環境）</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-green-400 space-y-1">
-            <p>kubectl drain {'<node>'} --ignore-daemonsets --delete-emptydir-data</p>
-            <p>kubectl get pods -n prod -o wide -w</p>
-            <p className="text-slate-400"># Pod 自動搬到其他 Node</p>
-            <p className="text-amber-400"># 記得 uncordon 加回來</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">親眼看到三件事</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>1. HPA 自動擴縮</p>
-            <p>2. Deployment 自我修復</p>
-            <p>3. Node 故障時 Pod 自動搬家</p>
-          </div>
-          <p className="text-xs text-slate-400 mt-2">這三個能力 = K8s 在生產環境的核心價值</p>
-        </div>
-      </div>
-    ),
-    notes: `好，壓測做完了。接下來做一個故障模擬。
-
-我要故意砍一個 API Pod。
-
-kubectl get pods -n prod -l app=api
-
-挑一個 Pod 的名字。
-
-kubectl delete pod api-某某某 -n prod
-
-kubectl get pods -n prod -l app=api -w
-
-大家看，舊的 Pod 被刪了，但幾秒鐘之內 Deployment 就補了一個新的。Pending、ContainerCreating、Running。全程不需要人介入。如果你不盯著看，你甚至不會知道有一個 Pod 被砍過。
-
-這就是 Deployment 的自我修復能力。第五堂學的。你設了 replicas 3，K8s 就會確保永遠有 3 個 Pod 在跑。少了就補，多了就刪。
-
-如果你是多節點環境，還可以做一個更刺激的實驗。把整個 Node drain 掉，模擬一台機器故障。
-
-kubectl drain 某個worker節點名 --ignore-daemonsets --delete-emptydir-data
-
-這台 Node 上面的所有 Pod 會被驅逐到其他 Node 上面。你用 kubectl get pods -n prod -o wide -w 看，Pod 會在其他 Node 重新建起來。這就是 K8s 多節點架構的價值。單機 Docker 做不到這件事。
-
-drain 完之後記得把 Node 加回來。
-
-kubectl uncordon 那個節點名
-
-好，故障模擬做完了。你親眼看到了三件事。第一，HPA 自動擴縮。第二，Deployment 自我修復。第三，Node 故障時 Pod 自動搬家。這三個能力加在一起，就是 K8s 在生產環境的核心價值。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-21 學員實作 ──
-  {
-    title: '學員實作時間',
-    subtitle: '必做：12 步從頭到尾自己做 / 挑戰：Helm WordPress + Probe + HPA',
-    section: 'Loop 7：從零部署（下）',
-    duration: '15',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">必做題</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>把 12 個步驟從頭到尾自己做一遍</p>
-            <p>不看指令，自己敲。做不出來再看</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">挑戰題</p>
-          <div className="text-sm text-slate-300 space-y-2">
-            <p>用 Helm 安裝 WordPress，再加 Probe + HPA</p>
-            <div className="bg-slate-900 p-2 rounded font-mono text-xs text-green-400">
-              <p>helm install my-wordpress bitnami/wordpress \</p>
-              <p>{'  '}--set resources.requests.cpu=100m</p>
-            </div>
-            <p className="text-xs text-slate-400">然後建 HPA 綁到 WordPress 的 Deployment</p>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">清理</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-green-400">
-            kubectl delete namespace prod
-          </div>
-          <p className="text-xs text-slate-400 mt-1">一行搞定，Namespace 底下全部一起刪</p>
-        </div>
-      </div>
-    ),
-    notes: `接下來是大家的自由練習時間。必做題是把 12 個步驟從頭到尾自己做一遍。不看我的指令，自己敲。做不出來就看一下。能不看就不看。
-
-挑戰題是用 Helm 安裝一個 WordPress，然後自己加上 Probe 和 HPA。提示：helm install my-wordpress bitnami/wordpress --set resources.requests.cpu=100m。然後再建一個 HPA 綁到 WordPress 的 Deployment 上面。
-
-做完實驗之後，清理很簡單。
-
-kubectl delete namespace prod
-
-一行搞定。Namespace 底下的所有東西全部一起刪掉。這也是為什麼用 Namespace 做環境隔離的好處之一，清理起來特別方便。
-
-大家動手做。
-
-【巡堂：走動確認學員進度。重點關注：(1) 是否按順序做、(2) MySQL Pod 有沒有起來、(3) API Pod 的 Probe 有沒有通過。卡住的學員優先協助。做完必做題的引導去挑戰題。】
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-22 回頭操作 ──
-  {
-    title: '回頭操作：確認 12 步',
-    subtitle: 'Loop 6-7 小結：從零到完整系統',
-    section: 'Loop 7：從零部署（下）',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">你做到哪一步了？</p>
-          <div className="text-sm text-slate-300 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400 text-xs">最低標準</span>
-              <span>步驟 1-6 做完，MySQL + API + Frontend 都在跑</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400 text-xs">理想狀態</span>
-              <span>步驟 1-11 全部做完，所有資源都有</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">常見的坑</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><span className="text-red-400 font-bold">1.</span> 步驟順序錯 → Secret 不存在時 Pod 出 CreateContainerConfigError</p>
-            <p><span className="text-red-400 font-bold">2.</span> HPA TARGETS 一直 unknown → metrics-server 或 requests 問題</p>
-            <p><span className="text-red-400 font-bold">3.</span> Ingress 連不上 → minikube 要 <code className="text-xs">minikube tunnel</code></p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg text-center">
-          <p className="text-green-400 font-semibold">從零到完整系統：四堂課的威力</p>
-          <p className="text-sm text-slate-300 mt-1">每堂課學的小零件，全部組裝起來就是生產級系統</p>
-        </div>
-      </div>
-    ),
-    notes: `好，回頭確認。你的 12 步做到幾步了？
-
-最低標準是步驟一到六做完了。kubectl get all -n prod 能看到 MySQL、API、Frontend 都在跑。
-
-理想狀態是步驟一到十一全部做完。kubectl get all, pvc, ingress, hpa, networkpolicy, secret, configmap -n prod 全部都有東西。
-
-如果你還沒做完也不用急。回去之後有時間可以自己練。YAML 檔案都在 final-project 目錄裡面，按編號做就對了。
-
-常見的坑。第一個，步驟順序搞錯。比如先建 API Deployment 再建 Secret。API 的 YAML 裡面引用了 mysql-secret，如果 Secret 不存在，Pod 會出現 CreateContainerConfigError。解法是按順序來：先 Secret 再 ConfigMap 再 MySQL 再 API。依賴關係決定順序。
-
-第二個，HPA 的 TARGETS 一直是 unknown。跟上午一樣，要嘛是 metrics-server 沒裝，要嘛是 Deployment 沒設 resources.requests。我們的 API Deployment 有設 requests，所以應該不會有這個問題。如果還是 unknown，kubectl top pods -n prod 看看 metrics-server 正不正常。
-
-第三個，Ingress 連不上。這個在 minikube 上需要額外設定。minikube 要跑 minikube tunnel 或者 minikube addons enable ingress。k3s 內建 Traefik Ingress Controller。如果只是確認 Ingress 有建好，kubectl get ingress -n prod 看到就行了。
-
-好，從零部署的兩個 Loop 全部結束。你從一個空的 Namespace 開始，一步一步建了 Namespace、Secret、ConfigMap、StatefulSet、Deployment、Service、Ingress、HPA、NetworkPolicy。12 步走完，一套完整的生產級系統就出來了。
-
-這就是四堂課的威力。每堂課學的東西單獨看都只是一個小零件，但全部組裝起來，就是一個完整的系統。
-
-接下來是今天最後的部分：四堂課的總複習。我們要用一條因果鏈把所有概念串起來。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-22 學員實作解答：從零部署下（步驟 7-12）──
-  {
-    title: '解答：步驟 7-12 驗收指令',
-    subtitle: 'Loop 7 完成',
-    section: 'Loop 7：從零部署（下）',
-    duration: '3',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做解答：關鍵驗收指令</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># Ingress 有 ADDRESS</p>
-            <p>kubectl get ingress -n prod</p>
-            <p className="text-slate-500 mt-1"># API health check</p>
-            <p>curl http://{'<NODE-IP>'}/api/health{'  '}# 回傳 200</p>
-            <p className="text-slate-500 mt-1"># HPA 壓測觀察 REPLICAS</p>
-            <p>kubectl get hpa -n prod -w</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">挑戰解答：RBAC 驗證</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 成功（有 get 權限）</p>
-            <p>kubectl --as=system:serviceaccount:prod:readonly-sa \</p>
-            <p>{'  '}get pods -n prod</p>
-            <p className="text-slate-500 mt-1"># 失敗 → Forbidden（沒有 delete 權限）</p>
-            <p>kubectl --as=system:serviceaccount:prod:readonly-sa \</p>
-            <p>{'  '}delete pod {'<pod>'} -n prod</p>
-            <p className="text-slate-500 mt-1"># 全部做完後清理</p>
-            <p>kubectl delete namespace prod</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">預期結果</p>
-          <p className="text-xs text-slate-300 mt-1">Ingress 有 ADDRESS、API 回 200、HPA REPLICAS 隨壓測變化、RBAC 驗證成功 / Forbidden</p>
-        </div>
-      </div>
-    ),
-    notes: `來看步驟 7 到 12 的驗收。
-
-第一個：kubectl get ingress -n prod，確認 ADDRESS 欄位有 IP。如果在 minikube 需要先跑 minikube tunnel 才會有 ADDRESS。
-
-第二個：curl http://NODE-IP/api/health，回傳 200 代表 Ingress + Service + Deployment 整條路徑都通了。
-
-第三個：kubectl get hpa -n prod -w，用 load-generator 壓測，看 REPLICAS 隨 CPU 使用率自動增加。
-
-RBAC 驗證跟 Loop 4 一樣，但這次是在 prod Namespace 裡面，ServiceAccount 是 readonly-sa。get pods 成功、delete pod 回 Forbidden，就表示權限控制做對了。
-
-全部驗收完畢之後，kubectl delete namespace prod 一次清掉所有資源。Namespace 刪掉，裡面所有的 Pod、Service、PVC 都一起消失。 [▶ 下一頁]`,
-  },
-
-  // ============================================================
-  // Loop 8：總複習 + 結業（7-23, 7-24, 7-25）
-  // ============================================================
-
-  // ── 7-23 四堂課總複習（1/2）：因果鏈上半 ──
-  {
-    title: '四堂課完整因果鏈（上）',
-    subtitle: 'Docker 扛不住 → K8s → Pod → Service → Ingress → ConfigMap → Secret → PVC → Deployment → StatefulSet → Helm',
-    section: 'Loop 8：總複習 + 結業',
-    duration: '8',
+    title: '五個判斷心法 — 接下來反覆用到',
+    subtitle: '先記住，等一下每一個都會示範',
+    section: '7-8 為什麼做這個 Demo',
+    duration: '2',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-400">Docker 扛不住</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400 font-bold">K8s</span>
-              <span className="text-slate-500 text-xs ml-1">容器編排平台</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-slate-500 ml-2">要跑容器</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">Pod</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="text-slate-500">IP 會變、外面連不到</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">Service</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-slate-500 ml-2">要域名路由</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-purple-900/40 border border-purple-500/50 px-2 py-1 rounded text-purple-400">Ingress</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="text-slate-500">設定寫死</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">ConfigMap</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-slate-500 ml-2">密碼明文</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-amber-900/40 border border-amber-500/50 px-2 py-1 rounded text-amber-400">Secret</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="text-slate-500">資料消失</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-amber-900/40 border border-amber-500/50 px-2 py-1 rounded text-amber-400">PV/PVC</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-slate-500 ml-2">單點故障</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">Deployment</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="text-slate-500">DB 特殊需求</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">StatefulSet</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-slate-500 ml-2">YAML 太多</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">Helm</span>
-            </div>
-          </div>
+        <div className="bg-slate-800/50 border-l-4 border-blue-500 p-3 rounded">
+          <p className="text-blue-300 font-semibold text-sm">① Deployment vs StatefulSet</p>
+          <p className="text-slate-300 text-xs mt-1">需要穩定身份（固定名稱+固定儲存）→ <span className="text-green-400">StatefulSet</span>；不需要 → <span className="text-green-400">Deployment</span></p>
         </div>
 
-        <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded-lg text-center">
-          <p className="text-cyan-400 text-sm font-semibold">到這裡，功能上完整了</p>
-          <p className="text-xs text-slate-400">使用者連得進來、前端能跑、API 能跑、資料不會丟</p>
-          <p className="text-xs text-slate-400">接下來：生產環境的考驗...</p>
+        <div className="bg-slate-800/50 border-l-4 border-purple-500 p-3 rounded">
+          <p className="text-purple-300 font-semibold text-sm">② Secret vs ConfigMap</p>
+          <p className="text-slate-300 text-xs mt-1">洩漏出去會有問題 → <span className="text-green-400">Secret</span>；不會 → <span className="text-green-400">ConfigMap</span></p>
+        </div>
+
+        <div className="bg-slate-800/50 border-l-4 border-orange-500 p-3 rounded">
+          <p className="text-orange-300 font-semibold text-sm">③ Job vs Deployment</p>
+          <p className="text-slate-300 text-xs mt-1">跑完就結束 → <span className="text-green-400">Job</span>；需要一直跑 → <span className="text-green-400">Deployment</span></p>
+        </div>
+
+        <div className="bg-slate-800/50 border-l-4 border-pink-500 p-3 rounded">
+          <p className="text-pink-300 font-semibold text-sm">④ DaemonSet vs Deployment</p>
+          <p className="text-slate-300 text-xs mt-1">跟 Node 數量綁定 → <span className="text-green-400">DaemonSet</span>；不綁定 → <span className="text-green-400">Deployment</span></p>
+        </div>
+
+        <div className="bg-slate-800/50 border-l-4 border-cyan-500 p-3 rounded">
+          <p className="text-cyan-300 font-semibold text-sm">⑤ Service 類型</p>
+          <p className="text-slate-300 text-xs mt-1">叢集內部用 → <span className="text-green-400">ClusterIP</span>；對外用 <span className="text-green-400">Ingress</span>（不是 NodePort）</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center mt-2">
+          接下來每一個組件上場，都會回來印證這些判斷心法
         </div>
       </div>
     ),
-    notes: `好，來到今天最後的部分了。四堂課的總複習。我不打算一個一個概念複習定義，那太無聊了。我要做的是用一條完整的因果鏈，從頭到尾串一遍。每一個概念都是因為上一步有問題才引出來的。這條鏈走完，你的腦袋裡就有一張完整的 K8s 知識地圖。
+    notes: `在動手之前，先把五個判斷心法寫在黑板上。接下來 40 分鐘，我會反覆用到這五個心法，每個組件上場就印證一次。
 
-準備好了嗎？我們從最開頭開始。
+第一個：Deployment 還是 StatefulSet？判斷原則是這個服務需不需要穩定的身份，也就是固定的名稱加固定的儲存。需要就 StatefulSet，不需要就 Deployment。PostgreSQL 需要，所以用 StatefulSet。Redis 不需要（任務重啟可以重算），所以用 Deployment。
 
-四堂課之前，你學完了 Docker。你會用 docker run 跑容器，會寫 Dockerfile build Image，會用 Docker Compose 管多個容器。在你的筆電上跑得好好的。
+第二個：Secret 還是 ConfigMap？洩漏出去會有問題的放 Secret，不會有問題的放 ConfigMap。就一條分界線。密碼、Token、JWT Secret 是 Secret。主機名、Port、DB 名稱是 ConfigMap。
 
-然後第一個問題來了。你的服務上了生產環境，一台伺服器跑所有容器。某天伺服器掛了，全部服務一起掛。或者流量暴增，一台機器扛不住。你想加第二台、第三台，但手動管太痛苦了。你需要一個工具幫你管一群機器上的一群容器。
+第三個：Job 還是 Deployment？跑完就結束的用 Job，要一直跑的用 Deployment。Migration 跑完就退出，用 Job。Backend 要一直跑，用 Deployment。
 
-這就是 Kubernetes。容器編排平台。把一群機器組成一個叢集，你只要告訴 K8s 你想要什麼狀態，K8s 會幫你實現。
+第四個：DaemonSet 還是 Deployment？跟 Node 數量綁定的用 DaemonSet，不綁定的用 Deployment。Task Runner 的數量看任務量決定，跟 Node 數量沒關係，所以是 Deployment 不是 DaemonSet。
 
-K8s 有了。你要跑容器。但 K8s 不直接管容器。它的最小調度單位是 Pod。一個 Pod 可以包含一個或多個容器，共享網路和儲存。多數時候一個 Pod 就跑一個容器。
+第五個：Service 類型。叢集內部的服務之間用 ClusterIP，對外暴露一律用 Ingress，不要用 NodePort。NodePort 的 Port 醜、沒有域名、管理麻煩，Ingress 統一入口比較好。
 
-Pod 跑起來了。但 Pod 有自己的 IP，這個 IP 是叢集內部的，外面連不到。而且 Pod 會被銷毀重建，IP 會變。你需要一個穩定的入口。
-
-這就是 Service。Service 給一組 Pod 提供穩定的 IP 和 DNS 名稱。Pod 掛了換新的，Service 地址不變。流量自動轉到健康的 Pod。
-
-Service 有了，但你的使用者要用 IP 加 Port 連進來，地址又長又醜。你想要用域名，想要 /api 走 API、/ 走前端。
-
-這就是 Ingress。用域名加路徑做 HTTP 路由。第六堂學的，還加了 TLS 做 HTTPS。
-
-OK，服務跑起來了，使用者也連得進來了。但你的設定寫死在 Docker Image 裡面。改一個環境變數就要重新 build Image。
-
-ConfigMap 解決了這個問題。設定抽出來，不寫死在 Image 裡。改設定不用重 build。
-
-設定分離了。但密碼呢？資料庫密碼寫在 ConfigMap 裡面，任何能讀 ConfigMap 的人都看得到。
-
-Secret 解決了這個問題。敏感資料用 Secret 存，至少做了 Base64 編碼，配合 RBAC 可以限制誰能讀。
-
-設定和密碼都分離了。但 MySQL Pod 重啟了一次，資料全部消失。因為容器的檔案系統是暫時性的，容器重啟就沒了。
-
-PV 和 PVC 解決了這個問題。PersistentVolume 是叢集裡的儲存空間，PersistentVolumeClaim 是 Pod 對儲存的申請。資料寫在 PV 裡，Pod 重啟資料還在。
-
-好，你的 API 跑在 Pod 裡面。但你只跑了一個 Pod。這個 Pod 掛了，服務就斷了。你想跑三個副本，壞了一個自動補上。
-
-Deployment 解決了這個問題。你設 replicas 3，K8s 保證永遠有三個 Pod 在跑。還有滾動更新和回滾的能力。
-
-Deployment 很好用，但資料庫不適合用 Deployment。Deployment 的 Pod 名字是隨機的、沒有順序、共用儲存。資料庫需要固定的名字、有序的啟動、獨立的儲存。
-
-StatefulSet 解決了這個問題。每個 Pod 有穩定的序號和 DNS 名稱，每個 Pod 有自己的 PVC。
-
-好，現在你的系統越來越複雜了。一個 MySQL 就要寫 StatefulSet、Headless Service、PVC、Secret，好幾個 YAML。管理起來很痛苦。
-
-Helm 解決了這個問題。K8s 的套件管理器，一行 helm install 搞定一整套安裝。
-
-到這裡，你的系統功能上是完整的了。使用者能連進來，前端能跑，API 能跑，資料庫的資料不會丟。
-
-但生產環境會考驗你。
+記住這五條，接下來就不會迷路。
 
 [▶ 下一頁]`,
   },
 
-  // ── 7-23 四堂課總複習（2/2）：因果鏈下半 + 知識地圖 ──
+  // ============================================================
+  // 7-9：邊建邊解釋（~40min）
+  // ============================================================
+
+  // ── Namespace ──
   {
-    title: '四堂課完整因果鏈（下）',
-    subtitle: '生產環境的考驗 → Probe → Resource → HPA → RBAC → NetworkPolicy → 12 步完整系統',
-    section: 'Loop 8：總複習 + 結業',
-    duration: '7',
+    title: 'Step 1：Namespace — 隔離這套系統',
+    subtitle: '第一步永遠是建 Namespace',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-4">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">為什麼要 Namespace</p>
+          <p className="text-slate-300 text-xs">叢集可能同時跑多套系統。全放 default 會混在一起，kubectl get 的時候分不清楚。Namespace 是邏輯隔離牆，RBAC 也能按 Namespace 管控。</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-slate-500"># 建立 Namespace</p>
+          <p className="text-green-400">kubectl create namespace tasks</p>
+          <p className="text-slate-500 mt-2"># 之後所有指令都要加 -n tasks</p>
+          <p className="text-green-400">kubectl get pods -n tasks</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300">
+          口訣：先 Namespace，再所有東西
+        </div>
+      </div>
+    ),
+    notes: `第一步，建一個 Namespace 把這套系統隔開。
+
+指令：kubectl create namespace tasks
+
+為什麼要建 Namespace？你的叢集上可能同時跑著這套系統、一個電商後台、一個內部監控工具。如果全部放在 default namespace，所有 Pod、Service、ConfigMap 混在一起，kubectl get pods 看到幾十個不知道哪個是哪個。Namespace 是邏輯上的隔離牆，每個系統有自己的空間，資源不互相干擾，RBAC 的權限也可以按 Namespace 分開控管。
+
+之後所有指令都加 -n tasks。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Secret 複習卡 ──
+  {
+    title: '複習：Secret vs ConfigMap — 分界線只有一條',
+    subtitle: 'Day 6 Loop 2 學過 · 現在用在真實系統',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2 text-sm">生產環境的考驗</p>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-400">服務卡死</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">Probe</span>
-              <span className="text-slate-500">liveness + readiness + startup</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-400">資源吃光</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">Resource</span>
-              <span className="text-slate-500">requests + limits</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-400">流量暴增</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">HPA</span>
-              <span className="text-slate-500">自動擴縮</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-400">誰都能刪</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">RBAC</span>
-              <span className="text-slate-500">最小權限原則</span>
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="bg-red-900/40 border border-red-500/50 px-2 py-1 rounded text-red-400">全通不安全</span>
-              <span className="text-cyan-400 font-bold">→</span>
-              <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">NetworkPolicy</span>
-              <span className="text-slate-500">三層隔離</span>
-            </div>
+        <div className="bg-slate-800/50 border-l-4 border-cyan-500 p-3 rounded">
+          <p className="text-cyan-300 font-semibold text-sm">分界線</p>
+          <p className="text-slate-300 text-xs mt-1">洩漏出去<span className="text-red-400 font-bold">會有問題</span> → Secret</p>
+          <p className="text-slate-300 text-xs">洩漏出去<span className="text-green-400 font-bold">沒關係</span> → ConfigMap</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+            <p className="text-red-400 font-semibold text-sm mb-1">Secret（機密）</p>
+            <ul className="text-xs text-slate-300 space-y-1">
+              <li>• DB 密碼</li>
+              <li>• Redis 密碼</li>
+              <li>• JWT Secret</li>
+              <li>• API Token</li>
+            </ul>
+          </div>
+          <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+            <p className="text-green-400 font-semibold text-sm mb-1">ConfigMap（設定）</p>
+            <ul className="text-xs text-slate-300 space-y-1">
+              <li>• DB 主機名</li>
+              <li>• Port 號</li>
+              <li>• DB 名稱</li>
+              <li>• 環境變數</li>
+            </ul>
           </div>
         </div>
 
-        <div className="bg-cyan-900/30 border border-cyan-500/50 p-4 rounded-lg text-center">
-          <p className="text-cyan-400 font-bold mb-2">12 步 = 全部串起來</p>
-          <div className="flex items-center gap-1 flex-wrap justify-center text-xs">
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">NS</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">Secret</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">CM</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">MySQL</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">API</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">FE</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">Ingress</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">HPA</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">NP</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">RBAC</span>
-            <span className="text-cyan-400">→</span>
-            <span className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">驗證</span>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded-lg text-center">
-          <p className="text-green-400 font-bold text-lg">這條因果鏈就是你的 K8s 知識地圖</p>
-          <p className="text-sm text-slate-300 mt-1">不用背定義，記住這條鏈就夠了</p>
+        <div className="bg-slate-800/40 p-2 rounded text-xs text-slate-400">
+          <span className="text-cyan-400 font-semibold">小提醒：</span>Secret 只是 base64 編碼，不是加密。還是要小心 RBAC 權限誰能讀。
         </div>
       </div>
     ),
-    notes: `但生產環境會考驗你。
+    notes: `先複習一下 Day 6 Loop 2 學過的 Secret 和 ConfigMap。
 
-Pod Running 但服務卡死了，K8s 不知道。所以你學了 Probe。livenessProbe 偵測死亡然後重啟。readinessProbe 偵測未就緒然後不導流量。startupProbe 給慢啟動的應用緩衝時間。
+很多同學學完還是分不清楚，我教你一個秒懂的方法。只問一個問題：這個值洩漏出去會有問題嗎？會，放 Secret。不會，放 ConfigMap。就這麼簡單。
 
-一個 Pod 有 bug，記憶體一直吃，把整台機器吃光了。所以你學了 Resource limits。requests 是保底，limits 是天花板。超過記憶體被 OOMKilled。
+DB 密碼、Redis 密碼、JWT secret、API token，這些洩漏出去會出大事，放 Secret。DB 主機名、Port 號、DB 名稱，這些就算放 GitHub 上也沒什麼，放 ConfigMap。
 
-流量暴增，三個 Pod 扛不住，手動 scale 來不及。所以你學了 HPA。根據 CPU 使用率自動擴縮，全自動不需要人。
-
-所有人都有 admin 權限，實習生不小心刪了生產環境。所以你學了 RBAC。定義角色、綁定權限，最小權限原則。
-
-所有 Pod 互相全通，前端被入侵攻擊者直接打資料庫。所以你學了 NetworkPolicy。三層隔離，前端只能連 API，API 只能連資料庫。
-
-最後，你把所有概念串在一起，從一個空的 Namespace 開始，12 步建了一套完整的生產級系統。
-
-這就是四堂課完整的因果鏈。Docker 扛不住，K8s 登場。要跑容器，Pod。要穩定入口，Service。要域名路由，Ingress。設定寫死，ConfigMap。密碼明文，Secret。資料消失，PVC。單點故障，Deployment。資料庫特殊，StatefulSet。YAML 太多，Helm。服務卡死，Probe。資源吃光，Resource limits。流量暴增，HPA。誰都能刪，RBAC。全通不安全，NetworkPolicy。
-
-每一個概念都不是憑空出現的。它出現是因為上一步有問題。解決了這個問題，又冒出新問題，又需要新概念。一環扣一環，這就是學習的正確方式。
-
-你不需要背這些概念的定義。你只需要記住這條因果鏈。遇到問題的時候，沿著鏈走就知道該用什麼工具。
-
-這條因果鏈就是你的 K8s 知識地圖。
+有一件事要特別提醒。Secret 不是加密，只是 base64 編碼。你 kubectl get secret -o yaml 看到一串亂碼，那不是加密，是 base64。任何人都能解回明文。所以 Secret 的保護是靠 RBAC 控制誰能讀，不是靠那個編碼。
 
 [▶ 下一頁]`,
   },
 
-  // ── 7-24 學習路線 + Q&A ──
+  // ── Secret 實作卡 ──
   {
-    title: '學習路線建議 + Q&A',
-    subtitle: '接下來可以往哪個方向走',
-    section: 'Loop 8：總複習 + 結業',
-    duration: '10',
-    content: (
-      <div className="space-y-3">
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-cyan-400 border-b border-slate-600">
-                <th className="text-left py-1 pr-2">方向</th>
-                <th className="text-left py-1">說明</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700/50">
-                <td className="py-2 pr-2 font-semibold text-amber-400">CKA 認證</td>
-                <td className="py-2 text-xs">CNCF 官方認證，線上實作考試，業界認可度高。四堂課涵蓋約 60%</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-2 pr-2 font-semibold text-green-400">Service Mesh</td>
-                <td className="py-2 text-xs">Istio — Sidecar Proxy 做流量控制、熔斷、鏈路追蹤</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-2 pr-2 font-semibold text-purple-400">GitOps</td>
-                <td className="py-2 text-xs">ArgoCD — git push 自動部署，版本歷史 + 回滾</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-2 pr-2 font-semibold text-blue-400">監控</td>
-                <td className="py-2 text-xs">Prometheus + Grafana — 收集指標 + 儀表板</td>
-              </tr>
-              <tr>
-                <td className="py-2 pr-2 font-semibold text-cyan-400">CI/CD</td>
-                <td className="py-2 text-xs">GitHub Actions + ArgoCD = 完整 Pipeline</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2 text-sm">推薦資源</p>
-          <div className="text-xs text-slate-300 space-y-1">
-            <p><span className="text-amber-400">K8s 官方文件</span> — CKA 考試可查，必須熟悉</p>
-            <p><span className="text-amber-400">Killer.sh</span> — CKA 模擬考平台</p>
-            <p><span className="text-amber-400">KodeKloud</span> — 互動式練習環境</p>
-            <p><span className="text-amber-400">K8s the Hard Way</span> — 從零手動搭建叢集</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `好，因果鏈串完了。接下來聊聊你學完這四堂課之後可以往哪個方向走。
-
-第一個推薦的方向是考 CKA。CKA 全名 Certified Kubernetes Administrator，CNCF 官方認證。業界認可度非常高，很多公司的 DevOps 職缺會明確要求有 CKA。
-
-CKA 的考試形式是線上實作。不是選擇題，是給你一個真實的 K8s 叢集，讓你在上面操作。兩個小時做完 15 到 20 題。而且考試的時候可以查 K8s 官方文件，所以不用死背指令，重要的是你知道怎麼找、怎麼用。
-
-我們四堂課學的內容大概涵蓋了 CKA 60% 左右的知識點。還需要額外學的包括：用 kubeadm 從零搭建叢集、etcd 備份和還原、Taint 和 Toleration、Node Affinity、PodDisruptionBudget、更深入的網路除錯。這些在 CKA 的備考課程裡都會教。
-
-如果你的角色偏開發不是運維，可以考 CKAD，Certified Kubernetes Application Developer。偏安全可以考 CKS，Certified Kubernetes Security Specialist。
-
-第二個方向是 Service Mesh。我們學了 Service 做基本的流量轉發，但如果你的微服務架構更複雜，需要做流量控制、熔斷、鏈路追蹤，就需要 Service Mesh。最知名的是 Istio。它在每個 Pod 旁邊放一個 Sidecar Proxy，攔截所有進出的流量做管控。還記得第四堂學的 Sidecar 模式嗎？Istio 就是 Sidecar 的極致應用。
-
-第三個方向是 GitOps。我們目前都是手動 kubectl apply 部署的。但在企業環境裡，你不會讓人手動操作生產環境。你會用 GitOps 的方式：把所有 YAML 放在 Git 倉庫裡，用 ArgoCD 這類工具監控倉庫。當你 git push 更新 YAML，ArgoCD 自動幫你 apply 到叢集上。整個部署流程是自動化的，而且有完整的版本歷史和回滾能力。
-
-第四個方向是監控。你的服務跑起來了，但你怎麼知道它跑得好不好？CPU 用了多少、請求量多少、錯誤率多少？這需要監控系統。最常用的組合是 Prometheus 加 Grafana。Prometheus 負責收集指標，Grafana 負責畫漂亮的儀表板。用 Helm 一行就能裝。
-
-第五個方向是 CI/CD 整合。寫好程式碼之後，自動跑測試、自動 build Docker Image、自動 push 到 Registry、自動部署到 K8s。GitHub Actions 可以做到這些。搭配 ArgoCD 就是完整的 CI/CD + GitOps Pipeline。
-
-推薦的學習資源。K8s 官方文件是最好的參考，CKA 考試也能查，一定要熟悉它的結構。Killer.sh 是 CKA 模擬考平台，跟真實考試很像。KodeKloud 有互動式練習環境，適合邊學邊做。如果你想深入理解 K8s 的底層原理，可以挑戰 Kubernetes the Hard Way，從零手動搭建叢集，不用任何工具。
-
-好，接下來是 Q&A 時間。大家有什麼問題都可以問。不管是今天的內容，還是前幾堂課的，或者是你在工作中遇到的 K8s 問題，都可以。
-
-（Q&A 環節，依現場狀況回答）
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-25 結業 ──
-  {
-    title: '結業',
-    subtitle: '四堂課的成長回顧',
-    section: 'Loop 8：總複習 + 結業',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3">四堂課，你經歷了什麼？</p>
-          <div className="text-sm text-slate-300 space-y-2">
-            <div className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold min-w-[60px]">第四堂</span>
-              <span>第一次看到 K8s 架構圖，腦袋一片混亂。硬著頭皮寫出第一個 Pod YAML</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-green-400 font-bold min-w-[60px]">第五堂</span>
-              <span>Deployment 自動修復、Service 讓瀏覽器連到 K8s。跨過了一道門</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-purple-400 font-bold min-w-[60px]">第六堂</span>
-              <span>Ingress、ConfigMap、Secret、PVC、StatefulSet、Helm。開始像生產系統了</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-cyan-400 font-bold min-w-[60px]">第七堂</span>
-              <span>Probe + Resource + HPA + RBAC + NetworkPolicy。12 步建完整系統</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg text-center">
-          <p className="text-green-400 font-bold text-lg mb-2">你手上有了一張完整的地圖</p>
-          <p className="text-sm text-slate-300">每個節點你都走過了。接下來的路，你可以自己走了。</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">最後三個建議</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><span className="text-amber-400 font-bold">1.</span> 12 步自己再做一遍，不看講義</p>
-            <p><span className="text-amber-400 font-bold">2.</span> 在你自己的專案裡用起來。學過的不用就會忘</p>
-            <p><span className="text-amber-400 font-bold">3.</span> 想要有份量的認證，去考 CKA</p>
-          </div>
-        </div>
-
-        <div className="text-center mt-4">
-          <p className="text-slate-400 text-lg">大家辛苦了。我們後會有期。</p>
-        </div>
-      </div>
-    ),
-    notes: `好，Q&A 結束了。我們的課程也走到終點了。
-
-讓我最後花幾分鐘跟大家說幾句話。
-
-回想四堂課之前，也就是第四堂的第一支影片。那時候你剛學完 Docker，覺得容器很酷。docker run 一行指令就能跑一個 nginx。Docker Compose 讓你一次啟動前端加後端加資料庫。你覺得這東西很方便。
-
-然後我問了你一個問題：如果你有一百台伺服器、五百個容器要管呢？Docker Compose 管得了一台機器上的容器，但管不了一百台機器。服務掛了誰幫你重啟？流量大了誰幫你擴容？機器壞了上面的容器怎麼辦？
-
-就是這個問題把你帶進了 Kubernetes 的世界。
-
-四堂課走下來，你經歷了什麼？
-
-第四堂，你第一次看到 K8s 的架構圖，Master Node、Worker Node、etcd、API Server、Scheduler、Controller Manager，一堆名詞砸過來，腦袋一片混亂。但你硬著頭皮跟著做，寫出了人生第一個 Pod 的 YAML，用 kubectl apply 把它跑起來了。那一刻你發現，K8s 好像也沒那麼恐怖。
-
-第五堂，你學了 Deployment，第一次看到 K8s 自動幫你修復。故意砍一個 Pod，幾秒鐘後新的 Pod 就出現了。你學了 Service，第一次用瀏覽器連到 K8s 裡面跑的 nginx。那個頁面跳出來的時候，你知道你跨過了一道門。
-
-第六堂，事情變得真實了。你用 Ingress 設了域名，用 ConfigMap 和 Secret 分離了設定，用 PVC 讓資料持久化，用 StatefulSet 跑了 MySQL，用 Helm 一行裝好了複雜的應用。你建出來的東西開始像一個真正的生產系統了。
-
-第七堂，也就是今天，你加上了 Probe 做健康檢查、Resource limits 做資源控制、HPA 做自動擴縮、RBAC 做權限管理、NetworkPolicy 做網路隔離。然後你把這些全部串在一起，從一個空的 Namespace 開始，12 步建了一套完整的系統。
-
-你知道嗎，有很多人學 K8s 學了好幾個月，看了一堆文章和影片，但從來沒有從零到一建過一套完整的系統。你今天做到了。
-
-我知道四堂課的資訊量很大。你不可能記住每一條指令、每一個 YAML 的寫法。但沒關係。你不需要記住所有細節。你需要記住的是那條因果鏈。Docker 扛不住所以 K8s。要跑容器所以 Pod。要穩定入口所以 Service。一路走到 NetworkPolicy。
-
-這條因果鏈就是你的地圖。
-
-我用一個比喻來結束。你現在手上有一張完整的地圖。地圖上的每一個節點你都走過了。Pod 走過了、Service 走過了、Ingress 走過了、RBAC 走過了。你知道每個節點是什麼、為什麼在那裡、怎麼到達。
-
-接下來的路，你可以自己走了。
-
-碰到新的問題，拿出地圖看看有沒有對應的節點。地圖上沒有的，查文件、找社群、動手試。你有了基礎，剩下的就是累積經驗。
-
-最後三個建議。第一，把今天的 12 步再自己做一遍，不看講義。做不出來的地方就是還需要加強的。第二，在你自己的專案裡用起來。學過的不用就會忘。第三，如果想要有份量的認證，去考 CKA。
-
-大家辛苦了。四堂課能走到這裡的人都不簡單。希望這門課能成為你技術道路上的一個轉折點。
-
-我們後會有期。
-
-[▶ 課程結束]`,
-  },
-
-  // ============================================================
-  // 附錄：NetworkPolicy（選讀，可跳過）
-  // ============================================================
-
-// Loop 5：NetworkPolicy（7-14, 7-15, 7-16）
-  // ============================================================
-
-  // ── 7-14 概念（1/2）：全通不安全 ──
-  {
-    title: '叢集內全通不安全',
-    subtitle: 'K8s 預設：所有 Pod 互通 → 橫向移動攻擊',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">問題：預設全通</p>
-          <div className="bg-slate-900/60 border border-slate-700 p-3 rounded-lg mt-2">
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              <div className="border-2 border-blue-500/70 rounded-lg p-2 bg-blue-900/20 text-center min-w-[80px]">
-                <p className="text-blue-400 text-sm font-bold">Frontend</p>
-              </div>
-              <span className="text-green-400 font-bold">→</span>
-              <div className="border-2 border-cyan-500/70 rounded-lg p-2 bg-cyan-900/20 text-center min-w-[80px]">
-                <p className="text-cyan-400 text-sm font-bold">API</p>
-              </div>
-              <span className="text-green-400 font-bold">→</span>
-              <div className="border-2 border-amber-500/70 rounded-lg p-2 bg-amber-900/20 text-center min-w-[80px]">
-                <p className="text-amber-400 text-sm font-bold">DB</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-center mt-2 gap-2">
-              <span className="text-blue-400 text-xs">Frontend</span>
-              <span className="text-red-400 font-bold text-sm">── 也能直連 ──→</span>
-              <span className="text-amber-400 text-xs">DB</span>
-              <span className="text-red-400 text-xs ml-1">危險！</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">橫向移動攻擊</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>1. 前端 Pod 有安全漏洞，被入侵</p>
-            <p>2. 網路全通 → 攻擊者從前端直連 DB</p>
-            <p>3. 讀取或修改資料 → 完蛋</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">解法：NetworkPolicy</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>Docker → <code className="text-xs">docker network create</code> 隔離（以 network 為單位）</p>
-            <p>K8s → <span className="text-green-400 font-bold">NetworkPolicy</span>（Pod 等級防火牆，用 label 篩選，更精細）</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `好，我們繼續因果鏈。上一個 Loop 用 RBAC 管住了「人」。開發人員只能看不能刪，實習生碰不到生產環境。人的問題解決了。
-
-但是 Pod 之間呢？
-
-K8s 預設的網路策略是什麼？全通。叢集裡面所有的 Pod，不管在哪個 Namespace，不管掛什麼 label，都可以互相通訊。前端 Pod 可以連 API Pod，API Pod 可以連 MySQL Pod。這很合理。但同時，前端 Pod 也可以直接連 MySQL Pod。這就不合理了。
-
-前端為什麼需要直連資料庫？正常架構下不需要。前端只需要連 API，API 再去連資料庫。但預設情況下，K8s 不會阻止前端直連資料庫。
-
-這有什麼問題？假設你的前端 Pod 有一個安全漏洞，被攻擊者入侵了。如果網路是全通的，攻擊者可以從前端 Pod 直接連到資料庫 Pod，讀取或者修改資料。這叫橫向移動，是安全攻擊裡最常見的手法之一。入侵一個弱點之後，在內部網路裡面橫著走，一路打到高價值目標。
-
-用 Docker 的經驗來想。Docker 有 network 隔離的概念。你建一個 frontend-net、一個 backend-net，把前端容器放在 frontend-net，把資料庫放在 backend-net。不同 network 的容器不能互相連線。Docker Compose 裡面你也可以用 networks 欄位做隔離。
-
-K8s 的做法比 Docker 更靈活，叫 NetworkPolicy。NetworkPolicy 是 Pod 等級的防火牆。你可以用 label 篩選目標 Pod，然後指定只有哪些 Pod 才能連進來或連出去。比 Docker 的 network 隔離更精細，因為 Docker 的隔離是以整個 network 為單位，K8s 可以做到以單個 Pod 為單位。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-14 概念（2/2）：ingress/egress 規則 + YAML ──
-  {
-    title: 'NetworkPolicy YAML 結構',
-    subtitle: 'podSelector + policyTypes + ingress/egress',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '7',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">四個區塊</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p><code className="text-cyan-400 text-xs">podSelector</code> → 這條規則套用在誰身上</p>
-            <p><code className="text-cyan-400 text-xs">policyTypes</code> → 管 Ingress（進）還是 Egress（出）</p>
-            <p><code className="text-cyan-400 text-xs">ingress.from</code> → 允許誰連進來</p>
-            <p><code className="text-cyan-400 text-xs">egress.to</code> → 允許連出去到哪</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm">
-          <p className="text-amber-400 font-semibold">注意別搞混！</p>
-          <p className="text-slate-300 text-xs mt-1">NetworkPolicy 的 Ingress（L3/L4 進入流量）≠ Ingress Controller（L7 HTTP 路由）</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-1 text-sm">重要觀念</p>
-          <p className="text-sm text-slate-300">被 Ingress / Egress policy 選中的方向 → 預設拒絕未允許流量（方向別白名單）</p>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm">
-          <p className="text-amber-400 font-semibold">CNI 支援注意</p>
-          <div className="text-xs text-slate-300 mt-1 space-y-1">
-            <p>✓ k3s 預設安裝 → 有內建 network policy controller</p>
-            <p>✓ <span className="text-green-400">Calico</span>、<span className="text-green-400">Cilium</span>、Weave → 明確支援；minikube 做 Lab 常用 Calico</p>
-          </div>
-        </div>
-      </div>
-    ),
-    code: `# 保護 DB：只讓 API Pod 連進來
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+    title: 'Step 2：Secret — 機密資料',
+    subtitle: 'stringData 填明文，K8s 幫你 encode',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: v1
+kind: Secret
 metadata:
-  name: db-allow-api-only
-spec:
-  podSelector:
-    matchLabels:
-      role: database        # 套用在 DB Pod
-  policyTypes:
-    - Ingress               # 只管進來的流量
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              role: api      # 只有 API 能連
-      ports:
-        - protocol: TCP
-          port: 3306         # 只開 MySQL port`,
-    notes: `來看 NetworkPolicy 的 YAML 結構。一共四個區塊。
-
-第一個是 podSelector，指定「這條規則套用在誰身上」。比如 matchLabels role: database，就是套用在所有帶 role=database 這個 label 的 Pod 上面。
-
-第二個是 policyTypes，指定管「進來的流量」還是「出去的流量」。Ingress 是進入 Pod 的流量，Egress 是離開 Pod 的流量。你可以只管其中一種，也可以兩種都管。
-
-這裡要特別注意一個容易混淆的點。NetworkPolicy 裡面的 Ingress 跟我們第六堂學的 Ingress Controller 完全是兩回事。NetworkPolicy 的 Ingress 是指「進入 Pod 的網路流量」，是 Layer 3 和 Layer 4 的概念。Ingress Controller 是 HTTP 路由器，是 Layer 7 的概念。名字碰巧一樣而已，不要搞混。
-
-第三個區塊是 ingress 規則。from 裡面用 podSelector 指定「允許誰連進來」。ports 裡面指定允許的 port 和 protocol。
-
-第四個區塊是 egress 規則，格式類似，用 to 和 ports 指定「允許連出去到哪裡」。
-
-來看一個具體的例子。我要保護資料庫 Pod，只讓 API Pod 連進來。podSelector 設 matchLabels role: database，表示這條規則套用在帶 role=database 的 Pod 上。policyTypes 設 Ingress，只管進來的流量。ingress from podSelector matchLabels role: api，表示只有帶 role=api 的 Pod 才能連進來。ports 設 TCP 3306，只允許 MySQL 的 port。
-
-翻譯成白話：資料庫只接受 API 的連線，而且只接受 3306 port。其他任何 Pod 想連資料庫的任何 port，全部擋掉。
-
-這裡有一個非常重要的觀念。NetworkPolicy 不是「一加就全部鎖死」，而是看你宣告哪個方向。如果某個 Pod 被帶有 Ingress 的 policy 選中，它的 ingress 會變成白名單模式；如果被帶有 Egress 的 policy 選中，它的 egress 也會變成白名單模式。只寫 Ingress，不會順便把 Egress 也鎖住；反過來也一樣。
-
-最後提一個很重要的實務注意事項。NetworkPolicy 這個東西是 K8s 的 API 規格，但實際執行還是要靠底層網路外掛或對應 controller。Calico、Cilium、Weave 都是常見選項。k3s 的預設安裝本身有 network policy controller，所以不是「Flannel 就一定不支援」這麼簡單；如果你在安裝時額外把它關掉，policy 才會存在但不生效。
-
-如果你想在 minikube 上做最可預期的 Lab，常見做法是用 minikube start --cni=calico 重新建叢集。實際排錯時，如果你 apply 成功但流量還是全通，第一步先確認目前叢集到底用哪個 CNI / controller，第二步再檢查 selector、policyTypes 和 ports 有沒有寫對。
-
-好，接下來我們實際操作一下。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-15 實作（1/2）：部署三服務 + 驗證全通 ──
-  {
-    title: 'NetworkPolicy 實作：部署 + 驗證全通',
-    subtitle: '三個服務：frontend / api / database',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '6',
+  name: app-secrets
+  namespace: tasks
+type: Opaque
+stringData:            # ← 填明文，K8s 自動 base64 encode
+  postgres-password: "MyPostgresP@ssw0rd"
+  redis-password: "MyRedisP@ssw0rd"
+  jwt-secret: "MyJwtSuperSecret"`,
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 1-2：部署 + 驗證預設全通</p>
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">stringData vs data</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p><span className="text-green-400 font-mono">stringData</span> → 填明文，K8s 幫你 base64 encode</p>
+            <p><span className="text-yellow-400 font-mono">data</span> → 你要自己先 base64 encode</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 01-secret.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get secret app-secrets -n tasks</p>
+          <p className="text-slate-500 mt-1"># 只看到 NAME 和 TYPE，看不到值 — 這是 K8s 設計的</p>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/40 p-2 rounded text-xs text-red-300">
+          <span className="font-semibold">不要推進 git！</span> 生產環境用 Sealed Secrets 或 External Secrets Operator 管理
         </div>
       </div>
     ),
-    code: `# Step 1：部署三個服務（都用 nginx 模擬，差別只是 label）
-kubectl apply -f networkpolicy-lab.yaml
-kubectl get pods -l "role in (frontend,api,database)"
-kubectl get svc
+    notes: `密碼和機密資料放 Secret，不是 ConfigMap。看 YAML。
 
-# Step 2：驗證預設全通（還沒套 NetworkPolicy）
-# frontend → db（不應該通，但預設全通）
-FRONTEND_POD=$(kubectl get pods -l role=frontend \\
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✓ 有回應 = 全通（不安全！）
+stringData 和 data 的差別很多人搞混。stringData 你填明文，K8s 幫你 base64 encode 再存。data 你要自己先 base64 encode 才能填進去。用 stringData 比較方便，但這個 YAML 不要推進 git，或者用 Sealed Secrets 這類工具管理。
 
-# api → db（應該通）
-API_POD=$(kubectl get pods -l role=api \\
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✓ 有回應 = 全通`,
-    notes: `好，我們來實作。這個實驗要部署三個服務：frontend、api、database。然後先驗證預設全通，再套上 NetworkPolicy，驗證隔離效果。
+指令：kubectl apply -f 01-secret.yaml
 
-先部署。networkpolicy-lab.yaml 裡面有三個 Deployment 和三個 Service。三個 Deployment 都用 nginx 來模擬，差別只是 label 不同。frontend 的 Pod 帶 role=frontend，api 的帶 role=api，database 的帶 role=database。
+驗證：
 
-kubectl apply -f networkpolicy-lab.yaml
+指令：kubectl get secret app-secrets -n tasks
 
-等 Pod 跑起來。kubectl get pods -l "role in (frontend,api,database)" 六個 Pod 都是 Running。好。看一下 Service。kubectl get svc 有 frontend-svc、api-svc、db-svc 三個 ClusterIP Service。
-
-現在還沒套 NetworkPolicy，所有 Pod 之間應該是全通的。我們來驗證。
-
-先從 frontend Pod 連 database。你會看到 nginx 的預設歡迎頁面。有回應，表示 frontend 可以連到 database。在正常的安全架構下，這不應該被允許。
-
-再從 api Pod 連 database。一樣有回應。api 也能連 database。這個是合理的，因為 API 需要存取資料庫。
+只看到 NAME 和 TYPE，看不到值。describe 也看不到值。這是 K8s 的設計，防止 Secret 在終端機輸出中洩漏。
 
 [▶ 下一頁]`,
   },
 
-  // ── 7-15 實作（2/2）：套 NetworkPolicy + 驗證隔離 ──
+  // ── ConfigMap 實作卡 ──
   {
-    title: 'NetworkPolicy 驗證：隔離生效',
-    subtitle: 'api → db ✓　frontend → db ✗',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '6',
+    title: 'Step 3：ConfigMap — 設定值',
+    subtitle: '注意：POSTGRES_HOST 填的是 Service 名稱',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: tasks
+data:
+  POSTGRES_HOST: "postgres-service"   # ← 等一下要建的 Service 名稱
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "taskdb"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"`,
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 3-5：套 NetworkPolicy + 重新測試</p>
+      <div className="space-y-3">
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded">
+          <p className="text-cyan-300 font-semibold text-sm mb-1">K8s 內建 DNS — 用 Service 名稱就能連</p>
+          <p className="text-slate-300 text-xs">每個 Service 建立後，叢集內部都能用 <span className="font-mono text-green-400">postgres-service</span> 這個名稱連到它。</p>
+          <p className="text-slate-300 text-xs mt-1">Pod 重啟換 IP 也沒關係 → Service DNS 名稱永遠不變 → ConfigMap 裡的值永遠有效</p>
         </div>
 
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">✓ api → db：通過</p>
-          <p className="text-xs text-slate-300">role=api 在允許清單 → 正常回應</p>
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 02-configmap.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get configmap app-config -n tasks -o yaml</p>
+          <p className="text-slate-500 mt-1"># 這個可以看到值，因為不是機密資料</p>
         </div>
 
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">✗ frontend → db：被擋（CNI 支援時）</p>
-          <p className="text-xs text-slate-300">role=frontend 不在允許清單 → 3 秒後 timeout</p>
-          <p className="text-xs text-slate-400 mt-1">CNI 不支援 → 還是會通，概念理解即可</p>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">✓ frontend → api：不受影響</p>
-          <p className="text-xs text-slate-300">NetworkPolicy 只套在 DB Pod，API Pod 沒有限制</p>
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          順序重點：Service 還沒建，但 ConfigMap 裡已經填好 Service 名稱 — 這是 K8s 的好處，名稱先定下來
         </div>
       </div>
     ),
-    code: `# Step 3：套上 NetworkPolicy
-kubectl apply -f networkpolicy-db-only-api.yaml
-kubectl get networkpolicy
-# NAME                POD-SELECTOR     AGE
-# db-allow-api-only   role=database    5s
+    notes: `看 ConfigMap 的 YAML。
 
-# Step 4：重新測試
-# api → db（應該通）
-kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✓ 有回應
+注意 POSTGRES_HOST 的值是 postgres-service。這是等一下我們要建的 Service 名稱。K8s 有內建 DNS，每個 Service 建立之後，叢集內部就可以用 Service 名稱直接連到它。在同一個 Namespace 裡用短名稱就夠，K8s DNS 自動解析。Pod 重啟換了 IP 也沒關係，Service 的 DNS 名稱不變，ConfigMap 裡的值永遠有效。
 
-# frontend → db（CNI 支援 → timeout；不支援 → 還是通）
-kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80
-# ✗ wget: download timed out（被擋了！）
+這就是為什麼我們可以先寫 ConfigMap，後建 Service。名稱先約定好，後面建起來就自動連上。
 
-# Step 5：frontend → api 不受影響
-kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://api-svc:80
-# ✓ 有回應`,
-    notes: `好，現在套上 NetworkPolicy。
-
-kubectl apply -f networkpolicy-db-only-api.yaml
-
-這個 NetworkPolicy 的內容就是剛才概念講的那個 YAML。podSelector 選 role=database 的 Pod，只允許 role=api 的 Pod 透過 TCP port 80 連進來。
-
-kubectl get networkpolicy 你會看到 db-allow-api-only 這條 NetworkPolicy，POD-SELECTOR 顯示 role=database。
-
-好，現在重新測試。先從 api 連 database。kubectl exec $API_POD -- wget -qO- --timeout=3 http://db-svc:80 還是有回應。因為 api Pod 帶 role=api label，在允許清單裡面。
-
-再從 frontend 連 database。kubectl exec $FRONTEND_POD -- wget -qO- --timeout=3 http://db-svc:80 如果你的 CNI 支援 NetworkPolicy，這個指令會在 3 秒後 timeout。因為 frontend Pod 的 label 是 role=frontend，不在 NetworkPolicy 的允許清單裡面，流量被擋掉了。
-
-如果你的 CNI 不支援，這邊還是會成功。不用擔心，概念你已經理解了。在生產環境用 Calico 或 Cilium 就會生效。
-
-最後確認一下 frontend 連 api 還是通的。有回應。因為我們的 NetworkPolicy 只套在 database Pod 上面，api Pod 沒有任何 NetworkPolicy 限制，所以 frontend 連 api 不受影響。
-
-這就是 NetworkPolicy 的效果。database 被保護起來了，只有 api 能連。frontend 連 database 被擋，但 frontend 連 api 不受影響。三層架構的網路隔離就是這樣做的。
+指令：kubectl apply -f 02-configmap.yaml
 
 [▶ 下一頁]`,
   },
 
-  // ── 7-15 學員實作 ──
+  // ── StatefulSet 複習卡 ──
   {
-    title: '學員實作：NetworkPolicy',
-    subtitle: '⏱ 巡堂確認',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '10',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">必做</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>1. 部署 frontend + api + db 三個服務</p>
-            <p>2. 驗證預設全通：frontend → db 有回應</p>
-            <p>3. apply NetworkPolicy</p>
-            <p>4. 驗證：api → db ✓、frontend → db ✗（或理解概念）</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">挑戰</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>在 API Pod 加一條 <code className="text-cyan-400">egress</code> 規則：</p>
-            <p>- API 只能連 DB，不能連外網</p>
-            <p>- 提示：policyTypes 加 Egress，egress 區塊用 podSelector 指定目標</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">巡堂檢查清單</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>□ kubectl get networkpolicy → db-allow-api-only 存在</p>
-            <p>□ POD-SELECTOR 顯示 role=database</p>
-            <p>□ api → db 測試通過</p>
-            <p>□ frontend → db 測試被擋（或 CNI 不支援已理解）</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `接下來是大家的實作時間。必做題是跟著剛才的步驟做一遍，確認 api 能連 db、frontend 不能連 db。挑戰題是在 api Pod 上面加一條 egress 規則，限制 api 只能連 database，不能連外網。提示：在 policyTypes 裡面加 Egress，然後在 egress 區塊裡用 podSelector 指定目標。大家動手做。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-16 回頭操作：NetworkPolicy ──
-  {
-    title: '回頭操作：NetworkPolicy 常見坑',
-    subtitle: 'Loop 5 小結 — 下午因果鏈回顧',
-    section: 'Loop 5：NetworkPolicy',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">常見坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">1.</span>
-              <div>
-                <p>CNI 不支援</p>
-                <p className="text-xs text-slate-400">先確認 CNI / controller；minikube 做 Lab 常用 Calico：minikube start --cni=calico</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">2.</span>
-              <div>
-                <p>podSelector label 不匹配</p>
-                <p className="text-xs text-slate-400">Pod 帶 app=database，Policy 寫 role=database → 沒套到任何 Pod</p>
-                <p className="text-xs text-slate-400">用 kubectl get pods --show-labels 確認</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">3.</span>
-              <div>
-                <p>忘了寫 policyTypes</p>
-                <p className="text-xs text-slate-400">K8s 會自動推斷，但明確寫出來是好習慣</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">下午因果鏈回顧</p>
-          <div className="text-sm text-slate-300">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400 text-xs">RBAC 管人</span>
-              <span className="text-slate-400">+</span>
-              <span className="bg-cyan-900/40 border border-cyan-500/50 px-2 py-1 rounded text-cyan-400 text-xs">NetworkPolicy 管網路</span>
-            </div>
-            <p className="mt-2 text-slate-400 text-xs">誰能操作 → 限制了，Pod 間通訊 → 隔離了</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm text-amber-300">
-          <p>接下來：把四堂課學的所有東西串在一起</p>
-          <p>從一個完全空的 Namespace → 一步一步建出完整系統</p>
-        </div>
-      </div>
-    ),
-    notes: `好，回頭確認一下大家的 NetworkPolicy 做到了。
-
-kubectl get networkpolicy 看一下。有 db-allow-api-only 這條嗎？POD-SELECTOR 欄位顯示的是 role=database 嗎？好。
-
-如果你的 CNI 支援 NetworkPolicy，你應該看到 api 連 db 成功、frontend 連 db 被擋。如果 CNI 不支援，兩個都能連也沒關係，重點是你理解了 YAML 在寫什麼。
-
-常見的坑。第一個，CNI 不支援。這是最常碰到的。你 apply 了 NetworkPolicy，kubectl get networkpolicy 也看得到，但流量照通。因為底層的 CNI 沒有執行這條規則。解法是換支援的 CNI，比如 minikube start --cni=calico。
-
-第二個坑，podSelector 的 label 寫錯。比如你的 Pod 帶的是 app=database，但 NetworkPolicy 的 podSelector 寫的是 role=database。label 不匹配，NetworkPolicy 根本沒有套到任何 Pod 上面。用 kubectl get pods --show-labels 確認 Pod 的 label 跟 NetworkPolicy 裡寫的一致。
-
-第三個坑，忘了寫 policyTypes。如果你不寫 policyTypes，K8s 會根據你有沒有寫 ingress 和 egress 區塊來自動推斷。但明確寫出來是好習慣，避免搞混。
-
-好，Loop 5 結束。到目前為止下午的兩個 Loop 解決了兩個問題。RBAC 管住了人，不該有權限的人做不了危險操作。NetworkPolicy 管住了 Pod 之間的網路，不該連的連不到。
-
-接下來進入今天最重頭戲的部分。我們要把四堂課學的所有東西串在一起，從一個完全空的 Namespace 開始，一步一步建出一套完整的系統。準備好了嗎？
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-16 學員實作解答：NetworkPolicy ──
-  {
-    title: '解答：只允許 api → database（port 3306）',
-    subtitle: 'Loop 5 完成',
-    section: 'Loop 5：NetworkPolicy',
+    title: '複習：StatefulSet — 為什麼不用 Deployment？',
+    subtitle: 'Day 6 Loop 4 學過 · 現在輪到 PostgreSQL',
+    section: '7-9 邊建邊解釋',
     duration: '3',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做解答：NetworkPolicy YAML 關鍵片段</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p>spec:</p>
-            <p className="text-green-400">{'  '}podSelector:</p>
-            <p>{'    '}matchLabels:</p>
-            <p>{'      '}app: database{'  '}# 套用到 database Pod</p>
-            <p>{'  '}policyTypes: [Ingress]</p>
-            <p>{'  '}ingress:</p>
-            <p>{'  - '}from:</p>
-            <p>{'    - '}podSelector:</p>
-            <p>{'        '}matchLabels:</p>
-            <p className="text-green-400">{'          '}app: api{'  '}# 只允許 api Pod 連進來</p>
-            <p>{'    '}ports:</p>
-            <p>{'    - '}port: 3306</p>
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">Deployment 的問題</p>
+          <p className="text-slate-300 text-xs">Pod 名稱隨機（postgres-7d4f8-xkjqp）。重啟後換名、跑到別的 Node，原本掛的磁碟連不上 → 資料丟</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">StatefulSet 解決三件事</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>① <span className="text-cyan-400 font-semibold">穩定名稱</span>：postgres-0、postgres-1，重啟不變</p>
+            <p>② <span className="text-cyan-400 font-semibold">穩定 DNS</span>：postgres-0.postgres-service 永遠指向同一個 Pod</p>
+            <p>③ <span className="text-cyan-400 font-semibold">獨立 PVC</span>：每個 Pod 永遠掛自己的磁碟</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 從 frontend pod exec，連 database（應該超時被擋）</p>
-            <p>kubectl exec {'<frontend-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
-            <p className="text-slate-500 mt-1"># 從 api pod exec，連 database（應該成功）</p>
-            <p>kubectl exec {'<api-pod>'} -- curl database-svc:3306 --connect-timeout 3</p>
-            <p className="text-slate-500 mt-1"># 清理</p>
-            <p>kubectl delete networkpolicy allow-api-to-db</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">預期結果</p>
-          <p className="text-xs text-slate-300 mt-1">frontend → database：超時（Connection timed out）；api → database：成功連線</p>
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center font-semibold">
+          判斷心法 ①：需要穩定身份 → StatefulSet；不需要 → Deployment
         </div>
       </div>
     ),
-    notes: `來看解答。
+    notes: `這裡是很多人第一次遇到的疑問。PostgreSQL 也是跑在 Pod 裡，為什麼不用 Deployment？
 
-NetworkPolicy 的 podSelector 決定「這條規則套到哪個 Pod」，這裡是 app: database。ingress 的 from.podSelector 決定「誰可以連進來」，這裡是 app: api。ports 限制只開 3306。
+Deployment 的 Pod 名稱是隨機的，比如 postgres-7d4f8-xkjqp，重啟之後名稱會換，可能跑到不同的 Node 上。如果今天 Pod 在 Node A 掛著某個磁碟，重啟後跑到 Node B，B 上沒有那個磁碟，資料就消失了。
 
-驗證的方式是 kubectl exec 進去不同的 Pod，用 curl 或 wget 去試連 database-svc:3306。從 frontend Pod 連應該超時，從 api Pod 連應該成功。超時就表示 NetworkPolicy 有效果。
+StatefulSet 解決三件事。第一，Pod 有穩定的名稱：postgres-0、postgres-1，重啟後名稱不變。第二，Pod 有穩定的 DNS：postgres-0.postgres-service 永遠指向 postgres-0 這個 Pod，不管它在哪個 Node。第三，每個 Pod 有自己的 PVC：postgres-0 永遠掛自己的 PVC，重啟後還是同一個磁碟，資料不丟。
 
-如果兩個都能連，最常見的原因是 CNI 不支援 NetworkPolicy，或者 label 不匹配，Policy 沒有套到正確的 Pod。用 kubectl get pods --show-labels 確認 label。
+判斷原則就這一句：這個服務需要穩定的身份（固定名稱和固定儲存）嗎？需要就 StatefulSet，不需要就 Deployment。
 
-清理：kubectl delete networkpolicy allow-api-to-db。 [▶ 下一頁]`,
+[▶ 下一頁]`,
   },
+
+  // ── PostgreSQL StatefulSet 實作卡 ──
+  {
+    title: 'Step 4：PostgreSQL StatefulSet',
+    subtitle: 'volumeClaimTemplates 是 StatefulSet 特有的',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    code: `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: tasks
+spec:
+  serviceName: "postgres-service"    # ← 對應 Headless Service
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: postgres-password
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:               # ← StatefulSet 特有
+  - metadata: { name: postgres-storage }
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests: { storage: 5Gi }`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">volumeClaimTemplates 的魔法</p>
+          <p className="text-slate-300 text-xs">StatefulSet 用這個模板自動幫每個 Pod 建一個 PVC。</p>
+          <p className="text-slate-300 text-xs mt-1">3 個副本 → 自動建 3 個 PVC（postgres-storage-postgres-0/1/2），每個 Pod 獨佔一個。</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 03-postgres.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get statefulset -n tasks</p>
+          <p className="text-slate-500"># 等 READY 顯示 1/1</p>
+          <p className="text-green-400 mt-1">kubectl get pvc -n tasks</p>
+          <p className="text-slate-500"># postgres-storage-postgres-0 STATUS 顯示 Bound</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          ReadWriteOnce：一個 PVC 只能被一個 Node 掛載 — PostgreSQL 不需要多節點同時寫同個磁碟
+        </div>
+      </div>
+    ),
+    notes: `看 YAML。
+
+volumeClaimTemplates 是 StatefulSet 特有的，Deployment 沒有。StatefulSet 用這個模板自動幫每個 Pod 建一個專屬的 PVC。一個副本就建一個 PVC，名字是 postgres-storage-postgres-0。三個副本就建三個，每個 Pod 自己一個，不共享。
+
+accessModes 設 ReadWriteOnce，代表這個 PVC 只能被一個 Node 掛載。PostgreSQL 不需要多個 Node 同時寫同一個磁碟，ReadWriteOnce 就夠了。
+
+還有一個很重要的欄位：serviceName，值是 postgres-service。StatefulSet 必須指向一個 Headless Service，下一張會解釋為什麼。
+
+指令：kubectl apply -f 03-postgres.yaml
+
+指令：kubectl get statefulset -n tasks
+
+等 READY 顯示 1/1。
+
+指令：kubectl get pvc -n tasks
+
+你會看到 postgres-storage-postgres-0，STATUS 是 Bound，代表已經分配到實際的儲存空間。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Headless Service 複習 + 實作 ──
+  {
+    title: 'Headless Service — StatefulSet 的搭檔',
+    subtitle: 'clusterIP: None → Pod 有自己的 DNS',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    code: `apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: tasks
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None          # ← 關鍵：Headless Service`,
+    content: (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-800/50 border border-slate-700 p-3 rounded">
+            <p className="text-slate-400 font-semibold text-sm mb-1">普通 ClusterIP Service</p>
+            <p className="text-xs text-slate-300">有一個虛擬 IP，流量進來做 LB 隨機分給後端 Pod</p>
+            <p className="text-xs text-red-400 mt-1">你不知道打到哪一個</p>
+          </div>
+          <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded">
+            <p className="text-cyan-400 font-semibold text-sm mb-1">Headless Service</p>
+            <p className="text-xs text-slate-300">沒有虛擬 IP，DNS 直接回傳 Pod 真實 IP</p>
+            <p className="text-xs text-green-400 mt-1">可以定址到特定 Pod</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">為什麼 StatefulSet 要搭 Headless Service</p>
+          <p className="text-slate-300 text-xs">有些場景要連到特定 Pod（例如 PostgreSQL 主從複製，Slave 要連 Master）</p>
+          <p className="text-slate-300 text-xs mt-1">用 <span className="font-mono text-green-400">postgres-0.postgres-service</span> 就能直接定址到 0 號 Pod</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          我們只有一個副本，其實用普通 Service 也能跑。但 StatefulSet + Headless Service 是標準寫法，記住這個 pattern。
+        </div>
+      </div>
+    ),
+    notes: `PostgreSQL 的 Service 要用 Headless Service。看 YAML，重點是 clusterIP: None。
+
+什麼是 Headless Service？普通的 ClusterIP Service 有一個虛擬 IP，流量打進來 K8s 做負載均衡隨機發給後端 Pod，你不知道打到哪一個。Headless Service 沒有虛擬 IP，DNS 查詢直接回傳 Pod 的真實 IP，而且每個 Pod 可以用穩定名稱定址，postgres-0.postgres-service。
+
+StatefulSet 要搭配 Headless Service，因為有些場景你需要連到特定的 Pod。比如 PostgreSQL 主從複製，Slave 要連到 Master，不能連到隨機一個節點。我們這個系統只有一個副本，沒有主從，但還是用 Headless Service，這是搭配 StatefulSet 的標準做法。
+
+建好之後驗證：kubectl exec -it postgres-0 -n tasks -- psql -U postgres -d taskdb，能進去代表資料庫正常。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Redis Deployment 複習卡 ──
+  {
+    title: 'Redis — 為什麼這裡不用 StatefulSet？',
+    subtitle: '同樣存資料，判斷卻不一樣',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">在這套系統裡，Redis 存的是什麼？</p>
+          <p className="text-slate-300 text-xs">暫存的任務佇列 — 不是主要資料庫</p>
+          <p className="text-slate-300 text-xs mt-1">真正的狀態在 PostgreSQL，Redis 只是中繼站</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">Redis 重啟丟資料，沒關係</p>
+          <p className="text-xs text-slate-300">CronJob 每分鐘觸發一次，會重新把待執行的任務從 DB 撈出來丟進 Queue</p>
+          <p className="text-xs text-slate-300 mt-1">→ 系統自動恢復，不用手動補</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center font-semibold">
+          判斷心法 ①：重啟能自動重建的資料 → Deployment（OK）
+        </div>
+
+        <div className="bg-slate-800/40 p-2 rounded text-xs text-slate-400">
+          <span className="text-cyan-400 font-semibold">補充：</span>如果 Redis 是主要儲存（例如排行榜服務），那就要用 StatefulSet + PVC 來保資料。看用途，不看軟體。
+        </div>
+      </div>
+    ),
+    notes: `Redis 也在存資料，為什麼用 Deployment 不用 StatefulSet？
+
+關鍵是：在這套系統裡，Redis 存的是什麼。Redis 只是暫存的任務佇列，不是主要資料庫。任務真正的狀態存在 PostgreSQL。Redis 裡的任務如果因為 Pod 重啟消失，CronJob 下次觸發時會重新把待執行的任務撈出來再丟進去，系統自動恢復。重啟丟資料是可以接受的。
+
+判斷原則：這份資料重啟之後能不能自動重建？能就 Deployment，不能就 StatefulSet。
+
+提醒一下，這是看用途，不是看軟體本身。如果 Redis 是你的主要儲存，比如排行榜、session store，那就要 StatefulSet 加 PVC。判斷標準是「重啟會不會丟資料造成問題」，不是「這是不是資料庫」。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Redis 實作卡 ──
+  {
+    title: 'Step 5：Redis Deployment + ClusterIP Service',
+    subtitle: '用普通 Service，不是 Headless',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: tasks
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata: { labels: { app: redis } }
+    spec:
+      containers:
+      - name: redis
+        image: redis:7
+        command: ["/bin/sh", "-c", "redis-server --requirepass $REDIS_PASSWORD"]
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: redis-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: tasks
+spec:
+  selector: { app: redis }
+  ports: [{ port: 6379, targetPort: 6379 }]
+  # 沒有 clusterIP: None → 普通 ClusterIP`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">為什麼 Redis 的 Service 用 ClusterIP 不用 Headless？</p>
+          <p className="text-slate-300 text-xs">Redis 不需要主從定址。任何一個 Redis 實例都能存任務，普通 LB 就夠</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 04-redis.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get pods -n tasks</p>
+          <p className="text-slate-500"># 等 redis Pod Running</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          密碼用 --requirepass 從 Secret 讀入 — 不是硬寫在 YAML 裡
+        </div>
+      </div>
+    ),
+    notes: `看 Redis 的 YAML。
+
+Redis 的 Service 用普通的 ClusterIP，不是 Headless Service。Redis 不需要主從定址，任何一個 Redis 實例都行，普通的負載均衡就夠了。
+
+密碼的處理方式要注意。我用 command 讓 Redis 啟動時讀環境變數 REDIS_PASSWORD 當作 requirepass。環境變數是從 Secret 用 secretKeyRef 注入進來的。整條鏈是：Secret → 環境變數 → Redis 啟動參數。沒有一個地方有明文密碼。
+
+指令：kubectl apply -f 04-redis.yaml
+
+指令：kubectl get pods -n tasks
+
+等 postgres-0 和 redis 的 Pod 都是 Running。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Service 三種類型總複習 ──
+  {
+    title: '複習：Service 三種類型總覽',
+    subtitle: 'Day 5 Loop 5 學過 · 判斷什麼時候用哪個',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 border-l-4 border-cyan-500 p-3 rounded">
+          <p className="text-cyan-300 font-semibold text-sm">ClusterIP（預設）</p>
+          <p className="text-slate-300 text-xs mt-1">只在叢集內部可存取，外面連不進來</p>
+          <p className="text-slate-400 text-xs mt-1">→ PostgreSQL、Redis、Backend、Frontend 都用這個</p>
+        </div>
+
+        <div className="bg-slate-800/50 border-l-4 border-yellow-500 p-3 rounded">
+          <p className="text-yellow-300 font-semibold text-sm">NodePort</p>
+          <p className="text-slate-300 text-xs mt-1">每個 Node 上開固定 Port（30000-32767），外部可用 Node IP + Port 連</p>
+          <p className="text-slate-400 text-xs mt-1">→ Port 醜、沒域名、沒 SSL，只適合測試，不適合生產</p>
+        </div>
+
+        <div className="bg-slate-800/50 border-l-4 border-purple-500 p-3 rounded">
+          <p className="text-purple-300 font-semibold text-sm">LoadBalancer</p>
+          <p className="text-slate-300 text-xs mt-1">雲端提供商幫你建真正的 LB，給公開 IP</p>
+          <p className="text-slate-400 text-xs mt-1">→ 本機 k3s/minikube 會 pending，要在 AWS/GCP/Azure 才有</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center font-semibold">
+          這套系統對外用 Ingress，不是 NodePort 或 LoadBalancer
+        </div>
+      </div>
+    ),
+    notes: `建完兩個資料庫 Service，剛好複習一下 Day 5 Loop 5 學過的三種 Service 類型。
+
+ClusterIP 是預設，只在叢集內部可以存取，外面連不進來。PostgreSQL、Redis、Backend API、Frontend 的 Service，全部用 ClusterIP。這些服務只需要叢集內部可以連，不需要對外暴露，用 ClusterIP 最安全。
+
+NodePort 在每個 Node 上開一個固定的 Port，範圍 30000 到 32767，外部可以用 Node IP 加這個 Port 連進來。缺點是 Port 號醜、沒有域名、功能少。適合測試環境，不適合生產。
+
+LoadBalancer 讓雲端提供商幫你建一個真正的 Load Balancer，給你一個公開 IP。要在雲端上才有，本機的 k3s 或 minikube 用 LoadBalancer type 會一直 pending。
+
+這套系統對外暴露用 Ingress，不是 NodePort 或 LoadBalancer。Ingress 統一入口，域名路由、SSL、rewrite 全部在這裡處理，一個 Ingress 管所有對外服務。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Job 複習卡 ──
+  {
+    title: '複習：Job — 為什麼一次性任務不用 Deployment？',
+    subtitle: 'Day 5 Loop 6 學過 · 現在用在 DB migration',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">用 Deployment 的慘劇</p>
+          <p className="text-slate-300 text-xs">Deployment 的目標：Pod 一直活著</p>
+          <p className="text-slate-300 text-xs mt-1">Migration 跑完自然退出 → Deployment 以為 Pod 死了 → 一直重啟 → migration 反覆跑 → 衝突、錯誤、資料壞掉</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">Job 是專門設計給「跑完就結束」的任務</p>
+          <p className="text-xs text-slate-300">Pod 結束 → Job 不重啟，只記錄成功/失敗</p>
+          <p className="text-xs text-slate-300 mt-1">可以設 backoffLimit 限制重試次數</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center font-semibold">
+          判斷心法 ③：跑完就結束 → Job；要一直跑 → Deployment
+        </div>
+      </div>
+    ),
+    notes: `第一個應用程式不是 Backend，是一個 Job，負責跑資料庫 schema migration，建立資料表。
+
+為什麼用 Job 不用 Deployment？Deployment 的目標是讓 Pod 一直保持存活。Migration 跑完程序退出，Deployment 看到 Pod 死了就一直重啟它，你的 migration 會反覆跑，產生衝突或錯誤。Job 是為跑完就結束的任務設計的，Pod 結束之後 Job 不重啟，只記錄成功或失敗。
+
+Day 5 Loop 6 學過 Job 和 CronJob，今天就用在真實場景上。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Job 實作卡 ──
+  {
+    title: 'Step 6：DB Migration Job',
+    subtitle: '跑一次建 schema，跑完就結束',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: tasks
+spec:
+  template:
+    spec:
+      restartPolicy: Never    # ← Pod 失敗不自己重啟，交給 Job 決定
+      containers:
+      - name: migrate
+        image: yanchen184/task-api:v2
+        command: ["node", "migrate.js"]
+        env:
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: postgres-password
+  backoffLimit: 3             # ← 最多重試 3 次`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">restartPolicy: Never</p>
+          <p className="text-slate-300 text-xs">Pod 失敗了 → 不重啟這個 Pod → Job 建一個新的 Pod 重試</p>
+          <p className="text-slate-300 text-xs">舊的 Pod 留著 → 你可以看 log 查錯</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 05-db-migrate-job.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get job -n tasks</p>
+          <p className="text-slate-500"># 等 COMPLETIONS 顯示 1/1</p>
+          <p className="text-green-400 mt-1">kubectl logs job/db-migrate -n tasks</p>
+          <p className="text-slate-500"># 看 log 確認沒有錯誤</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          backoffLimit: 3 — 失敗 3 次就標記 Failed，不會無限重試浪費資源
+        </div>
+      </div>
+    ),
+    notes: `看 YAML。
+
+restartPolicy Never，Pod 失敗了不重啟這個 Pod，Job 建一個新的 Pod 重試，舊的 Pod 留著讓你看 log。backoffLimit 3，最多重試三次，三次都失敗 Job 標記為 Failed，你知道有問題要去查。
+
+image 用 task-api:v2，這是 Backend 的 image，裡面除了 server.js 還有 migrate.js 這支腳本，專門跑 schema migration。同一個 image 包兩支程式，啟動時用 command 指定跑哪支，這是常見做法，不用為了 migration 再 build 另一個 image。
+
+指令：kubectl apply -f 05-db-migrate-job.yaml
+
+指令：kubectl get job -n tasks
+
+等 COMPLETIONS 顯示 1/1，migration 成功。
+
+指令：kubectl logs job/db-migrate -n tasks
+
+看 log 確認沒有錯誤。
+
+[▶ 下一頁]`,
+  },
+
+  // ── RBAC 複習卡 ──
+  {
+    title: '複習：RBAC — 給 Pod 操作 K8s API 的身份',
+    subtitle: 'Day 7 上午學過 · 今天在真實系統上用',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">為什麼 Backend 要碰 RBAC？</p>
+          <p className="text-slate-300 text-xs">我們的 Backend 是故意寫成「<span className="text-green-400 font-semibold">runtime 去讀 ConfigMap</span>」</p>
+          <p className="text-slate-300 text-xs mt-1">→ ConfigMap 改了不用重啟 Pod，下次呼叫就拿到新值</p>
+          <p className="text-slate-300 text-xs mt-1">→ 但程式呼叫 K8s API 需要<span className="text-green-400 font-semibold">身份+權限</span></p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">RBAC 三兄弟的分工</p>
+          <div className="space-y-2 text-xs">
+            <div className="flex gap-2"><span className="font-mono text-blue-400 w-32 shrink-0">ServiceAccount</span><span className="text-slate-300">身份（這個 Pod 是誰）</span></div>
+            <div className="flex gap-2"><span className="font-mono text-purple-400 w-32 shrink-0">Role</span><span className="text-slate-300">權限（能做什麼）</span></div>
+            <div className="flex gap-2"><span className="font-mono text-pink-400 w-32 shrink-0">RoleBinding</span><span className="text-slate-300">把身份跟權限綁在一起</span></div>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          一般的 envFrom 注入環境變數 → 不用 RBAC。主動呼叫 K8s API → 要 RBAC。
+        </div>
+      </div>
+    ),
+    notes: `先說明為什麼 Backend 要碰 RBAC。一般的寫法是在 Pod 啟動的時候，把 ConfigMap 的內容透過 envFrom 灌成環境變數，程式讀環境變數就好，這樣根本不需要 RBAC。
+
+但我們這套 Backend 是故意寫成 runtime 去讀 ConfigMap，也就是程式啟動後直接呼叫 K8s API 把 ConfigMap 拉下來。為什麼？因為這樣 ConfigMap 改了不用重啟 Pod，下次呼叫就拿到新的值。生產環境真的有很多服務是這樣做的，比如 feature flag、路由規則、動態白名單。
+
+一旦你的程式要主動呼叫 K8s API，就必須有對應的身份和權限，這就是 RBAC 三兄弟要出場的時候。ServiceAccount 是身份，Role 是權限，RoleBinding 把兩者綁在一起。
+
+[▶ 下一頁]`,
+  },
+
+  // ── RBAC 實作卡 ──
+  {
+    title: 'Step 7：Backend RBAC — 只給 get/list configmaps',
+    subtitle: '最小權限原則 — 只開需要的，不多給',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: v1
+kind: ServiceAccount         # ① 身份
+metadata:
+  name: backend-sa
+  namespace: tasks
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role                   # ② 權限
+metadata:
+  name: backend-role
+  namespace: tasks
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]     # ← 只讀，沒有 create/update/delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding            # ③ 綁定
+metadata:
+  name: backend-rolebinding
+  namespace: tasks
+subjects:
+- kind: ServiceAccount
+  name: backend-sa
+  namespace: tasks
+roleRef:
+  kind: Role
+  name: backend-role
+  apiGroup: rbac.authorization.k8s.io`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">verbs 只給 get 和 list</p>
+          <p className="text-slate-300 text-xs">沒有 create、update、delete、patch</p>
+          <p className="text-slate-300 text-xs mt-1">就算 Backend 程式有 bug / 被攻擊 → 也不能改叢集設定</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 06-rbac.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get serviceaccount,role,rolebinding -n tasks</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          等一下部署完 Backend，我會回來示範「拿掉這個 Role 會怎樣」— 驗證 RBAC 真的在擋
+        </div>
+      </div>
+    ),
+    notes: `看 YAML。三個資源串在一起。
+
+ServiceAccount 是身份。Role 是權限，verbs 只有 get 和 list，沒有 create、update、delete。Backend 只需要讀，不需要寫，給最小權限就好，這才是 RBAC 的精髓。
+
+RoleBinding 把 ServiceAccount 和 Role 綁在一起，subjects 指向 ServiceAccount，roleRef 指向 Role。
+
+等一下部署完 Backend 之後，我會回來驗證一件事：把這個 Role 拿掉，看 Backend 會不會真的報錯。這樣大家才知道 RBAC 不是裝飾品，是真的在擋。
+
+指令：kubectl apply -f 06-rbac.yaml
+
+[▶ 下一頁]`,
+  },
+
+  // ── readinessProbe 複習卡 ──
+  {
+    title: '複習：readinessProbe — Pod Running ≠ 可以接流量',
+    subtitle: 'Day 7 上午學過 · Backend 部署前必看',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">沒有 readinessProbe 的災難</p>
+          <p className="text-slate-300 text-xs">Pod Running → K8s 馬上把流量打進來</p>
+          <p className="text-slate-300 text-xs">但 Node.js 還沒啟動完 / DB 還沒連上 → 使用者收到錯誤</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">readinessProbe 的作用</p>
+          <p className="text-xs text-slate-300">K8s 每隔幾秒打 /health，直到回 200 才把 Pod 加入 Service 後端</p>
+          <p className="text-xs text-slate-300 mt-1">→ READY 欄位顯示 1/1 才算真的準備好</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">和 livenessProbe 的差別</p>
+          <p className="text-xs text-slate-300"><span className="font-mono text-yellow-400">readiness</span>：「可以接流量嗎」→ 失敗 = 從 Service 拔掉</p>
+          <p className="text-xs text-slate-300"><span className="font-mono text-red-400">liveness</span>：「還活著嗎」→ 失敗 = 砍掉重啟</p>
+        </div>
+      </div>
+    ),
+    notes: `Backend 的 YAML 等一下會看到 readinessProbe，這裡先複習一下為什麼需要它。
+
+Day 7 上午有學 Probe，重點是這句話：Pod Running 不等於可以接流量。Node.js 啟動需要幾秒，連資料庫也需要時間。Pod 從 K8s 的角度看是 Running，但從使用者的角度看應用還沒 ready。如果 K8s 直接把流量打進來，使用者第一批請求就會拿到錯誤。
+
+readinessProbe 解決這件事。每隔幾秒打一次 /health，只有回 200，K8s 才把這個 Pod 加進 Service 的後端列表。kubectl get pods 看到的 READY 欄位 1/1，就是 readinessProbe 通過的意思。
+
+順便區分一下 readiness 和 liveness。readiness 問「可以接流量嗎」，失敗就從 Service 拔掉，等 ready 了再加回來。liveness 問「還活著嗎」，失敗就直接砍掉重啟。兩個解決不同問題，常常一起用。
+
+[▶ 下一頁]`,
+  },
+
+  // ── envFrom vs env 觀念卡 ──
+  {
+    title: '觀念：envFrom vs env — 為什麼 Secret 不能用 envFrom？',
+    subtitle: '最小權限原則在 YAML 上的具體應用',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">envFrom → 一次灌進全部</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mt-1">
+            <p>envFrom:</p>
+            <p>- configMapRef:</p>
+            <p>{'    '}name: app-config</p>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">→ ConfigMap 有的 key 全部變成環境變數</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">env + valueFrom → 一條一條明確列</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mt-1">
+            <p>env:</p>
+            <p>- name: POSTGRES_PASSWORD</p>
+            <p>{'  '}valueFrom:</p>
+            <p>{'    '}secretKeyRef:</p>
+            <p>{'      '}name: app-secrets</p>
+            <p>{'      '}key: postgres-password</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300">
+          ConfigMap 可以用 envFrom，Secret 不建議用 — 最小權限：只讓容器看到需要的欄位
+        </div>
+      </div>
+    ),
+    notes: `部署 Backend 前，我先解釋一個很多人會搞混的差別：envFrom 和 env 的差別。
+
+envFrom 的 configMapRef 是一次把整個 ConfigMap 所有 key 都設成環境變數，不用一條一條列。方便。
+
+但 Secret 不建議用 envFrom。為什麼？因為那樣 Secret 裡的所有欄位都會暴露給容器。Backend 可能只需要 postgres-password，但 envFrom 會把 jwt-secret、redis-password 也一起灌進去，容器可以讀到所有密碼。這不符合最小權限。
+
+Secret 要用 env.valueFrom.secretKeyRef 一條一條明確列，只讓容器看到需要的那幾個。
+
+等一下看 Backend 的 YAML 就會發現：ConfigMap 用 envFrom 整包灌，Secret 用 env 一條一條列。這是設計過的。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Backend 實作卡 ──
+  {
+    title: 'Step 8：Backend Deployment + Service',
+    subtitle: '一次看到 6 個概念在同一個 YAML 裡',
+    section: '7-9 邊建邊解釋',
+    duration: '4',
+    code: `apiVersion: apps/v1
+kind: Deployment
+metadata: { name: backend, namespace: tasks }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      serviceAccountName: backend-sa       # ① RBAC 身份
+      containers:
+      - name: backend
+        image: yanchen184/task-api:v2
+        ports: [{ containerPort: 3000 }]
+        env:                               # ② Secret 一條條列
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: app-secrets, key: postgres-password }
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: app-secrets, key: redis-password }
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef: { name: app-secrets, key: jwt-secret }
+        resources:                         # ③ HPA 前提
+          requests: { cpu: "100m", memory: "128Mi" }
+          limits: { cpu: "500m", memory: "256Mi" }
+        readinessProbe:                    # ④ 接流量才顯示 READY
+          httpGet: { path: /health, port: 3000 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service                              # ⑤ ClusterIP
+metadata: { name: backend-service, namespace: tasks }
+spec:
+  selector: { app: backend }
+  ports: [{ port: 3000, targetPort: 3000 }]`,
+    content: (
+      <div className="space-y-2">
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold text-xs mb-1">一個 YAML 串起 6 個概念</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>① <span className="text-green-400 font-mono">serviceAccountName</span> → RBAC 身份（剛建的 backend-sa）</p>
+            <p>② <span className="text-green-400 font-mono">env + valueFrom</span> → Secret 一條條列（最小權限）</p>
+            <p>③ <span className="text-green-400 font-mono">resources.requests.cpu</span> → HPA 能運作的前提</p>
+            <p>④ <span className="text-green-400 font-mono">readinessProbe</span> → 真的 ready 才接流量</p>
+            <p>⑤ <span className="text-green-400 font-mono">ClusterIP Service</span> → 對外交給 Ingress</p>
+            <p>⑥ <span className="text-green-400 font-mono">replicas: 2</span> → 起手就兩個副本，HPA 再擴</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-2 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 07-backend.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get pods -n tasks -l app=backend</p>
+          <p className="text-slate-500"># 等兩個 backend 都 Running 且 READY 1/1</p>
+          <p className="text-green-400 mt-1">kubectl port-forward service/backend-service 3000:3000 -n tasks</p>
+          <p className="text-green-400 mt-1">curl http://localhost:3000/health</p>
+          <p className="text-slate-500"># {`{"status":"ok"}`} 代表後端正常</p>
+        </div>
+      </div>
+    ),
+    notes: `Backend 是整個系統 YAML 最密集的地方。一個 Deployment YAML 裡同時用到 6 個概念。
+
+第一，serviceAccountName: backend-sa，把 Pod 的身份設成剛才建的 ServiceAccount，K8s 自動把對應的 token 掛進去，Pod 就有讀取 ConfigMap 的權限。
+
+第二，Secret 用 env 一條條列，不用 envFrom，剛剛說過原因。
+
+第三，resources.requests.cpu 設 100m。這是 HPA 的前提。HPA 計算目前使用量除以 request 等於百分比，沒有 request 就算不出來，HPA 的 TARGETS 會一直顯示 unknown。
+
+第四，readinessProbe。剛剛那頁複習過，Pod Running 不等於可以接流量。
+
+第五，Service 用 ClusterIP。外部的請求先打 Ingress，Ingress 轉給 Backend 的 ClusterIP Service。用 NodePort 會額外開一個 30000+ 的 Port，多餘的攻擊面，沒必要。
+
+第六，replicas 2。起手就兩個副本，HPA 之後會再擴。
+
+指令：kubectl apply -f 07-backend.yaml
+
+指令：kubectl get pods -n tasks -l app=backend
+
+等兩個 backend Pod 都 Running 且 READY 顯示 1/1，readinessProbe 通過才會顯示 1/1。
+
+驗證：kubectl port-forward service/backend-service 3000:3000 -n tasks
+
+另開終端機：curl http://localhost:3000/health
+
+看到 status ok 代表後端正常。
+
+[▶ 下一頁]`,
+  },
+
+  // ── RBAC 真的 403 驗證卡（亮點！）──
+  {
+    title: '驗證 RBAC 真的在擋 — 拿掉 Role 會怎樣',
+    subtitle: '不是裝飾，是真的會 403',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">現在 Backend 正常 — 能讀到 ConfigMap</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mt-1">
+            <p className="text-green-400">kubectl logs -l app=backend -n tasks --tail=5</p>
+            <p className="text-slate-500 mt-1"># Loaded ConfigMap from K8s API: [POSTGRES_HOST, ...]</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">拿掉 Role → 重啟 Pod → crash</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mt-1">
+            <p className="text-green-400">kubectl delete role backend-role -n tasks</p>
+            <p className="text-green-400">kubectl rollout restart deployment/backend -n tasks</p>
+            <p className="text-green-400">kubectl logs -l app=backend -n tasks --tail=10</p>
+          </div>
+          <p className="text-red-400 text-xs mt-1 font-mono">→ configmaps "app-config" is forbidden (403)</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">加回 Role → 恢復</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded mt-1">
+            <p className="text-green-400">kubectl apply -f 06-rbac.yaml</p>
+            <p className="text-green-400">kubectl rollout restart deployment/backend -n tasks</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center font-semibold">
+          這才是 RBAC 在真實系統上的意義 — 不是好看的三個 YAML，是真的會擋
+        </div>
+      </div>
+    ),
+    notes: `Backend 起來了，現在我要做一個很重要的示範：證明剛才做的 RBAC 真的有用。
+
+先看現在的狀態。
+
+指令：kubectl logs -l app=backend -n tasks --tail=5
+
+你會看到這行：Loaded ConfigMap from K8s API。這代表 Backend 用 ServiceAccount 的 token 成功呼叫 K8s API 把 ConfigMap 讀下來了。
+
+現在把 Role 拿掉，看會發生什麼事。
+
+指令：kubectl delete role backend-role -n tasks
+
+重啟 Backend 讓它重新讀 ConfigMap：
+
+指令：kubectl rollout restart deployment/backend -n tasks
+
+看 log：
+
+指令：kubectl logs -l app=backend -n tasks --tail=10
+
+你會看到 Pod 在啟動階段就 crash 掉，錯誤訊息是 configmaps app-config is forbidden，而且 status code 是 403。
+
+這就是 RBAC 在擋。Backend 的 ServiceAccount 沒有對應的 Role，API Server 直接拒絕。
+
+把 Role 加回來：
+
+指令：kubectl apply -f 06-rbac.yaml
+
+指令：kubectl rollout restart deployment/backend -n tasks
+
+Backend 又恢復正常。
+
+這才是 RBAC 在真實系統上的意義。不是 YAML 上好看的三個資源，是真的會擋。上午學的最小權限原則，今天在一個真實系統上具體看到效果。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Frontend 實作卡 ──
+  {
+    title: 'Step 9：Frontend Deployment + Service',
+    subtitle: 'React build 出來的靜態檔 + nginx serve',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: apps/v1
+kind: Deployment
+metadata: { name: frontend, namespace: tasks }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      containers:
+      - name: frontend
+        image: yanchen184/task-frontend:v1
+        ports: [{ containerPort: 80 }]
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: frontend-service, namespace: tasks }
+spec:
+  selector: { app: frontend }
+  ports: [{ port: 80, targetPort: 80 }]`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">Frontend 比 Backend 單純很多</p>
+          <p className="text-slate-300 text-xs">只是 nginx 靜態伺服器 serve React build 出來的檔案</p>
+          <p className="text-slate-300 text-xs mt-1">不用連資料庫、不用 RBAC、不用 readinessProbe（nginx 啟動極快）</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 08-frontend.yaml</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          ClusterIP Service → 對外暴露一樣交給 Ingress
+        </div>
+      </div>
+    ),
+    notes: `Frontend 是 nginx 靜態伺服器，serve build 出來的 React 靜態檔。比 Backend 單純很多，不用連資料庫、不用 RBAC。
+
+replicas 2 保有高可用，ClusterIP Service 對外暴露交給 Ingress。
+
+指令：kubectl apply -f 08-frontend.yaml
+
+[▶ 下一頁]`,
+  },
+
+  // ── Task Runner 為什麼沒有 Service ──
+  {
+    title: 'Step 10：Task Runner — 為什麼不需要 Service？',
+    subtitle: 'Service 的作用是「讓別人連進來」',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    code: `apiVersion: apps/v1
+kind: Deployment
+metadata: { name: task-runner, namespace: tasks }
+spec:
+  replicas: 3                    # ← 3 個同時消費 Queue
+  selector: { matchLabels: { app: task-runner } }
+  template:
+    metadata: { labels: { app: task-runner } }
+    spec:
+      containers:
+      - name: task-runner
+        image: yanchen184/task-runner:v1
+        command: ["node", "runner.js"]
+        envFrom:
+        - configMapRef: { name: app-config }
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: app-secrets, key: postgres-password }
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: app-secrets, key: redis-password }
+# ⚠️ 沒有 Service！`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">先問：Service 是什麼？</p>
+          <p className="text-slate-300 text-xs">Service 的作用 = 讓別人「連進來」</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">Task Runner 的方向是反的</p>
+          <p className="text-slate-300 text-xs">Task Runner 主動去連 Redis 拉任務 → <span className="text-green-400">Task Runner 是 client</span></p>
+          <p className="text-slate-300 text-xs">沒有人要連到 Task Runner → <span className="text-red-400">不需要 Service</span></p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">replicas: 3 的意義</p>
+          <p className="text-slate-300 text-xs">3 個 Runner 同時從 Queue 拉任務 → 吞吐量 ×3</p>
+          <p className="text-slate-300 text-xs mt-1">Redis 的 <span className="font-mono text-green-400">BLPOP</span> 是原子操作 → 同一個任務只會被一個 Runner 拿走</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center">
+          判斷心法：有人要連進來 → 要 Service；沒有 → 不用
+        </div>
+      </div>
+    ),
+    notes: `Task Runner 跑起來，要不要建 Service？
+
+不需要。Service 的作用是讓別人連進來。Task Runner 是主動去 Redis Queue 拉任務，沒有人要連到它，它連到 Redis。方向是反的，Task Runner 是 client，Redis 是 server，所以 Task Runner 不需要 Service。
+
+三個副本，三個同時從 Queue 拉任務，吞吐量是一個的三倍。Redis 的 BLPOP 是原子操作，同一個任務只會被一個 Task Runner 拿走，不會重複執行。
+
+這是一個常見的誤區，很多同學以為每個 Deployment 都要有 Service。其實不是。判斷原則：有沒有別的服務需要連到這個 Deployment？有就要 Service，沒有就不用。
+
+[▶ 下一頁]`,
+  },
+
+  // ── DaemonSet vs Deployment ──
+  {
+    title: '為什麼 Task Runner 不用 DaemonSet？',
+    subtitle: '判斷心法 ④：跟 Node 數量綁定嗎？',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">DaemonSet 的定義</p>
+          <p className="text-slate-300 text-xs">保證每個 Node 上都跑一個 Pod</p>
+          <p className="text-slate-300 text-xs mt-1">5 個 Node → 5 個 Pod；加到 10 個 Node → 自動變 10 個 Pod</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">DaemonSet 適合跟 Node 綁定的任務</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• <span className="font-mono text-cyan-400">Log Agent</span>（fluentd）：讀 Node 本機磁碟的 log</p>
+            <p>• <span className="font-mono text-cyan-400">Metrics Agent</span>（node-exporter）：收 Node 層級 metrics</p>
+            <p>• <span className="font-mono text-cyan-400">網路插件</span>（kube-proxy）：管理 Node 的 iptables</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">Task Runner 根本不該是 DaemonSet</p>
+          <p className="text-xs text-slate-300">Task Runner 消費 Redis Queue 的任務，<span className="text-red-400 font-semibold">跟 Node 數量完全沒關係</span></p>
+          <p className="text-xs text-slate-300 mt-1">叢集擴到 100 個 Node → 你不需要 100 個 Task Runner</p>
+          <p className="text-xs text-slate-300 mt-1">Task Runner 數量 = 任務量決定，不是 Node 數量</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center font-semibold">
+          跟 Node 綁定 → DaemonSet；不綁定 → Deployment
+        </div>
+      </div>
+    ),
+    notes: `有同學會問：Task Runner 要一直跑，是不是每個 Node 都要有一個，聽起來像 DaemonSet？
+
+這是一個非常經典的誤區，今天把它講清楚。
+
+DaemonSet 的定義是：保證每個 Node 上都跑一個 Pod。你有五個 Node 就有五個 Pod，加到十個 Node 就自動變十個 Pod。
+
+DaemonSet 適合跟 Node 綁定的任務。日誌收集 Agent：每個 Node 上的 Pod 都在 Node 的本機磁碟上產生 log，你需要每個 Node 都有一個 Agent 去讀自己節點上的 log。跨節點讀別人的本機磁碟做不到。監控 Agent：node-exporter 收集 Node 層級的 metrics，每個 Node 一個。網路插件：kube-proxy 在每個 Node 上管理 iptables 規則，每個 Node 要有。
+
+Task Runner 消費的是 Redis Queue 裡的任務，跟 Node 數量完全沒關係。三個 Node 不代表要三個 Worker，三個 Task Runner 也不代表只能有三個 Node。Task Runner 數量取決於任務量，不取決於 Node 數量。
+
+如果你用 DaemonSet，叢集擴到 100 個 Node 就有 100 個 Task Runner，這不是你要的。
+
+判斷原則一句話：跟 Node 數量綁定就用 DaemonSet，不綁定就用 Deployment。
+
+指令：kubectl apply -f 09-task-runner.yaml
+
+[▶ 下一頁]`,
+  },
+
+  // ── CronJob 複習 ──
+  {
+    title: '複習：CronJob — 定時觸發',
+    subtitle: 'Day 5 Loop 6 學過 · 現在用在排程掃描',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Cron 語法五個欄位</p>
+          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
+            <p>* * * * *</p>
+            <p>分 時 日 月 週</p>
+          </div>
+          <div className="text-xs text-slate-300 mt-2 space-y-1">
+            <p><span className="font-mono text-green-400">* * * * *</span> → 每分鐘</p>
+            <p><span className="font-mono text-green-400">0 9 * * *</span> → 每天早上 9 點</p>
+            <p><span className="font-mono text-green-400">*/5 * * * *</span> → 每 5 分鐘</p>
+            <p><span className="font-mono text-green-400">0 */6 * * *</span> → 每 6 小時</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">concurrencyPolicy 三個選項</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• <span className="font-mono text-blue-400">Allow</span>（預設）→ 允許同時跑多個</p>
+            <p>• <span className="font-mono text-green-400">Forbid</span> → 上一個沒跑完，這次跳過（我們用這個）</p>
+            <p>• <span className="font-mono text-yellow-400">Replace</span> → 砍掉舊的，起新的</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          為什麼用 Forbid？防止同一批任務被重複掃描入隊
+        </div>
+      </div>
+    ),
+    notes: `CronJob 每分鐘掃一次資料庫，把到期的任務撈出來丟進 Queue。先複習 Cron 語法。
+
+schedule 的 Cron 語法，五個欄位從左到右是分、時、日、月、週。全星號代表每分鐘。0 9 * * * 是每天早上九點，0 斜線 6 星號星號星號是每六小時，斜線 5 星號星號星號星號是每五分鐘。
+
+concurrencyPolicy 三個選項。Allow 是預設，允許同時跑多個 Job。Forbid 是上一個還沒跑完就跳過這次，防止同一批任務被重複入隊，我們用這個。Replace 是砍掉上一個還在跑的，起一個新的，適合跑最新的就好、舊的不重要的場景。
+
+[▶ 下一頁]`,
+  },
+
+  // ── CronJob 實作卡 ──
+  {
+    title: 'Step 11：CronJob Task Scheduler',
+    subtitle: '每分鐘掃一次到期任務丟進 Queue',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: batch/v1
+kind: CronJob
+metadata: { name: task-scheduler, namespace: tasks }
+spec:
+  schedule: "* * * * *"          # 每分鐘
+  concurrencyPolicy: Forbid      # 上一個沒完 → 跳過
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: scheduler
+            image: yanchen184/task-scheduler:v1
+            command: ["node", "scheduler.js"]
+            envFrom:
+            - configMapRef: { name: app-config }
+            env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: postgres-password }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: redis-password }`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 10-cronjob.yaml</p>
+          <p className="text-slate-500 mt-1"># 等一分鐘</p>
+          <p className="text-green-400 mt-1">kubectl get job -n tasks</p>
+          <p className="text-slate-500"># CronJob 自動建 Job，COMPLETIONS 1/1</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">CronJob 會生 Job，Job 會生 Pod</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>CronJob <span className="text-cyan-400">→</span> 時間到建 Job</p>
+            <p>Job <span className="text-cyan-400">→</span> 建 Pod 執行</p>
+            <p>Pod 跑完 <span className="text-cyan-400">→</span> Job 記錄成功，等下次</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          historyLimit: 3 — 保留最近 3 次成功/失敗紀錄，超過會自動清掉
+        </div>
+      </div>
+    ),
+    notes: `看 YAML。
+
+schedule 是 * * * * * 每分鐘。concurrencyPolicy Forbid。historyLimit 各保留 3 筆，避免 Job 一直累積。
+
+指令：kubectl apply -f 10-cronjob.yaml
+
+等一分鐘：
+
+指令：kubectl get job -n tasks
+
+你會看到 CronJob 自動建立了 Job，COMPLETIONS 1/1。CronJob 和 Job 是一對多的關係，CronJob 是模板，每次觸發建一個 Job，Job 建 Pod 去執行，這樣三層結構。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Ingress 複習卡 ──
+  {
+    title: '複習：Ingress — 為什麼不用 NodePort？',
+    subtitle: 'Day 6 Loop 1 學過 · 今天 Docker Desktop 用 nginx',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">NodePort 的問題</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• Port 號 30000 以上，地址醜</p>
+            <p>• 沒有域名、沒有 SSL、沒有路由</p>
+            <p>• 五個服務 = 開五個 NodePort → 管理噩夢</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">Ingress 統一入口</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• 一個 Ingress Controller 管所有對外流量</p>
+            <p>• 根據域名、路徑路由到不同 Service</p>
+            <p>• TLS、rewrite、IP 白名單集中處理</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">不同環境的 Ingress Controller</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• k3s → 內建 <span className="font-mono text-yellow-400">Traefik</span></p>
+            <p>• Docker Desktop / minikube → <span className="font-mono text-green-400">nginx</span>（今天用這個）</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Frontend 和 Backend 的 Service 都是 ClusterIP，外面連不進來。用 Ingress 對外開放。
+
+為什麼是 Ingress 不是 NodePort？NodePort 的 Port 號在 30000 以上，地址醜、沒有域名、沒有 SSL、沒有路由功能。你有五個服務就要開五個 NodePort，管理起來是噩夢。Ingress 統一入口，一個 Ingress Controller 在叢集裡跑，所有對外流量都打它，它根據域名和路徑路由到不同的 Service。TLS、rewrite、IP 白名單全部集中在這裡處理。
+
+補充一下 Ingress Controller。不同環境的內建 controller 不一樣，k3s 內建 Traefik，Docker Desktop 和 minikube 都是裝 nginx ingress controller。今天示範用 Docker Desktop，所以 ingressClassName 寫 nginx。
+
+[▶ 下一頁]`,
+  },
+
+  // ── Ingress 實作卡（nginx）──
+  {
+    title: 'Step 12：Ingress（nginx）— path rewrite',
+    subtitle: '同一個域名，路徑分流給不同後端',
+    section: '7-9 邊建邊解釋',
+    duration: '3',
+    code: `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tasks-ingress
+  namespace: tasks
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2   # ← 關鍵
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: task.local
+    http:
+      paths:
+      - path: /api(/|$)(.*)                    # 正規式抓 /tasks
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-service
+            port: { number: 3000 }
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port: { number: 80 }`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">path rewrite 在做什麼</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>使用者打 → <span className="font-mono text-yellow-400">task.local/api/tasks</span></p>
+            <p>nginx 匹配 <span className="font-mono text-green-400">/api(/|$)(.*)</span>，抓到 <span className="font-mono text-cyan-400">tasks</span></p>
+            <p>rewrite-target <span className="font-mono text-green-400">/$2</span> → Backend 收到 <span className="font-mono text-cyan-400">/tasks</span> ✓</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/40 p-2 rounded">
+          <p className="text-red-300 text-xs">沒 rewrite → Backend 收到 /api/tasks → API route 只認 /tasks → <span className="font-bold">404</span></p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 12-ingress.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get ingress -n tasks</p>
+          <p className="text-slate-500 mt-2"># 改 /etc/hosts 加一行：</p>
+          <p className="text-yellow-400">127.0.0.1  task.local</p>
+        </div>
+      </div>
+    ),
+    notes: `看 Ingress 的 YAML。
+
+使用者打 task.local/api/tasks，nginx 先比對這條正規表示法 /api(/|$)(.*)。括號內的 (.*) 會抓到 tasks 這段路徑，annotation 裡的 rewrite-target /$2 把路徑改寫成 /tasks，Backend 收到的就是 /tasks。如果沒有 rewrite，Backend 收到的是 /api/tasks，你的 API route 只認 /tasks，就 404 了。
+
+這個正規表示法的寫法是 nginx ingress controller 的標準做法。不同 controller 做 path rewrite 的語法不一樣，Traefik 要用 Middleware CRD，nginx 用 annotation 就可以。今天用 Docker Desktop 環境，記住 nginx 這套寫法就好。
+
+指令：kubectl apply -f 12-ingress.yaml
+
+指令：kubectl get ingress -n tasks
+
+確認 ADDRESS 有值（Docker Desktop 上會顯示 localhost），代表 Ingress Controller 接管了這條規則。
+
+要讓瀏覽器用 task.local 連進來，記得改 /etc/hosts 加一行：127.0.0.1 task.local。
+
+[▶ 下一頁]`,
+  },
+
+  // ── HPA 複習卡 ──
+  {
+    title: '複習：HPA — 自動擴縮',
+    subtitle: 'Day 7 上午學過 · 前提是 requests.cpu',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">HPA 的公式</p>
+          <p className="text-slate-300 text-xs font-mono">使用率 = 目前用量 ÷ requests.cpu</p>
+          <p className="text-slate-300 text-xs mt-1">沒設 <span className="font-mono text-yellow-400">requests.cpu</span> → 算不出百分比 → TARGETS 顯示 unknown</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">Backend 的 requests.cpu 是 100m</p>
+          <p className="text-xs text-slate-300">HPA 設定 averageUtilization: 70</p>
+          <p className="text-xs text-slate-300">CPU 用超過 70m（100m × 70%）→ 擴</p>
+          <p className="text-xs text-slate-300">CPU 低於 70m → 縮</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          HPA 的範圍 2~10 個副本。擴到 10 還不夠 → 看是不是該加機器 / 優化程式
+        </div>
+      </div>
+    ),
+    notes: `上午學過 HPA。我再快速複習一下，Backend 剛才 YAML 裡面設了 resources.requests.cpu 100m，就是在為 HPA 鋪路。
+
+HPA 計算使用率的公式是：目前 CPU 用量除以 requests.cpu。如果沒設 requests.cpu，這個公式算不出來，HPA 的 TARGETS 會一直顯示 unknown。這是新手最常犯的錯。
+
+averageUtilization 設 70 的意思是：全部副本的平均使用率超過 70% 就擴，低於就縮。Backend 的 requests 是 100m，70% 就是 70m。
+
+[▶ 下一頁]`,
+  },
+
+  // ── HPA 實作卡 ──
+  {
+    title: 'Step 13：HPA — Backend 2~10 副本',
+    subtitle: 'CPU 超過 70% 就擴',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: tasks
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-900/60 border border-slate-700 p-3 rounded font-mono text-xs">
+          <p className="text-green-400">kubectl apply -f 11-hpa.yaml</p>
+          <p className="text-green-400 mt-1">kubectl get hpa -n tasks</p>
+          <p className="text-slate-500"># TARGETS 欄位顯示：3%/70% 或 unknown/70%</p>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">如果 TARGETS 一直 unknown？</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>1. Pod 沒設 <span className="font-mono text-yellow-400">requests.cpu</span> → HPA 算不出百分比</p>
+            <p>2. <span className="font-mono text-yellow-400">metrics-server</span> 還沒啟動 → 等 1 分鐘</p>
+            <p>3. 等 5 分鐘還 unknown → <span className="font-mono text-green-400">kubectl top pods</span> 看能不能出數字</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `HPA 的 YAML。
+
+scaleTargetRef 指向 Backend Deployment，min 2、max 10，target 是 CPU 平均使用率 70%。
+
+指令：kubectl apply -f 11-hpa.yaml
+
+指令：kubectl get hpa -n tasks
+
+TARGETS 顯示目前 CPU 使用率和目標。
+
+如果 TARGETS 一直是 unknown，兩個原因。第一，Pod 沒設 resources.requests.cpu，HPA 算不出百分比。回去 Deployment YAML 加上 requests，重新 apply。第二，metrics-server 剛啟動還在收集數據，等一分鐘再看。等五分鐘還是 unknown，用 kubectl top pods 看看能不能出數字，不能的話看 metrics-server 的 log。
+
+[▶ 下一頁]`,
+  },
+
+  // ── 全系統驗收 ──
+  {
+    title: '全系統驗收 — 13 步全部跑完',
+    subtitle: 'kubectl get all 一次看全部',
+    section: '7-9 邊建邊解釋',
+    duration: '2',
+    code: `# 看所有資源
+kubectl get all -n tasks
+
+# 看 PVC
+kubectl get pvc -n tasks
+
+# 看 Secret / ConfigMap / RBAC
+kubectl get secret,configmap,serviceaccount,role,rolebinding -n tasks
+
+# 開瀏覽器（已改好 /etc/hosts）
+open http://task.local`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">應該看到的畫面</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>✓ StatefulSet <span className="font-mono text-green-400">postgres</span> READY 1/1</p>
+            <p>✓ Deployment <span className="font-mono text-green-400">redis/backend/frontend/task-runner</span> 全 READY</p>
+            <p>✓ Job <span className="font-mono text-green-400">db-migrate</span> COMPLETIONS 1/1</p>
+            <p>✓ CronJob <span className="font-mono text-green-400">task-scheduler</span> 存在（每分鐘觸發）</p>
+            <p>✓ PVC <span className="font-mono text-green-400">postgres-storage-postgres-0</span> Bound</p>
+            <p>✓ Ingress <span className="font-mono text-green-400">tasks-ingress</span> ADDRESS 有值</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded text-center">
+          <p className="text-green-300 font-semibold text-sm">13 步全部打完 = 完整系統上線</p>
+          <p className="text-slate-300 text-xs mt-1">12 個 K8s 組件、4 個應用服務、3 層 Queue 架構</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-sm text-amber-300 text-center">
+          在瀏覽器建一個任務 → 馬上看到 task-runner 把它處理完 ✓
+        </div>
+      </div>
+    ),
+    notes: `好，13 步全部跑完，一套完整的系統就在這裡了。
+
+指令：kubectl get all -n tasks
+
+確認 StatefulSet postgres READY 1/1、Deployment redis、backend、frontend、task-runner 都 READY、CronJob 存在。
+
+指令：kubectl get pvc -n tasks
+
+postgres-storage-postgres-0 STATUS 是 Bound。
+
+指令：kubectl get secret,configmap,serviceaccount,role,rolebinding -n tasks
+
+全部都存在，系統完整部署完成。
+
+打開瀏覽器 task.local，建一個任務，你會看到 task-runner 幾秒內把它處理完，狀態從 pending 變成 done。這是一套真的在跑的非同步任務系統。
+
+從空的 Namespace 到完整系統，13 個步驟。每個步驟背後都有判斷：用什麼組件、為什麼。這個判斷能力，比會打 kubectl apply 重要得多。
+
+7-9 到這邊結束，下一段是 QA 和 Helm 示範。
+
+[▶ 下一頁]`,
+  },
+
+  // ========== 7-10: QA + Helm + 學員題目 ==========
+  {
+    title: '影片 7-10：QA + Helm + 學員題目',
+    subtitle: '從操作疑難到產品化管理',
+    section: '7-10',
+    duration: '~15 min',
+    content: (
+      <div className="space-y-4">
+        <div className="text-center">
+          <p className="text-2xl text-slate-200 mb-2">三個主題</p>
+          <p className="text-sm text-slate-400">剛操作完 13 個步驟，先回答常見問題，再示範生產環境怎麼管</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-center">
+            <p className="text-3xl mb-2">❓</p>
+            <p className="text-cyan-300 font-semibold text-sm">常見 QA</p>
+            <p className="text-xs text-slate-300 mt-1">PVC Pending / CrashLoopBackOff / HPA unknown / Task Runner 不消費</p>
+          </div>
+          <div className="bg-purple-900/20 border border-purple-500/40 p-3 rounded text-center">
+            <p className="text-3xl mb-2">⎈</p>
+            <p className="text-purple-300 font-semibold text-sm">Helm 示範</p>
+            <p className="text-xs text-slate-300 mt-1">install / upgrade / rollback / --set</p>
+          </div>
+          <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded text-center">
+            <p className="text-3xl mb-2">🎯</p>
+            <p className="text-amber-300 font-semibold text-sm">學員題目</p>
+            <p className="text-xs text-slate-300 mt-1">從零建一個短網址服務</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `7-9 結束，進入 7-10。
+
+這一集做三件事。第一，QA，把剛才操作過程中常見的問題統一回答。第二，Helm 示範，剛才是用 kubectl apply 一個一個打，這在管理系統的時候有版本追蹤和 rollback 的問題，Helm 就是解法。第三，學員題目，從零建一個短網址服務。
+
+[▶ 下一頁]`,
+  },
+
+  // QA 1: PVC Pending
+  {
+    title: 'QA #1：PVC 一直是 Pending 怎麼辦？',
+    subtitle: '看 StorageClass 和 Events',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">症狀</p>
+          <p className="text-xs text-slate-300">kubectl get pvc 顯示 STATUS = Pending，postgres Pod 起不來</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">排查步驟</p>
+          <div className="text-xs font-mono text-slate-300 space-y-1">
+            <p className="text-green-400"># 1. 看叢集有沒有預設 StorageClass</p>
+            <p>kubectl get storageclass</p>
+            <p className="text-green-400"># 2. 看 PVC 的 Events 寫什麼</p>
+            <p>kubectl describe pvc postgres-storage-postgres-0 -n tasks</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">常見原因</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• 叢集沒有預設 StorageClass（k3s 內建 local-path、Docker Desktop 有 hostpath）</p>
+            <p>• StorageClass 存在但 volumeClaimTemplates 沒指定對應名稱</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Q：PVC 一直是 Pending，不是 Bound，怎麼辦？
+
+A：kubectl get pvc -n tasks 看 STATUS，如果是 Pending，原因通常是叢集沒有對應的 StorageClass 可以動態佈建。
+
+kubectl get storageclass 確認有沒有預設的 StorageClass，k3s 內建 local-path，minikube 用 standard，Docker Desktop 用 hostpath。
+
+如果 StorageClass 存在但還是 Pending，kubectl describe pvc 看 Events，通常會寫清楚為什麼找不到合適的 PV。
+
+[▶ 下一頁]`,
+  },
+
+  // QA 2: CrashLoopBackOff
+  {
+    title: 'QA #2：Pod 一直 CrashLoopBackOff',
+    subtitle: '三個最常見原因',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">第一件事：看 logs</p>
+          <p className="text-xs font-mono text-green-400">kubectl logs pod名稱 -n tasks --tail=50</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+            <p className="text-red-300 font-semibold text-sm">原因 1：資料庫還沒準備好</p>
+            <p className="text-xs text-slate-300 mt-1">Migration 還沒跑完就部署了 Backend → Backend 連不上 DB 就 crash</p>
+            <p className="text-xs text-amber-300 mt-1">解法：先等 postgres Running → 跑完 migration → 再部署 Backend</p>
+          </div>
+
+          <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+            <p className="text-red-300 font-semibold text-sm">原因 2：Secret 名稱拼錯</p>
+            <p className="text-xs text-slate-300 mt-1">env.valueFrom.secretKeyRef.name 對不上 Secret 名字</p>
+          </div>
+
+          <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+            <p className="text-red-300 font-semibold text-sm">原因 3：ConfigMap 的 key 打錯</p>
+            <p className="text-xs text-slate-300 mt-1">valueFrom.configMapKeyRef.key 要跟 ConfigMap 裡的 key 名稱完全一樣</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Q：Pod 一直 CrashLoopBackOff，怎麼查？
+
+A：kubectl logs pod名稱 -n tasks 看最後幾行。最常見的是三個原因。
+
+第一，資料庫還沒準備好，Migration 還沒跑完就部署了 Backend，Backend 連不上 DB 就 crash。順序要對，先等 postgres Running，跑完 migration 再部署 Backend。
+
+第二，Secret 名稱拼錯，env 裡的 secretKeyRef.name 要完全對應 Secret 的名字。
+
+第三，ConfigMap 的 key 打錯，valueFrom.configMapKeyRef.key 要跟 ConfigMap 裡的 key 名稱完全一樣。
+
+[▶ 下一頁]`,
+  },
+
+  // QA 3: HPA unknown
+  {
+    title: 'QA #3：HPA TARGETS 一直顯示 unknown',
+    subtitle: '兩個原因',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">症狀</p>
+          <p className="text-xs font-mono text-slate-300 mt-1">NAME REFERENCE TARGETS{'\n'}backend Deployment/backend &lt;unknown&gt;/70%</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">原因 1：Pod 沒設 resources.requests.cpu</p>
+          <p className="text-xs text-slate-300 mt-1">HPA 算百分比的分母就是 requests.cpu，沒設就算不出來</p>
+          <p className="text-xs text-amber-300 mt-1">解法：回去 Deployment YAML 補 requests.cpu，重新 apply</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">原因 2：metrics-server 還沒收到數據</p>
+          <p className="text-xs text-slate-300 mt-1">剛 apply 完等一分鐘就會出現數字</p>
+          <p className="text-xs font-mono text-green-400 mt-1">kubectl top pods -n tasks   # 確認 metrics 有數字</p>
+          <p className="text-xs text-slate-400 mt-1">五分鐘還是沒有 → 看 metrics-server logs</p>
+        </div>
+      </div>
+    ),
+    notes: `Q：HPA 的 TARGETS 一直顯示 unknown，怎麼辦？
+
+A：兩個原因。
+
+第一，Pod 沒有設 resources.requests.cpu，HPA 算不出百分比。回去 Deployment YAML 加上 requests，重新 apply。
+
+第二，metrics-server 剛啟動還在收集數據，等一分鐘再看。如果等五分鐘還是 unknown，kubectl top pods -n tasks 看看能不能出現數字，不能的話看 metrics-server 的 logs。
+
+[▶ 下一頁]`,
+  },
+
+  // QA 4: Task Runner not consuming
+  {
+    title: 'QA #4：Task Runner 不消費 Queue 的任務',
+    subtitle: '幾乎都是 Redis 連線設錯',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">症狀</p>
+          <p className="text-xs text-slate-300">Task Runner Pod 是 Running，但 Queue 裡的任務永遠 pending，沒被消費</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">第一步：看 logs</p>
+          <p className="text-xs font-mono text-green-400">kubectl logs -l app=task-runner -n tasks</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">最常見原因：Redis 連不上</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• REDIS_HOST 設錯 → 應該是 Service 名稱 redis-service</p>
+            <p>• REDIS_PASSWORD 值錯 → Secret 裡的 redis-password</p>
+            <p>• Redis Pod 還沒 Running → kubectl get pod -l app=redis</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
+          <p className="text-amber-300 font-semibold text-sm">診斷順序</p>
+          <p className="text-xs text-slate-300 mt-1">logs → ConfigMap 的 REDIS_HOST → Secret 的 REDIS_PASSWORD → Redis Pod 狀態</p>
+        </div>
+      </div>
+    ),
+    notes: `Q：Task Runner 啟動了，但 Queue 裡的任務沒有被消費？
+
+A：kubectl logs -l app=task-runner -n tasks 看 Task Runner 的 log。
+
+最常見是 Redis 連線失敗，通常是 REDIS_HOST 或 REDIS_PASSWORD 設錯。確認 redis-service 存在、Redis Pod 是 Running 狀態，然後確認 ConfigMap 和 Secret 的值對不對。
+
+QA 結束。接下來示範 Helm。
+
+[▶ 下一頁]`,
+  },
+
+  // Helm intro
+  {
+    title: 'Helm 示範 — 同一套系統，用 Helm 管理',
+    subtitle: '為什麼不裸 YAML？',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-2">裸 YAML 的三個問題</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>✗ 版本怎麼追蹤？改了什麼不記得</p>
+            <p>✗ Rollback 怎麼做？找上次的 YAML 重打？</p>
+            <p>✗ 要換一個設定值，去哪個檔案改？apply 之後怎麼確認沒漏？</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">Helm 的解法</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>✓ 版本歷史：helm history 看每次動了什麼</p>
+            <p>✓ Rollback：helm rollback 一行回到前一版</p>
+            <p>✓ 設定集中：所有可變值放在 values.yaml</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded text-center">
+          <p className="text-amber-300 font-semibold text-sm">接下來示範 4 件事</p>
+          <p className="text-xs text-slate-300 mt-1">install → upgrade → rollback → --set</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-1">示範前先清場</p>
+          <p className="text-xs font-mono text-green-400">kubectl delete namespace tasks{'\n'}kubectl get ns  # 等刪乾淨</p>
+        </div>
+      </div>
+    ),
+    notes: `好，QA 結束。在進入學員題目之前，我要用剛才這套系統示範一件事。
+
+你剛才用 kubectl apply 一個一個把 YAML 打上去。這在管理一套系統的時候有個問題：版本怎麼追蹤？rollback 怎麼做？要換一個設定值，你要去找哪個 YAML 改，apply 之後怎麼知道有沒有漏掉？
+
+這就是 Helm 要解決的問題。我把這套任務排程系統包成一個 Helm Chart，接下來示範四件事：install、upgrade、rollback、換 values。
+
+先清掉剛才用 kubectl apply 建的東西。指令：kubectl delete namespace tasks。等 namespace 刪乾淨。
+
+[▶ 下一頁]`,
+  },
+
+  // Helm install
+  {
+    title: 'Step 1 — helm install',
+    subtitle: '一行部署整套系統',
+    section: '7-10',
+    code: `# 一行部署整套系統
+helm install task-system ./apps/helm/task-system
+
+# 查看 release 狀態
+helm list
+
+# 確認所有組件都在
+kubectl get all -n tasks`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">這一行 = 剛才所有 kubectl apply 加起來</p>
+          <p className="text-xs text-slate-300">Namespace、Secret、ConfigMap、StatefulSet、Deployment、Service、Job、CronJob、HPA、Ingress、RBAC — 全部一次部署</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">應該看到的畫面</p>
+          <div className="text-xs font-mono text-slate-300 space-y-1">
+            <p>NAME        NAMESPACE REVISION STATUS   CHART</p>
+            <p>task-system tasks     1        deployed task-system-0.1.0</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
+          <p className="text-amber-300 font-semibold text-sm">REVISION = 1</p>
+          <p className="text-xs text-slate-300 mt-1">Helm 開始追蹤版本。每次 install/upgrade/rollback 都會累加 REVISION</p>
+        </div>
+      </div>
+    ),
+    notes: `Step 1，helm install。
+
+指令：helm install task-system ./apps/helm/task-system
+
+這一行做的事，等於你剛才打的所有 kubectl apply 加起來。
+
+看部署狀態，指令：helm list
+
+指令：kubectl get all -n tasks
+
+等所有 Pod READY，migration Job 也跑完。
+
+注意 REVISION 是 1，Helm 從這裡開始追蹤版本。
+
+[▶ 下一頁]`,
+  },
+
+  // Helm upgrade
+  {
+    title: 'Step 2 — helm upgrade',
+    subtitle: '換 image tag、擴副本',
+    section: '7-10',
+    code: `# 用另一個 values 檔升級（v2 image + backend 副本擴到 3）
+helm upgrade task-system ./apps/helm/task-system \\
+  -f apps/helm/values-v2.yaml
+
+# 查看版本歷史
+helm history task-system`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">Helm 的聰明之處</p>
+          <p className="text-xs text-slate-300">只更新「有變的資源」，沒變的完全不動 → Postgres、Redis 這些不動，只改 Backend image 和 replicas</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">helm history 應該看到</p>
+          <div className="text-xs font-mono text-slate-300 space-y-1">
+            <p>REVISION UPDATED STATUS     DESCRIPTION</p>
+            <p>1        ...     superseded Install complete</p>
+            <p>2        ...     deployed   Upgrade complete  ← 這次</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
+          <p className="text-amber-300 font-semibold text-sm">歷史完整保留</p>
+          <p className="text-xs text-slate-300 mt-1">REVISION 1 還在，隨時可以 rollback 回去</p>
+        </div>
+      </div>
+    ),
+    notes: `Step 2，helm upgrade。
+
+現在假設你出了 v2，backend 副本要從 2 擴到 3。
+
+指令：helm upgrade task-system ./apps/helm/task-system -f apps/helm/values-v2.yaml
+
+Helm 只更新有變的資源，沒變的不動。
+
+看 history，指令：helm history task-system
+
+你會看到兩個 REVISION，REVISION 1 是 install，REVISION 2 是這次 upgrade。
+
+[▶ 下一頁]`,
+  },
+
+  // Helm rollback
+  {
+    title: 'Step 3 — helm rollback',
+    subtitle: 'v2 有問題？一行回到 v1',
+    section: '7-10',
+    code: `# rollback 到 REVISION 1
+helm rollback task-system 1
+
+# 再看 history
+helm history task-system`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded">
+          <p className="text-red-300 font-semibold text-sm mb-1">情境</p>
+          <p className="text-xs text-slate-300">upgrade 到 v2 之後發現 bug，五分鐘內要回到穩定版</p>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">關鍵觀念：rollback 建立新 REVISION</p>
+          <div className="text-xs font-mono text-slate-300 space-y-1">
+            <p>REVISION UPDATED STATUS     DESCRIPTION</p>
+            <p>1        ...     superseded Install complete</p>
+            <p>2        ...     superseded Upgrade complete</p>
+            <p>3        ...     deployed   Rollback to 1  ← 新增</p>
+          </div>
+          <p className="text-xs text-slate-300 mt-2">內容跟 REVISION 1 一樣，但歷史完整保留</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
+          <p className="text-amber-300 font-semibold text-sm">為什麼不直接「覆蓋 REVISION 1」？</p>
+          <p className="text-xs text-slate-300 mt-1">因為你還可能想 rollback 到 2（如果發現 2 比較好），歷史不可破壞</p>
+        </div>
+      </div>
+    ),
+    notes: `Step 3，helm rollback。
+
+upgrade 之後發現 v2 有問題，一行 rollback。
+
+指令：helm rollback task-system 1
+
+rollback 不是覆蓋 REVISION 1，它建立一個新的 REVISION 3，內容跟 REVISION 1 一樣。history 完整保留，你知道每一次動了什麼。
+
+指令：helm history task-system
+
+這個設計很重要，因為你之後可能又想 rollback 到 REVISION 2，歷史不能破壞。
+
+[▶ 下一頁]`,
+  },
+
+  // Helm --set
+  {
+    title: 'Step 4 — --set 覆蓋單一 value',
+    subtitle: '臨時調整不改 values.yaml',
+    section: '7-10',
+    code: `# 不改 values 檔，直接 --set 臨時覆蓋
+helm upgrade task-system ./apps/helm/task-system \\
+  --set replicas.backend=5
+
+# 確認 backend Pod 從 2 變 5
+kubectl get pods -n tasks -l app=backend`,
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">--set 適合這些場景</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• 臨時調整副本數應對突發流量</p>
+            <p>• 手動改一個 image tag 做實驗</p>
+            <p>• CI/CD 流程動態注入版本號</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
+          <p className="text-amber-300 font-semibold text-sm mb-1">但正式環境還是要用 values 檔</p>
+          <p className="text-xs text-slate-300">--set 的改動沒記錄在檔案裡，下次 upgrade 不帶 --set 就消失。正式環境要「設定 = 檔案」，方便 review、方便 git 追蹤</p>
+        </div>
+      </div>
+    ),
+    notes: `Step 4，--set 換單一 value。
+
+不用改 values.yaml，直接 --set 覆蓋單一值。
+
+指令：helm upgrade task-system ./apps/helm/task-system --set replicas.backend=5
+
+指令：kubectl get pods -n tasks -l app=backend
+
+backend Pod 從 2 個變 5 個。
+
+--set 適合臨時調整，正式環境還是用 values 檔記錄。因為 --set 的改動沒寫進檔案，下次不帶 --set 就消失，正式環境每個設定都要可以在 git 裡找到。
+
+[▶ 下一頁]`,
+  },
+
+  // Helm summary table
+  {
+    title: 'Helm 四個操作總結',
+    subtitle: '生產環境就用這五條指令',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 border border-slate-600 p-4 rounded">
+          <div className="grid grid-cols-[1fr_2fr] gap-2 text-xs">
+            <div className="font-semibold text-cyan-300 py-2 border-b border-slate-600">操作</div>
+            <div className="font-semibold text-cyan-300 py-2 border-b border-slate-600">指令</div>
+
+            <div className="py-2 text-slate-300">部署整套系統</div>
+            <div className="py-2 font-mono text-green-400">helm install task-system ./apps/helm/task-system</div>
+
+            <div className="py-2 text-slate-300">升級版本</div>
+            <div className="py-2 font-mono text-green-400">helm upgrade task-system ./apps/helm/task-system -f values-v2.yaml</div>
+
+            <div className="py-2 text-slate-300">查歷史</div>
+            <div className="py-2 font-mono text-green-400">helm history task-system</div>
+
+            <div className="py-2 text-slate-300">Rollback</div>
+            <div className="py-2 font-mono text-green-400">helm rollback task-system 1</div>
+
+            <div className="py-2 text-slate-300">換單一值</div>
+            <div className="py-2 font-mono text-green-400">helm upgrade task-system ./apps/helm/task-system --set replicas.backend=5</div>
+
+            <div className="py-2 text-slate-300">清除整套</div>
+            <div className="py-2 font-mono text-green-400">helm uninstall task-system</div>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-2">為什麼生產環境都用 Helm</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>✓ 版本有歷史（history）</p>
+            <p>✓ Rollback 一行（rollback）</p>
+            <p>✓ 設定值集中（values.yaml）</p>
+            <p>✓ 不用管 apply 順序</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `四個操作總結：
+
+部署整套系統用 helm install。
+升級版本用 helm upgrade 配 -f values 檔。
+查歷史用 helm history。
+Rollback 用 helm rollback 加 REVISION 編號。
+換單一值用 helm upgrade 配 --set。
+清除整套用 helm uninstall。
+
+這就是為什麼生產環境都用 Helm 管理，不用裸 YAML。版本有歷史、rollback 一行、設定值集中在一個地方。
+
+Helm 示範到這邊，接下來換你們動手。
+
+[▶ 下一頁]`,
+  },
+
+  // Student exercise
+  {
+    title: '學員題目：從零建短網址服務',
+    subtitle: '不是背指令，是練習做選擇',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">系統功能</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>1. 使用者輸入長網址 → 系統回傳短網址（short.ly/abc123）</p>
+            <p>2. 使用者打短網址 → 系統查 DB → 跳轉到長網址</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
+          <p className="text-amber-300 font-semibold text-sm mb-2">你要做的決策</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>□ Frontend、Backend 用 Deployment 還是 StatefulSet？</p>
+            <p>□ DB 選什麼？（PostgreSQL？Redis？）要不要持久化？</p>
+            <p>□ Service 用哪種類型（ClusterIP / NodePort / LoadBalancer）？</p>
+            <p>□ 需不需要 Ingress？</p>
+            <p>□ 需不需要 HPA？</p>
+            <p>□ 需不需要 RBAC？</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded">
+          <p className="text-green-300 font-semibold text-sm mb-1">提示</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• 短網址資料不能丟 → DB 要持久化</p>
+            <p>• 短網址查詢流量可能很高 → 考慮 HPA</p>
+            <p>• 對外要用域名，不是 IP:Port → Ingress</p>
+          </div>
+        </div>
+
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-center">
+          <p className="text-cyan-300 font-semibold text-sm">先自己試，卡住再舉手</p>
+        </div>
+      </div>
+    ),
+    notes: `好，QA 結束。換大家動手了。
+
+下一個 Loop 是學員自架。主題是短網址服務。我給你需求，你自己設計架構，自己寫 YAML，自己部署。
+
+這套系統的功能：使用者輸入一個長網址，系統回傳一個短網址，比如 short.ly/abc123。使用者打短網址，系統查資料庫，跳轉到原始的長網址。
+
+需要的組件：Frontend、Backend API、資料庫（你來選用什麼）。你要決定哪些東西用 Deployment，哪些用 StatefulSet，Service 用哪種類型，需不需要 Ingress，需不需要 HPA，需不需要 RBAC。
+
+這個決策過程就是今天下午的重點。你不是在背指令，你是在練習做選擇。
+
+給你一些提示。短網址的資料不能丟，你選的資料庫要能持久化。短網址查詢的流量可能很高，你考慮一下要不要加 HPA。短網址服務對外要用域名，不是 IP 加 Port。
+
+題目就這樣，動手吧。有問題可以舉手，但先試試看自己想。
+
+[▶ 下一頁]`,
+  },
+
+  // Solution guide
+  {
+    title: '解答：完整判斷流程',
+    subtitle: '從需求 → 組件選擇',
+    section: '7-10',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 border border-slate-600 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">資料庫選型</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• <span className="text-green-400">PostgreSQL</span>：完整、支援複雜查詢 — 未來要擴功能的話合理</p>
+            <p>• <span className="text-green-400">Redis</span>：key-value 超快 — 短網址查詢幾乎都是 lookup，很適合</p>
+            <p>• <span className="text-amber-300">選 Redis 做主 DB 時 → StatefulSet + PVC（資料不能丟）</span></p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 border border-slate-600 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">完整服務清單</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>✓ Frontend：<span className="text-green-400">Deployment + ClusterIP Service</span></p>
+            <p>✓ Backend API：<span className="text-green-400">Deployment + ClusterIP Service + HPA</span></p>
+            <p>✓ 資料庫：<span className="text-green-400">StatefulSet + Headless Service + PVC</span></p>
+            <p>✓ 對外：<span className="text-green-400">Ingress（短網址要用域名）</span></p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 border border-slate-600 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">進階判斷</p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>• <span className="text-amber-300">HPA</span>：讀取流量高 → 加，記得 Backend 設 requests.cpu</p>
+            <p>• <span className="text-amber-300">RBAC</span>：Backend 如果 runtime 讀 ConfigMap → 加 SA+Role。只靠 env 注入就不需要</p>
+          </div>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded text-center">
+          <p className="text-green-300 font-semibold text-sm">這就是真正的 K8s 工程師在做的事</p>
+          <p className="text-xs text-slate-300 mt-1">從需求出發，一個一個決定用什麼組件。打 kubectl apply 只是最後一步</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded text-center">
+          <p className="text-amber-300 font-semibold">今天的課程到這裡結束。謝謝大家。</p>
+        </div>
+      </div>
+    ),
+    notes: `解答時間。
+
+資料庫選 PostgreSQL 或 Redis 都合理。PostgreSQL 比較完整，支援複雜查詢。Redis 速度很快，短網址查詢幾乎都是 key-value lookup，Redis 很適合。如果你選 Redis 做持久化，這時候要用 StatefulSet，因為資料不能丟了。
+
+服務清單：Frontend Deployment + ClusterIP Service、Backend API Deployment + ClusterIP Service、資料庫 StatefulSet + Headless Service + PVC。
+
+是否需要 HPA？短網址服務的讀取流量可能很高，Backend API 加 HPA 是合理的。記得設 resources.requests.cpu。
+
+是否需要 RBAC？如果 Backend 需要在 runtime 讀取 K8s 的 ConfigMap 或 Secret，需要。如果你只是在 Pod 啟動時注入環境變數，不需要 ServiceAccount 也能跑。
+
+Ingress 一定要，對外要用域名，不用 NodePort。
+
+這就是一套完整的判斷流程。你從需求出發，一個一個決定用什麼組件，這才是真正的 K8s 工程師在做的事情。
+
+今天的課程到這裡結束。謝謝大家。`,
+  },
+
 ]

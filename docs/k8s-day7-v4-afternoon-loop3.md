@@ -345,7 +345,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: migrate
-        image: your-registry/task-api:v1
+        image: yanchen184/task-api:v2
         command: ["node", "migrate.js"]
         env:
         - name: POSTGRES_HOST
@@ -382,7 +382,11 @@ restartPolicy Never，Pod 失敗了不重啟這個 Pod，Job 建一個新的 Pod
 
 ### RBAC — 給 Backend 最小讀取權限
 
-Backend API 在 runtime 需要讀 ConfigMap。用 RBAC 只給讀取的權限，不給多餘的。
+先說明為什麼 Backend 要碰 RBAC。一般的寫法是在 Pod 啟動的時候，把 ConfigMap 的內容透過 envFrom 灌成環境變數，程式讀環境變數就好，這樣根本不需要 RBAC。
+
+但我們這套 Backend 是故意寫成 runtime 去讀 ConfigMap — 也就是程式啟動後直接呼叫 K8s API 把 ConfigMap 拉下來。為什麼？因為這樣 ConfigMap 改了不用重啟 Pod，下次呼叫就拿到新的值。生產環境真的有很多服務是這樣做的，比如 feature flag、路由規則、動態白名單。
+
+一旦你的程式要主動呼叫 K8s API，就必須有對應的身份和權限，這就是 RBAC 三兄弟要出場的時候。
 
 ```yaml
 apiVersion: v1
@@ -416,9 +420,11 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-上午學的 RBAC，現在用在真實系統上。verbs 只有 get 和 list，沒有 create、update、delete。
+上午學的 RBAC，現在用在真實系統上。verbs 只有 get 和 list，沒有 create、update、delete。Backend 只需要讀，不需要寫，給最小權限就好，這才是 RBAC 的精髓。
 
 指令：kubectl apply -f backend-rbac.yaml
+
+等一下部署完 Backend 之後，我會回來驗證一件事：把這個 Role 拿掉，看 Backend 會不會真的報錯。這樣大家才知道 RBAC 不是裝飾品，是真的在擋。
 
 ---
 
@@ -443,7 +449,7 @@ spec:
       serviceAccountName: backend-sa
       containers:
       - name: backend
-        image: your-registry/task-api:v1
+        image: yanchen184/task-api:v2
         ports:
         - containerPort: 3000
         envFrom:
@@ -522,6 +528,38 @@ Backend Service 用 ClusterIP。外部的請求先打 Ingress，Ingress 轉給 B
 
 ---
 
+### 驗證 RBAC 真的在擋 — 拿掉 Role 看會不會 403
+
+Backend 起來了，現在驗證剛才做的 RBAC 真的有用。
+
+指令：kubectl logs -l app=backend -n tasks --tail=5
+
+你會看到這行：Loaded ConfigMap from K8s API: [...]。這代表 Backend 用 ServiceAccount 的 token 成功呼叫 K8s API 把 ConfigMap 讀下來了。
+
+現在把 Role 拿掉，看會發生什麼事：
+
+指令：kubectl delete role backend-role -n tasks
+
+重啟 Backend 讓它重新讀 ConfigMap：
+
+指令：kubectl rollout restart deployment/backend -n tasks
+
+看 log：
+
+指令：kubectl logs -l app=backend -n tasks --tail=10
+
+你會看到 Pod 在啟動階段就 crash 掉，錯誤訊息是 configmaps "app-config" is forbidden，而且 status code 是 403。
+
+這就是 RBAC 在擋。Backend 的 ServiceAccount 沒有對應的 Role，API Server 直接拒絕。把 Role 加回來：
+
+指令：kubectl apply -f backend-rbac.yaml
+
+指令：kubectl rollout restart deployment/backend -n tasks
+
+Backend 又恢復正常。這才是 RBAC 在真實系統上的意義，不是 YAML 上好看的三個資源，是真的會擋。
+
+---
+
 ### Frontend（Deployment + Service）
 
 ```yaml
@@ -542,7 +580,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/task-frontend:v1
+        image: yanchen184/task-frontend:v1
         ports:
         - containerPort: 80
         env:
@@ -594,8 +632,8 @@ spec:
     spec:
       containers:
       - name: task-runner
-        image: your-registry/task-task-runner:v1
-        command: ["node", "task-runner.js"]
+        image: yanchen184/task-runner:v1
+        command: ["node", "runner.js"]
         envFrom:
         - configMapRef:
             name: app-config
@@ -659,8 +697,8 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: scheduler
-            image: your-registry/task-scheduler:v1
-            command: ["node", "enqueue-due-tasks.js"]
+            image: yanchen184/task-scheduler:v1
+            command: ["node", "scheduler.js"]
             envFrom:
             - configMapRef:
                 name: app-config
@@ -697,36 +735,24 @@ Frontend 和 Backend 的 Service 都是 ClusterIP，外面連不進來。用 Ing
 
 為什麼是 Ingress 不是 NodePort？NodePort 的 Port 號在 30000 以上，地址醜、沒有域名、沒有 SSL、沒有路由功能。你有五個服務就要開五個 NodePort，管理起來是噩夢。Ingress 統一入口，一個 Ingress Controller 在叢集裡跑，所有對外流量都打它，它根據域名和路徑路由到不同的 Service。TLS、rewrite、IP 白名單全部集中在這裡處理。
 
-k3s 內建的 Ingress Controller 是 Traefik，不是 nginx。所以 ingressClassName 要寫 traefik，不是 nginx。
-
-Traefik 的 path strip 要用 Middleware 做。先建一個 Middleware 把 /api 前綴剝掉：
+補充一下 Ingress Controller。不同環境的內建 controller 不一樣，k3s 內建 Traefik，Docker Desktop 和 minikube 都是裝 nginx ingress controller。今天示範用 Docker Desktop，所以 ingressClassName 寫 nginx。
 
 ```yaml
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: strip-api-prefix
-  namespace: tasks
-spec:
-  stripPrefix:
-    prefixes:
-      - /api
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tasks-ingress
   namespace: tasks
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: tasks-strip-api-prefix@kubernetescrd
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   rules:
-  - host: task.example.com
+  - host: task.local
     http:
       paths:
-      - path: /api
-        pathType: Prefix
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: backend-service
@@ -741,15 +767,21 @@ spec:
               number: 80
 ```
 
-path rewrite 說明。使用者打 task.example.com/api/tasks，Traefik 先比對 /api 這條規則，然後 Middleware strip-api-prefix 把 /api 剝掉，Backend 收到的是 /tasks。如果沒有 strip，Backend 收到的是 /api/tasks，你的 API route 是 /tasks，就 404 了。
+path rewrite 說明。使用者打 task.local/api/tasks，nginx 先比對 /api(/|$)(.*) 這條規則。括號內的 `(.*)` 會抓到 `tasks`，annotation 裡的 `rewrite-target: /$2` 把路徑改寫成 `/tasks`，Backend 收到的就是 /tasks。如果沒有 rewrite，Backend 收到的是 /api/tasks，你的 API route 只認 /tasks，就 404 了。
 
-Middleware 的 annotation 格式是 namespace-middleware名稱@kubernetescrd，這是 Traefik CRD 的固定寫法，記住這個格式。
+這個正規表示法的寫法是 nginx ingress controller 的標準做法。不同 controller 做 path rewrite 的語法不一樣，Traefik 要用 Middleware CRD，nginx 用 annotation 就可以。
 
 指令：kubectl apply -f ingress.yaml
 
 指令：kubectl get ingress -n tasks
 
-確認 ADDRESS 有 IP，代表 Ingress Controller 接管了這條規則。
+確認 ADDRESS 有值（Docker Desktop 上會顯示 localhost），代表 Ingress Controller 接管了這條規則。
+
+要讓瀏覽器用 task.local 連進來，記得改 /etc/hosts 加一行：
+
+```
+127.0.0.1 task.local
+```
 
 ---
 

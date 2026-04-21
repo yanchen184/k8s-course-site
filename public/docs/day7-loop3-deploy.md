@@ -3,13 +3,6 @@
 > 系統架構：Frontend → Backend API → Redis Queue → Task Runner → PostgreSQL
 > 涵蓋 12 個 K8s 組件：Deployment, StatefulSet, PVC, ConfigMap, Secret, Service, Ingress, HPA, RBAC, Job, CronJob, DaemonSet（對比說明）
 
-> **⚠️ 待處理（上課前要做）：**
-> 1. **RBAC 真實化**：目前 Backend 用 `envFrom` 注入 ConfigMap，RBAC 只是示範用途。
->    需要改 `apps/task-api/server.js`，改成啟動時用 K8s SDK 主動讀 ConfigMap。
->    然後 build + push `yanchen184/task-api:v2`，並更新 `apps/k8s/07-backend.yaml` 的 image 為 v2、拿掉 `envFrom`。
->    這樣 RBAC 拿掉後 Backend 會真的報 403，驗收才有意義。
->    （`server.js` 和 `package.json` 已改好，只差 Docker Desktop 開起來 build + push）
-
 ---
 
 ## 7-8 我們要建什麼？

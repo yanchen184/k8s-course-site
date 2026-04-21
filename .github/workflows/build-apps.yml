@@ -16,7 +16,15 @@ jobs:
 
     strategy:
       matrix:
-        app: [task-api, task-runner, task-scheduler, task-frontend]
+        include:
+          - app: task-api
+            version: v2
+          - app: task-runner
+            version: v1
+          - app: task-scheduler
+            version: v1
+          - app: task-frontend
+            version: v1
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +46,6 @@ jobs:
           push: true
           tags: |
             ${{ env.OWNER }}/${{ matrix.app }}:latest
-            ${{ env.OWNER }}/${{ matrix.app }}:v1
+            ${{ env.OWNER }}/${{ matrix.app }}:${{ matrix.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

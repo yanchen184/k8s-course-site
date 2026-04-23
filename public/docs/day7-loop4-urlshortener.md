@@ -78,17 +78,41 @@ Ingress short.local
 
 所以不要把它看成 9 個檔案，而要看成 9 個部署問題。
 
-| 檔案 | 真正在回答的問題 |
-|---|---|
-| `00-namespace.yaml` | 這個產品放在哪個隔離空間？ |
-| `01-secret.yaml` | 敏感資訊放哪裡？ |
-| `02-configmap.yaml` | 非敏感設定放哪裡？ |
-| `03-postgres.yaml` | 資料要不要保留？ |
-| `04-migrate-job.yaml` | 資料表誰來建立？ |
-| `05-api.yaml` | 誰負責建立短網址與 redirect？ |
-| `06-frontend.yaml` | 誰提供操作介面？ |
-| `07-hpa.yaml` | 流量變大怎麼辦？ |
-| `08-ingress.yaml` | 使用者怎麼進產品？ |
+| 檔案 | 建立的 K8s 物件 | 真正在回答的問題 |
+|---|---|---|
+| `00-namespace.yaml` | `Namespace` | 這個產品放在哪個隔離空間？ |
+| `01-secret.yaml` | `Secret` | 敏感資訊放哪裡？ |
+| `02-configmap.yaml` | `ConfigMap` | 非敏感設定放哪裡？ |
+| `03-postgres.yaml` | Headless `Service` + `StatefulSet` + PVC template | 資料要不要保留？ |
+| `04-migrate-job.yaml` | `Job` + init container | 資料表誰來建立？ |
+| `05-api.yaml` | `Deployment` + `Service` | 誰負責建立短網址與 redirect？ |
+| `06-frontend.yaml` | `Deployment` + `Service` | 誰提供操作介面？ |
+| `07-hpa.yaml` | `HorizontalPodAutoscaler` | 流量變大怎麼辦？ |
+| `08-ingress.yaml` | `Ingress` | 使用者怎麼進產品？ |
+
+### YAML 大複習：每份檔案到底做了什麼？
+
+這一段可以當成整門課的總複習。學生每 apply 一份 YAML，都要能說出三件事：
+
+1. 這份 YAML 建了哪些 K8s 物件。
+2. 這些物件在產品裡負責什麼。
+3. 這份 YAML 和前面學過的哪個觀念對應。
+
+| 檔案 | 它做了什麼 | 大複習重點 |
+|---|---|---|
+| `00-namespace.yaml` | 建立 `url-shortener` namespace。後續 Secret、ConfigMap、DB、API、Frontend、HPA、Ingress 都放在同一個 namespace。 | Namespace 是產品邊界，不是單純分類資料夾。 |
+| `01-secret.yaml` | 建立 `url-shortener-secrets`，目前放 `postgres-password`。API、migration、PostgreSQL 都從這裡拿 DB 密碼。 | Secret 放敏感值；正式環境不要把真密碼提交到 Git。 |
+| `02-configmap.yaml` | 建立 `url-shortener-config`，放 `POSTGRES_HOST`、`POSTGRES_PORT`、`POSTGRES_DB`、`POSTGRES_USER`。 | ConfigMap 放非敏感設定；程式不應硬編碼環境差異。 |
+| `03-postgres.yaml` | 建立 `postgres-service` headless Service 和 `postgres` StatefulSet；透過 `volumeClaimTemplates` 建 PVC。 | DB 需要穩定身份與持久化儲存，所以用 StatefulSet + PVC。 |
+| `04-migrate-job.yaml` | 建立一次性的 `db-migrate` Job；init container 先等 PostgreSQL 開好，再執行 `node migrate.js` 建表。 | Job 適合一次性任務；migration 不應靠手動進 DB 操作。 |
+| `05-api.yaml` | 建立 `url-api` Deployment 和 `url-api-service`；API 從 ConfigMap/Secret 拿 DB 連線設定，並設定 probes、resources。 | 無狀態服務用 Deployment；readiness/liveness/resources 是 production readiness。 |
+| `06-frontend.yaml` | 建立 `url-frontend` Deployment 和 `url-frontend-service`；跑靜態網站。 | Frontend 也是無狀態服務，Service 提供穩定入口給 Ingress。 |
+| `07-hpa.yaml` | 建立 `url-api-hpa`，目標是 `url-api` Deployment，CPU 平均使用率 70% 時擴縮。 | HPA 不是獨立魔法；它需要 target Deployment 也需要 CPU requests。 |
+| `08-ingress.yaml` | 建立 `url-shortener-ingress`，把 `short.local` 的 `/` 導到 frontend，把 `/api`、`/r`、`/health`、`/ready` 導到 API。 | Ingress 是產品對外入口；同一個 domain 可以依 path 導到不同 Service。 |
+
+最後要把學生拉回一個觀念：
+
+> 你剛剛不是在部署 9 份 YAML，你是在把一個產品拆成 9 個可管理、可驗收、可重複交付的 K8s 物件群。
 
 ### 課前 image 檢查
 
@@ -128,6 +152,21 @@ Namespace 是產品的邏輯邊界。今天所有資源都放在 `url-shortener`
 
 學生要知道：不是因為範例喜歡多建一層，而是因為之後所有資源管理、`kubectl get all -n url-shortener`、權限範圍都會靠這個邊界。
 
+這份 YAML 很短，但很重要：
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: url-shortener
+```
+
+講解重點：
+
+- `kind: Namespace`：建立產品的隔離空間。
+- `metadata.name`：後面所有 manifest 都會用 `namespace: url-shortener` 放進同一個空間。
+- 這是整套產品的外框，後面才開始把元件放進去。
+
 ### Step 2：建立 Secret 和 ConfigMap
 
 ```bash
@@ -146,6 +185,18 @@ kubectl apply -f apps/k8s/url-shortener/02-configmap.yaml
 
 學生要知道：`Secret` 和 `ConfigMap` 不是兩個隨便選的名字，而是在回答「這個值洩漏出去會不會有問題」。
 
+`01-secret.yaml` 的重點：
+
+- `kind: Secret`：建立敏感設定容器。
+- `type: Opaque`：一般用途的 key/value secret。
+- `stringData.postgres-password`：課堂 placeholder。正式環境應改由安全流程注入。
+
+`02-configmap.yaml` 的重點：
+
+- `kind: ConfigMap`：建立非敏感設定容器。
+- `POSTGRES_HOST: postgres-service`：不是 IP，而是 K8s Service DNS 名稱。
+- API、migration、PostgreSQL 都靠這兩份設定把資料庫連起來。
+
 ### Step 3：部署 PostgreSQL StatefulSet + PVC
 
 ```bash
@@ -160,6 +211,21 @@ kubectl get pods,pvc -n url-shortener
 - Pod 重建後要掛回同一個 PVC。
 
 學生要知道：這裡不是因為 PostgreSQL 比較特別才用 `StatefulSet`，而是因為它需要穩定名稱和穩定儲存。
+
+這份 YAML 建了兩類物件：
+
+| 物件 | 作用 |
+|---|---|
+| Headless `Service` | 給 StatefulSet 穩定 DNS，`clusterIP: None`。 |
+| `StatefulSet` | 建立 `postgres-0`，讓 DB 有穩定 Pod 名稱。 |
+| `volumeClaimTemplates` | 自動建立 PVC，讓資料寫到持久化磁碟。 |
+
+幾個應該講清楚的欄位：
+
+- `serviceName: postgres-service`：StatefulSet 會用這個 Service 建立穩定網路身份。
+- `selector.matchLabels` 和 Pod `labels` 要對上，Service 才找得到 Pod。
+- `volumeMounts.mountPath: /var/lib/postgresql/data`：PostgreSQL 資料寫入的位置。
+- `readinessProbe`：DB 還沒 ready 前，不要把它當成可用。
 
 驗收：
 
@@ -180,6 +246,14 @@ Job 適合一次性任務。這裡只負責建立 `short_links` table。
 
 學生要知道：建立資料表不是讓講師手動進 DB 做，而是把它變成可重複執行、可追蹤 log 的 K8s 物件。
 
+這份 YAML 的重點：
+
+- `kind: Job`：跑完就結束，不需要一直常駐。
+- `restartPolicy: OnFailure`：失敗時重跑 Pod。
+- `initContainers.wait-for-postgres`：先等 `postgres-service:5432` 可以連，再跑 migration。
+- `command: ["node", "migrate.js"]`：用 API image 裡的 migration 程式建表。
+- `backoffLimit: 3`：最多重試 3 次，避免無限重跑。
+
 ### Step 5：部署 API
 
 ```bash
@@ -198,6 +272,22 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 
 學生要知道：`Deployment` 不是「預設都用它」，而是因為 API 無狀態，可以隨時被補回。
 
+這份 YAML 建了兩個物件：
+
+| 物件 | 作用 |
+|---|---|
+| `Deployment` | 跑 2 個 API Pod，Pod 掛掉會自動補回。 |
+| `Service` | 提供 `url-api-service` 這個穩定入口，給 Ingress 使用。 |
+
+幾個應該講清楚的欄位：
+
+- `replicas: 2`：API 先跑兩份，避免單 Pod 掛掉就中斷。
+- `envFrom.configMapRef`：把 DB host、port、database、user 注入 API。
+- `secretKeyRef`：只把 API 需要的 DB password 注入，不整包暴露。
+- `resources.requests.cpu`：HPA 需要這個值才能計算 CPU 使用率百分比。
+- `livenessProbe: /health`：確認 process 是否還活著。
+- `readinessProbe: /ready`：確認 API 是否真的可以接流量，包含 DB 連線狀態。
+
 ### Step 6：部署 Frontend
 
 ```bash
@@ -209,6 +299,19 @@ Frontend 是靜態網站，無狀態，所以也是 Deployment。
 
 學生要知道：這裡的 Frontend 很單純，但它很重要，因為最後能不能打開網頁是產品感的來源。
 
+這份 YAML 建了兩個物件：
+
+| 物件 | 作用 |
+|---|---|
+| `Deployment` | 跑 2 個 frontend Pod，提供靜態網頁。 |
+| `Service` | 提供 `url-frontend-service`，讓 Ingress 可以把 `/` 導過來。 |
+
+Frontend 沒有 DB 連線設定，也不需要 Secret，這正好可以讓學生比較：
+
+- API 是有後端依賴的無狀態服務。
+- Frontend 是更單純的無狀態服務。
+- 兩者都適合 Deployment，但 env / probe / resources 的需求不同。
+
 ### Step 7：部署 HPA
 
 ```bash
@@ -219,6 +322,13 @@ kubectl get hpa -n url-shortener
 HPA 掛在 API 上。因為短網址查詢流量主要打 API，Frontend 通常不是瓶頸。
 
 學生要知道：不是每個服務都一定要 HPA，而是先判斷誰最可能成為瓶頸。
+
+這份 YAML 的重點：
+
+- `kind: HorizontalPodAutoscaler`：建立自動擴縮規則。
+- `scaleTargetRef.name: url-api`：HPA 擴的是 API Deployment，不是 DB，也不是 Frontend。
+- `minReplicas: 2` / `maxReplicas: 6`：設定擴縮上下限，避免縮到太少或放大無上限。
+- `averageUtilization: 70`：CPU 平均使用率超過目標時開始擴。
 
 如果 `TARGETS` 顯示 `unknown`，先確認：
 
@@ -233,6 +343,16 @@ kubectl describe hpa url-api-hpa -n url-shortener
 kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml
 kubectl get ingress -n url-shortener
 ```
+
+這份 YAML 的重點：
+
+- `kind: Ingress`：建立 HTTP 入口。
+- `ingressClassName: traefik`：指定用 k3s 預設的 Traefik 處理。
+- `host: short.local`：使用者看到的是 domain，不是 Pod IP。
+- `/api`、`/r`、`/health`、`/ready` 導到 `url-api-service`。
+- `/` 導到 `url-frontend-service`。
+
+這裡是整個產品最像真實服務的地方：同一個 domain，用不同 path 分流到不同 Service。
 
 在自己的電腦加 hosts：
 
@@ -257,6 +377,7 @@ http://short.local
 - 9 份 YAML 不是 9 份作業，而是 9 個部署決定。
 - 每一份 manifest 都是在回答一個問題。
 - 先手動做一次，後面講 Helm 才有意義。
+- Helm 一鍵部署不是魔法，它只是把這 9 份 YAML template 化。
 
 ---
 
@@ -382,6 +503,19 @@ helm install url-shortener ./apps/helm/url-shortener \
 - Frontend Deployment + Service
 - HPA
 - Ingress
+
+也就是說，Helm 做的不是另一套東西。它做的是把剛剛手動 apply 的那些 manifest 變成 template：
+
+| 手動 YAML | Helm template |
+|---|---|
+| `01-secret.yaml` | `templates/secret.yaml` |
+| `02-configmap.yaml` | `templates/configmap.yaml` |
+| `03-postgres.yaml` | `templates/postgres.yaml` |
+| `04-migrate-job.yaml` | `templates/migrate-job.yaml` |
+| `05-api.yaml` | `templates/api.yaml` |
+| `06-frontend.yaml` | `templates/frontend.yaml` |
+| `07-hpa.yaml` | `templates/hpa.yaml` |
+| `08-ingress.yaml` | `templates/ingress.yaml` |
 
 ### 一個指令升級
 

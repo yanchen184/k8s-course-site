@@ -53,6 +53,7 @@
 
 - 不要把手動部署講成照表操課。
 - 每一份 YAML 都是在回答一個部署問題。
+- 每一份 YAML 都要拆出「建了什麼物件、物件做什麼、對應哪個 K8s 觀念」。
 - 學生要知道為什麼先手動，再談 Helm。
 
 ### 講法主軸
@@ -81,6 +82,94 @@
 >
 > 所以手動部署的目的，不是讓你學會背 9 份 YAML。手動部署的目的，是讓你第一次把這些問題完整走過一次。
 
+### 每份 YAML 的講解口條
+
+#### `00-namespace.yaml`
+
+> 第一份是 Namespace。這份 YAML 很短，但它是整套產品的外框。
+>
+> `kind: Namespace` 代表我們建立一個新的隔離空間，名字叫 `url-shortener`。後面 Secret、ConfigMap、PostgreSQL、API、Frontend、HPA、Ingress 都會放在這個 namespace。
+>
+> 所以這裡複習的是 Namespace：它不是資料夾，它是資源管理、權限範圍、查詢範圍的邊界。
+
+#### `01-secret.yaml`
+
+> 第二份是 Secret。這裡建立 `url-shortener-secrets`，目前只有一個 key：`postgres-password`。
+>
+> 等一下 PostgreSQL 啟動時會用它設定 DB 密碼，API 和 migration 連 DB 時也會從這裡拿密碼。
+>
+> 這裡複習的是 Secret：敏感資訊不要寫在 ConfigMap，也不要硬編碼在程式裡。課堂上用 placeholder 是為了讓 lab 能跑，正式環境要改成安全的注入流程。
+
+#### `02-configmap.yaml`
+
+> 第三份是 ConfigMap。這裡放的是非敏感設定：`POSTGRES_HOST`、`POSTGRES_PORT`、`POSTGRES_DB`、`POSTGRES_USER`。
+>
+> 注意 `POSTGRES_HOST` 是 `postgres-service`，不是 IP。這裡順便複習 K8s Service DNS：Pod IP 會變，但 Service 名稱穩定，所以程式應該連 Service，不是連 Pod IP。
+>
+> 這裡的判斷很簡單：洩漏出去會出事的放 Secret；只是環境設定的放 ConfigMap。
+
+#### `03-postgres.yaml`
+
+> 第四份是 PostgreSQL，這份最適合當 StatefulSet 複習。
+>
+> 它其實建了兩個主要東西。第一個是 `postgres-service`，而且 `clusterIP: None`，這是 headless Service。第二個是 `postgres` StatefulSet。
+>
+> 為什麼不是 Deployment？因為資料庫需要穩定身份和持久化儲存。Deployment 的 Pod 可以任意替換，適合無狀態服務；StatefulSet 會建立穩定名稱，例如 `postgres-0`，並且透過 `volumeClaimTemplates` 幫它建立 PVC。
+>
+> 請特別看三個欄位。`serviceName: postgres-service` 讓 StatefulSet 搭配 headless Service。`volumeMounts` 把 PVC 掛到 `/var/lib/postgresql/data`。`readinessProbe` 用 `pg_isready` 確認 DB 是否真的可用。
+>
+> 這裡複習的是：有狀態服務、穩定名稱、PVC、readinessProbe。
+
+#### `04-migrate-job.yaml`
+
+> 第五份是 migration Job。這份 YAML 告訴學生，建資料表也應該被 Kubernetes 管理，而不是講師手動進 DB 做。
+>
+> `kind: Job` 代表這是一個跑完就結束的任務。`initContainers` 先用 busybox 等 `postgres-service:5432` 可以連線，避免 DB 還沒起來就跑 migration。真正的 container 用 `url-shortener-api` image 執行 `node migrate.js`。
+>
+> `restartPolicy: OnFailure` 和 `backoffLimit: 3` 代表失敗會重試，但不會無限重跑。
+>
+> 這裡複習的是：Job、init container、啟動順序、失敗重試。
+
+#### `05-api.yaml`
+
+> 第六份是 API，這份最適合複習 Deployment、Service、probe、resources。
+>
+> 它建了兩個物件：`url-api` Deployment 和 `url-api-service` Service。Deployment 負責跑 API Pod，Service 負責提供穩定入口給 Ingress。
+>
+> API 是無狀態服務，所以用 Deployment。`replicas: 2` 代表先跑兩份。Pod 掛掉時 Deployment 會補回。
+>
+> 設定的部分，非敏感資料從 ConfigMap 進來，DB password 從 Secret 進來。這裡可以提醒學生，Secret 不要整包 envFrom，最好只把需要的 key 注入。
+>
+> `resources.requests.cpu` 很重要，因為 HPA 需要它才能算 CPU 使用率百分比。`livenessProbe` 看 `/health`，`readinessProbe` 看 `/ready`，兩者不是同一件事。
+>
+> 這裡複習的是：Deployment、Service、Secret/ConfigMap 注入、resources、livenessProbe、readinessProbe。
+
+#### `06-frontend.yaml`
+
+> 第七份是 Frontend。它也是 Deployment 加 Service，但比 API 單純。
+>
+> Frontend 是靜態網站，不需要 DB password，也不需要連 PostgreSQL。它只需要跑 nginx 或靜態頁面，然後用 Service 提供穩定入口，讓 Ingress 可以把 `/` 導過來。
+>
+> 這裡可以讓學生比較：API 和 Frontend 都是無狀態，所以都用 Deployment；但 API 有 DB 依賴、probe、更多 resources，Frontend 則比較單純。
+
+#### `07-hpa.yaml`
+
+> 第八份是 HPA。它不是部署新的 app，而是建立一個擴縮規則。
+>
+> `scaleTargetRef` 指向 `url-api` Deployment，代表 HPA 擴的是 API，不是 DB，也不是 Frontend。`minReplicas: 2`、`maxReplicas: 6` 是邊界，`averageUtilization: 70` 是 CPU 目標。
+>
+> 這裡要提醒學生：HPA 不是只 apply 一份 YAML 就會動。它需要 metrics-server，也需要目標 Pod 設定 CPU requests。
+
+#### `08-ingress.yaml`
+
+> 第九份是 Ingress。這是使用者真正進入產品的入口。
+>
+> `host: short.local` 代表使用者用 domain 進來。`/api`、`/r`、`/health`、`/ready` 都導到 `url-api-service`，`/` 導到 `url-frontend-service`。
+>
+> 這裡可以讓學生看到真實產品常見的模式：同一個 domain，依 path 分流到不同 Service。使用者不需要知道後面有幾個 Pod、Pod IP 是什麼、API 在哪個 port。
+>
+> 這裡複習的是：Ingress、host/path routing、Service 作為穩定 backend。
+
 ### 各步驟帶學生時可用的短句
 
 - Namespace：先隔離，再部署。
@@ -91,11 +180,13 @@
 - Frontend：讓產品可視化，不只是 API 存在而已。
 - HPA：先有 requests，才有擴縮。
 - Ingress：使用者應該看到 domain，不是 Pod IP。
+- Helm：把這些 YAML template 化，不是另一套部署概念。
 
 ### 這一段學生要帶走的話
 
 - 每一份 manifest 都是在回答一個部署問題。
 - 先手動做一次，後面講 Helm 才有意義。
+- 一鍵部署的前提，是你知道那一鍵背後做了哪些事。
 
 ---
 
@@ -159,6 +250,10 @@
 >
 > 所以 Helm 不是取代 Kubernetes，也不是把前面學的東西全部省略掉。相反地，你要先懂前面的東西，才知道 Helm 幫你包了什麼。
 >
+> 你可以直接把剛剛的手動 YAML 對到 Helm template：Secret 對 `templates/secret.yaml`，ConfigMap 對 `templates/configmap.yaml`，PostgreSQL 對 `templates/postgres.yaml`，migration 對 `templates/migrate-job.yaml`，API 對 `templates/api.yaml`，Frontend 對 `templates/frontend.yaml`，HPA 對 `templates/hpa.yaml`，Ingress 對 `templates/ingress.yaml`。
+>
+> 換句話說，Helm 不是做了另一件事。它只是把剛剛那些固定 YAML 變成可以調參的 template。
+>
 > 接著你可以帶學生看 values。  
 > `image.tag` 控制版本。  
 > `replicaCount` 控制副本數。  
@@ -174,6 +269,7 @@
 
 - 手動部署是理解結構。
 - Helm 是交付結構。
+- 一鍵部署背後仍然是 Namespace、Secret、ConfigMap、StatefulSet、Job、Deployment、Service、HPA、Ingress。
 
 ---
 
@@ -188,6 +284,7 @@
 ### 7-12
 
 - 9 份 YAML = 9 個部署問題
+- 每份 YAML 都要講：物件、欄位、責任、對應觀念
 - 每一步都要講「為什麼是這個元件」
 - 不要把流程講成背指令
 
@@ -202,4 +299,5 @@
 
 - 先回答「為什麼前面手動，現在又 Helm」
 - Helm 是封裝，不是取代
+- 手動 YAML 要能對到 Helm templates
 - 帶學生看 values 對應到真實部署決定

@@ -99,9 +99,10 @@ k3s 內建，minikube 用 `minikube addons enable metrics-server` 啟用。
 
 **Step 1：確認 metrics-server**
 
-```
-指令：kubectl get pods -n kube-system
-指令：kubectl top nodes
+```bash
+kubectl get pods -n kube-system -l k8s-app=metrics-server
+kubectl top nodes
+kubectl top pods
 ```
 
 看到 CPU 和 MEMORY 的數字代表 metrics-server 正常。

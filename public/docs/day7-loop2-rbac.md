@@ -158,6 +158,12 @@ roleRef:
 
 回傳 `no`，代表這個身份沒有 delete pods 的權限。`auth can-i` 是快速確認某個身份有沒有某個操作的權限，不用真的去執行那個操作。
 
+列出這個身份能做的**所有事**（權限稽核用）：
+
+```bash
+kubectl auth can-i --list --as=system:serviceaccount:default:viewer-sa
+```
+
 **QA**
 
 > Q：--as 格式一直報錯？

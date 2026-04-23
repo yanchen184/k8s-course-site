@@ -166,12 +166,11 @@
 | 11:25-11:40 | 講課 | RBAC 概念 | 15min |
 | 11:40-12:00 | 實作 | **實作 4：RBAC** | 20min |
 | 12:00-13:00 | 午休 | | |
-| 13:00-13:30 | 實作 | **實作 5：故障排除**（故意搞壞 → describe + logs 找原因 → 修好） | 30min |
-| 13:30-13:40 | 休息 | | 10min |
-| 13:40-15:10 | 實作 | **實作 6：🔨 總複習** — 從零部署完整系統 12 步 | 90min |
-| 15:10-15:20 | 休息 | | 10min |
-| 15:20-15:40 | 講課 | 課程回顧 + Docker → K8s 對照表 + 環境方案比較 | 20min |
-| 15:40-16:00 | 講課 | Q&A + 結語 | 20min |
+| 13:00-13:25 | 講師示範 | 任務排程系統架構回顧：複雜產品如何對應 Deployment / StatefulSet / Job / CronJob / HPA | 25min |
+| 13:25-13:35 | 休息 | | 10min |
+| 13:35-15:35 | 實作 | **實作 5：短網址服務產品實作** — 學生不寫程式碼，手動部署一套完整產品 | 120min |
+| 15:35-15:50 | 講課 + 示範 | Helm 收尾：剛剛手動做的事，其實可以一個指令完成，並用 values 調整副本、資源、HPA、Ingress、版本 | 15min |
+| 15:50-16:00 | 講課 | 課程總結 + Q&A | 10min |
 
 ### 實作清單
 
@@ -181,8 +180,8 @@
 | 2 | Resource limits | 設 requests/limits → 跑吃記憶體的 Pod → 觀察 OOMKilled | 超過限制會被殺 |
 | 3 | HPA | `kubectl autoscale` → busybox 壓測 → `get hpa` 看 Pod 自動增加 | 流量大自動加 Pod |
 | 4 | RBAC | ServiceAccount + Role（只能 get pods）→ 測 get ✅ delete ❌ | 權限控制生效 |
-| 5 | 故障排除 | 故意部署壞的（image 拼錯、port 錯、config 錯）→ describe + logs 找原因 → 修好 | 系統性排錯能力 |
-| 6 | 🔨 總複習 | Namespace → Secret → ConfigMap → MySQL StatefulSet + PVC → API Deployment（3 replicas）→ Nginx Deployment → ClusterIP Service × 3 → Ingress → Probe → Resource limits → HPA → 瀏覽器驗證 | 從零到完整系統 |
+| 5 | 短網址服務產品實作 | Namespace → Secret → ConfigMap → PostgreSQL StatefulSet + PVC → Migration Job → API Deployment → Frontend Deployment → Service → Ingress → Probe → Resource limits → HPA → 瀏覽器驗證 | 從零部署一個可用產品 |
+| 6 | Helm 一鍵部署與調參 | `helm install` 一個指令裝完整產品 → `helm upgrade --set` 調整副本數、HPA、網域、資源、版本 → `helm rollback` 回滾 | 理解 Helm 是把 YAML 打包成可重複部署、可調參、可升級回滾的產品 |
 
 ---
 

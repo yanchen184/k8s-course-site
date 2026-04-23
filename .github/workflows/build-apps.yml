@@ -1,4 +1,4 @@
-name: Build and Push Task Apps
+name: Build and Push Course Apps
 
 on:
   push:
@@ -24,6 +24,10 @@ jobs:
           - app: task-scheduler
             version: v1
           - app: task-frontend
+            version: v1
+          - app: url-shortener-api
+            version: v1
+          - app: url-shortener-frontend
             version: v1
 
     steps:

@@ -647,6 +647,10 @@ spec:
     spec:
       accessModes: ["ReadWriteOnce"]   # ★ 同時只能一個 Node 掛載
       resources: { requests: { storage: 1Gi } }`}</code></pre>
+
+        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl apply -f 03-mysql.yaml
+kubectl wait pod/mysql-0 -n tasks --for=condition=Ready --timeout=120s
+kubectl exec -it mysql-0 -n tasks -- mysql -uroot -p"MyMysqlP@ssw0rd" -D taskdb`}</code></pre>
       </div>
     ),
     notes: `這份 YAML 稍微長一點，我挑關鍵的地方講。
@@ -898,6 +902,10 @@ metadata: { name: redis-service, namespace: tasks }
 spec:
   selector: { app: redis }
   ports: [{ port: 6379, targetPort: 6379 }]`}</code></pre>
+
+        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl apply -f 04-redis.yaml
+kubectl get pods -n tasks -l app=redis
+kubectl exec deploy/redis -n tasks -- redis-cli -a MyRedisP@ssw0rd ping`}</code></pre>
       </div>
     ),
     notes: `Redis 這裡最關鍵的判斷：為什麼不用 StatefulSet？
@@ -1416,6 +1424,9 @@ metadata: { name: frontend-service, namespace: tasks }
 spec:
   selector: { app: frontend }
   ports: [{ port: 80, targetPort: 80 }]`}</code></pre>
+
+        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl apply -f 08-frontend.yaml
+kubectl get pods -n tasks -l app=frontend`}</code></pre>
       </div>
     ),
     notes: `Frontend 最單純，就是一個純前端。
@@ -1531,6 +1542,9 @@ spec:
             不會。Redis BLPOP 是原子操作，同一個任務只會被一個 Task Runner 拿走。
           </p>
         </div>
+
+        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl apply -f 09-task-runner.yaml
+kubectl get pods -n tasks -l app=task-runner`}</code></pre>
       </div>
     ),
     notes: `Task Runner 的 YAML，長得跟一般 Deployment 差不多。
@@ -1773,6 +1787,9 @@ spec:
             <span className="font-mono">namespace-middleware名稱@kubernetescrd</span>——少一個字都不認
           </p>
         </div>
+
+        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl apply -f 12-ingress.yaml
+kubectl get ingress -n tasks`}</code></pre>
       </div>
     ),
     notes: `Middleware 先定義，kind Middleware，spec.stripPrefix.prefixes /api。

@@ -1016,7 +1016,10 @@ kubectl delete pod <任意pod名> --as=system:serviceaccount:default:viewer-sa
 
 # 快速確認權限（yes = 有，no = 沒有）
 kubectl auth can-i get pods --as=system:serviceaccount:default:viewer-sa
-kubectl auth can-i delete pods --as=system:serviceaccount:default:viewer-sa`,
+kubectl auth can-i delete pods --as=system:serviceaccount:default:viewer-sa
+
+# 列出這個身份能做的所有事（權限稽核用）
+kubectl auth can-i --list --as=system:serviceaccount:default:viewer-sa`,
     notes: `必做題是跟著我剛才的步驟做一遍。建 ServiceAccount、Role、RoleBinding，然後用 --as 測試。確認 get pods 成功，delete pod 被拒。
 
 挑戰題是自己寫一個新的 Role，允許 get、list、create、update、delete deployments，但不能碰 secrets。然後建一個新的 ServiceAccount 綁上去，用 --as 測試能操作 Deployment 但不能讀 Secret。提示：resources 那個欄位可以寫多條 rule，每條 rule 指定不同的 resources 和 verbs。

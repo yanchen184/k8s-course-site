@@ -863,10 +863,15 @@ nginx-xxx   1/1    Running  0`}</pre>
         <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
           <p className="text-red-400 font-semibold mb-2">✗ 建立被拒</p>
           <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa</p>
+            <p>$ kubectl run test --image=nginx \</p>
+            <p>    --as=system:serviceaccount:default:viewer-sa</p>
             <p className="text-red-400">Error from server (Forbidden): cannot create resource "pods"</p>
           </div>
         </div>
+
+        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl get pods --as=system:serviceaccount:default:viewer-sa
+kubectl delete pod <Pod名稱> --as=system:serviceaccount:default:viewer-sa
+kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa`}</code></pre>
 
         <div className="bg-slate-800/50 p-4 rounded-lg text-sm text-slate-300">
           <p>不加 <code className="text-cyan-400">--as</code> → 用預設 admin 身份 → 什麼都能做</p>

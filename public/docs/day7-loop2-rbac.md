@@ -99,8 +99,21 @@ roleRef:
 
 - **`apiGroups: [""]`**：空字串代表 core API group，包含 Pod、Service、ConfigMap、Secret 等基礎資源。Deployment 屬於 `apps` group，要另外列一條 rule
 - **`verbs`**：只有 get / list / watch，沒有 create / update / delete。這就是最小權限原則，只給看的權利
-- **`subjects`**：綁定對象是 ServiceAccount，kind 要寫 ServiceAccount，namespace 要和 SA 所在的 namespace 一致
-- **`roleRef`**：一旦建好就不能改，要改只能刪掉 RoleBinding 重建。name 打錯字就綁不上去
+- **`subjects`**：綁定對象是 ServiceAccount，kind 要寫 ServiceAccount，namespace 要和 SA 所在的 namespace 一致。`subjects` 是陣列，可以同時綁多個 SA 到同一個 Role：
+
+  ```yaml
+  subjects:
+    - kind: ServiceAccount
+      name: viewer-sa
+      namespace: default
+    - kind: ServiceAccount
+      name: another-sa
+      namespace: default
+  ```
+
+  反過來，一個 RoleBinding 只能綁一個 Role（`roleRef` 只能一個）。**多個 SA 要同一個 Role → 一個 RoleBinding 搞定。一個 SA 要多個 Role → 要建多個 RoleBinding。**
+
+- **`roleRef`**：一旦建好就不能改，要改只能刪掉 RoleBinding 重建。name 打錯字就綁不上去。`apiGroup: rbac.authorization.k8s.io` 是固定寫法，告訴 K8s 這個 Role 屬於 RBAC 這個 API 群組，不能省略也不能改
 
 **部署**
 
@@ -194,3 +207,70 @@ rules:
 **Loop 2 因果鏈**
 
 誰都能刪，實習生一個指令毀掉 production → RBAC 根據角色分配最小權限，誰能看、誰能改、誰能刪，分明清楚。
+
+---
+
+## 進階：真的發一份 kubeconfig 給別人
+
+`--as` 是管理員模擬測試用，實際環境要給別人獨立的 kubeconfig，對方用那份登入就只有對應的權限。
+
+**Step 1：產生 token**
+
+```bash
+TOKEN=$(kubectl create token viewer-sa --duration=8760h)
+```
+
+`--duration=8760h` 是一年，可以依需求調整。
+
+**Step 2：取得 cluster 資訊**
+
+```bash
+CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+```
+
+**Step 3：組成 kubeconfig**
+
+```bash
+cat > /tmp/viewer-sa.kubeconfig << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: k3s
+  cluster:
+    server: $CLUSTER_SERVER
+    certificate-authority-data: $CA_DATA
+users:
+- name: viewer-sa
+  user:
+    token: $TOKEN
+contexts:
+- name: viewer-sa@k3s
+  context:
+    cluster: k3s
+    user: viewer-sa
+current-context: viewer-sa@k3s
+EOF
+```
+
+**Step 4：把 127.0.0.1 換成 master 實際 IP（給外部使用者用）**
+
+```bash
+sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' /tmp/viewer-sa.kubeconfig
+```
+
+`127.0.0.1` 只有在 master 本機才能用。要給別人就要換成 master 的實際 IP，對方才能連到。
+
+**Step 5：用這份 kubeconfig 測試**
+
+```bash
+# 成功（有 get 權限）
+kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig get pods
+
+# 失敗（沒有 delete 權限）
+kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig delete pod <任意名稱>
+```
+
+第一行成功，第二行回 `Forbidden`，代表這份 kubeconfig 真的只有你給的權限。
+
+把 `/tmp/viewer-sa.kubeconfig` 複製給對方，他們 `export KUBECONFIG=/path/to/viewer-sa.kubeconfig` 後所有 kubectl 操作都受 RBAC 限制。

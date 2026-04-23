@@ -1174,6 +1174,108 @@ RBAC 的核心是 verbs。這個 Role 只給了 get、list、watch，沒有 dele
 清理三個資源：kubectl delete sa viewer-sa、delete role pod-viewer、delete rolebinding viewer-binding。 [▶ 下一頁]`,
   },
 
+  // ── 進階：真的發 kubeconfig 給別人 ──
+  {
+    title: '進階：真的發一份 kubeconfig 給別人',
+    subtitle: '對方用那份登入，就只有你給的權限',
+    section: 'Loop 2：RBAC',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 border border-slate-700 p-3 rounded text-xs text-slate-400">
+          <p><code className="text-amber-300">--as</code> 是管理員模擬測試用。真實環境要給對方一份獨立的 kubeconfig，他登入就只有對應的權限。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-xs mb-2">Step 1–3：產生 token + 組 kubeconfig</p>
+          <pre className="bg-slate-950 text-green-400 p-2 rounded text-xs overflow-x-auto"><code>{`TOKEN=$(kubectl create token viewer-sa --duration=8760h)
+CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+
+cat > /tmp/viewer-sa.kubeconfig << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: k3s
+  cluster:
+    server: $CLUSTER_SERVER
+    certificate-authority-data: $CA_DATA
+users:
+- name: viewer-sa
+  user:
+    token: $TOKEN
+contexts:
+- name: viewer-sa@k3s
+  context:
+    cluster: k3s
+    user: viewer-sa
+current-context: viewer-sa@k3s
+EOF`}</code></pre>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-xs mb-2">Step 4：換成 master 實際 IP（給外部使用者）</p>
+          <pre className="bg-slate-950 text-green-400 p-2 rounded text-xs overflow-x-auto"><code>{`sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' /tmp/viewer-sa.kubeconfig`}</code></pre>
+          <p className="text-slate-400 text-xs mt-1">127.0.0.1 只有在 master 本機才能用，給別人要換成實際 IP</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold text-xs mb-2">Step 5：驗證</p>
+          <pre className="bg-slate-950 text-green-400 p-2 rounded text-xs overflow-x-auto"><code>{`# 成功（有 get 權限）
+kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig get pods
+
+# 失敗（沒有 delete 權限）→ Forbidden
+kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig delete pod <任意名稱>`}</code></pre>
+        </div>
+      </div>
+    ),
+    code: `# Step 1：產生 token（一年效期）
+TOKEN=$(kubectl create token viewer-sa --duration=8760h)
+
+# Step 2：取得 cluster 資訊
+CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+
+# Step 3：組成 kubeconfig
+cat > /tmp/viewer-sa.kubeconfig << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: k3s
+  cluster:
+    server: $CLUSTER_SERVER
+    certificate-authority-data: $CA_DATA
+users:
+- name: viewer-sa
+  user:
+    token: $TOKEN
+contexts:
+- name: viewer-sa@k3s
+  context:
+    cluster: k3s
+    user: viewer-sa
+current-context: viewer-sa@k3s
+EOF
+
+# Step 4：換成 master 實際 IP
+sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' /tmp/viewer-sa.kubeconfig
+
+# Step 5：驗證
+kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig get pods
+kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig delete pod <任意名稱>`,
+    notes: `--as 是管理員模擬用，不是真的換身份。真實環境要給別人獨立的 kubeconfig。
+
+token 用 kubectl create token 產生，duration 可以設 1h、24h、8760h（一年）。
+
+kubeconfig 裡有三樣東西：cluster（server 位址和 CA）、user（token）、context（把兩者綁在一起）。
+
+注意 server 預設是 127.0.0.1，只有在 master 本機才能用。要給外部的人就要換成 master 的實際 IP。
+
+驗證：get pods 成功，delete pod Forbidden，代表這份 kubeconfig 真的只有 viewer-sa 的權限。
+
+把 /tmp/viewer-sa.kubeconfig 複製給對方，對方 export KUBECONFIG=/path/to/viewer-sa.kubeconfig 後所有 kubectl 操作都受 RBAC 限制。`,
+  },
+
   // ============================================================
   // Loop 3：Probe 健康檢查（對應 public/docs/day7-loop3-probe.md）
   // 7-2 概念（2 張） + 7-3 實作（4 張） + 7-4 學員實作（1 張）= 7 張

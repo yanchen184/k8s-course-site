@@ -6,6 +6,12 @@
 
 ## 7-11 我們要做出什麼？
 
+### 這一段要回答的問題
+
+這一段不是在教新的 YAML 語法，而是在回答：
+
+> 一個已經寫好的產品，放到 Kubernetes 上之後，最少要有哪些運行元件？
+
 ### 產品功能
 
 短網址服務是一個很適合最後總複習的產品：
@@ -17,6 +23,12 @@
 5. API 回傳 redirect，瀏覽器跳到原始網址。
 
 這個題目不需要學生寫程式碼，但能讓學生完整走過「產品部署」的流程。
+
+### 這一段學生要帶走什麼？
+
+- 今天的任務不是寫 app，而是部署 app。
+- 學生要能分清楚入口、邏輯、資料各自在哪一層。
+- 最後驗收不只看網站能不能開，還要看資料會不會丟、Pod 壞了會不會恢復。
 
 ### 架構
 
@@ -42,6 +54,14 @@ Ingress short.local
 | K8s 覆蓋 | Deployment、StatefulSet、PVC、ConfigMap、Secret、Service、Ingress、Probe、Resource、HPA 都用得到 |
 | 驗收清楚 | 能不能建立短網址、redirect、刪 Pod 後恢復、DB 資料是否保留 |
 
+### 講師提醒
+
+這一段先不要急著講 YAML。先讓學生回答三個問題就好：
+
+1. 誰是入口？`Ingress + Frontend`
+2. 誰處理邏輯？`API`
+3. 資料放哪裡？`PostgreSQL + PVC`
+
 ---
 
 ## 7-12 手動部署：一步一步把產品建起來
@@ -49,6 +69,26 @@ Ingress short.local
 > 這段的重點不是背 YAML，而是知道每個檔案負責哪一層。
 >
 > Lab 檔案會放在 `k8s-course-labs/lesson7/url-shortener/`。學生上課時從該資料夾操作即可。
+
+### 這一段要回答的問題
+
+這一段真正要回答的是：
+
+> 把產品放上 K8s 時，到底在做哪些部署決定？
+
+所以不要把它看成 9 個檔案，而要看成 9 個部署問題。
+
+| 檔案 | 真正在回答的問題 |
+|---|---|
+| `00-namespace.yaml` | 這個產品放在哪個隔離空間？ |
+| `01-secret.yaml` | 敏感資訊放哪裡？ |
+| `02-configmap.yaml` | 非敏感設定放哪裡？ |
+| `03-postgres.yaml` | 資料要不要保留？ |
+| `04-migrate-job.yaml` | 資料表誰來建立？ |
+| `05-api.yaml` | 誰負責建立短網址與 redirect？ |
+| `06-frontend.yaml` | 誰提供操作介面？ |
+| `07-hpa.yaml` | 流量變大怎麼辦？ |
+| `08-ingress.yaml` | 使用者怎麼進產品？ |
 
 ### 課前 image 檢查
 
@@ -86,6 +126,8 @@ kubectl get ns url-shortener
 
 Namespace 是產品的邏輯邊界。今天所有資源都放在 `url-shortener`。
 
+學生要知道：不是因為範例喜歡多建一層，而是因為之後所有資源管理、`kubectl get all -n url-shortener`、權限範圍都會靠這個邊界。
+
 ### Step 2：建立 Secret 和 ConfigMap
 
 ```bash
@@ -102,6 +144,8 @@ kubectl apply -f apps/k8s/url-shortener/02-configmap.yaml
 
 正式環境不要把真實密碼提交到 Git。課堂範例使用 lab placeholder，目的是讓流程能跑通。
 
+學生要知道：`Secret` 和 `ConfigMap` 不是兩個隨便選的名字，而是在回答「這個值洩漏出去會不會有問題」。
+
 ### Step 3：部署 PostgreSQL StatefulSet + PVC
 
 ```bash
@@ -114,6 +158,8 @@ kubectl get pods,pvc -n url-shortener
 - DB 需要穩定名稱。
 - DB 需要固定儲存。
 - Pod 重建後要掛回同一個 PVC。
+
+學生要知道：這裡不是因為 PostgreSQL 比較特別才用 `StatefulSet`，而是因為它需要穩定名稱和穩定儲存。
 
 驗收：
 
@@ -132,6 +178,8 @@ kubectl logs job/db-migrate -n url-shortener
 
 Job 適合一次性任務。這裡只負責建立 `short_links` table。
 
+學生要知道：建立資料表不是讓講師手動進 DB 做，而是把它變成可重複執行、可追蹤 log 的 K8s 物件。
+
 ### Step 5：部署 API
 
 ```bash
@@ -148,6 +196,8 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 - livenessProbe 確認 API process 還活著。
 - resources requests/limits 讓 HPA 有計算基準。
 
+學生要知道：`Deployment` 不是「預設都用它」，而是因為 API 無狀態，可以隨時被補回。
+
 ### Step 6：部署 Frontend
 
 ```bash
@@ -157,6 +207,8 @@ kubectl get deploy,svc -n url-shortener
 
 Frontend 是靜態網站，無狀態，所以也是 Deployment。
 
+學生要知道：這裡的 Frontend 很單純，但它很重要，因為最後能不能打開網頁是產品感的來源。
+
 ### Step 7：部署 HPA
 
 ```bash
@@ -165,6 +217,8 @@ kubectl get hpa -n url-shortener
 ```
 
 HPA 掛在 API 上。因為短網址查詢流量主要打 API，Frontend 通常不是瓶頸。
+
+學生要知道：不是每個服務都一定要 HPA，而是先判斷誰最可能成為瓶頸。
 
 如果 `TARGETS` 顯示 `unknown`，先確認：
 
@@ -198,9 +252,25 @@ curl -H "Host: short.local" http://<NODE-IP>/health
 http://short.local
 ```
 
+### 這一段學生要帶走什麼？
+
+- 9 份 YAML 不是 9 份作業，而是 9 個部署決定。
+- 每一份 manifest 都是在回答一個問題。
+- 先手動做一次，後面講 Helm 才有意義。
+
 ---
 
 ## 7-13 驗收：產品真的可用
+
+### 這一段要回答的問題
+
+> 怎樣才算真的部署完成？
+
+答案不是 `Pod Running`，而是要同時通過：
+
+1. 產品驗收
+2. K8s 驗收
+3. 故障驗收
 
 ### 功能驗收
 
@@ -217,6 +287,8 @@ curl -s -X POST http://short.local/api/links \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://kubernetes.io/"}'
 ```
+
+這一層在回答：**產品到底能不能用？**
 
 ### K8s 驗收
 
@@ -241,6 +313,8 @@ kubectl get hpa -n url-shortener
 | Ingress | 讓瀏覽器能用 domain 進來 |
 | HPA | API 流量高時自動擴縮 |
 
+這一層在回答：**Kubernetes 有沒有真的提供你要的運行能力？**
+
 ### 故障驗收
 
 刪掉 API Pod：
@@ -261,6 +335,15 @@ kubectl get pod postgres-0 -n url-shortener -w
 
 預期：StatefulSet 重新建立 `postgres-0`，同一個 PVC 仍然掛回來，短網址資料還在。
 
+這一層在回答：**系統壞掉時，平台能不能幫你恢復？**
+
+### 講師提醒
+
+這一段很適合直接講一句總結：
+
+> 如果只能用、不能恢復，不算部署完成。
+> 如果能恢復、但資料會丟，也不算部署完成。
+
 ---
 
 ## 7-14 最後收尾：其實可以一個指令完成
@@ -268,6 +351,17 @@ kubectl get pod postgres-0 -n url-shortener -w
 前面一步一步做，是為了讓你知道每個 K8s 元件在產品裡扮演什麼角色。
 
 正式工作不會每天手動 apply 八個 YAML。通常會用 Helm，把剛剛那一整套 YAML 包成一個 chart。
+
+### 這一段要回答的問題
+
+> 為什麼剛剛要手動做一次，最後又說其實可以一個指令完成？
+
+因為兩件事目的不同：
+
+| 做法 | 目的 |
+|---|---|
+| 手動 `kubectl apply` | 理解一個產品拆開來有哪些 K8s 元件 |
+| `helm install` | 把這些元件包成可重複交付的產品 |
 
 ### 一個指令安裝
 
@@ -327,7 +421,7 @@ helm upgrade url-shortener ./apps/helm/url-shortener \
 
 最後要讓學生帶走這句話：
 
-> K8s 的價值不是讓你背一堆 YAML，而是讓你知道一個產品由哪些運行元件組成；Helm 的價值，是把這些元件打包成可以重複部署、可以調參、可以升級回滾的一個產品。
+> K8s 教你的是系統怎麼組成；Helm 教你的是怎麼把這套系統變成可以重複交付的產品。
 
 ---
 

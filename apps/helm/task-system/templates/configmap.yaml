@@ -4,10 +4,10 @@ metadata:
   name: app-config
   namespace: tasks
 data:
-  POSTGRES_HOST: "postgres-service"
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: {{ .Values.db.name | quote }}
-  POSTGRES_USER: {{ .Values.db.user | quote }}
+  MYSQL_HOST: "mysql-service"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: {{ .Values.db.name | quote }}
+  MYSQL_USER: {{ .Values.db.user | quote }}
   REDIS_HOST: "redis-service"
   REDIS_PORT: "6379"
   API_URL: "http://backend-service:3000"

@@ -21,11 +21,11 @@ spec:
         - configMapRef:
             name: app-config
         env:
-        - name: POSTGRES_PASSWORD
+        - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
               name: app-secrets
-              key: postgres-password
+              key: mysql-password
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:

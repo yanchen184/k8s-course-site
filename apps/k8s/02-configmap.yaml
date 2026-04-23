@@ -4,10 +4,10 @@ metadata:
   name: app-config
   namespace: tasks
 data:
-  POSTGRES_HOST: "postgres-service"
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: "taskdb"
-  POSTGRES_USER: "postgres"
+  MYSQL_HOST: "mysql-service"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "taskdb"
+  MYSQL_USER: "root"
   REDIS_HOST: "redis-service"
   REDIS_PORT: "6379"
   API_URL: "http://backend-service:3000"

@@ -11,13 +11,13 @@ replicas:
   taskRunner: 3
 
 secrets:
-  postgresPassword: "MyPostgresP@ssw0rd"
+  mysqlPassword: "MyMysqlP@ssw0rd"
   redisPassword: "MyRedisP@ssw0rd"
   jwtSecret: "MyJwtSuperSecret"
 
 db:
   name: taskdb
-  user: postgres
+  user: root
 
 ingress:
   enabled: true

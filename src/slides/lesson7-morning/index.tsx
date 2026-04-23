@@ -1043,4 +1043,381 @@ RBAC 的核心是 verbs。這個 Role 只給了 get、list、watch，沒有 dele
   },
 
   // ============================================================
+  // Loop 3：Probe 健康檢查（對應 public/docs/day7-loop3-probe.md）
+  // 7-2 概念（2 張） + 7-3 實作（4 張） + 7-4 學員實作（1 張）= 7 張
+  // ============================================================
+
+  // ── Loop 3-1（1/7）：Running 在騙你 ──
+  {
+    title: 'Loop 3：Probe 健康檢查',
+    subtitle: 'Running 不代表服務正常',
+    section: '7-2：Probe 概念',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/30 border-l-4 border-red-500 p-3 rounded">
+          <p className="text-red-300 font-semibold mb-1">殘酷的事實</p>
+          <p className="text-slate-300 text-sm">kubectl get pods 看到 Running，不代表服務正常。Running 只代表容器裡面的主行程還在跑——process 活著，K8s 就認為你是 Running。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-4 rounded-lg">
+          <p className="text-cyan-400 font-semibold text-sm mb-2">三種 Running 卻出包的場景</p>
+          <div className="space-y-2 text-xs">
+            <div className="bg-slate-900/60 p-2 rounded border-l-2 border-amber-500">
+              <p className="text-amber-300 font-semibold">場景一：API 死鎖</p>
+              <p className="text-slate-400">process 還活著，但不處理任何請求</p>
+            </div>
+            <div className="bg-slate-900/60 p-2 rounded border-l-2 border-amber-500">
+              <p className="text-amber-300 font-semibold">場景二：連線池滿了</p>
+              <p className="text-slate-400">回 500 錯誤，K8s 照樣顯示 Running</p>
+            </div>
+            <div className="bg-slate-900/60 p-2 rounded border-l-2 border-amber-500">
+              <p className="text-amber-300 font-semibold">場景三：Java 啟動要 60 秒</p>
+              <p className="text-slate-400">這 60 秒的請求全部失敗</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `上一個 Loop 我們做了 RBAC，權限分明了。但我今天要跟大家說一件殘酷的事情：穿得漂亮不代表扛得住。
+
+從第四堂到現在，你怎麼確認服務正常？打 kubectl get pods，看到 STATUS 是 Running，覺得沒事了。但 Running 這個狀態在騙你。Running 只代表一件事：容器裡面的主行程還在跑。process 活著，K8s 就認為你是 Running。
+
+場景一：API 死鎖，process 還活著，但不處理任何請求。場景二：連線池滿了，回 500 錯誤但 K8s 照樣顯示 Running。場景三：Java 啟動要 60 秒，這 60 秒的請求全部失敗。K8s 不知道你的服務到底正不正常。
+
+所以我們需要 Probe。[▶ 下一頁：三種 Probe]`,
+  },
+
+  // ── Loop 3-2（2/7）：三種 Probe ──
+  {
+    title: '三種 Probe 各司其職',
+    subtitle: 'K8s 用三種探針解決 Running 不等於健康的問題',
+    section: '7-2：Probe 概念',
+    duration: '2',
+    content: (
+      <div className="space-y-3">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-800">
+                <th className="border border-slate-700 p-2 text-cyan-300">Probe</th>
+                <th className="border border-slate-700 p-2 text-cyan-300">問的問題</th>
+                <th className="border border-slate-700 p-2 text-cyan-300">失敗怎麼辦</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-slate-700 p-2 font-mono text-amber-300">livenessProbe</td>
+                <td className="border border-slate-700 p-2 text-slate-300">你還活著嗎？</td>
+                <td className="border border-slate-700 p-2 text-red-300">重啟容器</td>
+              </tr>
+              <tr className="bg-slate-900/40">
+                <td className="border border-slate-700 p-2 font-mono text-amber-300">readinessProbe</td>
+                <td className="border border-slate-700 p-2 text-slate-300">準備好接流量了嗎？</td>
+                <td className="border border-slate-700 p-2 text-orange-300">從 Service 移除</td>
+              </tr>
+              <tr>
+                <td className="border border-slate-700 p-2 font-mono text-amber-300">startupProbe</td>
+                <td className="border border-slate-700 p-2 text-slate-300">啟動完了嗎？</td>
+                <td className="border border-slate-700 p-2 text-red-300">重啟容器（慢啟動用）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-slate-800/40 border-l-4 border-cyan-500 p-3 rounded text-xs">
+          <p className="text-cyan-300 font-semibold mb-1">對比 Docker HEALTHCHECK</p>
+          <p className="text-slate-400">Docker 只有一種，只會標記 unhealthy，不會幫你重啟也不會切流量。K8s 三種 Probe 各司其職。</p>
+        </div>
+      </div>
+    ),
+    notes: `K8s 用三種 Probe——探針——來解這個問題。
+
+第一個 livenessProbe，存活探測，問「你還活著嗎？」失敗就重啟容器。
+
+第二個 readinessProbe，就緒探測，問「準備好接流量了嗎？」失敗不重啟，只把 Pod 從 Service 的 Endpoints 移除，不導流量給它。等它自己恢復再加回來。
+
+第三個 startupProbe，啟動探測，專門給啟動特別慢的應用用的。等它通過，才開始跑 liveness 和 readiness。
+
+對比一下 Docker HEALTHCHECK，Docker 只有一種，只會標記 unhealthy，不會幫你重啟也不會切流量。K8s 三種各司其職，這才是生產等級的健康管理。
+
+詳細用法我們進實作再說。[▶ 下一頁：三種檢查方式]`,
+  },
+
+  // ── Loop 3-3（3/7）：三種檢查方式 + YAML 參數 ──
+  {
+    title: '三種檢查方式 + 四個關鍵參數',
+    subtitle: '怎麼檢查 ＋ 多久檢查一次',
+    section: '7-3：Probe 實作',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="bg-slate-800/60 border border-slate-700 p-3 rounded">
+            <p className="text-green-300 font-mono font-semibold">httpGet</p>
+            <p className="text-slate-400 mt-1">打 URL，200~399 成功</p>
+            <p className="text-slate-500 mt-1 text-[0.7rem]">Web API（最常用）</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-700 p-3 rounded">
+            <p className="text-green-300 font-mono font-semibold">tcpSocket</p>
+            <p className="text-slate-400 mt-1">連 port，連上成功</p>
+            <p className="text-slate-500 mt-1 text-[0.7rem]">資料庫、Redis</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-700 p-3 rounded">
+            <p className="text-green-300 font-mono font-semibold">exec</p>
+            <p className="text-slate-400 mt-1">執行指令，exit 0 成功</p>
+            <p className="text-slate-500 mt-1 text-[0.7rem]">自訂檢查邏輯</p>
+          </div>
+        </div>
+
+        <pre className="bg-slate-950 text-slate-100 p-3 rounded text-xs overflow-x-auto"><code>{`livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5    # 容器啟動後先等幾秒再開始
+  periodSeconds: 10          # 每幾秒檢查一次
+  failureThreshold: 3        # 連續失敗幾次才判定不健康
+  timeoutSeconds: 1          # 每次檢查等幾秒沒回應算超時`}</code></pre>
+
+        <div className="bg-slate-800/40 border-l-4 border-amber-500 p-2 rounded text-xs text-amber-300">
+          readinessProbe 的 periodSeconds 通常比 liveness 短——Pod 準備好了就趕快接流量
+        </div>
+      </div>
+    ),
+    notes: `三種檢查方式。
+
+httpGet，打一個 URL，回 200 到 399 算成功。Web API 最常用。tcpSocket，只看 port 連不連得上，適合資料庫、Redis 這種不是 HTTP 的服務。exec，在容器裡跑一段指令，exit 0 算成功，自訂檢查邏輯用的。
+
+YAML 四個關鍵參數。initialDelaySeconds 是容器啟動後先等幾秒再開始檢查。periodSeconds 是每幾秒檢查一次。failureThreshold 是連續失敗幾次才判定不健康——不是失敗一次就重啟，可能只是網路抖了一下。timeoutSeconds 是每次檢查等幾秒沒回應算超時。
+
+readinessProbe 的 periodSeconds 通常比 liveness 短。因為 readinessProbe 管的是流量，Pod 一準備好就要快點加回 Service 開始接流量。
+
+概念講完了，進 demo。[▶ 下一頁：Step 1-3 部署 + 觀察]`,
+  },
+
+  // ── Loop 3-4（4/7）：Step 1-3 部署 nginx + Probe ──
+  {
+    title: 'Step 1-3：部署 nginx + 確認 Probe',
+    subtitle: 'deployment-probe.yaml',
+    section: '7-3：Probe 實作',
+    duration: '4',
+    content: (
+      <div className="space-y-3">
+        <pre className="bg-slate-950 text-slate-100 p-3 rounded text-xs overflow-x-auto"><code>{`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-probe-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-probe
+  template:
+    metadata:
+      labels:
+        app: nginx-probe
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2`}</code></pre>
+
+        <div className="bg-slate-800/50 p-2 rounded text-xs font-mono space-y-1">
+          <p className="text-slate-500"># 部署 + 確認 Probe 設定</p>
+          <p className="text-green-300">kubectl apply -f deployment-probe.yaml</p>
+          <p className="text-green-300">kubectl get pods -l app=nginx-probe</p>
+          <p className="text-green-300">kubectl describe pods -l app=nginx-probe | grep -A10 "Liveness\\|Readiness"</p>
+        </div>
+      </div>
+    ),
+    notes: `先建 deployment-probe.yaml。replicas 2、image nginx:1.27、containerPort 80。兩種 Probe 都設。
+
+livenessProbe 打根路徑，initialDelaySeconds 5、periodSeconds 10、failureThreshold 3、timeoutSeconds 1。意思是容器啟動後等 5 秒開始檢查，每 10 秒打一次，連續失敗 3 次才判定不健康，每次等 1 秒沒回應就超時。
+
+readinessProbe 也打根路徑，但 periodSeconds 設 5 秒，比 liveness 頻繁。
+
+apply 下去，兩個 Pod Running，READY 1/1，RESTARTS 0。
+
+describe 確認 Probe 有吃進去，你會看到 Liveness 和 Readiness 兩行，顯示 delay、timeout、period、failure，跟我們設的一致。這樣才算設定正確。
+
+接下來故意把它搞壞。[▶ 下一頁：Step 4-6 故意搞壞]`,
+  },
+
+  // ── Loop 3-5（5/7）：Step 4-6 故意搞壞觀察重啟 ──
+  {
+    title: 'Step 4-6：刪掉 index.html 觀察重啟',
+    subtitle: 'livenessProbe 失敗 → K8s 重啟容器',
+    section: '7-3：Probe 實作',
+    duration: '4',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/40 border-l-4 border-amber-500 p-3 rounded text-xs">
+          <p className="text-amber-300 font-semibold mb-1">原理</p>
+          <p className="text-slate-400">nginx 預設回 200。刪掉 index.html 後找不到檔案，回 403 Forbidden。403 不在 200~399 的範圍，Probe 失敗。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded text-xs font-mono space-y-1">
+          <p className="text-slate-500"># 抓第一個 Pod 名字</p>
+          <p className="text-green-300">{`POD_NAME=$(kubectl get pods -l app=nginx-probe -o jsonpath='{.items[0].metadata.name}')`}</p>
+          <p className="text-slate-500 mt-1"># 故意搞壞</p>
+          <p className="text-green-300">kubectl exec $POD_NAME -- rm /usr/share/nginx/html/index.html</p>
+          <p className="text-slate-500 mt-1"># 觀察（watch 模式）</p>
+          <p className="text-green-300">kubectl get pods -l app=nginx-probe -w</p>
+        </div>
+
+        <div className="bg-slate-950 p-2 rounded text-xs font-mono">
+          <p className="text-slate-400">NAME                       READY   STATUS    RESTARTS   AGE</p>
+          <p className="text-slate-300">nginx-probe-demo-...-abc   1/1     Running   0          2m</p>
+          <p className="text-amber-300">nginx-probe-demo-...-abc   0/1     Running   0          2m30s</p>
+          <p className="text-green-300">nginx-probe-demo-...-abc   1/1     Running   <b>1</b>          2m35s</p>
+        </div>
+
+        <div className="bg-slate-800/40 border-l-4 border-cyan-500 p-2 rounded text-xs">
+          <p className="text-cyan-300">算一下時間：periodSeconds 10 × failureThreshold 3 = <b>最多等 30 秒</b> 看到重啟</p>
+        </div>
+      </div>
+    ),
+    notes: `現在故意把它搞壞。
+
+原理先講清楚。nginx 的 livenessProbe 打根路徑，nginx 會回傳 index.html，狀態碼 200，Probe 通過。如果把 index.html 刪掉，nginx 找不到這個檔案，回 403 Forbidden。403 不在 200 到 399 的範圍，Probe 失敗。
+
+指令三步。先抓第一個 Pod 的名字，用 jsonpath 取 items 零的 metadata name。然後 kubectl exec 進容器，rm /usr/share/nginx/html/index.html 刪掉首頁。最後 kubectl get pods -w，w 是 watch 模式，即時顯示狀態變化。
+
+算一下時間。periodSeconds 10 秒，failureThreshold 3 次，最多等 30 秒看到重啟。你會看到 READY 從 1/1 變 0/1——這是 readinessProbe 先失敗把 Pod 從 Service 拉掉——再過幾秒 RESTARTS 從 0 變 1，livenessProbe 達到 failureThreshold，K8s 重啟容器。重啟完 nginx 重新載入，index.html 恢復，兩個 Probe 都通過。
+
+按 Ctrl+C 停 watch。接下來看 Events 確認原因。[▶ 下一頁：Events + QA]`,
+  },
+
+  // ── Loop 3-6（6/7）：Events + QA + 常見坑 ──
+  {
+    title: 'Events 確認原因 + 三個常見坑',
+    subtitle: 'describe pod 看 Probe 失敗記錄',
+    section: '7-3：Probe 實作',
+    duration: '3',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-2 rounded text-xs font-mono">
+          <p className="text-green-300">kubectl describe pod $POD_NAME</p>
+        </div>
+
+        <div className="bg-slate-950 p-2 rounded text-xs font-mono space-y-1">
+          <p className="text-slate-500">Events:</p>
+          <p className="text-amber-300">Warning  Unhealthy  Liveness probe failed: statuscode: 403</p>
+          <p className="text-amber-300">Warning  Killing    Container nginx failed liveness probe, will be restarted</p>
+          <p className="text-slate-300">Normal   Pulled     Container image "nginx:1.27" already present</p>
+          <p className="text-green-300">Normal   Started    Started container nginx</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-amber-300 font-semibold mb-2">三個常見坑</p>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-slate-900">
+                <th className="border border-slate-700 p-1 text-cyan-300">坑</th>
+                <th className="border border-slate-700 p-1 text-cyan-300">症狀</th>
+                <th className="border border-slate-700 p-1 text-cyan-300">解法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-slate-700 p-1 font-mono">initialDelay 設 0</td>
+                <td className="border border-slate-700 p-1">Pod 一啟動就重啟</td>
+                <td className="border border-slate-700 p-1">至少 3~5 秒</td>
+              </tr>
+              <tr className="bg-slate-900/40">
+                <td className="border border-slate-700 p-1 font-mono">path 寫錯</td>
+                <td className="border border-slate-700 p-1">一直重啟看不出原因</td>
+                <td className="border border-slate-700 p-1">確認 path 會回 200</td>
+              </tr>
+              <tr>
+                <td className="border border-slate-700 p-1 font-mono">port 不一致</td>
+                <td className="border border-slate-700 p-1">每次 connection refused</td>
+                <td className="border border-slate-700 p-1">對齊 containerPort</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ),
+    notes: `kubectl describe pod，找到 Events 區塊，你會看到完整的記錄。
+
+Warning Unhealthy，Liveness probe failed，statuscode 403——這就是 K8s 偵測到 403 的證據。
+
+Warning Killing，Container nginx failed liveness probe, will be restarted——K8s 決定重啟。
+
+接著是 Normal Pulled，Normal Started，容器重新啟動起來。
+
+這就是完整的因果鏈。Probe 失敗→判定不健康→重啟→恢復。
+
+三個常見坑要特別注意。第一，initialDelaySeconds 設 0，容器一啟動就檢查，程式還沒初始化完就被判不健康，Pod 一直重啟。至少設 3 到 5 秒。
+
+第二，path 寫錯。你設了 /health 但應用沒有這個路徑，每次 Probe 都 404，Pod 一直被重啟但你看不出原因。確認 path 是你的應用確實會回 200 的路徑。
+
+第三，port 跟 containerPort 不一致。每次 Probe 都 connection refused。這個最容易踩到。
+
+QA 快速過三個。liveness 和 readiness 可以同時設，而且是最常見做法，互補不衝突。startupProbe 通過就不跑了，交棒給另外兩個。readinessProbe 失敗 Pod 還在，但不收流量，等它自己恢復。[▶ 下一頁：學員實作]`,
+  },
+
+  // ── Loop 3-7（7/7）：學員實作 ──
+  {
+    title: '學員實作：my-nginx-probe',
+    subtitle: '讓 RESTARTS 從 0 變 1',
+    section: '7-4：回頭操作 Loop 3',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/40 border-l-4 border-green-500 p-3 rounded text-xs">
+          <p className="text-green-300 font-semibold mb-1">🎯 必做題</p>
+          <p className="text-slate-300">自己從零寫一個 nginx Deployment，加 livenessProbe，觸發重啟，讓 RESTARTS 從 0 變 1。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-2">要求</p>
+          <ul className="text-slate-300 space-y-1 list-disc list-inside">
+            <li>Deployment 名稱：<code className="bg-slate-900 px-1 rounded text-amber-300">my-nginx-probe</code>，replicas: 1</li>
+            <li>image: <code className="bg-slate-900 px-1 rounded text-amber-300">nginx:1.27</code></li>
+            <li>livenessProbe httpGet 打 <code className="bg-slate-900 px-1 rounded text-amber-300">/</code>、port 80</li>
+            <li><code className="bg-slate-900 px-1 rounded text-amber-300">initialDelaySeconds: 5</code>、<code className="bg-slate-900 px-1 rounded text-amber-300">periodSeconds: 10</code>、<code className="bg-slate-900 px-1 rounded text-amber-300">failureThreshold: 3</code></li>
+          </ul>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-2">驗證步驟</p>
+          <ol className="text-slate-300 space-y-1 list-decimal list-inside">
+            <li>kubectl get pods 確認 Running</li>
+            <li>kubectl exec ... -- rm /usr/share/nginx/html/index.html</li>
+            <li>kubectl get pods -w 等 30 秒內看到 RESTARTS +1</li>
+            <li>kubectl describe pod 在 Events 找到 Liveness probe failed</li>
+          </ol>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          🏆 挑戰題：再加 readinessProbe + startupProbe + Service，觀察 endpoints 變化
+        </div>
+      </div>
+    ),
+    notes: `好，現在是你們的實作時間。我示範完了，換你們自己做一遍。記住目標：讓 RESTARTS 從 0 變成 1。
+
+必做題，自己從零寫一個 nginx Deployment，加上 livenessProbe。Deployment 名稱 my-nginx-probe，replicas 1，image nginx:1.27。livenessProbe 用 httpGet 打根路徑 port 80，initialDelaySeconds 5、periodSeconds 10、failureThreshold 3。
+
+部署後的驗證步驟四步。第一步 kubectl get pods 確認 Running。第二步 kubectl exec 進容器 rm 掉 index.html。第三步 kubectl get pods -w，等 30 秒內看到 RESTARTS 欄位從 0 變 1。第四步 kubectl describe pod，在 Events 裡找到 Liveness probe failed。
+
+挑戰題給行有餘力的。同時設 readinessProbe 和 startupProbe，並建一個對應的 Service。刪 index.html 後用 kubectl get endpoints 觀察 Pod IP 從 endpoints 消失——這是 readinessProbe 失敗把 Pod 從 Service 拉掉。等容器重啟後再看一次，Pod IP 又出現在 endpoints。這樣你就親眼看到 readinessProbe 控制流量、livenessProbe 控制重啟，兩個分工。
+
+給你們 10 到 15 分鐘。做完下課前我們進下午的 Loop 4，從零建完整系統。[▶ Loop 3 結束]`,
+  },
+
+  // ============================================================
 ]

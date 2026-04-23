@@ -1,12 +1,14 @@
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 const Redis = require('ioredis');
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
-  database: process.env.POSTGRES_DB || 'taskdb',
-  user: process.env.POSTGRES_USER || 'postgres',
-  password: process.env.POSTGRES_PASSWORD,
+const pool = mysql.createPool({
+  host: process.env.MYSQL_HOST || 'localhost',
+  port: parseInt(process.env.MYSQL_PORT || '3306'),
+  database: process.env.MYSQL_DATABASE || 'taskdb',
+  user: process.env.MYSQL_USER || 'root',
+  password: process.env.MYSQL_PASSWORD,
+  waitForConnections: true,
+  connectionLimit: 10,
 });
 
 const redis = new Redis({
@@ -18,24 +20,24 @@ const redis = new Redis({
 async function enqueueDueTasks() {
   console.log('Scanning for due tasks...');
 
-  const result = await pool.query(
+  const [rows] = await pool.query(
     `SELECT id, title FROM tasks
      WHERE status = 'pending'
        AND scheduled_at IS NOT NULL
        AND scheduled_at <= NOW()`
   );
 
-  if (result.rows.length === 0) {
+  if (rows.length === 0) {
     console.log('No due tasks found');
     process.exit(0);
   }
 
-  for (const task of result.rows) {
+  for (const task of rows) {
     await redis.rpush('task-queue', JSON.stringify({ id: task.id, title: task.title }));
     console.log(`Enqueued task ${task.id}: ${task.title}`);
   }
 
-  console.log(`Enqueued ${result.rows.length} tasks`);
+  console.log(`Enqueued ${rows.length} tasks`);
   process.exit(0);
 }
 

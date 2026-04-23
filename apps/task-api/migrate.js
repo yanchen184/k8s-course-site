@@ -1,31 +1,30 @@
-const { Client } = require('pg');
+const mysql = require('mysql2/promise');
 
 async function migrate() {
-  const client = new Client({
-    host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5432'),
-    database: process.env.POSTGRES_DB || 'taskdb',
-    user: process.env.POSTGRES_USER || 'postgres',
-    password: process.env.POSTGRES_PASSWORD,
+  const connection = await mysql.createConnection({
+    host: process.env.MYSQL_HOST || 'localhost',
+    port: parseInt(process.env.MYSQL_PORT || '3306'),
+    database: process.env.MYSQL_DATABASE || 'taskdb',
+    user: process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_PASSWORD,
   });
 
-  await client.connect();
-  console.log('Connected to PostgreSQL');
+  console.log('Connected to MySQL');
 
-  await client.query(`
+  await connection.query(`
     CREATE TABLE IF NOT EXISTS tasks (
-      id SERIAL PRIMARY KEY,
+      id INT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(255) NOT NULL,
       description TEXT,
       status VARCHAR(50) DEFAULT 'pending',
-      scheduled_at TIMESTAMP,
-      executed_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT NOW()
+      scheduled_at DATETIME NULL,
+      executed_at DATETIME NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
   console.log('Migration complete: tasks table ready');
-  await client.end();
+  await connection.end();
 }
 
 migrate().catch(err => {

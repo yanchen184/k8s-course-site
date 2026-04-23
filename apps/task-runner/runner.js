@@ -1,12 +1,14 @@
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 const Redis = require('ioredis');
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
-  database: process.env.POSTGRES_DB || 'taskdb',
-  user: process.env.POSTGRES_USER || 'postgres',
-  password: process.env.POSTGRES_PASSWORD,
+const pool = mysql.createPool({
+  host: process.env.MYSQL_HOST || 'localhost',
+  port: parseInt(process.env.MYSQL_PORT || '3306'),
+  database: process.env.MYSQL_DATABASE || 'taskdb',
+  user: process.env.MYSQL_USER || 'root',
+  password: process.env.MYSQL_PASSWORD,
+  waitForConnections: true,
+  connectionLimit: 10,
 });
 
 const redis = new Redis({
@@ -22,7 +24,7 @@ async function processTask(task) {
   await new Promise(resolve => setTimeout(resolve, 500));
 
   await pool.query(
-    `UPDATE tasks SET status = 'done', executed_at = NOW() WHERE id = $1`,
+    `UPDATE tasks SET status = 'done', executed_at = NOW() WHERE id = ?`,
     [task.id]
   );
 

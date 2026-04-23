@@ -1,5 +1,5 @@
 const express = require('express');
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 const Redis = require('ioredis');
 const k8s = require('@kubernetes/client-node');
 
@@ -25,12 +25,14 @@ async function loadConfigFromK8s() {
 async function init() {
   const config = await loadConfigFromK8s();
 
-  pool = new Pool({
-    host: config.POSTGRES_HOST,
-    port: parseInt(config.POSTGRES_PORT),
-    database: config.POSTGRES_DB,
-    user: 'postgres',
-    password: process.env.POSTGRES_PASSWORD,
+  pool = mysql.createPool({
+    host: config.MYSQL_HOST,
+    port: parseInt(config.MYSQL_PORT),
+    database: config.MYSQL_DATABASE,
+    user: 'root',
+    password: process.env.MYSQL_PASSWORD,
+    waitForConnections: true,
+    connectionLimit: 10,
   });
 
   redis = new Redis({
@@ -51,10 +53,10 @@ app.get('/health', (req, res) => {
 
 app.get('/tasks', async (req, res) => {
   try {
-    const result = await pool.query(
+    const [rows] = await pool.query(
       'SELECT * FROM tasks ORDER BY created_at DESC LIMIT 50'
     );
-    res.json({ tasks: result.rows });
+    res.json({ tasks: rows });
   } catch (err) {
     console.error('GET /tasks error:', err.message);
     res.status(500).json({ error: 'Database error' });
@@ -68,12 +70,13 @@ app.post('/tasks', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    const [result] = await pool.query(
       `INSERT INTO tasks (title, description, scheduled_at, status)
-       VALUES ($1, $2, $3, 'pending') RETURNING *`,
+       VALUES (?, ?, ?, 'pending')`,
       [title, description || null, scheduled_at || null]
     );
-    const task = result.rows[0];
+    const [rows] = await pool.query('SELECT * FROM tasks WHERE id = ?', [result.insertId]);
+    const task = rows[0];
 
     await redis.rpush('task-queue', JSON.stringify({ id: task.id, title: task.title }));
     console.log(`Task ${task.id} created and queued`);

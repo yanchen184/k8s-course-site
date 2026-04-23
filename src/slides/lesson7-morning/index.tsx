@@ -814,7 +814,13 @@ subjects:
 roleRef:
   kind: Role
   name: pod-viewer
-  apiGroup: rbac.authorization.k8s.io`,
+  apiGroup: rbac.authorization.k8s.io
+
+# 部署
+kubectl apply -f rbac-viewer.yaml
+kubectl get serviceaccount viewer-sa
+kubectl get role pod-viewer
+kubectl get rolebinding viewer-binding`,
     notes: `好，來動手做。我們要建三個資源：一個 ServiceAccount、一個 Role、一個 RoleBinding。把它們組合起來，做出一個只能看不能改的使用者。
 
 先部署。rbac-viewer.yaml 這個檔案裡面包含了剛才講的三個 YAML，用三個橫線分隔開。

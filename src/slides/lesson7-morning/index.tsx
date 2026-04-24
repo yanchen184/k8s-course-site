@@ -1847,11 +1847,7 @@ EOF`}</pre>
           <div className="bg-slate-900 p-2 rounded font-mono">
             <p className="text-green-300">kubectl get endpoints nginx-liv-svc</p>
             <p className="text-slate-400">  <span className="text-red-400">→ 3 個 IP 都還在（沒拔壞 pod）</span></p>
-            <p className="text-green-300 mt-1">kubectl run curl-test --image=curlimages/curl \</p>
-            <p className="text-green-300">  --rm -it --restart=Never \</p>
-            <p className="text-green-300">  -- sh -c "for i in \\$(seq 1 9); do \</p>
-            <p className="text-green-300">    curl -s -o /dev/null -w '%{`{http_code}`}\\n' \</p>
-            <p className="text-green-300">    nginx-liv-svc; done"</p>
+            <p className="text-green-300 mt-1">kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -- sh -c "for i in \$(seq 1 9); do curl -s -o /dev/null -w '%{`{http_code}`}\n' nginx-liv-svc; done"</p>
             <p className="text-slate-400">  <span className="text-red-400">→ 200, 200, 403, 200, 403, 200, ...（1/3 機率）</span></p>
           </div>
         </div>
@@ -1944,11 +1940,7 @@ EOF`}</pre>
             <p className="text-slate-400">  <span className="text-green-400">→ 3 → 2（壞 pod 被拔了）</span></p>
             <p className="text-green-300 mt-1">kubectl get pods -l app=nginx-readiness</p>
             <p className="text-slate-400">  <span className="text-yellow-400">→ Running，READY 0/1，RESTARTS 0（沒被殺！）</span></p>
-            <p className="text-green-300 mt-1">kubectl run curl-test --image=curlimages/curl \</p>
-            <p className="text-green-300">  --rm -it --restart=Never \</p>
-            <p className="text-green-300">  -- sh -c "for i in \\$(seq 1 9); do \</p>
-            <p className="text-green-300">    curl -s -o /dev/null -w '%{`{http_code}`}\\n' \</p>
-            <p className="text-green-300">    nginx-rdy-svc; done"</p>
+            <p className="text-green-300 mt-1">kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -- sh -c "for i in \$(seq 1 9); do curl -s -o /dev/null -w '%{`{http_code}`}\n' nginx-rdy-svc; done"</p>
             <p className="text-slate-400">  <span className="text-green-400">→ 200, 200, 200, 200, 200, 200, 200, 200, 200（全綠！）</span></p>
           </div>
         </div>

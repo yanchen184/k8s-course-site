@@ -326,6 +326,8 @@ StatefulSet 的 Pod 命名規則固定是 `StatefulSet名稱-序號`：第一個
 指令：kubectl get pvc -n tasks
 ```
 
+`03-mysql.yaml` 裡面用 `---` 分隔，一個檔案同時定義了三個物件：StatefulSet、Headless Service、PVC。`kubectl apply -f` 一次全部建立，所以上面 PPT 15 看到的 Headless Service YAML 就是這個檔案的一部分，不需要單獨 apply。
+
 你會看到 `statefulset.apps/mysql created` 和 `service/mysql-service created` 兩行。
 
 等 READY 顯示 1/1，PVC STATUS 從 Pending 變成 Bound（local-path provisioner 在 Pod 實際排到某個 Node 後才 bind，要等一下）。

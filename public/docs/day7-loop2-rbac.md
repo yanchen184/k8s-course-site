@@ -202,6 +202,12 @@ EOF
 **要點**：
 - `--duration=8760h` = 1 年（看 API Server 上限，預設最長 8760h）
 - K8s 1.24+ 預設不自動產 Token Secret，要用 `kubectl create token` 即席產生
+
+> 不確定版本？用這個查：
+> ```
+> 指令：kubectl version
+> ```
+> 看 `Server Version`，例如 `v1.34.6+k3s1`，超過 1.24 就要用 create token。
 - 要永久用 → 手動建 `type: kubernetes.io/service-account-token` 的 Secret
 
 ---

@@ -1088,6 +1088,8 @@ EOF`}</pre>
 
 講一個 K8s 1.24 的變化。以前你建 SA，K8s 會自動產一個 Secret 存 Token，你去撈那個 Secret 就好。1.24 之後預設不自動產了，所以我們用 kubectl create token 這個新指令即席產生。要永久用，要自己手動建一個 type 是 kubernetes.io/service-account-token 的 Secret。
 
+不確定自己是哪個版本？跑 kubectl version，看 Server Version 那行，例如 v1.34.6+k3s1，超過 1.24 就是要用 create token。
+
 Token 是一串很長的 JWT。echo 前 40 個字元看一下，確認有東西。
 
 Part 6 組 kubeconfig。用 cat 加 heredoc 語法寫一個 YAML 檔。結構三個部分：clusters 裡放 server 跟 CA，users 裡放 user 名稱跟 token，contexts 把前兩者綁在一起，current-context 指定預設用哪個 context。

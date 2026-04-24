@@ -1974,11 +1974,11 @@ metrics-server 是 HPA 的資料來源，k3s 內建有。一般 k8s 要自己裝
               </tr>
             </thead>
             <tbody className="text-slate-300">
-              <tr><td className="border border-slate-700 p-2 font-mono">get pods</td><td className="border border-slate-700 p-2">frontend x2 Running；task-runner x3 Running</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get cronjob</td><td className="border border-slate-700 p-2">LAST SCHEDULE 有時間；SUSPEND False</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">get hpa</td><td className="border border-slate-700 p-2">TARGETS cpu: X%/70%（非 unknown）</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get ingress</td><td className="border border-slate-700 p-2">ADDRESS 出現 Node IP</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">logs -l app=task-runner --tail=20</td><td className="border border-slate-700 p-2">task-runner started, waiting for tasks...</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl get pods -n tasks</td><td className="border border-slate-700 p-2">frontend x2 Running；task-runner x3 Running</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get cronjob -n tasks</td><td className="border border-slate-700 p-2">LAST SCHEDULE 有時間；SUSPEND False</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl get hpa -n tasks</td><td className="border border-slate-700 p-2">TARGETS cpu: X%/70%（非 unknown）</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get ingress -n tasks</td><td className="border border-slate-700 p-2">ADDRESS 出現 Node IP</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl logs -l app=task-runner -n tasks --tail=20</td><td className="border border-slate-700 p-2">task-runner started, waiting for tasks...</td></tr>
             </tbody>
           </table>
         </div>

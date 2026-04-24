@@ -790,11 +790,11 @@ apply 一下跑起來，等 mysql-0 READY 1/1，記得 readinessProbe 通過才�
             </thead>
             <tbody className="text-slate-300">
               <tr><td className="border border-slate-700 p-2 font-mono">kubectl get namespace tasks</td><td className="border border-slate-700 p-2">STATUS</td><td className="border border-slate-700 p-2 text-green-300">Active</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get secret app-secrets</td><td className="border border-slate-700 p-2">DATA</td><td className="border border-slate-700 p-2 text-green-300">3</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">get configmap app-config</td><td className="border border-slate-700 p-2">DATA</td><td className="border border-slate-700 p-2 text-green-300">6</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get statefulset</td><td className="border border-slate-700 p-2">READY</td><td className="border border-slate-700 p-2 text-green-300">1/1</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">get pvc</td><td className="border border-slate-700 p-2">STATUS</td><td className="border border-slate-700 p-2 text-green-300">Bound</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get pods</td><td className="border border-slate-700 p-2">mysql-0</td><td className="border border-slate-700 p-2 text-green-300">Running 1/1</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get secret app-secrets -n tasks</td><td className="border border-slate-700 p-2">DATA</td><td className="border border-slate-700 p-2 text-green-300">3</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl get configmap app-config -n tasks</td><td className="border border-slate-700 p-2">DATA</td><td className="border border-slate-700 p-2 text-green-300">6</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get statefulset -n tasks</td><td className="border border-slate-700 p-2">READY</td><td className="border border-slate-700 p-2 text-green-300">1/1</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl get pvc -n tasks</td><td className="border border-slate-700 p-2">STATUS</td><td className="border border-slate-700 p-2 text-green-300">Bound</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get pods -n tasks</td><td className="border border-slate-700 p-2">mysql-0</td><td className="border border-slate-700 p-2 text-green-300">Running 1/1</td></tr>
             </tbody>
           </table>
         </div>

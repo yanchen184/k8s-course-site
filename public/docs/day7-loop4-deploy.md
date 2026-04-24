@@ -1035,6 +1035,8 @@ spec:
 
 Middleware 把 /api 前綴剝掉，Backend 收到的是 /tasks 而不是 /api/tasks，否則 404。Annotation 格式：`namespace-middleware名稱@kubernetescrd`。
 
+為什麼不直接讓 Backend 收 `/api/tasks`？因為 `/api` 前綴是 Ingress 路由層的決定，不應該滲透到 Backend 程式裡。Backend 只管自己的邏輯，不管外面怎麼路由，以後換路由規則不用改 Backend 程式碼。
+
 ```
 指令：kubectl apply -f 12-ingress.yaml
 指令：kubectl get ingress -n tasks

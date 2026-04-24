@@ -2299,10 +2299,11 @@ Q4，Task Runner 啟動但 Queue 任務沒被消費。看 task-runner 的 log，
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
             <p className="text-cyan-300 font-semibold">2. 匯入並檢查每台 node</p>
             <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \\
-K3S_NODES="user@cp user@worker" \\
+K3S_NODES="user@192.168.56.10 user@192.168.56.11" \\
   ./scripts/load-images-to-k3s-ssh.sh
-K3S_NODES="user@cp user@worker" \\
+K3S_NODES="user@192.168.56.10 user@192.168.56.11" \\
   ./scripts/check-k3s-images-ssh.sh`}</code></pre>
+            <p className="text-slate-400 mt-2">把 IP 換成自己的 control plane / worker IP。</p>
           </div>
         </div>
 
@@ -2320,6 +2321,8 @@ K3S_NODES="user@cp user@worker" \\
 以前上課可能遇過，全班同時從 Docker Hub 拉 image，結果被 rate limit，大家的 Pod 都卡在 ImagePullBackOff。這不是 YAML 寫錯，而是外部 registry 限流。
 
 所以短網址 Lab 預設改成講師提供完整 image tar。學生課堂現場不要 pull Docker Hub，也不要重新 build API / Frontend。學生只要從雲端空間下載 url-shortener-k3s-images.tar，檢查 sha256，再透過 SSH 把 tar 傳進 VMware 裡的 control plane 和 worker node，最後用 k3s ctr images import 把 image 放進每個 k3s node 的 containerd。最後才 kubectl apply 或 helm install。
+
+K3S_NODES 不是 Kubernetes 指令，它只是給腳本讀的 node 清單。像 K3S_NODES="user@192.168.56.10 user@192.168.56.11"，意思是用 user 這個帳號 SSH 到兩台 VM。192.168.56.10 通常是 control plane，192.168.56.11 通常是 worker。學生要換成自己的 VM IP 和自己的 Linux 帳號。
 
 這裡一定要講清楚：下載 tar 到學生操作環境還不夠；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd，所以還要 import 到 control plane 和 worker。
 

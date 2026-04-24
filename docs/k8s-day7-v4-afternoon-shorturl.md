@@ -53,6 +53,12 @@
 >
 > 以 Windows + VMware 的上課環境來說，你會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
 >
+> 等一下你會看到一個環境變數叫 `K3S_NODES`。它不是 Kubernetes 指令，而是我們提供給腳本看的清單，意思是「這些 node 都要匯入 image」。
+>
+> 例如 `K3S_NODES="user@192.168.56.10 user@192.168.56.11"`，代表腳本會用 `user` 這個帳號 SSH 到兩台 VM。`192.168.56.10` 通常是 control plane，`192.168.56.11` 通常是 worker。你們要把 IP 換成自己 VM 的 IP，帳號也要換成自己真的可以 SSH 進去的 Linux 帳號。
+>
+> 如果你的帳號是 `ubuntu`，就要寫 `ubuntu@192.168.56.10`，不是照抄 `user@...`。如果有兩台 worker，就要把兩台 worker 都放進 `K3S_NODES`。重點不是名字叫什麼，重點是每一台可能跑 Pod 的 node 都要出現在這份清單裡。
+>
 > 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到你的 Windows、你的 WSL，或你的操作機就好，而是要把 tar 匯入每台 node。
 >
 > 可以直接記這句話：Pod 被排到哪台 node，那台 node 就必須已經有 image。

@@ -91,6 +91,44 @@ K3S_NODES="user@192.168.56.10 user@192.168.56.11" \
 K3S_NODES="user@192.168.56.10 user@192.168.56.11" ./scripts/check-k3s-images-ssh.sh
 ```
 
+這段指令的意思是：
+
+| 片段 | 意思 |
+|---|---|
+| `IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar` | 告訴腳本 image tar 放在哪裡。 |
+| `K3S_NODES="..."` | 告訴腳本要處理哪些 k3s node。 |
+| `user@192.168.56.10` | 用 `user` 這個 Linux 帳號 SSH 進 `192.168.56.10` 這台 VM，通常是 control plane。 |
+| `user@192.168.56.11` | 用 `user` 這個 Linux 帳號 SSH 進 `192.168.56.11` 這台 VM，通常是 worker。 |
+| `./scripts/load-images-to-k3s-ssh.sh` | 把 tar 傳到每台 node，並在每台 node 執行 `sudo k3s ctr images import`。 |
+| `./scripts/check-k3s-images-ssh.sh` | 逐台檢查 containerd 裡是否已經有短網址會用到的四個 image。 |
+
+學生要把範例 IP 換成自己的 VM IP。如果你的 VM 是：
+
+| 角色 | IP | SSH 帳號 |
+|---|---|---|
+| control plane | `192.168.56.10` | `user` |
+| worker | `192.168.56.11` | `user` |
+
+那 `K3S_NODES` 就寫：
+
+```bash
+K3S_NODES="user@192.168.56.10 user@192.168.56.11"
+```
+
+如果你的帳號叫 `ubuntu`，就要改成：
+
+```bash
+K3S_NODES="ubuntu@192.168.56.10 ubuntu@192.168.56.11"
+```
+
+如果目前只有一台 control plane，可以先只填一台：
+
+```bash
+K3S_NODES="user@192.168.56.10"
+```
+
+但只要有 worker node，就一定要把 worker 也放進 `K3S_NODES`。因為 Pod 可能被排到 worker 上，worker 沒有 image 的話，Pod 還是會啟動失敗。
+
 SHA256 應該是：
 
 ```text

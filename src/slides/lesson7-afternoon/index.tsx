@@ -2387,8 +2387,10 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
           </div>
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
             <p className="text-cyan-300 font-semibold">匯入 k3s node</p>
-            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`./scripts/load-images-to-k3s-multipass.sh
-./scripts/check-k3s-images.sh`}</code></pre>
+            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`K3S_NODES="student@cp student@worker" \\
+  ./scripts/load-images-to-k3s-ssh.sh
+K3S_NODES="student@cp student@worker" \\
+  ./scripts/check-k3s-images-ssh.sh`}</code></pre>
           </div>
         </div>
 
@@ -2401,9 +2403,11 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
 
 以前上課可能遇過，全班同時從 Docker Hub 拉 image，結果被 rate limit，大家的 Pod 都卡在 ImagePullBackOff。這不是 YAML 寫錯，而是外部 registry 限流。
 
-所以短網址 Lab 預設改成本地 image workflow：學生先從 source code docker build，產生 url-shortener-api:lab 和 url-shortener-frontend:lab。接著 docker save 匯出 tar，再用 k3s ctr images import 把 image 放進每個 k3s node 的 containerd。最後才 kubectl apply 或 helm install。
+所以短網址 Lab 預設改成本地 image workflow：學生先從 source code docker build，產生 url-shortener-api:lab 和 url-shortener-frontend:lab。接著 docker save 匯出 tar，再透過 SSH 把 tar 傳進 VMware 裡的 control plane 和 worker node，最後用 k3s ctr images import 把 image 放進每個 k3s node 的 containerd。最後才 kubectl apply 或 helm install。
 
-這裡一定要講清楚：docker build 是把 image 放在學生電腦的 Docker 裡；k3s 跑 Pod 用的是 VM 裡的 containerd。兩邊不是同一個地方，所以不能只 build，還要 import。
+這裡一定要講清楚：docker build 是把 image 放在學生操作環境的 Docker 裡；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。兩邊不是同一個地方，所以不能只 build，還要 import 到 control plane 和 worker。
+
+課前要確認 SSH 和 sudo 權限。學生要能 ssh 到 control plane 和 worker，而且該帳號要能免互動執行 sudo -n k3s ctr images list -q，否則腳本會卡在 sudo 密碼提示。
 
 另外 PostgreSQL 和 busybox 也要考慮。只 build API 和 Frontend 還不夠，postgres:15 和 busybox:1.36 如果沒有匯入 k3s node，Pod 還是可能對外拉 image。
 

@@ -126,16 +126,20 @@ source code
   -> kubectl apply / helm install
 ```
 
-重點是：`docker build` 只會把 image 放在學生電腦的 Docker image store；k3s 使用的是 VM 裡的 containerd。兩邊不是同一個地方，所以還要把 image 匯入每個 k3s node。
+重點是：`docker build` 只會把 image 放在學生操作環境的 Docker image store；k3s 使用的是 control plane / worker node 裡的 containerd。兩邊不是同一個地方，所以還要把 image 匯入每個 k3s node。
 
 在 `k8s-course-labs/lesson7/url-shortener/` 執行：
 
 ```bash
 ./scripts/build-local-images.sh
 ./scripts/save-k3s-images.sh
-./scripts/load-images-to-k3s-multipass.sh
-./scripts/check-k3s-images.sh
+K3S_NODES="student@192.168.56.10 student@192.168.56.11" ./scripts/load-images-to-k3s-ssh.sh
+K3S_NODES="student@192.168.56.10 student@192.168.56.11" ./scripts/check-k3s-images-ssh.sh
 ```
+
+`K3S_NODES` 要填每台 Linux VM 的 SSH 目標，通常會包含 control plane 和 worker node。Windows + VMware 環境下，只要學生可以從執行腳本的地方 `ssh student@<node-ip>` 進 VM，且該使用者可以免互動執行 `sudo -n k3s ctr images list -q`，就可以用這條路徑。
+
+如果講師或助教使用的是 Multipass 環境，才改用 `load-images-to-k3s-multipass.sh` 和 `check-k3s-images.sh`。
 
 這會準備四個 image：
 

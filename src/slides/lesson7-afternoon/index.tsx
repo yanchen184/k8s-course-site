@@ -1792,10 +1792,23 @@ spec:
           service: { name: frontend-service, port: { number: 80 } }`}</code></pre>
 
         <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded text-xs">
-          <p className="text-amber-300 font-semibold">annotation 格式</p>
-          <p className="text-slate-300 mt-1">
-            <span className="font-mono">namespace-middleware名稱@kubernetescrd</span>——少一個字都不認
-          </p>
+          <p className="text-amber-300 font-semibold">annotation 格式拆解</p>
+          <p className="text-slate-300 mt-2 font-mono">tasks - strip-api-prefix @ kubernetescrd</p>
+          <div className="grid grid-cols-3 gap-2 mt-2 text-center text-xs">
+            <div className="bg-slate-800 p-2 rounded">
+              <p className="text-cyan-300 font-mono">tasks</p>
+              <p className="text-slate-400 mt-1">Middleware 所在的 namespace</p>
+            </div>
+            <div className="bg-slate-800 p-2 rounded">
+              <p className="text-cyan-300 font-mono">strip-api-prefix</p>
+              <p className="text-slate-400 mt-1">Middleware 的 metadata.name</p>
+            </div>
+            <div className="bg-slate-800 p-2 rounded">
+              <p className="text-cyan-300 font-mono">@kubernetescrd</p>
+              <p className="text-slate-400 mt-1">固定後綴，告訴 Traefik 去 CRD 找這個資源</p>
+            </div>
+          </div>
+          <p className="text-red-300 mt-2 text-xs">少一個字、拼錯都不認</p>
         </div>
 
         <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl apply -f 12-ingress.yaml

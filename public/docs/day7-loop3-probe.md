@@ -1,106 +1,127 @@
-# Day 7 Loop 1 — Probe 健康檢查
+# Loop 3 — Probe 健康檢查
 
 ---
 
-## 7-2 Probe 概念（~5 min）
+## 7-2 Probe 概念（5 分鐘純概念）
 
-### ① 課程內容
+### Running ≠ 可用
 
-📄 7-2 第 1 張
+你打 `kubectl get pods`，看到 STATUS 是 `Running`。你以為沒事了——**Running 這個狀態在騙你**。
 
-上一堂課做了 Ingress、ConfigMap、Secret、PV、StatefulSet、Helm，服務看起來很體面。但我今天要跟大家說一件殘酷的事情：**穿得漂亮不代表扛得住**。
+Running 只代表一件事：容器裡的主行程還活著。process 還在，K8s 就說你 Running。但「活著」不等於「能服務」。
 
-從第四堂到現在，你怎麼確認服務正常？打 `kubectl get pods`，看到 STATUS 是 `Running`，覺得沒事了。但 **Running 這個狀態在騙你**。Running 只代表一件事：容器裡面的主行程還在跑。process 活著，K8s 就認為你是 Running。
+**真實場景**：
+- **Java GC 死迴圈**：process 沒 crash，但 CPU 100%，request 打進去永遠不回應
+- **連線池滿了**：process 還活著，回 500 錯誤
+- **Spring Boot 啟動要 30 秒**：Pod Running 了，但 app 還在 load config，打進去全 503
 
-場景一：**API 死鎖**，process 還活著，但不處理任何請求。場景二：**連線池滿了**，回 500 錯誤但 K8s 照樣顯示 Running。場景三：**Java 啟動要 60 秒**，這 60 秒的請求全部失敗。K8s 不知道你的服務到底正不正常。
+這三種狀況，K8s **永遠不會發現**，除非你有 Probe。
+
+### 三種 Probe 一張表看懂
+
+| | **Liveness** | **Readiness** | **Startup** |
+|---|---|---|---|
+| **問題** | 你還活著嗎？ | 能接流量嗎？ | 啟動完了嗎？ |
+| **失敗後果** | Kill + Restart | 從 Service endpoints 拔掉 | 暫停 Liveness/Readiness |
+| **用途** | 救活死掉的 app | 避免流量打到壞 pod | 保護慢啟動 app |
+
+**白話版**：
+- **Liveness**：「你再不回我我就殺了你。」→ 暴力，換一個
+- **Readiness**：「你還沒好？那我暫時不給你工作。」→ 溫柔，等它好
+- **Startup**：「啟動中請勿打擾。」→ 保護傘，啟動完就關閉
+
+### 三種檢查方式
+
+| 方式 | 適合 |
+|------|------|
+| `httpGet`：打 URL，2xx/3xx 算過 | Web API（最常用） |
+| `tcpSocket`：連 port，連上算過 | DB、Redis |
+| `exec`：執行指令，exit 0 算過 | 自訂檢查邏輯 |
+
+### Docker vs K8s 對照
+
+Docker 的 `HEALTHCHECK` 只有一種，只標記 unhealthy，不會重啟也不會切流量。K8s 三種 Probe 各司其職。
 
 ---
 
-📄 7-2 第 2 張
+## 7-3 Probe 實戰（15 分鐘）
 
-K8s 用**三種 Probe**（探針）來解這個問題：
-
-| Probe | 問的問題 | 失敗怎麼辦 |
-|:------|:---------|:-----------|
-| livenessProbe | 你還活著嗎？ | 重啟容器 |
-| readinessProbe | 準備好接流量了嗎？ | 從 Service 移除 |
-| startupProbe | 啟動完了嗎？ | 重啟容器（慢啟動用） |
-
-Docker 的 HEALTHCHECK 只有一種，只會標記 unhealthy，不會幫你重啟也不會切流量。K8s 三種 Probe 各司其職，詳細用法我們進實作再說。
+五個 demo，兩兩對照。**同一個破壞動作（rm index.html），看不同設定的差異**。
 
 ---
 
-## 7-3 Probe 實作（~12 min）
+### Demo 1a：沒 Probe 的慘狀
 
-### ② 所有指令＋講解
+**目的**：證明 K8s 在沒 Probe 時，**完全不知道服務壞了**。
 
-**三種 Probe 說明**
-
-**livenessProbe（存活探測）**：K8s 定期去戳你的 Pod，連續失敗超過 `failureThreshold` 次就重啟容器。容器重啟後程式重新初始化，死鎖就解開了。注意是重啟容器，不是刪 Pod。
-
-**readinessProbe（就緒探測）**：失敗時 K8s 不重啟容器，而是把這個 Pod 從 Service 的 Endpoints 移除，不再導流量給它。等它自己恢復了再加回來。適合「暫時不能服務但會自己恢復」的情況。
-
-**startupProbe（啟動探測）**：專門給啟動特別慢的應用。K8s 先等 startupProbe 通過，才開始跑 liveness 和 readiness。啟動完成後 startupProbe 就不再執行，交棒給另外兩個。
-
-**三種檢查方式**
-
-| 檢查方式 | 適合 |
-|:---------|:-----|
-| `httpGet`：打 URL，200~399 成功 | Web API（最常用） |
-| `tcpSocket`：連 port，連上成功 | 資料庫、Redis |
-| `exec`：執行指令，exit 0 成功 | 自訂檢查邏輯 |
-
-**YAML 四個關鍵參數**
+`nginx-no-probe.yaml`：
 
 ```yaml
-livenessProbe:
-  httpGet:
-    path: /
-    port: 80
-  initialDelaySeconds: 5    # 容器啟動後先等幾秒再開始檢查
-  periodSeconds: 10          # 每幾秒檢查一次
-  failureThreshold: 3        # 連續失敗幾次才判定不健康
-  timeoutSeconds: 1          # 每次檢查等幾秒沒回應算超時
-readinessProbe:
-  httpGet:
-    path: /
-    port: 80
-  initialDelaySeconds: 3
-  periodSeconds: 5
-  failureThreshold: 2
-```
-
-`readinessProbe` 的 `periodSeconds` 通常比 liveness 短，Pod 準備好了就趕快接流量。
-
-**Docker vs K8s 對照**
-
-| Docker HEALTHCHECK | K8s Probe |
-|:-------------------|:----------|
-| `--interval=30s` | `periodSeconds: 30` |
-| `--timeout=3s` | `timeoutSeconds: 3` |
-| `--retries=3` | `failureThreshold: 3` |
-| `--start-period=5s` | `initialDelaySeconds: 5` |
-| 只有一種，只標記 unhealthy | 三種，各自負責重啟或切流量 |
-
----
-
-**Step 1：建立 deployment-probe.yaml**
-
-```yaml
-# deployment-probe.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-probe-demo
+  name: nginx-no-probe
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: nginx-probe
+      app: nginx-no-probe
   template:
     metadata:
       labels:
-        app: nginx-probe
+        app: nginx-no-probe
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+```
+
+部署 + 破壞：
+
+```
+指令：kubectl apply -f nginx-no-probe.yaml
+指令：kubectl get pods -l app=nginx-no-probe
+指令：POD1=$(kubectl get pods -l app=nginx-no-probe -o jsonpath='{.items[0].metadata.name}')
+指令：kubectl exec $POD1 -- rm /usr/share/nginx/html/index.html
+```
+
+觀察結果：
+
+```
+指令：kubectl get pods -l app=nginx-no-probe
+指令：kubectl exec $POD1 -- curl -s -o /dev/null -w "%{http_code}\n" localhost
+```
+
+- `kubectl get pods` → STATUS 永遠是 `Running`，RESTARTS 永遠是 0
+- 但 `curl` 回 **403** — 實際上壞掉了
+- **K8s 以為一切正常，但使用者看到錯誤**
+
+這就是「Running 在騙你」的證據。
+
+---
+
+### Demo 1b：加 Liveness → 自動救援
+
+**目的**：同樣的破壞，有了 Liveness 會發生什麼。
+
+`nginx-liveness.yaml`：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-liveness
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-liveness
+  template:
+    metadata:
+      labels:
+        app: nginx-liveness
     spec:
       containers:
         - name: nginx
@@ -115,6 +136,157 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
             timeoutSeconds: 1
+```
+
+**參數說明**：
+- `initialDelaySeconds: 5`：容器啟動後等 5 秒再開始檢查
+- `periodSeconds: 10`：每 10 秒檢查一次
+- `failureThreshold: 3`：連續失敗 3 次才判定不健康（不要一次就炸）
+- `timeoutSeconds: 1`：1 秒沒回應算超時
+
+部署 + 破壞：
+
+```
+指令：kubectl apply -f nginx-liveness.yaml
+指令：POD2=$(kubectl get pods -l app=nginx-liveness -o jsonpath='{.items[0].metadata.name}')
+指令：kubectl exec $POD2 -- rm /usr/share/nginx/html/index.html
+```
+
+觀察重啟：
+
+```
+指令：kubectl get pods -l app=nginx-liveness -w
+```
+
+約 30 秒內（10 秒 × 3 次）會看到：
+
+```
+NAME                             READY   STATUS    RESTARTS   AGE
+nginx-liveness-xxx               1/1     Running   0          2m
+nginx-liveness-xxx               0/1     Running   0          2m30s
+nginx-liveness-xxx               1/1     Running   1          2m35s
+```
+
+**RESTARTS 從 0 變 1** — K8s 自動殺掉容器重啟。重啟後 nginx 重新 init，index.html 回來了。
+
+按 `Ctrl+C` 停 watch。看事件：
+
+```
+指令：kubectl describe pod $POD2
+```
+
+Events 會看到：
+- `Liveness probe failed: HTTP probe failed with statuscode: 403`
+- `Container nginx failed liveness probe, will be restarted`
+
+**結論**：**同樣的破壞**，沒 probe → 壞到底；有 Liveness → 30 秒自動救活。
+
+---
+
+### Demo 2a：沒 Readiness → 流量打到壞 pod
+
+**目的**：證明只有 Liveness 不夠，使用者在「失敗→被殺」那段時間還是會看到錯誤。
+
+這次用 **3 replicas + Service**，只設 Liveness，沒 Readiness。
+
+`nginx-liveness-only.yaml`：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-liv-only
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-liv-only
+  template:
+    metadata:
+      labels:
+        app: nginx-liv-only
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-liv-svc
+spec:
+  selector:
+    app: nginx-liv-only
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+部署 + 破壞其中一個 pod：
+
+```
+指令：kubectl apply -f nginx-liveness-only.yaml
+指令：kubectl get pods -l app=nginx-liv-only
+指令：POD3=$(kubectl get pods -l app=nginx-liv-only -o jsonpath='{.items[0].metadata.name}')
+指令：kubectl exec $POD3 -- rm /usr/share/nginx/html/index.html
+```
+
+觀察 endpoints 和流量：
+
+```
+指令：kubectl get endpoints nginx-liv-svc
+指令：kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -- sh -c "for i in \$(seq 1 9); do curl -s -o /dev/null -w '%{http_code}\n' nginx-liv-svc; done"
+```
+
+- `endpoints` → 3 個 IP 都還在（K8s 沒把壞 pod 拔掉）
+- 9 次 curl → 會看到 `200, 200, 403, 200, 403, ...` 交錯（1/3 機率打到壞 pod）
+
+**結論**：只有 Liveness，從「破壞」到「被殺」中間約 30 秒，**使用者有 1/3 流量看到 403**。
+
+---
+
+### Demo 2b：加 Readiness → 拔流量無感
+
+**目的**：同樣的破壞，加上 Readiness 會自動避開壞 pod。
+
+`nginx-readiness.yaml`（Liveness + Readiness 都設）：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-readiness
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-readiness
+  template:
+    metadata:
+      labels:
+        app: nginx-readiness
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /
@@ -122,236 +294,151 @@ spec:
             initialDelaySeconds: 3
             periodSeconds: 5
             failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-rdy-svc
+spec:
+  selector:
+    app: nginx-readiness
+  ports:
+    - port: 80
+      targetPort: 80
 ```
 
-重點說明：
+**為什麼 Readiness 的 periodSeconds 比 Liveness 短**：Readiness 要快速反應（5 秒 × 2 次 = 10 秒拔流量），Liveness 慢慢來沒關係（10 秒 × 3 次 = 30 秒才殺）。這樣 Readiness 先拔流量，流量已經被導開了再 Liveness 殺。
 
-- `livenessProbe.httpGet.path: /`：打 nginx 的根路徑。nginx 預設回 200，Probe 通過。
-- `initialDelaySeconds: 5`：容器啟動後先等 5 秒再開始。nginx 啟動很快，但留點緩衝。
-- `periodSeconds: 10`：每 10 秒戳一次，不要太頻繁浪費資源。
-- `failureThreshold: 3`：連續失敗 3 次才重啟。不是失敗一次就重啟，可能只是網路抖了一下。
-- `timeoutSeconds: 1`：等 1 秒沒回應就算超時。
-- `readinessProbe`：打相同路徑，但 periodSeconds 設 5 秒，比 liveness 頻繁，Pod 好了就快點接流量。
+部署 + 破壞：
+
+```
+指令：kubectl apply -f nginx-readiness.yaml
+指令：POD4=$(kubectl get pods -l app=nginx-readiness -o jsonpath='{.items[0].metadata.name}')
+指令：kubectl exec $POD4 -- rm /usr/share/nginx/html/index.html
+```
+
+等 15 秒（Readiness 先反應）：
+
+```
+指令：kubectl get endpoints nginx-rdy-svc
+指令：kubectl get pods -l app=nginx-readiness
+```
+
+- `endpoints` → **從 3 個 IP 變 2 個**（壞 pod 被拔）
+- `get pods` → 壞 pod 還是 `Running`，READY 欄位變 `0/1`（還沒被殺）
+- **Pod 沒被殺，但流量已經避開**
+
+打 service 驗證使用者無感：
+
+```
+指令：kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -- sh -c "for i in \$(seq 1 9); do curl -s -o /dev/null -w '%{http_code}\n' nginx-rdy-svc; done"
+```
+
+9 次 curl → **全部 200**。使用者完全不知道有 pod 壞掉。
+
+再等一下，Liveness 也會觸發重啟（30 秒）。重啟完 Readiness 通過，pod 重新加回 endpoints。整個過程使用者**無感**。
+
+**結論**：同一個破壞，沒 Readiness → 1/3 流量看 403；有 Readiness → 使用者完全無感。
 
 ---
 
-**Step 2：部署**
+### Liveness vs Readiness 關鍵對比
 
-```bash
-kubectl apply -f deployment-probe.yaml
-```
+| | Liveness | Readiness |
+|---|---|---|
+| 失敗做什麼 | **Kill pod + Restart** | **從 endpoints 拔掉** |
+| Pod 會被殺嗎 | ✅ 會 | ❌ 不會 |
+| RESTARTS 欄位 | +1 | 不變 |
+| 適合 | 死鎖、卡住的 app | 暫時過載、暖機中 |
 
-預期輸出：
-```
-deployment.apps/nginx-probe-demo created
-```
-
----
-
-**Step 3：確認 Pod 狀態和 Probe 設定**
-
-```bash
-kubectl get pods -l app=nginx-probe
-```
-
-預期輸出：
-```
-NAME                              READY   STATUS    RESTARTS   AGE
-nginx-probe-demo-6d8f7b9c4-abc   1/1     Running   0          30s
-nginx-probe-demo-6d8f7b9c4-xyz   1/1     Running   0          30s
-```
-
-兩個 Pod 都 Running，READY 1/1，RESTARTS 0。
-
-```bash
-kubectl describe pods -l app=nginx-probe | grep -A10 "Liveness\|Readiness"
-```
-
-你會看到：
-```
-Liveness:   http-get http://:80/ delay=5s timeout=1s period=10s success=1 failure=3
-Readiness:  http-get http://:80/ delay=3s timeout=1s period=5s success=1 failure=2
-```
-
-這就是我們設的參數，確認 Probe 有正確吃進去。
+**同一招 rm html**：
+- Liveness 設定 → RESTARTS +1
+- Readiness 設定 → RESTARTS 0，但 endpoints 少一個 IP
 
 ---
 
-**Step 4：故意搞壞 — 刪掉 index.html**
+### Startup 延伸講解（不做 demo）
 
-原理：nginx 的 livenessProbe 打根路徑 `/`，nginx 會回傳 `/usr/share/nginx/html/index.html`，狀態碼 200，Probe 通過。如果把 index.html 刪掉，nginx 找不到這個檔案，回 **403 Forbidden**。403 不在 200～399 的範圍，Probe 失敗。
+**場景**：Legacy Java app 啟動要 2 分鐘。你 Liveness 設 `initialDelaySeconds: 30` 想說夠了吧？**錯了**。
 
-先抓第一個 Pod 的名字：
+30 秒後 Liveness 打進去失敗 → kill → restart → 又要 2 分鐘 → 又 kill → **無限循環，pod 永遠起不來**。
 
-```bash
-POD_NAME=$(kubectl get pods -l app=nginx-probe -o jsonpath='{.items[0].metadata.name}')
-echo $POD_NAME
-```
+**爛解法**：`initialDelaySeconds: 180`。問題是穩定運行後如果卡住，要等 3 分鐘才會被救——為了啟動犧牲了運行期敏感度。
 
-- `-o jsonpath`：從 JSON 輸出裡取出特定欄位，`items[0]` 是第一個 Pod。
-
-進去刪掉 index.html：
-
-```bash
-kubectl exec $POD_NAME -- rm /usr/share/nginx/html/index.html
-```
-
-- `kubectl exec`：在容器裡執行指令。
-- `--`：分隔 kubectl 的參數和容器內的指令。
-- `rm /usr/share/nginx/html/index.html`：刪掉 nginx 的首頁檔案。
-
----
-
-**Step 5：觀察重啟**
-
-```bash
-kubectl get pods -l app=nginx-probe -w
-```
-
-- `-w`：watch 模式，即時顯示狀態變化。
-
-算一下時間：periodSeconds 10 秒 × failureThreshold 3 次 = 最多等 30 秒。你會看到：
-
-```
-NAME                              READY   STATUS    RESTARTS   AGE
-nginx-probe-demo-6d8f7b9c4-abc   1/1     Running   0          2m
-nginx-probe-demo-6d8f7b9c4-abc   0/1     Running   0          2m30s
-nginx-probe-demo-6d8f7b9c4-abc   1/1     Running   1          2m35s
-```
-
-RESTARTS 從 0 變成 1。K8s 重啟了這個容器。重啟後 nginx 重新載入，index.html 恢復，livenessProbe 又通過了。
-
-按 `Ctrl+C` 停止 watch。
-
----
-
-**Step 6：看 Events 確認原因**
-
-```bash
-kubectl describe pod $POD_NAME
-```
-
-找到 Events 區塊，你會看到：
-
-```
-Warning  Unhealthy  ...  Liveness probe failed: HTTP probe failed with statuscode: 403
-Warning  Killing    ...  Container nginx failed liveness probe, will be restarted
-Normal   Pulled     ...  Container image "nginx:1.27" already present
-Normal   Started    ...  Started container nginx
-```
-
-這就是完整的記錄：K8s 偵測到 403，判定失敗，重啟容器，重新啟動。
-
----
-
-**排錯指令**
-
-```bash
-# Probe 狀態詳細
-kubectl describe pod <pod-name>
-
-# 如果想看 readinessProbe 對 endpoints 的影響，先建 Service
-kubectl get endpoints
-
-# 看容器 logs
-kubectl logs <pod-name>
-```
-
-**三個常見坑**
-
-| 坑 | 症狀 | 解法 |
-|----|------|------|
-| `initialDelaySeconds` 設 0 | Pod 啟動就一直重啟 | 至少設 3 到 5 秒給程式初始化 |
-| `path` 寫錯（比如 `/health` 但沒有這個路徑） | Pod 一直被重啟但看不出原因 | 確認 path 是你的應用確實會回 200 的路徑 |
-| `port` 跟容器實際監聽的不一樣 | 每次 Probe 都 connection refused | port 要跟 containerPort 一致 |
-
----
-
-### ③ QA
-
-**Q：livenessProbe 和 readinessProbe 可以同時設嗎？同時失敗會怎樣？**
-
-A：可以同時設，這也是最常見的做法。如果 liveness 和 readiness 打同一個路徑，當路徑不通時，readiness 先失敗（它的 periodSeconds 比較短），Pod 從 Service 移除，不再收流量。再過幾秒 liveness 也失敗，達到 failureThreshold 之後容器被重啟。重啟完成後 readiness 先通過，Pod 重新加回 Service 開始接流量，liveness 也跟著通過。這兩個同時設是互補的，不是衝突的。
-
-**Q：startupProbe 通過之後就不跑了嗎？那誰來保護啟動慢的服務？**
-
-A：對，startupProbe 通過之後就不再執行了，交棒給 liveness 和 readiness。startupProbe 只負責「等待啟動完成」這件事。啟動完成後，liveness 負責偵測死鎖等問題，readiness 負責控制流量。三個 Probe 分工，不是同一件事。
-
-**Q：readinessProbe 失敗了但容器沒被重啟，那這個 Pod 還在浪費資源嗎？**
-
-A：從資源的角度來說，Pod 還在跑，requests 還是佔著。但它不會收到任何流量。這個設計是故意的，因為 readinessProbe 失敗的場景（比如暫時過載、連線池滿了）通常是可以自己恢復的。如果你重啟容器，反而可能讓問題更嚴重。等它恢復了，readinessProbe 通過，自然重新加入 Service。
-
-**Q：為什麼 Probe 的 path 設 `/` 而不是設 `/health`？**
-
-A：看你的應用有沒有 `/health` 這個端點。nginx 沒有，所以用根路徑 `/`。正式的後端 API 通常會專門建一個 `/health` 或 `/healthz` 端點，只做最輕量的健康確認（比如 return 200），不查資料庫、不做複雜邏輯，讓 Probe 打這個。用根路徑的問題是，根路徑可能需要存取資料庫或做其他事情，萬一根路徑邏輯有問題，Probe 就會一直失敗。
-
----
-
-## 7-4 回頭操作 Loop 1（~5 min）
-
-### ④ 學員實作
-
-> 📢 **講師說話口吻**
->
-> 好，現在是你們的實作時間。我示範完了，換你們自己做一遍。記住目標：讓 RESTARTS 從 0 變成 1。
-
-**🎯 必做題：nginx + livenessProbe**
-
-自己從零寫一個 nginx Deployment，加上 livenessProbe，部署之後 exec 進去刪 index.html，觀察 K8s 自動重啟容器，RESTARTS 欄位從 0 變成 1。
-
-要求：
-- Deployment 名稱：`my-nginx-probe`，replicas: 1
-- image: nginx:1.27
-- livenessProbe 用 httpGet 打根路徑，port 80
-- `initialDelaySeconds: 5`，`periodSeconds: 10`，`failureThreshold: 3`
-
-部署後的驗證步驟：
-1. `kubectl get pods` 確認 Running
-2. `kubectl exec <pod-name> -- rm /usr/share/nginx/html/index.html`
-3. `kubectl get pods -w` 等 30 秒內看到 RESTARTS 加 1
-4. `kubectl describe pod <pod-name>` 在 Events 找到 `Liveness probe failed`
-
----
-
-**🏆 挑戰題：readinessProbe + startupProbe + Service**
-
-同時設 readinessProbe 和 startupProbe，並建一個對應的 Service。
-
-要求：
-- 在同一個 Deployment 加上 readinessProbe（httpGet `/`，port 80）
-- 加上 startupProbe（httpGet `/`，port 80，failureThreshold: 30，periodSeconds: 5）
-- 建一個 ClusterIP Service 指向這個 Deployment
-
-觀察：
-- 刪 index.html 後用 `kubectl get endpoints <service-name>` 觀察 Pod IP 從 endpoints 消失（readinessProbe 失敗）
-- 等容器重啟後觀察 Pod IP 重新出現在 endpoints（readinessProbe 通過）
-
-```bash
-# 使用的 lab 檔案
-~/workspace/k8s-course-labs/lesson7/deployment-probe.yaml
-```
-
----
-
-### ⑤ 學員實作解答
-
-**必做解答**
+**正解**：用 Startup Probe。
 
 ```yaml
-# my-nginx-probe.yaml
+startupProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8080
+  failureThreshold: 30
+  periodSeconds: 5
+# → 最多等 30 × 5 = 150 秒
+```
+
+- 啟動期只跑 Startup（容忍 150 秒）
+- Startup 成功**一次**後 → **永久關閉**，Liveness / Readiness 接手用正常短間隔
+- 啟動慢 + 運行期敏感，兩個都要
+
+**為什麼不 demo**：nginx 啟動 < 1 秒，很難做出慢啟動場景。知道這個工具存在、遇到慢啟動 app 時知道要用就好。挑戰題會讓你自己實作。
+
+---
+
+### 清理這段的所有資源
+
+```
+指令：kubectl delete -f nginx-no-probe.yaml
+指令：kubectl delete -f nginx-liveness.yaml
+指令：kubectl delete -f nginx-liveness-only.yaml
+指令：kubectl delete -f nginx-readiness.yaml
+```
+
+---
+
+## 7-4 學員實作（10 分鐘）
+
+### 題目場景
+
+你剛學會三種 Probe，現在自己部署一個 nginx，同時加上 Liveness + Readiness + Service，照著指令卡跑一次完整流程驗證三件事：
+1. Liveness 真的會重啟壞 pod
+2. Readiness 真的會把壞 pod 從 endpoints 拔掉
+3. 整體使用者無感
+
+### 必做題要求
+
+- Deployment：`my-probe`，replicas 3
+- image：`nginx:1.27`
+- Liveness + Readiness 都設，打 `/`，port 80
+- Liveness：`initialDelaySeconds: 5, periodSeconds: 10, failureThreshold: 3`
+- Readiness：`initialDelaySeconds: 3, periodSeconds: 5, failureThreshold: 2`
+- ClusterIP Service：`my-probe-svc`
+
+### 驗收條件
+
+- ✅ 部署後三個 pod 都 Running + READY 1/1
+- ✅ `rm index.html` 後 15 秒內 endpoints 從 3 變 2
+- ✅ 30 秒內 RESTARTS +1
+- ✅ 重啟後 endpoints 自動加回 3
+
+### 完整指令清單（照著打）
+
+```bash
+# ─── Part 1：寫 YAML ───
+cat > my-probe.yaml <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-nginx-probe
+  name: my-probe
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
-      app: my-nginx-probe
+      app: my-probe
   template:
     metadata:
       labels:
-        app: my-nginx-probe
+        app: my-probe
     spec:
       containers:
         - name: nginx
@@ -365,54 +452,74 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
-            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-probe-svc
+spec:
+  selector:
+    app: my-probe
+  ports:
+    - port: 80
+      targetPort: 80
+EOF
+
+# ─── Part 2：部署 + 確認 ───
+kubectl apply -f my-probe.yaml
+kubectl get pods -l app=my-probe
+kubectl get endpoints my-probe-svc                  # 3 個 IP
+
+# ─── Part 3：破壞一個 pod ───
+POD=$(kubectl get pods -l app=my-probe -o jsonpath='{.items[0].metadata.name}')
+kubectl exec $POD -- rm /usr/share/nginx/html/index.html
+
+# ─── Part 4：觀察 Readiness 拔流量（約 15 秒內）───
+kubectl get endpoints my-probe-svc                  # 3 → 2
+kubectl get pods -l app=my-probe                    # pod 還 Running，READY 變 0/1
+
+# ─── Part 5：觀察 Liveness 重啟（30 秒內）───
+kubectl get pods -l app=my-probe -w
+# 看到 RESTARTS +1，Ctrl+C 離開 watch
+
+# ─── Part 6：查看失敗事件 ───
+kubectl describe pod $POD | grep -A5 Events
+
+# ─── Part 7：清理 ───
+kubectl delete -f my-probe.yaml
 ```
 
-部署：
+### 挑戰題：Startup Probe
 
-```bash
-kubectl apply -f my-nginx-probe.yaml
-kubectl get pods -l app=my-nginx-probe
-```
+情境：假設 nginx 啟動要 2 分鐘（模擬慢啟動）。加一個 Startup Probe，確保啟動期間 Liveness 不會誤殺，Startup 通過後才由 Liveness 接手。
 
-觸發重啟：
+要求：
+- 加 `startupProbe` 打 `/`，`failureThreshold: 30`，`periodSeconds: 5`（容忍 150 秒）
+- 部署後觀察 Startup 先通過，才輪到 Liveness 開始檢查
+- 用 `kubectl describe pod` 看 Events，找 Startup probe 的記錄
 
-```bash
-# 取得 Pod 名稱
-POD_NAME=$(kubectl get pods -l app=my-nginx-probe -o jsonpath='{.items[0].metadata.name}')
+### Loop 3 因果鏈
 
-# 刪掉 index.html
-kubectl exec $POD_NAME -- rm /usr/share/nginx/html/index.html
-
-# 觀察（等 30 秒內看到 RESTARTS 加 1）
-kubectl get pods -l app=my-nginx-probe -w
-```
-
-確認 Events：
-
-```bash
-kubectl describe pod $POD_NAME
-# 找 Events 裡的 "Liveness probe failed" 和 "will be restarted"
-```
+Running 在騙你（沒 probe K8s 不知道死活）→ Liveness 自動救援（殺掉重建）→ Readiness 避免流量打到壞 pod（拔流量不殺）→ 同一招 rm html，兩種 probe 兩種後果 → 生產級 K8s 部署必備組合。
 
 ---
 
-**三個常見坑**
+## 清理（Loop 3 結束）
 
-1. **`initialDelaySeconds` 太短**：設 0 的話容器一啟動就開始檢查，nginx 雖然快，但 Pod 網路初始化可能還沒完成，造成不必要的失敗記錄。建議至少 3～5 秒。
-
-2. **`path` 寫錯**：你設了 `path: /health` 但 nginx 沒有 `/health` 路徑，每次 Probe 都是 404，Pod 會一直被重啟。確認 path 是你的應用確實會回 200 的端點。
-
-3. **`port` 寫錯**：容器 `containerPort` 是 80，但 Probe 的 `port` 寫成 8080，K8s 每次都連不上，Probe 一直失敗，Pod 一直重啟。port 要和容器實際監聽的 port 一致。
-
----
-
-**清理**
-
-```bash
-kubectl delete -f my-nginx-probe.yaml
-kubectl delete -f deployment-probe.yaml
-
-# 確認清乾淨
-kubectl get pods
 ```
+指令：kubectl delete -f nginx-no-probe.yaml --ignore-not-found
+指令：kubectl delete -f nginx-liveness.yaml --ignore-not-found
+指令：kubectl delete -f nginx-liveness-only.yaml --ignore-not-found
+指令：kubectl delete -f nginx-readiness.yaml --ignore-not-found
+指令：kubectl delete -f my-probe.yaml --ignore-not-found
+指令：rm -f nginx-no-probe.yaml nginx-liveness.yaml nginx-liveness-only.yaml nginx-readiness.yaml my-probe.yaml
+```
+
+下一段：Loop 4 整合部署。Probe 讓服務能自我修復，下一段把 Probe 跟 ConfigMap、Secret、Service 全部整合起來，做一個完整的 production-ready 部署。

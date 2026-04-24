@@ -104,6 +104,12 @@ metadata:
 指令：kubectl apply -f 00-namespace.yaml
 ```
 
+**Namespace 是什麼**：
+- K8s 的隔離邊界，把資源分組
+- 同一個 cluster 可以有多個 namespace，資源名字可以重複（不同 ns 不衝突）
+- 權限（RBAC）、網路政策、資源配額都可以按 namespace 控制
+- 不加 `-n` 預設看 `default` namespace，這套系統全部放 `tasks`，之後所有指令都要加 `-n tasks`
+
 建立 `tasks` namespace，隔離這套系統，所有後續指令都加 `-n tasks`。
 
 ▶ **PPT 8/44：Secret YAML**

@@ -2378,21 +2378,21 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
 
   // ── [48/50] Image 交付 ──
   {
-    title: '[48/50] Image 也要被交付',
-    subtitle: '避免全班同時拉 Docker Hub，被 rate limit 擋住',
+    title: '[48/50] 先把 image 放進每台 node',
+    subtitle: '這一步完成後，後面的 kubectl apply / helm install 才會順',
     section: '7-12 手動部署',
     duration: '5',
     content: (
       <div className="space-y-3 text-xs">
         <div className="bg-gradient-to-r from-amber-900/30 to-red-900/30 border border-amber-500/50 p-3 rounded">
-          <p className="text-amber-300 font-semibold mb-1">問題</p>
-          <p className="text-slate-300">YAML 寫對了，但如果 image 拉不下來，Pod 還是起不來。全班同時拉 Docker Hub 很容易被限流。</p>
+          <p className="text-amber-300 font-semibold mb-1">你現在要做的事</p>
+          <p className="text-slate-300">先把短網址會用到的 4 個 image 放進 control plane 和 worker。這樣 Pod 啟動時就不用去 Docker Hub 下載。</p>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-700 p-3 rounded">
-          <p className="text-cyan-300 font-semibold mb-2 text-center">Cloud tar workflow</p>
+          <p className="text-cyan-300 font-semibold mb-2 text-center">上課流程</p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            {['cloud download', 'SSH / scp', 'k3s ctr import', 'kubectl apply / helm install'].map((step, index) => (
+            {['1 下載老師給的 tar', '2 匯入每台 node', '3 檢查 image', '4 開始部署'].map((step, index) => (
               <div key={step} className="flex items-center gap-2">
                 <span className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-slate-200 font-mono">{step}</span>
                 {index < 3 && <span className="text-cyan-400">→</span>}
@@ -2403,11 +2403,11 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
-            <p className="text-cyan-300 font-semibold">學生下載 tar</p>
+            <p className="text-cyan-300 font-semibold">1. 下載後先確認檔案</p>
             <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`sha256sum ~/Downloads/url-shortener-k3s-images.tar`}</code></pre>
           </div>
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
-            <p className="text-cyan-300 font-semibold">匯入 k3s node</p>
+            <p className="text-cyan-300 font-semibold">2. 匯入並檢查每台 node</p>
             <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \\
 K3S_NODES="user@cp user@worker" \\
   ./scripts/load-images-to-k3s-ssh.sh
@@ -2417,7 +2417,7 @@ K3S_NODES="user@cp user@worker" \\
         </div>
 
         <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-cyan-300 text-center">
-          講師課前準備完整 tar；學生現場只下載、匯入、檢查。
+          tar 裡已經包含 API、Frontend、PostgreSQL、BusyBox；不用在現場 pull Docker Hub。
         </div>
 
         <div className="bg-emerald-900/20 border border-emerald-500/40 p-3 rounded text-emerald-300 text-center font-semibold">

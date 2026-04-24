@@ -254,51 +254,46 @@ kubeconfig 的三個區塊是「分開定義、再用 context 綁在一起」的
 
 把 alice-kubeconfig.yaml 傳給 Alice。她在自己電腦（或我們現場用同一台機器 export 模擬）：
 
+為什麼不用 `export KUBECONFIG`？master 上 `~/.kube/config` 已有 `default` context，export 會把兩個檔 merge，`default` 蓋掉 `alice@k3s`，結果還是 admin 身份。用 `--kubeconfig` 直接指定檔案，完全不碰 `~/.kube/config`。
+
 ```
-指令：export KUBECONFIG=$PWD/alice-kubeconfig.yaml
+指令：unset KUBECONFIG
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml auth whoami
 ```
 
-**先確認現在是誰（防止還在用 admin）**：
-```
-指令：kubectl auth whoami
-指令：kubectl config current-context
-```
-
-`whoami` 應該回 `system:serviceaccount:dev-alice:dev-alice`，current-context 應該是 `alice@k3s`。
+應該回 `system:serviceaccount:dev-alice:dev-alice`，確認是 Alice 才繼續。
 
 **✓ 自己的 ns 完整權限**：
 ```
-指令：kubectl get pods
-指令：kubectl run mypod --image=nginx
-指令：kubectl get pods
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get pods
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml run mypod --image=nginx
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get pods
 ```
 
 **✗ 其他 ns 全擋**：
 ```
-指令：kubectl get pods -n default
-指令：kubectl get pods -n kube-system
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get pods -n kube-system
 ```
 
 回 `Forbidden`。
 
 **✗ 不能讀 Secret**：
 ```
-指令：kubectl get secret
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get secret
 ```
 
 回 `Forbidden`。
 
 **✗ cluster 層級擋**：
 ```
-指令：kubectl get nodes
-指令：kubectl get ns
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get nodes
 ```
 
 回 `Forbidden`。
 
-**切回 admin**：
+**切回 admin（什麼都不用做，直接打）**：
 ```
-指令：unset KUBECONFIG
+指令：kubectl get nodes
 指令：kubectl get nodes
 ```
 

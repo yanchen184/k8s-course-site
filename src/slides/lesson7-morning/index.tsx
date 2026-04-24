@@ -1101,55 +1101,45 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
     content: (
       <div className="space-y-2 text-xs">
         <div className="bg-slate-800/50 p-2 rounded font-mono">
-          <p className="text-slate-500"># 切成 Alice</p>
-          <p className="text-green-300">export KUBECONFIG=$PWD/alice-kubeconfig.yaml</p>
-        </div>
-
-        <div className="bg-cyan-900/20 border border-cyan-500/40 p-2 rounded font-mono">
-          <p className="text-cyan-400 font-semibold mb-1">先確認現在是誰（防止還在用 admin）</p>
-          <p className="text-green-300">kubectl auth whoami</p>
-          <p className="text-green-300">kubectl config current-context</p>
-          <p className="text-slate-400 text-[10px] mt-1">whoami → system:serviceaccount:dev-alice:dev-alice　　current-context → alice@k3s</p>
+          <p className="text-slate-500"># 先 unset，避免 merge 問題</p>
+          <p className="text-green-300">unset KUBECONFIG</p>
+          <p className="text-slate-500 mt-1"># 用 --kubeconfig 直接指定，不碰 ~/.kube/config</p>
+          <p className="text-green-300">kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml auth whoami</p>
+          <p className="text-slate-400 text-[10px] mt-1">→ Username: system:serviceaccount:dev-alice:dev-alice</p>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
             <p className="text-green-400 font-semibold mb-1">✓ 自己 ns 完整權限</p>
-            <div className="font-mono text-green-300 space-y-0.5">
-              <p>kubectl get pods</p>
-              <p>kubectl run mypod --image=nginx</p>
-              <p>kubectl get pods</p>
+            <div className="font-mono text-green-300 space-y-0.5 text-[10px]">
+              <p>kubectl --kubeconfig=.../alice-kubeconfig.yaml get pods</p>
+              <p>kubectl --kubeconfig=.../alice-kubeconfig.yaml run mypod --image=nginx</p>
             </div>
           </div>
 
           <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
             <p className="text-red-400 font-semibold mb-1">✗ 其他 ns 被擋</p>
-            <div className="font-mono text-green-300 space-y-0.5">
-              <p>kubectl get pods -n default</p>
-              <p>kubectl get pods -n kube-system</p>
+            <div className="font-mono text-green-300 space-y-0.5 text-[10px]">
+              <p>kubectl --kubeconfig=.../alice-kubeconfig.yaml get pods -n kube-system</p>
             </div>
             <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
           </div>
 
           <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
             <p className="text-red-400 font-semibold mb-1">✗ 不能讀 Secret</p>
-            <div className="font-mono text-green-300">kubectl get secret</div>
+            <div className="font-mono text-green-300 text-[10px]">kubectl --kubeconfig=.../alice-kubeconfig.yaml get secret</div>
             <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
           </div>
 
           <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
             <p className="text-red-400 font-semibold mb-1">✗ cluster 層級擋</p>
-            <div className="font-mono text-green-300 space-y-0.5">
-              <p>kubectl get nodes</p>
-              <p>kubectl get ns</p>
-            </div>
+            <div className="font-mono text-green-300 text-[10px]">kubectl --kubeconfig=.../alice-kubeconfig.yaml get nodes</div>
             <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-2 rounded font-mono">
-          <p className="text-slate-500"># 切回 admin</p>
-          <p className="text-green-300">unset KUBECONFIG</p>
+          <p className="text-slate-500"># 切回 admin（什麼都不用做，直接打）</p>
           <p className="text-green-300">kubectl get nodes  <span className="text-slate-500"># ✓ 全權</span></p>
         </div>
 
@@ -1166,9 +1156,9 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
     ),
     notes: `Part 7 是驗收，也是最爽的一步。前面六步全部為了這一刻。
 
-export KUBECONFIG 指向我們剛才組的 alice-kubeconfig.yaml，後面所有 kubectl 指令都會用 Alice 的身份。
+切身份用 --kubeconfig 直接指定檔案，不用 export KUBECONFIG。原因：master 上 ~/.kube/config 已有 default context，export KUBECONFIG 會把兩個檔 merge，default 會蓋掉 alice@k3s，結果還是 admin 身份。--kubeconfig 完全不碰 ~/.kube/config，只讀指定的檔案。
 
-export KUBECONFIG 之後先確認身份，不要假設已經切過去了。kubectl auth whoami 會顯示 system:serviceaccount:dev-alice:dev-alice，kubectl config current-context 顯示 alice@k3s。兩個都對才繼續。這個步驟常見問題：unset 沒生效、export 打錯路徑，結果還在用 admin 身份做測試，以為權限沒擋到。
+先跑 kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml auth whoami，確認回 system:serviceaccount:dev-alice:dev-alice 才繼續。
 
 四個情境要測。
 

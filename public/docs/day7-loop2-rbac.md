@@ -263,30 +263,63 @@ kubeconfig 的三個區塊是「分開定義、再用 context 綁在一起」的
 
 應該回 `system:serviceaccount:dev-alice:dev-alice`，確認是 Alice 才繼續。
 
+切身份有三種方法，從簡單到正式：
+
+**方法① 每次帶 `--kubeconfig`（最直接）**
+```
+指令：unset KUBECONFIG
+指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml auth whoami
+```
+
+**方法② alias 縮短（課堂推薦）**
+```
+指令：alias kali="kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml"
+指令：kali auth whoami
+```
+
+之後所有指令都用 `kali` 代替 `kubectl`：
+
+**方法③ merge 進 `~/.kube/config`（生產環境正式做法）**
+```
+指令：KUBECONFIG=~/.kube/config:/home/user/alice-kubeconfig.yaml kubectl config view --flatten > /tmp/merged.yaml
+指令：cp /tmp/merged.yaml ~/.kube/config
+指令：kubectl config use-context alice@k3s
+指令：kubectl auth whoami
+```
+
+切回 admin：
+```
+指令：kubectl config use-context default
+```
+
+---
+
+以下測試以方法②（`kali` alias）示範：
+
 **✓ 自己的 ns 完整權限**：
 ```
-指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get pods
-指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml run mypod --image=nginx
-指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get pods
+指令：kali get pods
+指令：kali run mypod --image=nginx
+指令：kali get pods
 ```
 
 **✗ 其他 ns 全擋**：
 ```
-指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get pods -n kube-system
+指令：kali get pods -n kube-system
 ```
 
 回 `Forbidden`。
 
 **✗ 不能讀 Secret**：
 ```
-指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get secret
+指令：kali get secret
 ```
 
 回 `Forbidden`。
 
 **✗ cluster 層級擋**：
 ```
-指令：kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml get nodes
+指令：kali get nodes
 ```
 
 回 `Forbidden`。

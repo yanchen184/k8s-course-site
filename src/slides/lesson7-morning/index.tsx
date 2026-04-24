@@ -1100,46 +1100,62 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
     duration: '3',
     content: (
       <div className="space-y-2 text-xs">
-        <div className="bg-slate-800/50 p-2 rounded font-mono">
-          <p className="text-slate-500"># 先 unset，避免 merge 問題</p>
-          <p className="text-green-300">unset KUBECONFIG</p>
-          <p className="text-slate-500 mt-1"># 用 --kubeconfig 直接指定，不碰 ~/.kube/config</p>
-          <p className="text-green-300">kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml auth whoami</p>
-          <p className="text-slate-400 text-[10px] mt-1">→ Username: system:serviceaccount:dev-alice:dev-alice</p>
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">切身份：三種方法</p>
+          <div className="space-y-2 font-mono text-[10px]">
+            <div>
+              <p className="text-slate-400">① 每次帶 --kubeconfig（最直接）</p>
+              <p className="text-green-300">unset KUBECONFIG</p>
+              <p className="text-green-300">kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml auth whoami</p>
+            </div>
+            <div>
+              <p className="text-slate-400">② alias 縮短（推薦課堂用）</p>
+              <p className="text-green-300">alias kali="kubectl --kubeconfig=/home/user/alice-kubeconfig.yaml"</p>
+              <p className="text-green-300">kali auth whoami</p>
+            </div>
+            <div>
+              <p className="text-slate-400">③ merge 進 ~/.kube/config（生產環境正式做法）</p>
+              <p className="text-green-300">KUBECONFIG=~/.kube/config:/home/user/alice-kubeconfig.yaml kubectl config view --flatten {'>'} /tmp/merged.yaml</p>
+              <p className="text-green-300">cp /tmp/merged.yaml ~/.kube/config</p>
+              <p className="text-green-300">kubectl config use-context alice@k3s</p>
+              <p className="text-green-300">kubectl auth whoami</p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
             <p className="text-green-400 font-semibold mb-1">✓ 自己 ns 完整權限</p>
             <div className="font-mono text-green-300 space-y-0.5 text-[10px]">
-              <p>kubectl --kubeconfig=.../alice-kubeconfig.yaml get pods</p>
-              <p>kubectl --kubeconfig=.../alice-kubeconfig.yaml run mypod --image=nginx</p>
+              <p>kali get pods</p>
+              <p>kali run mypod --image=nginx</p>
             </div>
           </div>
 
           <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
             <p className="text-red-400 font-semibold mb-1">✗ 其他 ns 被擋</p>
             <div className="font-mono text-green-300 space-y-0.5 text-[10px]">
-              <p>kubectl --kubeconfig=.../alice-kubeconfig.yaml get pods -n kube-system</p>
+              <p>kali get pods -n kube-system</p>
             </div>
             <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
           </div>
 
           <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
             <p className="text-red-400 font-semibold mb-1">✗ 不能讀 Secret</p>
-            <div className="font-mono text-green-300 text-[10px]">kubectl --kubeconfig=.../alice-kubeconfig.yaml get secret</div>
+            <div className="font-mono text-green-300 text-[10px]">kali get secret</div>
             <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
           </div>
 
           <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
             <p className="text-red-400 font-semibold mb-1">✗ cluster 層級擋</p>
-            <div className="font-mono text-green-300 text-[10px]">kubectl --kubeconfig=.../alice-kubeconfig.yaml get nodes</div>
+            <div className="font-mono text-green-300 text-[10px]">kali get nodes</div>
             <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-2 rounded font-mono">
-          <p className="text-slate-500"># 切回 admin（什麼都不用做，直接打）</p>
+          <p className="text-slate-500"># 切回 admin</p>
+          <p className="text-green-300">kubectl config use-context default  <span className="text-slate-500"># 方法③用</span></p>
           <p className="text-green-300">kubectl get nodes  <span className="text-slate-500"># ✓ 全權</span></p>
         </div>
 

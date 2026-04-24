@@ -857,8 +857,9 @@ kubectl create serviceaccount dev-alice -n dev-alice，建一個 SA。這個 SA 
     duration: '3',
     content: (
       <div className="space-y-2 text-[11px]">
-        <div className="bg-slate-900 p-2 rounded font-mono overflow-x-auto">
-          <pre className="text-slate-300 whitespace-pre">{`apiVersion: rbac.authorization.k8s.io/v1
+        <div className="bg-slate-900 p-2 rounded font-mono overflow-x-auto text-[9px]">
+          <pre className="text-slate-300 whitespace-pre">{`cat > rbac-alice.yaml << 'EOF'
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: developer-role
@@ -883,7 +884,8 @@ subjects:
 roleRef:
   kind: Role
   name: developer-role
-  apiGroup: rbac.authorization.k8s.io`}</pre>
+  apiGroup: rbac.authorization.k8s.io
+EOF`}</pre>
         </div>
 
         <div className="bg-slate-800/50 p-2 rounded">

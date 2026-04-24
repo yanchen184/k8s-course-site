@@ -114,29 +114,36 @@ Ingress short.local
 
 > 你剛剛不是在部署 9 份 YAML，你是在把一個產品拆成 9 個可管理、可驗收、可重複交付的 K8s 物件群。
 
-### 預設 image 策略：學生自行 build，不集中拉 Docker Hub
+### 預設 image 策略：講師提供 tar，不集中拉 Docker Hub
 
-前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。短網址 Lab 預設改成 local image workflow：
+前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。短網址 Lab 預設改成「講師提供 image tar」的 workflow：
 
 ```text
-source code
-  -> docker build
-  -> docker save
+cloud download
   -> k3s ctr images import
   -> kubectl apply / helm install
 ```
 
-重點是：`docker build` 只會把 image 放在學生操作環境的 Docker image store；k3s 使用的是 control plane / worker node 裡的 containerd。兩邊不是同一個地方，所以還要把 image 匯入每個 k3s node。
+學生不需要在課堂現場從 Docker Hub pull `postgres:15`、`busybox:1.36`，也不需要重新 build API / Frontend。講師課前把完整的 `url-shortener-k3s-images.tar` 放到雲端空間，學生下載後直接匯入每台 k3s node。
+
+重點是：k3s 使用的是 control plane / worker node 裡的 containerd，所以 image tar 要匯入每個 k3s node。
 
 一句話記住：**Pod 被排到哪台 node，那台 node 就必須已經有 image。** 如果 YAML 使用 `imagePullPolicy: Never`，k3s 不會退回去 Docker Hub 幫你拉。
 
 在 `k8s-course-labs/lesson7/url-shortener/` 執行：
 
 ```bash
-./scripts/build-local-images.sh
-./scripts/save-k3s-images.sh
-K3S_NODES="student@192.168.56.10 student@192.168.56.11" ./scripts/load-images-to-k3s-ssh.sh
+sha256sum ~/Downloads/url-shortener-k3s-images.tar
+IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \
+K3S_NODES="student@192.168.56.10 student@192.168.56.11" \
+  ./scripts/load-images-to-k3s-ssh.sh
 K3S_NODES="student@192.168.56.10 student@192.168.56.11" ./scripts/check-k3s-images-ssh.sh
+```
+
+SHA256 應該是：
+
+```text
+bae34023b8fd055f13235ce239976c95d5f97156bde6bd0452c8de7a76f7fc44
 ```
 
 `K3S_NODES` 要填每台 Linux VM 的 SSH 目標，通常會包含 control plane 和 worker node。Windows + VMware 環境下，只要學生可以從執行腳本的地方 `ssh student@<node-ip>` 進 VM，且該使用者可以免互動執行 `sudo -n k3s ctr images list -q`，就可以用這條路徑。
@@ -152,7 +159,7 @@ K3S_NODES="student@192.168.56.10 student@192.168.56.11" ./scripts/check-k3s-imag
 | `postgres:15` | PostgreSQL StatefulSet |
 | `busybox:1.36` | migration Job 的 init container |
 
-只 build API / Frontend 還不夠。`postgres:15` 和 `busybox:1.36` 如果沒有匯入 k3s node，Pod 還是會嘗試對外拉 image，現場仍可能被限流。
+如果講師要課前重產 tar，才需要跑 `build-local-images.sh`、`docker pull postgres:15`、`docker pull busybox:1.36` 和 `save-k3s-images.sh`。
 
 ### 備援 image 策略：使用 Docker Hub public image
 

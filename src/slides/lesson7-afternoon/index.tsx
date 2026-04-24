@@ -2390,12 +2390,12 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-700 p-3 rounded">
-          <p className="text-cyan-300 font-semibold mb-2 text-center">Local image workflow</p>
+          <p className="text-cyan-300 font-semibold mb-2 text-center">Cloud tar workflow</p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            {['source code', 'docker build', 'docker save', 'k3s ctr import', 'kubectl apply / helm install'].map((step, index) => (
+            {['cloud download', 'SSH / scp', 'k3s ctr import', 'kubectl apply / helm install'].map((step, index) => (
               <div key={step} className="flex items-center gap-2">
                 <span className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-slate-200 font-mono">{step}</span>
-                {index < 4 && <span className="text-cyan-400">→</span>}
+                {index < 3 && <span className="text-cyan-400">→</span>}
               </div>
             ))}
           </div>
@@ -2403,13 +2403,13 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
-            <p className="text-cyan-300 font-semibold">學生 build</p>
-            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`./scripts/build-local-images.sh
-./scripts/save-k3s-images.sh`}</code></pre>
+            <p className="text-cyan-300 font-semibold">學生下載 tar</p>
+            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`sha256sum ~/Downloads/url-shortener-k3s-images.tar`}</code></pre>
           </div>
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
             <p className="text-cyan-300 font-semibold">匯入 k3s node</p>
-            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`K3S_NODES="student@cp student@worker" \\
+            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \\
+K3S_NODES="student@cp student@worker" \\
   ./scripts/load-images-to-k3s-ssh.sh
 K3S_NODES="student@cp student@worker" \\
   ./scripts/check-k3s-images-ssh.sh`}</code></pre>
@@ -2417,7 +2417,7 @@ K3S_NODES="student@cp student@worker" \\
         </div>
 
         <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-cyan-300 text-center">
-          docker build 是產生 image；k3s ctr import 是把 image 放進 Kubernetes 會使用的 containerd。
+          講師課前準備完整 tar；學生現場只下載、匯入、檢查。
         </div>
 
         <div className="bg-emerald-900/20 border border-emerald-500/40 p-3 rounded text-emerald-300 text-center font-semibold">
@@ -2429,15 +2429,17 @@ K3S_NODES="student@cp student@worker" \\
 
 以前上課可能遇過，全班同時從 Docker Hub 拉 image，結果被 rate limit，大家的 Pod 都卡在 ImagePullBackOff。這不是 YAML 寫錯，而是外部 registry 限流。
 
-所以短網址 Lab 預設改成本地 image workflow：學生先從 source code docker build，產生 url-shortener-api:lab 和 url-shortener-frontend:lab。接著 docker save 匯出 tar，再透過 SSH 把 tar 傳進 VMware 裡的 control plane 和 worker node，最後用 k3s ctr images import 把 image 放進每個 k3s node 的 containerd。最後才 kubectl apply 或 helm install。
+所以短網址 Lab 預設改成講師提供完整 image tar。學生課堂現場不要 pull Docker Hub，也不要重新 build API / Frontend。學生只要從雲端空間下載 url-shortener-k3s-images.tar，檢查 sha256，再透過 SSH 把 tar 傳進 VMware 裡的 control plane 和 worker node，最後用 k3s ctr images import 把 image 放進每個 k3s node 的 containerd。最後才 kubectl apply 或 helm install。
 
-這裡一定要講清楚：docker build 是把 image 放在學生操作環境的 Docker 裡；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。兩邊不是同一個地方，所以不能只 build，還要 import 到 control plane 和 worker。
+這裡一定要講清楚：下載 tar 到學生操作環境還不夠；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd，所以還要 import 到 control plane 和 worker。
 
 課前要確認 SSH 和 sudo 權限。學生要能 ssh 到 control plane 和 worker，而且該帳號要能免互動執行 sudo -n k3s ctr images list -q，否則腳本會卡在 sudo 密碼提示。
 
 這句話一定要讓學生記住：Pod 被排到哪台 node，那台 node 就必須已經有 image。imagePullPolicy: Never 的意思就是不要對外拉，所以沒有 image 的 node 會直接失敗。
 
-另外 PostgreSQL 和 busybox 也要考慮。只 build API 和 Frontend 還不夠，postgres:15 和 busybox:1.36 如果沒有匯入 k3s node，Pod 還是可能對外拉 image。
+另外 PostgreSQL 和 busybox 也要包含在 tar 裡。只準備 API 和 Frontend 不夠，postgres:15 和 busybox:1.36 如果沒有匯入 k3s node，Pod 還是可能對外拉 image。
+
+講師如果要重產 tar，才在課前跑 build-local-images.sh、docker pull postgres:15、docker pull busybox:1.36 和 save-k3s-images.sh。這不是學生現場流程。
 
 local YAML 會使用 imagePullPolicy: Never。這代表不要對外拉 image，只使用 node 上已經有的 image。如果忘記匯入，就會看到 ErrImageNeverPull。這是預期的錯誤訊號。
 

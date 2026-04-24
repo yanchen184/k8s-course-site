@@ -89,17 +89,19 @@
 >
 > 如果全班同時從 Docker Hub 拉 `yanchen184/url-shortener-api:v1`、`postgres:15`、`busybox:1.36`，很容易遇到 rate limit。這不是 YAML 寫錯，而是外部 registry 限流。
 >
-> 所以這個 Lab 預設改成 local image workflow。學生先在自己的 Linux 操作環境 build `url-shortener-api:lab` 和 `url-shortener-frontend:lab`，再把這兩個 image 加上 `postgres:15`、`busybox:1.36` 匯入每台 k3s node 的 containerd。
+> 所以這個 Lab 預設改成講師提供完整 image tar。學生不需要在現場從 Docker Hub pull，也不需要重新 build API / Frontend；學生只要從雲端空間下載 `url-shortener-k3s-images.tar`，再匯入每台 k3s node 的 containerd。
 >
 > 以 Windows + VMware 的上課環境來說，學生會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
 >
 > 所以課前要確認兩件事：第一，學生操作環境可以 SSH 到每台 VM；第二，該帳號可以免互動執行 `sudo -n k3s ctr images list -q`。不然腳本會卡在 sudo password prompt，現場會很難排。
 >
-> 這裡有一個很重要的觀念：`docker build` 是把 image 放在 Docker 裡；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。兩個地方不一定相通，所以要用 `docker save` 加上 `k3s ctr images import`。
+> 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到學生電腦就好，而是要把 tar 匯入每台 node。
 >
 > 可以直接給學生一句話：Pod 被排到哪台 node，那台 node 就必須已經有 image。用 `imagePullPolicy: Never` 的時候，K8s 不會幫你去 Docker Hub 補拉。
 >
 > 如果沒有匯入，YAML 寫 `imagePullPolicy: Never` 時會看到 `ErrImageNeverPull`；如果用 public image，則可能看到 `ImagePullBackOff`。兩個錯誤都跟 image 準備有關。
+>
+> 如果講師要重產 tar，才需要在課前跑 `build-local-images.sh`、`docker pull postgres:15`、`docker pull busybox:1.36` 和 `save-k3s-images.sh`。這不放在學生現場流程。
 
 ### 每份 YAML 的講解口條
 

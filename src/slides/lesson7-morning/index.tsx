@@ -241,7 +241,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 50 # ★4 CPU > requests 50% 就擴`}</pre>
+        averageUtilization: 2  # ★4 課堂 VM 值（生產設 50~70）`}</pre>
         </div>
 
         <div className="bg-slate-800/50 p-2 rounded">
@@ -250,7 +250,7 @@ spec:
             <li><code className="text-amber-300">scaleTargetRef.name</code>：要跟 Deployment 的 metadata.name 完全一致</li>
             <li><code className="text-amber-300">minReplicas: 2</code>：沒流量也保留 2 個避免單點故障</li>
             <li><code className="text-amber-300">maxReplicas: 5</code>：單節點 VM 安全值；生產環境可調大</li>
-            <li><code className="text-amber-300">averageUtilization: 50</code>：requests 100m 的 50% = 50m</li>
+            <li><code className="text-amber-300">averageUtilization: 2</code>：課堂 VM 設 2%（nginx 靜態頁面 CPU 極低）；生產通常 50~70%</li>
           </ul>
         </div>
 
@@ -268,7 +268,7 @@ spec:
 
 第三，maxReplicas 設 5。為什麼不設 10？因為我們用的是單節點 VM 環境，設太大會把節點資源吃光、VM 可能重啟。生產環境你有幾個大 node 可以設到 20、50。
 
-第四，averageUtilization 設 50。這個是相對於 requests 的百分比。Pod requests 設 100m，50% 就是 50m。現在每個 Pod 平均用超過 50m 就擴容。
+第四，averageUtilization。這個是相對於 requests 的百分比。課堂 VM 我們設 2%——為什麼這麼低？因為 nginx 服務靜態頁面吃 CPU 極低，設 50% busybox 打不上去，課堂就看不到擴容。生產環境通常設 50 到 70。
 
 實戰我們有兩種建法。Demo 1 會用 kubectl autoscale 一行指令——快、適合實驗、但不能調進階參數。Demo 4 重壓測前會升級成完整 YAML、加上 behavior 欄位——這個可以版控、可以調穩定窗口，生產環境就是這樣管的。
 
@@ -336,7 +336,7 @@ EOF`}</pre>
         <div className="bg-slate-800/50 p-2 rounded">
           <p className="text-cyan-400 font-semibold mb-1">Step 3：建 HPA（一行指令版）</p>
           <div className="bg-slate-900 p-2 rounded font-mono">
-            <p className="text-green-300">kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=50%</p>
+            <p className="text-green-300">kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=2%</p>
             <p className="text-green-300">kubectl get hpa</p>
             <p className="text-slate-400">→ 剛建好 TARGETS 顯示 unknown/50%，等 30s~1min 變實際數字</p>
           </div>
@@ -351,7 +351,7 @@ Step 2 部署 nginx。YAML 的重點在 resources 區塊。requests.cpu 100m 是
 
 apply 下去，get deploy 看 READY 2/2、get svc 看 CLUSTER-IP 有分配到。
 
-Step 3 建 HPA。這是今天第一次用一行指令建 HPA。kubectl autoscale 後面接 deployment 名字、min 2、max 5、cpu 50%。這行指令等同於 18 行 YAML，但不能調進階參數。Demo 4 我們會升級成 YAML 版。
+Step 3 建 HPA。這是今天第一次用一行指令建 HPA。kubectl autoscale 後面接 deployment 名字、min 2、max 5、cpu 2%。為什麼是 2%？因為課堂 VM 跑 nginx 靜態頁面 CPU 極低，設 50% 根本壓不上去，課堂看不到擴容。生產環境你設 50 到 70。這行指令等同於 18 行 YAML，但不能調進階參數。Demo 4 我們會升級成 YAML 版。
 
 建好 get hpa 看。TARGETS 欄位剛開始顯示 unknown 斜線 50%。unknown 不代表錯——是 metrics-server 還沒回報數據。等 30 秒到 1 分鐘，TARGETS 會變成實際數字，比如 1% 斜線 50%。那就是 HPA 準備好了。
 
@@ -478,7 +478,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 50
+        averageUtilization: 2  # ← 課堂 VM 值，生產設 50~70
   behavior:                            # ★ 進階參數
     scaleDown:
       stabilizationWindowSeconds: 60   # ← 60 秒就縮（預設 300）
@@ -565,7 +565,7 @@ kubectl get deploy nginx-resource-demo
 kubectl get svc nginx-resource-svc
 
 # ─── Part 2：建 HPA（一行版）───
-kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=50%
+kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=2%
 kubectl get hpa
 
 # ─── Part 3：輕壓 0.1（對照組，應不擴）───

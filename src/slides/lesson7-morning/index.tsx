@@ -1819,7 +1819,7 @@ spec:
         livenessProbe:             # ★ 只有 Liveness，故意沒 Readiness
           httpGet: {path: /, port: 80}
           periodSeconds: 10
-          failureThreshold: 3
+          failureThreshold: 6      # 60 秒才重啟，空窗期夠長
 ---
 apiVersion: v1
 kind: Service
@@ -1905,7 +1905,7 @@ spec:
         livenessProbe:
           httpGet: {path: /, port: 80}
           periodSeconds: 10
-          failureThreshold: 3      # 30 秒才殺
+          failureThreshold: 6      # 60 秒才殺，空窗期夠長
         readinessProbe:            # ★ 多加這區塊
           httpGet: {path: /, port: 80}
           periodSeconds: 5         # 比 Liveness 頻繁

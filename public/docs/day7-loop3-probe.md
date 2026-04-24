@@ -219,7 +219,7 @@ spec:
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
-            failureThreshold: 3
+            failureThreshold: 6    # 60 秒才重啟，空窗期夠長
 ---
 apiVersion: v1
 kind: Service
@@ -288,7 +288,7 @@ spec:
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
-            failureThreshold: 3
+            failureThreshold: 6    # 60 秒才重啟，空窗期夠長
           readinessProbe:
             httpGet:
               path: /
@@ -309,7 +309,7 @@ spec:
       targetPort: 80
 ```
 
-**為什麼 Readiness 的 periodSeconds 比 Liveness 短**：Readiness 要快速反應（5 秒 × 2 次 = 10 秒拔流量），Liveness 慢慢來沒關係（10 秒 × 3 次 = 30 秒才殺）。這樣 Readiness 先拔流量，流量已經被導開了再 Liveness 殺。
+**為什麼 Readiness 的 periodSeconds 比 Liveness 短**：Readiness 要快速反應（5 秒 × 2 次 = 10 秒拔流量），Liveness 慢慢來沒關係（10 秒 × 6 次 = 60 秒才殺）。這樣 Readiness 先拔流量，流量已經被導開了再 Liveness 殺。
 
 部署 + 破壞：
 
@@ -453,7 +453,7 @@ spec:
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
-            failureThreshold: 3
+            failureThreshold: 6    # 60 秒才重啟，空窗期夠長
           readinessProbe:
             httpGet:
               path: /

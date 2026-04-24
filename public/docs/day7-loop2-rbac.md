@@ -279,10 +279,15 @@ kubeconfig 的三個區塊是「分開定義、再用 context 綁在一起」的
 
 之後所有指令都用 `kali` 代替 `kubectl`：
 
-**方法③ merge 進 `~/.kube/config`（生產環境正式做法）**
+**方法③ 加進 `~/.kube/config`（生產環境正式做法）**
+
+不用 merge 檔案，直接用 `kubectl config set-*` 一個一個加：
+
 ```
-指令：KUBECONFIG=~/.kube/config:/home/user/alice-kubeconfig.yaml kubectl config view --flatten > /tmp/merged.yaml
-指令：cp /tmp/merged.yaml ~/.kube/config
+指令：TOKEN=$(kubectl create token dev-alice -n dev-alice --duration=8760h)
+指令：kubectl config set-cluster k3s-alice --server=https://${VM_IP}:6443 --insecure-skip-tls-verify=true
+指令：kubectl config set-credentials dev-alice --token=$TOKEN
+指令：kubectl config set-context alice@k3s --cluster=k3s-alice --user=dev-alice --namespace=dev-alice
 指令：kubectl config use-context alice@k3s
 指令：kubectl auth whoami
 ```

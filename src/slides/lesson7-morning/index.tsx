@@ -1114,9 +1114,11 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
               <p className="text-green-300">kali auth whoami</p>
             </div>
             <div>
-              <p className="text-slate-400">③ merge 進 ~/.kube/config（生產環境正式做法）</p>
-              <p className="text-green-300">KUBECONFIG=~/.kube/config:/home/user/alice-kubeconfig.yaml kubectl config view --flatten {'>'} /tmp/merged.yaml</p>
-              <p className="text-green-300">cp /tmp/merged.yaml ~/.kube/config</p>
+              <p className="text-slate-400">③ 加進 ~/.kube/config（生產環境正式做法）</p>
+              <p className="text-green-300">TOKEN=$(kubectl create token dev-alice -n dev-alice --duration=8760h)</p>
+              <p className="text-green-300">kubectl config set-cluster k3s-alice --server=https://$&#123;VM_IP&#125;:6443 --insecure-skip-tls-verify=true</p>
+              <p className="text-green-300">kubectl config set-credentials dev-alice --token=$TOKEN</p>
+              <p className="text-green-300">kubectl config set-context alice@k3s --cluster=k3s-alice --user=dev-alice --namespace=dev-alice</p>
               <p className="text-green-300">kubectl config use-context alice@k3s</p>
               <p className="text-green-300">kubectl auth whoami</p>
             </div>

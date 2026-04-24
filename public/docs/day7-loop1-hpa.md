@@ -301,6 +301,7 @@ READY 應該是 2/2。
 
 ```
 指令：kubectl delete hpa nginx-resource-demo
+指令：kubectl scale deployment nginx-resource-demo --replicas=2
 ```
 
 `hpa-tuned.yaml`：

@@ -54,6 +54,7 @@
 - 不要把手動部署講成照表操課。
 - 每一份 YAML 都是在回答一個部署問題。
 - 每一份 YAML 都要拆出「建了什麼物件、物件做什麼、對應哪個 K8s 觀念」。
+- 要補上 image 也需要被交付到 k3s node，否則一鍵部署仍會卡在 image pull。
 - 學生要知道為什麼先手動，再談 Helm。
 
 ### 講法主軸
@@ -81,6 +82,18 @@
 > 你會發現，這些不是短網址服務才有的問題，而是幾乎所有產品部署到 K8s 上都要回答的問題。
 >
 > 所以手動部署的目的，不是讓你學會背 9 份 YAML。手動部署的目的，是讓你第一次把這些問題完整走過一次。
+
+### Image 交付口條
+
+> 這裡要特別補一個真實上課會遇到的問題：image 也要被交付。
+>
+> 如果全班同時從 Docker Hub 拉 `yanchen184/url-shortener-api:v1`、`postgres:15`、`busybox:1.36`，很容易遇到 rate limit。這不是 YAML 寫錯，而是外部 registry 限流。
+>
+> 所以這個 Lab 預設改成 local image workflow。學生先在自己的電腦 build `url-shortener-api:lab` 和 `url-shortener-frontend:lab`，再把這兩個 image 加上 `postgres:15`、`busybox:1.36` 匯入每台 k3s node 的 containerd。
+>
+> 這裡有一個很重要的觀念：`docker build` 是把 image 放在 Docker 裡；k3s 跑 Pod 用的是 VM 裡的 containerd。兩個地方不一定相通，所以要用 `docker save` 加上 `k3s ctr images import`。
+>
+> 如果沒有匯入，YAML 寫 `imagePullPolicy: Never` 時會看到 `ErrImageNeverPull`；如果用 public image，則可能看到 `ImagePullBackOff`。兩個錯誤都跟 image 準備有關。
 
 ### 每份 YAML 的講解口條
 
@@ -128,6 +141,8 @@
 >
 > `restartPolicy: OnFailure` 和 `backoffLimit: 3` 代表失敗會重試，但不會無限重跑。
 >
+> local YAML 會用 `url-shortener-api:lab` 和 `imagePullPolicy: Never`，意思是不要去 Docker Hub 拉，直接使用 k3s node 裡已經匯入的 image。
+>
 > 這裡複習的是：Job、init container、啟動順序、失敗重試。
 
 #### `05-api.yaml`
@@ -142,6 +157,8 @@
 >
 > `resources.requests.cpu` 很重要，因為 HPA 需要它才能算 CPU 使用率百分比。`livenessProbe` 看 `/health`，`readinessProbe` 看 `/ready`，兩者不是同一件事。
 >
+> 這份 local YAML 會用 `url-shortener-api:lab`。所以在 apply 之前，學生必須已經把 API image 匯入所有 k3s node。
+>
 > 這裡複習的是：Deployment、Service、Secret/ConfigMap 注入、resources、livenessProbe、readinessProbe。
 
 #### `06-frontend.yaml`
@@ -151,6 +168,8 @@
 > Frontend 是靜態網站，不需要 DB password，也不需要連 PostgreSQL。它只需要跑 nginx 或靜態頁面，然後用 Service 提供穩定入口，讓 Ingress 可以把 `/` 導過來。
 >
 > 這裡可以讓學生比較：API 和 Frontend 都是無狀態，所以都用 Deployment；但 API 有 DB 依賴、probe、更多 resources，Frontend 則比較單純。
+>
+> local YAML 會用 `url-shortener-frontend:lab`，同樣需要先匯入 k3s node。
 
 #### `07-hpa.yaml`
 
@@ -253,6 +272,8 @@
 > 你可以直接把剛剛的手動 YAML 對到 Helm template：Secret 對 `templates/secret.yaml`，ConfigMap 對 `templates/configmap.yaml`，PostgreSQL 對 `templates/postgres.yaml`，migration 對 `templates/migrate-job.yaml`，API 對 `templates/api.yaml`，Frontend 對 `templates/frontend.yaml`，HPA 對 `templates/hpa.yaml`，Ingress 對 `templates/ingress.yaml`。
 >
 > 換句話說，Helm 不是做了另一件事。它只是把剛剛那些固定 YAML 變成可以調參的 template。
+>
+> 但 Helm 不會幫你 build image，也不會幫你把 image 匯入 k3s node。一鍵部署前，image 還是要先準備好。`values-local.yaml` 只是告訴 Helm：請使用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，而且 `pullPolicy` 用 `Never`。
 >
 > 接著你可以帶學生看 values。  
 > `image.tag` 控制版本。  

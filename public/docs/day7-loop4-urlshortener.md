@@ -114,7 +114,41 @@ Ingress short.local
 
 > 你剛剛不是在部署 9 份 YAML，你是在把一個產品拆成 9 個可管理、可驗收、可重複交付的 K8s 物件群。
 
-### 課前 image 檢查
+### 預設 image 策略：學生自行 build，不集中拉 Docker Hub
+
+前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。短網址 Lab 預設改成 local image workflow：
+
+```text
+source code
+  -> docker build
+  -> docker save
+  -> k3s ctr images import
+  -> kubectl apply / helm install
+```
+
+重點是：`docker build` 只會把 image 放在學生電腦的 Docker image store；k3s 使用的是 VM 裡的 containerd。兩邊不是同一個地方，所以還要把 image 匯入每個 k3s node。
+
+在 `k8s-course-labs/lesson7/url-shortener/` 執行：
+
+```bash
+./scripts/build-local-images.sh
+./scripts/save-k3s-images.sh
+./scripts/load-images-to-k3s-multipass.sh
+./scripts/check-k3s-images.sh
+```
+
+這會準備四個 image：
+
+| Image | 用在哪裡 |
+|---|---|
+| `url-shortener-api:lab` | API Deployment 和 migration Job |
+| `url-shortener-frontend:lab` | Frontend Deployment |
+| `postgres:15` | PostgreSQL StatefulSet |
+| `busybox:1.36` | migration Job 的 init container |
+
+只 build API / Frontend 還不夠。`postgres:15` 和 `busybox:1.36` 如果沒有匯入 k3s node，Pod 還是會嘗試對外拉 image，現場仍可能被限流。
+
+### 備援 image 策略：使用 Docker Hub public image
 
 這個 Lab 的 K8s YAML 和 Helm chart 會使用：
 
@@ -123,14 +157,14 @@ yanchen184/url-shortener-api:v1
 yanchen184/url-shortener-frontend:v1
 ```
 
-上課前先確認 image 已經存在：
+如果 local image workflow 當天失敗，才改用 public image。上課前先確認 image 已經存在：
 
 ```bash
 docker manifest inspect yanchen184/url-shortener-api:v1 >/dev/null
 docker manifest inspect yanchen184/url-shortener-frontend:v1 >/dev/null
 ```
 
-如果 image 還不存在，先把 course site repo 裡的 `apps/**` 變更推到 `master`，讓 `.github/workflows/build-apps.yml` 透過 Docker Hub token build/push。否則學生 apply YAML 時會卡在 `ImagePullBackOff`。
+如果 image 還不存在，先把 course site repo 裡的 `apps/**` 變更推到 `master`，讓 `.github/workflows/build-apps.yml` 透過 Docker Hub token build/push。否則學生 apply public YAML 時會卡在 `ImagePullBackOff`。
 
 ### Step 0：確認 Node 和 Ingress
 
@@ -237,7 +271,7 @@ kubectl get pvc -n url-shortener
 ### Step 4：執行 Migration Job
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/04-migrate-job.yaml
+kubectl apply -f apps/k8s/url-shortener-local/04-migrate-job.yaml
 kubectl get jobs -n url-shortener
 kubectl logs job/db-migrate -n url-shortener
 ```
@@ -251,13 +285,15 @@ Job 適合一次性任務。這裡只負責建立 `short_links` table。
 - `kind: Job`：跑完就結束，不需要一直常駐。
 - `restartPolicy: OnFailure`：失敗時重跑 Pod。
 - `initContainers.wait-for-postgres`：先等 `postgres-service:5432` 可以連，再跑 migration。
+- `image: url-shortener-api:lab`：使用學生自己 build 並匯入 k3s 的 local image。
+- `imagePullPolicy: Never`：要求 k3s 不要對外拉 image，直接使用 node 上已有的 image。
 - `command: ["node", "migrate.js"]`：用 API image 裡的 migration 程式建表。
 - `backoffLimit: 3`：最多重試 3 次，避免無限重跑。
 
 ### Step 5：部署 API
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/05-api.yaml
+kubectl apply -f apps/k8s/url-shortener-local/05-api.yaml
 kubectl get deploy,svc -n url-shortener
 kubectl get pods -l app=url-api -n url-shortener
 ```
@@ -281,6 +317,8 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 
 幾個應該講清楚的欄位：
 
+- `image: url-shortener-api:lab`：使用本地 build/import 的 image，不走 Docker Hub。
+- `imagePullPolicy: Never`：避免現場因外部 registry 限流而失敗。
 - `replicas: 2`：API 先跑兩份，避免單 Pod 掛掉就中斷。
 - `envFrom.configMapRef`：把 DB host、port、database、user 注入 API。
 - `secretKeyRef`：只把 API 需要的 DB password 注入，不整包暴露。
@@ -291,7 +329,7 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 ### Step 6：部署 Frontend
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/06-frontend.yaml
+kubectl apply -f apps/k8s/url-shortener-local/06-frontend.yaml
 kubectl get deploy,svc -n url-shortener
 ```
 
@@ -305,6 +343,8 @@ Frontend 是靜態網站，無狀態，所以也是 Deployment。
 |---|---|
 | `Deployment` | 跑 2 個 frontend Pod，提供靜態網頁。 |
 | `Service` | 提供 `url-frontend-service`，讓 Ingress 可以把 `/` 導過來。 |
+
+local YAML 使用 `url-shortener-frontend:lab` 和 `imagePullPolicy: Never`，原因和 API 相同：上課時不依賴 Docker Hub。
 
 Frontend 沒有 DB 連線設定，也不需要 Secret，這正好可以讓學生比較：
 
@@ -378,6 +418,7 @@ http://short.local
 - 每一份 manifest 都是在回答一個問題。
 - 先手動做一次，後面講 Helm 才有意義。
 - Helm 一鍵部署不是魔法，它只是把這 9 份 YAML template 化。
+- 一鍵部署前，image 也要先交付到 k3s node；Helm 不會幫你 build image。
 
 ---
 
@@ -489,7 +530,8 @@ kubectl get pod postgres-0 -n url-shortener -w
 ```bash
 helm install url-shortener ./apps/helm/url-shortener \
   -n url-shortener \
-  --create-namespace
+  --create-namespace \
+  -f ./apps/helm/url-shortener/values-local.yaml
 ```
 
 這一個指令會建立：
@@ -516,6 +558,19 @@ helm install url-shortener ./apps/helm/url-shortener \
 | `06-frontend.yaml` | `templates/frontend.yaml` |
 | `07-hpa.yaml` | `templates/hpa.yaml` |
 | `08-ingress.yaml` | `templates/ingress.yaml` |
+
+`values-local.yaml` 會把 API / Frontend image 設成：
+
+```yaml
+image:
+  registry: ""
+  apiRepository: url-shortener-api
+  frontendRepository: url-shortener-frontend
+  tag: lab
+  pullPolicy: Never
+```
+
+所以 Helm render 後會使用 `url-shortener-api:lab` 和 `url-shortener-frontend:lab`，而不是 `/url-shortener-api:lab` 或 Docker Hub 上的 `yanchen184/...`。
 
 ### 一個指令升級
 

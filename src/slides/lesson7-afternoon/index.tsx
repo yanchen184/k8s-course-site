@@ -2409,9 +2409,9 @@ kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml`}</code></pre>
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
             <p className="text-cyan-300 font-semibold">匯入 k3s node</p>
             <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \\
-K3S_NODES="student@cp student@worker" \\
+K3S_NODES="user@cp user@worker" \\
   ./scripts/load-images-to-k3s-ssh.sh
-K3S_NODES="student@cp student@worker" \\
+K3S_NODES="user@cp user@worker" \\
   ./scripts/check-k3s-images-ssh.sh`}</code></pre>
           </div>
         </div>

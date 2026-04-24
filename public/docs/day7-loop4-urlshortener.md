@@ -128,6 +128,8 @@ source code
 
 重點是：`docker build` 只會把 image 放在學生操作環境的 Docker image store；k3s 使用的是 control plane / worker node 裡的 containerd。兩邊不是同一個地方，所以還要把 image 匯入每個 k3s node。
 
+一句話記住：**Pod 被排到哪台 node，那台 node 就必須已經有 image。** 如果 YAML 使用 `imagePullPolicy: Never`，k3s 不會退回去 Docker Hub 幫你拉。
+
 在 `k8s-course-labs/lesson7/url-shortener/` 執行：
 
 ```bash

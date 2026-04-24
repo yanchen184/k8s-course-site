@@ -97,6 +97,8 @@
 >
 > 這裡有一個很重要的觀念：`docker build` 是把 image 放在 Docker 裡；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。兩個地方不一定相通，所以要用 `docker save` 加上 `k3s ctr images import`。
 >
+> 可以直接給學生一句話：Pod 被排到哪台 node，那台 node 就必須已經有 image。用 `imagePullPolicy: Never` 的時候，K8s 不會幫你去 Docker Hub 補拉。
+>
 > 如果沒有匯入，YAML 寫 `imagePullPolicy: Never` 時會看到 `ErrImageNeverPull`；如果用 public image，則可能看到 `ImagePullBackOff`。兩個錯誤都跟 image 準備有關。
 
 ### 每份 YAML 的講解口條

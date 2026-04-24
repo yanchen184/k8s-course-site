@@ -2403,6 +2403,10 @@ K3S_NODES="student@cp student@worker" \\
         <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-cyan-300 text-center">
           docker build 是產生 image；k3s ctr import 是把 image 放進 Kubernetes 會使用的 containerd。
         </div>
+
+        <div className="bg-emerald-900/20 border border-emerald-500/40 p-3 rounded text-emerald-300 text-center font-semibold">
+          Pod 被排到哪台 node，那台 node 就必須已經有 image。
+        </div>
       </div>
     ),
     notes: `這張要補一個非常實務的問題：Image 也要被交付。
@@ -2414,6 +2418,8 @@ K3S_NODES="student@cp student@worker" \\
 這裡一定要講清楚：docker build 是把 image 放在學生操作環境的 Docker 裡；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。兩邊不是同一個地方，所以不能只 build，還要 import 到 control plane 和 worker。
 
 課前要確認 SSH 和 sudo 權限。學生要能 ssh 到 control plane 和 worker，而且該帳號要能免互動執行 sudo -n k3s ctr images list -q，否則腳本會卡在 sudo 密碼提示。
+
+這句話一定要讓學生記住：Pod 被排到哪台 node，那台 node 就必須已經有 image。imagePullPolicy: Never 的意思就是不要對外拉，所以沒有 image 的 node 會直接失敗。
 
 另外 PostgreSQL 和 busybox 也要考慮。只 build API 和 Frontend 還不夠，postgres:15 和 busybox:1.36 如果沒有匯入 k3s node，Pod 還是可能對外拉 image。
 

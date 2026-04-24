@@ -463,7 +463,8 @@ Redis 用普通 ClusterIP Service，不需要 Headless。
 
 | 類型 | 特性 | 適合場景 |
 |------|------|---------|
-| ClusterIP（預設）| 只在叢集內部可存取 | 內部服務互連 |
+| ClusterIP（預設）| 只在叢集內部可存取，有虛擬 IP | 內部服務互連（Redis、Backend）|
+| Headless（clusterIP: None）| 沒有虛擬 IP，DNS 直接回 Pod IP | StatefulSet（MySQL）|
 | NodePort | Node IP + 30000+ Port 對外 | 測試環境 |
 | LoadBalancer | 雲端 Load Balancer，給公開 IP | 雲端生產環境 |
 

@@ -1301,7 +1301,7 @@ kubectl auth can-i get secrets --as=system:serviceaccount:backend-team:backend-d
 
 # ─── Part 4：抓 cluster 資訊 ───
 VM_IP=$(hostname -I | awk '{print $1}')
-CLUSTER_SERVER="https://${VM_IP}:6443"
+CLUSTER_SERVER="https://${'${VM_IP}'}:6443"
 CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 if [ -z "$CA_DATA" ]; then
   CA_DATA=$(sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt | base64 -w 0)
@@ -1334,7 +1334,7 @@ EOF
 
 # ─── Part 7：切身份驗收 ───
 unset KUBECONFIG
-kubectl config set-cluster k3s-backend --server=https://${VM_IP}:6443 --insecure-skip-tls-verify=true
+kubectl config set-cluster k3s-backend --server=https://${'${VM_IP}'}:6443 --insecure-skip-tls-verify=true
 kubectl config set-credentials backend-dev --token=$TOKEN
 kubectl config set-context backend-dev@k3s --cluster=k3s-backend --user=backend-dev --namespace=backend-team
 kubectl config use-context backend-dev@k3s

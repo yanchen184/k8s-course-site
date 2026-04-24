@@ -12,589 +12,574 @@ export interface Slide {
 
 export const slides: Slide[] = [
   // ============================================================
-  // 7-1：第六堂回顧 + 生產環境的挑戰（2 張）
+  // Loop 1：HPA 自動擴縮（對應 public/docs/day7-loop1-hpa.md）
+  // 7-1 回顧+環境（3 張）+ 7-2 概念（2 張）+ 7-3 實戰（4 張）+ 7-4 實作（1 張）= 10 張
   // ============================================================
 
-  // ── 7-1（1/2）：開場 + 第六堂因果鏈回顧 ──
+  // ── [1/10] 7-1（1/3）：開場 + 第六堂因果鏈回顧 ──
   {
     title: '第七堂：生產就緒 — 穿得漂亮不代表扛得住',
-    subtitle: 'HPA → RBAC → 下午：從零建完整系統',
-    section: '7-1：回顧 + 生產環境的挑戰',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-3">第六堂因果鏈回顧</p>
-          <div className="flex items-center justify-center gap-1 text-xs flex-wrap my-1">
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">NodePort 又長又醜</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">Ingress 域名路由</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">ConfigMap / Secret</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">PV / PVC 持久化</span>
-          </div>
-          <div className="flex items-center justify-center gap-1 text-xs flex-wrap my-1">
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">StorageClass 動態佈建</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">StatefulSet 跑 DB</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">Helm 套件管理</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">Rancher GUI</span>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">上堂課的比喻</p>
-          <p className="text-slate-300 text-sm">域名=門牌、設定/密碼=名片夾、持久化=保險箱、Helm=購物車、Rancher=監控攝影機</p>
-          <p className="text-red-400 font-semibold mt-2">穿得漂亮 ≠ 扛得住生產環境的考驗</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">今天的因果鏈</p>
-          <div className="flex items-center gap-2 flex-wrap text-sm">
-            <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">HPA 自動擴縮</span>
-            <span className="text-slate-400 font-bold">→</span>
-            <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">RBAC 權限控管</span>
-            <span className="text-slate-400 font-bold">→</span>
-            <span className="bg-cyan-900/40 border border-cyan-500/50 px-3 py-1 rounded text-cyan-400 font-semibold">從零建完整系統</span>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `好，歡迎回來。今天是我們 Kubernetes 課程的第七堂，也是最後一堂。在開始新的內容之前，我們先花幾分鐘把第六堂的因果鏈快速串一遍，確認大家的腦袋裡有一條完整的線。
-
-第六堂的起點是什麼？是第五堂結束的時候，使用者要用 IP 加 NodePort 連進來，地址又長又醜，像是 192.168.1.100:30080 這種東西。你總不能叫使用者記這串數字吧。所以我們學了 Ingress，用域名加路徑做路由。blog.example.com 連到前端，blog.example.com/api 連到後端 API。地址漂亮了，還加了 TLS 做 HTTPS。
-
-接著我們發現設定寫死在 Image 裡面。改一個環境變數就要重新 build Image，密碼寫在 Dockerfile 裡更是災難。所以學了 ConfigMap 管一般設定、Secret 管敏感資料。
-
-設定和密碼分離了，服務跑起來了。結果 MySQL Pod 重啟一次，資料全部消失。所以學了 PV 和 PVC 做持久化儲存。手動建 PV 太煩了，又學了 StorageClass 動態佈建。
-
-有了持久化，可以正式跑資料庫了。但 Deployment 不適合跑資料庫，名字不固定、沒有順序、共用 PVC。所以學了 StatefulSet，固定序號、有序啟動、獨立儲存。
-
-到這裡 YAML 已經多到爆了，一個 MySQL 就要五六個資源。所以學了 Helm，一行 helm install 搞定整套安裝。最後全部用 kubectl 管叢集太痛苦了，學了 Rancher 提供 GUI 管理。
-
-這就是第六堂完整的因果鏈。每一個概念都是因為上一步有沒解決的問題才引出來的。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-1（2/2）：生產環境四個要命問題 ──
-  {
-    title: '生產環境的四個要命問題',
-    subtitle: '穿上正式衣服了，但壓力測試呢？',
-    section: '7-1：回顧 + 生產環境的挑戰',
+    subtitle: '從第六堂六招，到今天的兩個戰場',
+    section: '7-1：回顧 + 今天的挑戰',
     duration: '5',
     content: (
       <div className="space-y-3">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-3">四個最常見的要命問題</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">1.</span>
-              <div>
-                <span className="text-white font-semibold">服務卡死沒人知</span>
-                <span className="text-slate-400 ml-2">— API 死鎖，Pod 顯示 Running，使用者看到 502</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">2.</span>
-              <div>
-                <span className="text-white font-semibold">一個 Pod 吃光整台機器</span>
-                <span className="text-slate-400 ml-2">— 記憶體洩漏，其他 Pod 被擠到沒資源</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">3.</span>
-              <div>
-                <span className="text-white font-semibold">流量暴增</span>
-                <span className="text-slate-400 ml-2">— 凌晨三點暴增，你在睡覺，使用者罵翻了</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">4.</span>
-              <div>
-                <span className="text-white font-semibold">誰都能刪</span>
-                <span className="text-slate-400 ml-2">— 實習生 kubectl delete namespace production</span>
-              </div>
-            </div>
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-2">第六堂六招因果鏈</p>
+          <div className="space-y-1 text-slate-300">
+            <p>① <b className="text-amber-300">Ingress</b> — IP+NodePort 地址醜 → 用域名路由</p>
+            <p>② <b className="text-amber-300">ConfigMap / Secret</b> — 設定寫死 Image → 設定跟程式分離</p>
+            <p>③ <b className="text-amber-300">PV / PVC</b> — Pod 重啟資料消失 → 持久化儲存</p>
+            <p>④ <b className="text-amber-300">StatefulSet</b> — 資料庫要穩定身份 → Pod 名字不變、有序啟動</p>
+            <p>⑤ <b className="text-amber-300">Helm</b> — YAML 複製貼上地獄 → values.yaml 管理</p>
+            <p>⑥ <b className="text-amber-300">Rancher GUI</b> — kubectl 操作成本高 → 圖形化降門檻</p>
           </div>
         </div>
 
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">今天的解法</p>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="text-slate-300"><span className="text-red-400">流量暴增</span> → <span className="text-green-400 font-semibold">HPA 自動擴縮</span></div>
-            <div className="text-slate-300"><span className="text-red-400">誰都能刪</span> → <span className="text-green-400 font-semibold">RBAC 權限控管</span></div>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded-lg text-center">
-          <p className="text-cyan-400 font-semibold text-sm">上午：Loop 1 HPA → Loop 2 RBAC ｜ 下午：從零建完整系統</p>
+        <div className="bg-gradient-to-r from-amber-900/30 to-red-900/30 border border-amber-500/40 p-3 rounded text-xs">
+          <p className="text-amber-300 font-semibold mb-1">但服務真的扛得住嗎？</p>
+          <p className="text-slate-300">有域名、有設定、有資料庫、有 GUI——<b>穿得漂亮不代表扛得住</b>。今天補兩個生產環境最要命的缺口。</p>
         </div>
       </div>
     ),
-    notes: `好，我上堂課結尾用了一個比喻：你的服務穿上了正式的衣服。域名是門牌、設定和密碼是名片夾、資料持久化是保險箱、套件管理是購物車、GUI 是監控攝影機。衣服穿好了，看起來很體面。
+    notes: `好，歡迎回來。今天是我們 Kubernetes 課程的第七堂，也是最後一堂。
 
-但我今天要跟大家說一件殘酷的事情。穿得漂亮不代表扛得住。生產環境會用各種方式考驗你的系統。
+在開始新內容之前，先把第六堂的因果鏈快速串一遍。為什麼要串？因為今天要講的東西，是建立在前六堂基礎上的最後一哩路。
 
-我舉四個最常見的要命問題。
+第六堂的起點是使用者要用 IP 加 NodePort 連進來，地址又長又醜、每次改 port 就爆炸。所以學了 Ingress，用域名路由。
 
-第一個，服務卡死沒人知。你的 API Pod 裡面的程式死鎖了，或者資料庫連線池滿了。Pod 的 process 還活著，K8s 看到 STATUS 是 Running。Service 照樣把流量往那邊送。使用者呢？看到的是 502 Bad Gateway，或者請求超時。但你在監控儀表板上看到的是一片綠色的 Running。
+接著發現設定寫死在 Image 裡、改設定要重 build image。所以學了 ConfigMap 跟 Secret，設定跟程式分離。
 
-第二個，一個 Pod 吃光整台機器的資源。有個 Pod 裡面的程式有記憶體洩漏，越吃越多。其他 Pod 被擠到沒資源可用，全部跟著掛。一隻老鼠壞了一鍋粥。
+然後 Pod 重啟資料全消失，資料庫跑在 K8s 裡等於自殺。所以學了 PV 跟 PVC，做持久化。
 
-第三個，流量暴增。雙十一來了，平常三個 Pod 夠用，現在三十個都不夠。你手動 kubectl scale 可以，但你不可能 24 小時盯著。凌晨三點流量暴增的時候你在睡覺，等你醒來使用者已經罵翻了。
+跑資料庫不只要持久化，還要穩定的身份跟有序啟動。所以學了 StatefulSet，Pod 名字不變、順序上線。
 
-第四個，誰都能刪。你的叢集上有十個團隊在跑服務，每個人都拿到了 admin 權限。新來的實習生不小心打了 kubectl delete namespace production，整個生產環境消失。
+當 YAML 多到爆、每個環境要改一堆值，複製貼上地獄。所以學了 Helm，用 values.yaml 一次管理。
 
-這四個問題，今天我們重點處理兩個。上午 Loop 1 是 HPA，解決流量暴增的問題。上午 Loop 2 是 RBAC，解決權限管控的問題。下午從零建一套完整的系統，把所有東西串在一起。
+最後 kubectl 管一整個叢集太痛苦，開發者要看日誌、除錯、重啟 Pod，全部靠指令效率太低。所以學了 Rancher GUI，用圖形化界面降低操作門檻。
 
-準備好了嗎？我們從第一個問題開始：流量暴增，手動 scale 來不及。
+服務看起來很體面了：有域名、有設定管理、有資料庫、有 GUI。但我今天要跟大家說一件殘酷的事情——穿得漂亮不代表扛得住。
 
-[▶ 下一頁]`,
+下一頁，今天兩個戰場。[▶ 下一頁]`,
   },
 
-  // ============================================================
-  // Loop 1-0：環境準備（開始前必做）
-  // ============================================================
-
-  // ── 環境準備 ──
+  // ── [2/10] 7-1（2/3）：今天兩個戰場 ──
   {
-    title: '開始前：清乾淨環境',
-    subtitle: '第六堂留下的 Helm release 與 PVC 會佔資源，先全部清掉',
-    section: 'Loop 1：環境準備',
+    title: '今天兩個戰場 — 流量暴增 + 誰都能刪',
+    subtitle: 'Loop 1 HPA 解決自動擴縮、Loop 2 RBAC 解決權限管控',
+    section: '7-1：回顧 + 今天的挑戰',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded text-xs">
+          <p className="text-red-400 font-semibold mb-1">戰場一：流量暴增（雙十一故事）</p>
+          <p className="text-slate-300 mb-1">平常 3 個 Pod 夠用，雙十一零點流量翻 10 倍。凌晨 3 點你在睡覺——使用者打不開頁面、每分鐘損失幾十萬。</p>
+          <p className="text-slate-300">手動 scale 兩個缺陷：<b className="text-amber-300">反應太慢</b>（你在睡覺）+ <b className="text-amber-300">忘記縮回來</b>（月底帳單傻眼）。</p>
+          <p className="text-green-400 font-semibold mt-2">→ Loop 1：HPA（Horizontal Pod Autoscaler）</p>
+        </div>
+
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded text-xs">
+          <p className="text-red-400 font-semibold mb-1">戰場二：誰都能刪（實習生故事）</p>
+          <p className="text-slate-300">十個人全拿 <code className="text-red-400">cluster-admin</code>。實習生跑清理腳本，<code className="text-red-400">kubectl delete namespace production</code>——整個生產環境瞬間消失。</p>
+          <p className="text-green-400 font-semibold mt-2">→ Loop 2：RBAC（Role-Based Access Control）</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded text-xs text-center">
+          <p className="text-cyan-400 font-semibold">上午：Loop 1 HPA → Loop 2 RBAC ｜ 下午：從零建完整系統</p>
+        </div>
+      </div>
+    ),
+    notes: `今天我選了生產環境裡兩個最要命的問題，上午各用一個 Loop 解決。
+
+戰場一，流量暴增。想像你的網站平常三個 Pod 夠用，雙十一零點開賣，流量瞬間翻十倍。你在哪？凌晨三點你在睡覺。使用者打不開頁面、下不了單，每分鐘損失幾十萬。等你起床手動 kubectl scale 已經半小時過去了。
+
+手動 scale 有兩個根本問題：第一，反應太慢，沒辦法即時應對。第二，容易忘記縮回來，流量過了還開著十個 Pod，月底帳單傻眼。這個問題用 HPA 解決。
+
+戰場二，誰都能刪。你團隊十個人，全部都拿 cluster-admin 的 kubeconfig。某天實習生跑清理腳本，指令打錯，kubectl delete namespace production。整個生產環境瞬間消失。這個問題用 RBAC 解決。
+
+上午兩個 Loop：Loop 1 HPA、Loop 2 RBAC。下午從零建一套完整系統，把前面學的所有東西串起來。
+
+進 Loop 1 之前，先把環境清乾淨。[▶ 下一頁：環境準備]`,
+  },
+
+  // ── [3/10] 7-1（3/3）：環境準備 ──
+  {
+    title: 'Loop 1 環境準備 — 清理殘留資源',
+    subtitle: '第六堂的 Helm release 會吃 CPU，干擾 HPA 觀察',
+    section: '7-1：環境準備',
+    duration: '5',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">為什麼要清？</p>
+          <p className="text-slate-300">monitoring / my-app / my-blog / my-ingress 還在跑會吃 CPU/Memory，HPA 指標會被干擾。PVC 不刪 disk 會佔滿。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">清理 Helm release</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">helm uninstall monitoring -n default</p>
+            <p className="text-green-300">helm uninstall my-app -n default</p>
+            <p className="text-green-300">helm uninstall my-blog -n default</p>
+            <p className="text-green-300">helm uninstall my-ingress -n default</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">清理殘留 + 釋放磁碟</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl delete all --all -n default</p>
+            <p className="text-green-300">kubectl delete pvc --all -n default</p>
+            <p className="text-green-300">sudo journalctl --vacuum-size=100M</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">確認環境乾淨</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl get pods -n default</p>
+            <p className="text-green-300">df -h /</p>
+            <p className="text-slate-400">→ pods 應為空、磁碟空間 ≥ 3G</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `在進 HPA 實作之前，先動手把環境清乾淨。
+
+為什麼要清？第六堂我們部署了四個 Helm release：monitoring、my-app、my-blog、my-ingress。這些都還在跑、會吃 CPU 跟 Memory。等一下 HPA 要觀察 CPU 指標，如果資源被其他東西吃掉，HPA 算出來的百分比會不準。你看到的擴縮行為就會奇怪。
+
+第一步，helm uninstall 把四個 release 全部刪掉。這會連帶刪掉它們建的所有 Deployment、Service、ConfigMap。
+
+第二步，保險起見再 kubectl delete all 跟 kubectl delete pvc。有些殘留資源可能不是 Helm 建的，這一步把它們清掉。PVC 一定要刪，不然 disk 空間會被佔住。
+
+第三步，journalctl vacuum。這個清 systemd 的 log，釋放磁碟空間。log 久了會吃掉幾個 G，不清等一下拉 image 可能空間不夠。
+
+最後確認。kubectl get pods 應該是空的，df -h 看 / 至少 3G 以上。準備好就進 HPA 概念。[▶ 下一頁：HPA 概念]`,
+  },
+
+  // ── [4/10] 7-2（1/2）：HPA 概念 ──
+  {
+    title: 'HPA 解決什麼問題？',
+    subtitle: '手動 scale 的兩個致命缺陷 → HPA 全自動擴縮',
+    section: '7-2：HPA 概念',
+    duration: '5',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-red-900/20 border border-red-500/40 p-3 rounded text-xs">
+          <p className="text-red-400 font-semibold mb-1">手動 scale 的兩個致命缺陷</p>
+          <ul className="text-slate-300 space-y-1 list-disc list-inside">
+            <li><b className="text-amber-300">反應太慢</b>：流量暴增時你在睡覺/吃飯/開會，損失已造成</li>
+            <li><b className="text-amber-300">忘記縮回來</b>：當下撐過去，事後沒人記得縮，帳單三倍</li>
+          </ul>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-green-400 font-semibold mb-2">HPA 工作流程（全自動）</p>
+          <div className="space-y-1 text-slate-300">
+            <p>每 <b className="text-cyan-400">15 秒</b> 問 metrics-server：目前每個 Pod CPU 多少？</p>
+            <p>→ 超過門檻（50%）：<b className="text-green-400">增加 Pod</b></p>
+            <p>→ 低於門檻：<b className="text-amber-300">等穩定窗口</b>（預設 5 分鐘）後縮 Pod</p>
+            <p className="text-slate-400">（穩定窗口防抖：避免流量短暫下降又回升時頻繁縮容）</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded text-xs">
+          <p className="text-amber-300 font-semibold mb-1">兩個前提（缺一不可）</p>
+          <ul className="text-slate-300 space-y-1 list-disc list-inside">
+            <li>Pod 要設 <code className="text-green-300">resources.requests.cpu</code>（HPA 算百分比的分母）</li>
+            <li>叢集要有 <code className="text-green-300">metrics-server</code>（k3s 內建、minikube 要手動開啟）</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    notes: `HPA 要解決什麼問題？手動 scale 有兩個致命缺陷。
+
+第一，反應太慢。流量暴增那一刻你可能在睡覺、在吃飯、在開會。等你發現、登入叢集、下指令，幾十分鐘過去了，損失已經造成。
+
+第二，容易忘記縮回來。就算你當下撐過去了，事後誰記得要縮回來？開著十個 Pod 整個月，帳單三倍不是開玩笑。
+
+所以需要自動化。這就是 HPA 存在的理由。
+
+HPA 的工作流程。HPA 每 15 秒去問一次 metrics-server：目前這個 Deployment 每個 Pod 的 CPU 使用率是多少？
+
+超過你設的目標值——比如 50%——HPA 就增加 Pod。新 Pod 啟動後，流量分攤到更多 Pod，CPU 使用率就降下來了。
+
+當流量降下來之後，CPU 也跟著降。但 HPA 不會馬上縮 Pod。它會等一段穩定窗口——預設五分鐘——看到 CPU 連續五分鐘都低於門檻才開始縮。為什麼？因為怕流量只是暫時降了一下馬上又上來。防抖設計。
+
+整個流程全自動，人不用看、不用介入。
+
+有兩個前提缺一不可。第一，Pod 必須設 resources.requests.cpu。HPA 算的是百分比，百分比需要分母，分母就是 requests。沒設 requests，TARGETS 永遠顯示 unknown，HPA 不會動。
+
+第二，叢集要有 metrics-server。k3s 內建，如果用 minikube 要 minikube addons enable metrics-server 啟用。
+
+下一頁看完整 YAML。[▶ 下一頁：HPA YAML]`,
+  },
+
+  // ── [5/10] 7-2（2/2）：HPA YAML 完整版 ──
+  {
+    title: 'HPA YAML 完整版 — 四個關鍵欄位',
+    subtitle: '實戰會用一行指令（快）+ 完整 YAML（進階參數）',
+    section: '7-2：HPA 概念',
     duration: '3',
     content: (
-      <div className="space-y-3 text-xs">
-        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded">
-          <p className="text-amber-300 font-semibold mb-1">為什麼要清</p>
-          <p className="text-slate-300">第六堂的 monitoring / my-app / my-blog / my-ingress 都還在跑，會吃掉 CPU 與 Memory，等一下 HPA 要觀察指標會被干擾。PVC 也要一起刪，不然 disk 佔滿。</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded font-mono text-xs space-y-0.5">
-          <p className="text-slate-500"># 1. 卸掉四個 Helm release</p>
-          <p className="text-green-300">helm uninstall monitoring -n default</p>
-          <p className="text-green-300">helm uninstall my-app -n default</p>
-          <p className="text-green-300">helm uninstall my-blog -n default</p>
-          <p className="text-green-300">helm uninstall my-ingress -n default</p>
-          <p className="text-slate-500 mt-1"># 2. 清掉殘留資源 + PVC</p>
-          <p className="text-green-300">kubectl delete all --all -n default</p>
-          <p className="text-green-300">kubectl delete pvc --all -n default</p>
-          <p className="text-slate-500 mt-1"># 3. 壓縮 journal log（選做）</p>
-          <p className="text-green-300">sudo journalctl --vacuum-size=100M</p>
-        </div>
-
-        <div className="bg-green-900/20 border border-green-500/40 p-2 rounded">
-          <p className="text-green-300 font-semibold mb-1">驗證</p>
-          <div className="font-mono text-slate-300 space-y-0.5">
-            <p><span className="text-green-400">kubectl get pods -n default</span> → <span className="text-cyan-300">No resources found</span></p>
-            <p><span className="text-green-400">df -h /</span> → 可用空間 <span className="text-cyan-300">≥ 3G</span></p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `進 Loop 1 之前先把環境清乾淨。
-
-第六堂我們部署了四個 Helm release：monitoring、my-app、my-blog、my-ingress。這些都還在跑，會吃 CPU 和 Memory。等一下我們要觀察 HPA 根據 CPU 使用率自動擴縮容，如果資源被其他東西吃掉，指標會被干擾，你看到的結果會不準。
-
-所以先做三件事：
-
-第一，helm uninstall 四個 release。這會把 Deployment、Service、Ingress 全部拆掉。
-
-第二，kubectl delete all --all -n default 再清一次殘留資源，保險。然後 kubectl delete pvc --all -n default 把 PVC 也刪掉。為什麼要刪 PVC？因為 StatefulSet 卸載不會自動刪 PVC，留著會一直佔 disk 空間。
-
-第三步選做：sudo journalctl --vacuum-size=100M 壓縮系統 log。如果你的 VM disk 很緊，這招可以多擠一點空間出來。
-
-驗證兩點。kubectl get pods -n default 應該回 No resources found，代表沒東西在跑了。df -h / 看根目錄可用空間要 ≥ 3G，不然等一下部署會失敗。
-
-清完就進 Loop 1，來看 HPA 要解決什麼問題。[▶ 下一頁]`,
-  },
-
-  // ============================================================
-  // Loop 1-1：HPA 概念（2 張：問題 → 解法）
-  // ============================================================
-
-  // ── 7-8（1/2）：手動 scale 來不及 ──
-  {
-    title: '問題：流量暴增，手動 scale 來不及',
-    subtitle: 'kubectl scale 是手動的 — 凌晨三點你在睡覺',
-    section: 'Loop 1：HPA 概念',
-    duration: '8',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-3">場景：雙十一零點流量翻十倍</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="bg-green-900/40 text-green-300 px-2 py-1 rounded text-xs">平常：3 Pod，CPU 30%</span>
-              <span className="text-slate-500">→</span>
-              <span className="bg-red-900/60 text-red-300 px-2 py-1 rounded text-xs border border-red-500/50">雙十一：3 Pod 全部 CPU 100%</span>
-              <span className="text-slate-500">→</span>
-              <span className="bg-red-900/60 text-red-300 px-2 py-1 rounded text-xs border border-red-500/50">超時 → 使用者罵翻</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">手動 scale 的兩個根本問題</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">1.</span>
-              <span className="text-slate-300">反應太慢 — 你不可能 24 小時盯 Grafana</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">2.</span>
-              <span className="text-slate-300">容易忘記縮回來 — 10 個 Pod 閒著浪費資源</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Docker 對照</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-600">
-                <th className="text-left py-1">Docker</th>
-                <th className="text-left py-1">K8s</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700">
-                <td className="py-1 font-mono text-xs">docker compose up --scale web=10</td>
-                <td className="py-1">kubectl scale（手動）</td>
-              </tr>
-              <tr>
-                <td className="py-1 text-slate-500">沒有自動 scale</td>
-                <td className="py-1 text-green-400 font-semibold">HPA（自動 scale）</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    ),
-    notes: `好，上一個 Loop 我們設好了 Resource limits。每個 Pod 有保底有天花板，不會吃光整台機器的資源。但是我現在要跟大家描述另一個場景。
-
-想像你的電商網站。平常日子裡，兩三個 Pod 就夠用了。CPU 使用率大概在 30% 左右，很悠閒。結果雙十一來了，零點一到，流量瞬間翻了十倍。你的三個 Pod 每個 CPU 都飆到 100%，請求開始排隊，回應時間從 100 毫秒暴增到 5 秒，然後開始超時。使用者不斷重試，流量更大，雪崩效應。
-
-你手邊有武器啊。第五堂學了 kubectl scale deployment my-app --replicas=10，把副本數加到 10 個。但問題是你怎麼知道什麼時候該加？你不可能 24 小時盯著 Grafana 的 CPU 圖表吧。凌晨三點流量暴增，你在睡覺。等你七點起床看到告警，使用者已經罵了四個小時了。
-
-然後雙十一結束了，流量回到正常。十個 Pod 閒在那裡什麼事都沒做，但 CPU 和記憶體還是佔著。你忘了把 replicas 調回來，白白浪費資源。
-
-手動 scale 有兩個根本問題。第一，反應太慢，你不可能即時反應。第二，容易忘記縮回來，浪費資源。
-
-Docker Compose 也有 scale 的功能，docker compose up --scale web=10，但一樣是手動的。
-
-K8s 提供了一個自動化的方案，叫 HPA，Horizontal Pod Autoscaler，水平 Pod 自動擴縮器。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-8（2/2）：HPA 自動擴縮 ──
-  {
-    title: '解法：HPA — 根據 CPU 自動擴縮 Pod',
-    subtitle: 'Horizontal Pod Autoscaler：超過閾值加 Pod，降下來減 Pod',
-    section: 'Loop 1：HPA 概念',
-    duration: '7',
-    content: (
-      <div className="space-y-3">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">HPA 工作流程</p>
-          <div className="flex items-center justify-center gap-1 text-xs flex-wrap my-1">
-            <span className="bg-cyan-900/40 text-cyan-300 px-2 py-1 rounded">每 15 秒查 metrics</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-cyan-900/40 text-cyan-300 px-2 py-1 rounded">CPU &gt; 50%</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-green-900/40 text-green-300 px-2 py-1 rounded">加 Pod</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-cyan-900/40 text-cyan-300 px-2 py-1 rounded">CPU 降下來</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-amber-900/40 text-amber-300 px-2 py-1 rounded">等 5 分鐘冷卻</span>
-            <span className="text-slate-500">→</span>
-            <span className="bg-amber-900/40 text-amber-300 px-2 py-1 rounded">減 Pod</span>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">HPA YAML 拆解</p>
-          <div className="text-xs text-slate-300 space-y-1 font-mono">
-            <p>apiVersion: autoscaling/v2</p>
-            <p>kind: HorizontalPodAutoscaler</p>
-            <p>spec:</p>
-            <p className="pl-4"><span className="text-cyan-400">scaleTargetRef:</span> <span className="text-slate-500">← 擴縮哪個 Deployment</span></p>
-            <p className="pl-8">kind: Deployment</p>
-            <p className="pl-8">name: nginx-resource-demo</p>
-            <p className="pl-4"><span className="text-green-400">minReplicas: 2</span> <span className="text-slate-500">← 最少保持（高可用）</span></p>
-            <p className="pl-4"><span className="text-red-400">maxReplicas: 10</span> <span className="text-slate-500">← 最多擴到（Node 資源有限）</span></p>
-            <p className="pl-4"><span className="text-amber-400">metrics:</span></p>
-            <p className="pl-8">cpu averageUtilization: <span className="text-amber-400">50</span> <span className="text-slate-500">← 50% of requests</span></p>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg">
-          <p className="text-red-400 font-semibold text-xs text-center">前提：Pod 必須設 resources.requests（HPA 算百分比的分母）</p>
-          <p className="text-slate-400 text-xs text-center mt-1">需要 metrics-server（k3s 內建）｜ 縮容冷卻期 5 分鐘（防抖動）</p>
-        </div>
-      </div>
-    ),
-    code: `apiVersion: autoscaling/v2
+      <div className="space-y-2 text-xs">
+        <div className="bg-slate-900 p-2 rounded font-mono text-[11px]">
+          <pre className="text-slate-300 whitespace-pre">{`apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: nginx-hpa
+  name: nginx-resource-demo
 spec:
-  scaleTargetRef:
+  scaleTargetRef:              # ★1 要管哪個 Deployment
     apiVersion: apps/v1
     kind: Deployment
     name: nginx-resource-demo
-  minReplicas: 2
-  maxReplicas: 10
+  minReplicas: 2               # ★2 最少 2 個（高可用）
+  maxReplicas: 5               # ★3 最多 5 個（VM 保護）
   metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 50
-
-# 或用一行指令：
-# kubectl autoscale deployment nginx-resource-demo \\
-#   --min=2 --max=10 --cpu=50%`,
-    notes: `HPA 做的事情用一句話說就是：監控 Pod 的 CPU 使用率，超過你設的閾值就自動加 Pod，低於閾值就自動減 Pod。全自動，不需要人介入。
-
-HPA 的工作流程是這樣的。它每 15 秒去問 metrics-server：目前每個 Pod 的 CPU 使用率是多少？拿到數據之後做計算。如果平均 CPU 使用率超過你設的目標值，比如 50%，HPA 就會增加 Pod 的數量。新的 Pod 啟動之後，流量分攤到更多 Pod 上面，每個 Pod 的 CPU 使用率就降下來了。
-
-當流量降下來之後，CPU 使用率也跟著降。HPA 發現 CPU 低於目標值了，但它不會馬上縮 Pod。它會等一段冷卻期，預設是 5 分鐘。為什麼要等？因為怕流量只是暫時降了一下馬上又上來。等了 5 分鐘確認流量真的穩定了，HPA 才會開始縮減 Pod 數量。
-
-來看 YAML 怎麼寫。apiVersion 是 autoscaling/v2，kind 是 HorizontalPodAutoscaler。
-
-spec 裡面第一個重點是 scaleTargetRef。它告訴 HPA 要擴縮哪個 Deployment。name 是 nginx-resource-demo，就是我們上一個 Loop 建的那個 nginx Deployment。
-
-minReplicas 設 2，表示最少保持 2 個 Pod。保持最少 2 個是基本的高可用。maxReplicas 設 10，表示最多擴到 10 個 Pod。maxReplicas 要根據你的 Node 總資源來設。
-
-metrics 裡面 averageUtilization 設 50。意思是當所有 Pod 的平均 CPU 使用率超過 50% 的時候就擴容。這裡的 50% 是相對於 requests 的 50%。如果你的 Pod requests cpu 是 100m，那 50% 就是 50m。
-
-這就是為什麼上一個 Loop 我一直強調要設 requests。HPA 算的是百分比。百分比需要一個分母。分母就是 requests。如果你沒設 requests，HPA 不知道 100% 是多少，就沒辦法算百分比，HPA 就不會動。
-
-最後一個前提。HPA 需要 metrics-server。如果你用的是 k3s，好消息，k3s 內建了 metrics-server。如果你用的是 minikube，需要執行 minikube addons enable metrics-server 來啟用它。
-
-概念講完了，下一支影片我們來壓測，親眼看 HPA 自動擴容。
-
-[▶ 下一頁]`,
-  },
-
-  // ============================================================
-  // Loop 1-2：HPA 實作 + 學員實作（2+1 張）
-  // ============================================================
-
-  // ── 7-9（1/3）：壓測觸發擴容 ──
-  {
-    title: 'HPA 實作：壓測觸發自動擴容',
-    subtitle: 'busybox 無限 wget → CPU 飆高 → HPA 加 Pod',
-    section: 'Loop 1：HPA 實作',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Step 0~2：確認環境 + 建 HPA</p>
-          <div className="text-xs text-green-400 font-mono space-y-1">
-            <p>$ kubectl get pods -n kube-system -l k8s-app=metrics-server</p>
-            <p className="text-slate-400"># → 確認 Running</p>
-            <p>$ kubectl top pods</p>
-            <p className="text-slate-400"># → 有數字 = metrics-server 正常</p>
-            <p>$ kubectl apply -f nginx-resource-demo.yaml</p>
-            <p className="text-slate-400"># → Deployment + Service 一起建好（含 nginx-resource-svc）</p>
-            <p>$ kubectl autoscale deployment nginx-resource-demo \</p>
-            <p>    --min=2 --max=10 --cpu=50%</p>
-            <p>$ kubectl get hpa</p>
-            <p className="text-slate-400"># → TARGETS: 1%/50%, REPLICAS: 2</p>
-          </div>
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50 # ★4 CPU > requests 50% 就擴`}</pre>
         </div>
 
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">Step 3：壓測（另開終端機）</p>
-          <div className="text-xs text-green-400 font-mono space-y-1">
-            <p>$ kubectl run load-test --image=busybox:1.36 --rm -it \</p>
-            <p>    --restart=Never -- sh -c \</p>
-            <p>    "while true; do wget -qO- http://nginx-resource-svc {'>'} /dev/null 2{'>'}&1; done"</p>
-          </div>
-          <p className="text-slate-400 text-xs mt-2">無限迴圈 wget → 每秒幾十~上百次請求</p>
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">四個關鍵欄位</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li><code className="text-amber-300">scaleTargetRef.name</code>：要跟 Deployment 的 metadata.name 完全一致</li>
+            <li><code className="text-amber-300">minReplicas: 2</code>：沒流量也保留 2 個避免單點故障</li>
+            <li><code className="text-amber-300">maxReplicas: 5</code>：單節點 VM 安全值；生產環境可調大</li>
+            <li><code className="text-amber-300">averageUtilization: 50</code>：requests 100m 的 50% = 50m</li>
+          </ul>
+        </div>
+
+        <div className="bg-gradient-to-r from-cyan-900/30 to-purple-900/30 border border-cyan-500/40 p-2 rounded">
+          <p className="text-cyan-300 font-semibold mb-1">實戰兩種建法</p>
+          <p className="text-slate-300">Demo 1 用 <code className="text-green-300">kubectl autoscale</code> 一行指令（快、適合實驗）→ Demo 4 升級成完整 YAML 加 <code className="text-green-300">behavior</code>（適合生產、可版控、能調進階參數）</p>
         </div>
       </div>
     ),
-    code: `# Step 0：確認 metrics-server
-kubectl get pods -n kube-system -l k8s-app=metrics-server
-kubectl top nodes
-kubectl top pods
+    notes: `這是一份完整的 HPA YAML，四個關鍵欄位看清楚。
 
-# Step 1：部署 Deployment + Service（yaml 已含 nginx-resource-svc）
-kubectl apply -f ~/workspace/k8s-course-labs/lesson7/nginx-resource-demo.yaml
+第一，scaleTargetRef。它告訴 HPA 要管哪個 Deployment。name 一定要跟 Deployment 的 metadata.name 完全一致，寫錯就連不上。
+
+第二，minReplicas 設 2。為什麼不是 1？因為設 1 的話 HPA 縮容後只剩一個 Pod，那個 Pod 掛掉就服務中斷。設 2 維持基本高可用。
+
+第三，maxReplicas 設 5。為什麼不設 10？因為我們用的是單節點 VM 環境，設太大會把節點資源吃光、VM 可能重啟。生產環境你有幾個大 node 可以設到 20、50。
+
+第四，averageUtilization 設 50。這個是相對於 requests 的百分比。Pod requests 設 100m，50% 就是 50m。現在每個 Pod 平均用超過 50m 就擴容。
+
+實戰我們有兩種建法。Demo 1 會用 kubectl autoscale 一行指令——快、適合實驗、但不能調進階參數。Demo 4 重壓測前會升級成完整 YAML、加上 behavior 欄位——這個可以版控、可以調穩定窗口，生產環境就是這樣管的。
+
+好，進實戰。[▶ 下一頁：Demo 1 部署 + 建 HPA]`,
+  },
+
+  // ── [6/10] 7-3（1/4）：Demo 1 部署 + 建 HPA（一行版）──
+  {
+    title: 'Demo 1：部署 nginx + 建 HPA（一行版）',
+    subtitle: 'kubectl autoscale 一行指令，快速建 HPA',
+    section: '7-3：HPA 實戰',
+    duration: '3',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Step 1：確認 metrics-server</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl get pods -n kube-system -l k8s-app=metrics-server</p>
+            <p className="text-green-300">kubectl top nodes</p>
+            <p className="text-green-300">kubectl top pods -A</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Step 2：部署 nginx（含 requests + limits）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <pre className="text-slate-300 whitespace-pre">{`# nginx-resource-demo.yaml 關鍵
+resources:
+  requests: {cpu: "100m", memory: "128Mi"}   # ★ HPA 分母
+  limits:   {cpu: "150m", memory: "256Mi"}   # ★ 單 Pod 上限`}</pre>
+          </div>
+          <div className="bg-slate-900 p-2 mt-1 rounded font-mono">
+            <p className="text-green-300">kubectl apply -f nginx-resource-demo.yaml</p>
+            <p className="text-green-300">kubectl get deploy nginx-resource-demo</p>
+            <p className="text-green-300">kubectl get svc nginx-resource-svc</p>
+            <p className="text-slate-400">→ READY 2/2，Service 有 CLUSTER-IP</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Step 3：建 HPA（一行指令版）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=50%</p>
+            <p className="text-green-300">kubectl get hpa</p>
+            <p className="text-slate-400">→ 剛建好 TARGETS 顯示 unknown/50%，等 30s~1min 變實際數字</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Demo 1 的目標很單純——部署 nginx、建 HPA，確認環境能動。
+
+Step 1 確認 metrics-server。跑三個指令：get pods 看 metrics-server 是不是 Running、kubectl top nodes 看節點 CPU memory 有沒有數字、kubectl top pods 看每個 pod 指標。都正常代表 metrics-server 在工作。k3s 內建，應該都沒問題。
+
+Step 2 部署 nginx。YAML 的重點在 resources 區塊。requests.cpu 100m 是 HPA 的分母——等一下 HPA 算百分比就拿這個當基準。limits.cpu 設 150m，這是單 Pod 最高能用 150m。為什麼不是 200？因為我們 maxReplicas 設 5，5 乘以 150m 等於 0.75 個 CPU，單節點 VM 2 核扛得住。設太高會打爆 VM。
+
+apply 下去，get deploy 看 READY 2/2、get svc 看 CLUSTER-IP 有分配到。
+
+Step 3 建 HPA。這是今天第一次用一行指令建 HPA。kubectl autoscale 後面接 deployment 名字、min 2、max 5、cpu 50%。這行指令等同於 18 行 YAML，但不能調進階參數。Demo 4 我們會升級成 YAML 版。
+
+建好 get hpa 看。TARGETS 欄位剛開始顯示 unknown 斜線 50%。unknown 不代表錯——是 metrics-server 還沒回報數據。等 30 秒到 1 分鐘，TARGETS 會變成實際數字，比如 1% 斜線 50%。那就是 HPA 準備好了。
+
+下一頁開始壓測。先輕壓做對照組。[▶ 下一頁：Demo 2 輕壓 sleep 0.1]`,
+  },
+
+  // ── [7/10] 7-3（2/4）：Demo 2 輕壓 sleep 0.1（對照組）──
+  {
+    title: 'Demo 2：輕壓測 sleep 0.1（對照組）',
+    subtitle: '證明 HPA 不會亂擴 — 流量低時即使有 HPA 也不動',
+    section: '7-3：HPA 實戰',
+    duration: '5',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">目的（對照組）</p>
+          <p className="text-slate-300">每秒 ~10 次請求，模擬日常低流量。預期 CPU 10-20%、REPLICAS 維持 2。<b>驗證 HPA 不會亂加 Pod。</b></p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">開新終端跑輕壓測</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <pre className="text-slate-300 whitespace-pre-wrap break-all">{`kubectl run load-light --image=busybox:1.36 --rm -it --restart=Never --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.1; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh`}</pre>
+          </div>
+          <p className="text-slate-400 mt-1">（壓測 pod 自己限制 100m，避免自己吃爆 node）</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">原終端觀察（1 分鐘）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl get hpa -w</p>
+            <p className="text-slate-400">→ TARGETS 爬到 10-20%，<span className="text-green-400">REPLICAS 維持 2</span></p>
+            <p className="text-slate-400">→ Ctrl+C 離開 watch，壓測終端也 Ctrl+C 停掉</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Demo 2 的角色是對照組——我要證明 HPA 不是你一壓就會擴。它看比例，比例不過門檻就不動。
+
+開新的終端機跑 load-light。這個指令看起來很長，解釋一下。kubectl run 起一個 busybox pod 叫 load-light。關鍵在 overrides——我用 JSON 覆寫 pod spec，加了兩件事：command 是 while true 無限迴圈，每次 wget 打 service，sleep 0.1 秒；resources.limits.cpu 100m 限制這個壓測 pod 自己最多用 100m。
+
+為什麼要限制壓測 pod？因為 busybox while true 如果不 sleep、又不限資源，壓測 pod 自己就會把 node CPU 吃光、連 kubelet 都餓死、VM 重啟。這是我之前自己測試踩的坑。
+
+sleep 0.1 每秒大概 10 次請求，模擬日常低流量。
+
+回原終端 kubectl get hpa -w，watch 模式看。1 分鐘左右你會看到 TARGETS 從 unknown 變成 10% 或 20%——CPU 有在動但低於 50% 門檻。REPLICAS 欄位維持 2，不擴。這就是對照組——驗證 HPA 不會亂加 pod。
+
+觀察夠了 Ctrl+C 離開 watch，切到壓測終端按 Ctrl+C 停掉 load-light。下一頁中壓測，看門檻邊緣。[▶ 下一頁：Demo 3 中壓 sleep 0.05]`,
+  },
+
+  // ── [8/10] 7-3（3/4）：Demo 3 中壓 sleep 0.05（臨界）──
+  {
+    title: 'Demo 3：中壓測 sleep 0.05（臨界觀察）',
+    subtitle: '讓 CPU 爬到接近門檻 — 看 HPA 是在算比例不是看絕對值',
+    section: '7-3：HPA 實戰',
+    duration: '5',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">目的（臨界值）</p>
+          <p className="text-slate-300">每秒 ~20 次請求。預期 CPU 30-40%、接近但未過 50%。REPLICAS <b>可能 2 或 3</b>，依 VM 實際表現。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">開新終端跑中壓測</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <pre className="text-slate-300 whitespace-pre-wrap break-all">{`kubectl run load-medium --image=busybox:1.36 --rm -it --restart=Never --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.05; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh`}</pre>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">觀察 1 分鐘</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl get hpa -w</p>
+            <p className="text-slate-400">→ TARGETS 爬到 30-40%，<span className="text-amber-300">REPLICAS 可能 2 或 3</span></p>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-amber-900/30 to-red-900/30 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">教學點</p>
+          <p className="text-slate-300">HPA 不是「一壓就擴」，是<b>看比例</b>。壓力大小、門檻高低、requests 設多少，三者一起決定擴不擴。</p>
+        </div>
+      </div>
+    ),
+    notes: `Demo 3 中壓測，看臨界值。
+
+同樣的結構，換名字叫 load-medium、sleep 從 0.1 降到 0.05，等於每秒 20 次請求。流量是 Demo 2 的兩倍。
+
+kubectl get hpa -w 看。預期 TARGETS 會爬到 30 到 40%，接近但還沒過 50% 門檻。REPLICAS 這邊就看 VM 實際表現——有的 VM 會衝到 50% 以上觸發擴容變 3，有的會卡在 40% 不動。都是正常的。
+
+這一階段的重點不是擴幾個，是讓學員看到 HPA 在算數字、不是按開關。壓力大小、門檻高低、requests 設多少，三者一起決定擴不擴。你如果把 targetCPU 改成 30%——像挑戰題那樣——同樣的中壓就會擴了。門檻越低越敏感。
+
+Ctrl+C 停掉 load-medium，進 Demo 4。重壓、而且要看到縮容。[▶ 下一頁：Demo 4 重壓 + 縮容]`,
+  },
+
+  // ── [9/10] 7-3（4/4）：Demo 4 重壓 + 升級 YAML + 看縮容 ──
+  {
+    title: 'Demo 4：重壓 sleep 0.01 + 升級 YAML + 縮容',
+    subtitle: 'behavior 縮短穩定窗口 60 秒，課堂看得到縮容',
+    section: '7-3：HPA 實戰',
+    duration: '7',
+    content: (
+      <div className="space-y-2 text-[11px]">
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-2 rounded">
+          <p className="text-cyan-300 font-semibold mb-1">Step 1：升級 HPA 加 behavior（一行指令做不到，只能用 YAML）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <pre className="text-slate-300 whitespace-pre">{`kubectl delete hpa nginx-resource-demo
+
+# hpa-tuned.yaml 加這段：
+behavior:
+  scaleDown:
+    stabilizationWindowSeconds: 60   # ← 60 秒就縮（預設 300）
+
+kubectl apply -f hpa-tuned.yaml`}</pre>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Step 2：重壓 sleep 0.01（每秒 ~100 req）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <pre className="text-slate-300 whitespace-pre-wrap break-all">{`kubectl run load-heavy --image=busybox:1.36 --rm -it --restart=Never --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.01; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh`}</pre>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Step 3：觀察擴 → 停壓 → 縮（60 秒）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl get hpa -w</p>
+            <p className="text-green-300">kubectl get pods -w</p>
+            <p className="text-slate-400">→ REPLICAS 2 → 3 → 4 → 5（擴到 max）</p>
+            <p className="text-slate-400">→ 壓測終端 Ctrl+C 停，回來等 <span className="text-amber-300">60 秒</span></p>
+            <p className="text-slate-400">→ REPLICAS 5 → 4 → 3 → 2（縮回 min）</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Step 4：看完整軌跡</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl describe hpa nginx-resource-demo</p>
+            <p className="text-slate-400">→ Events：New size 3 / 5（擴）→ New size 4 / 2（縮）</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Demo 4 三件事一次做：重壓觸發擴容、升級 YAML 加 behavior 看縮容、看完整軌跡。
+
+Step 1 升級 HPA。為什麼要升級？因為預設的 downscale stabilization window 是 300 秒，也就是停壓後要等五分鐘才開始縮。課堂上等五分鐘太久。
+
+一行 kubectl autoscale 做不到改這個參數——這是進階參數、只能用 YAML。這剛好是教學點：生產環境的 HPA 一定要用 YAML 管理，指令式只適合快速實驗。
+
+先 kubectl delete hpa 把舊的一行版刪掉。然後 apply hpa-tuned.yaml。這個 YAML 多了 behavior 區塊，scaleDown 的 stabilizationWindowSeconds 設 60。就是 60 秒的縮容穩定窗口，不是 300 秒。課堂就看得到縮容。
+
+Step 2 開新終端跑 load-heavy。sleep 0.01 每秒大概 100 次請求。這是真的重壓。
+
+Step 3 回原終端 get hpa -w 跟 get pods -w。預期 TARGETS 飆到 60 到 80%，REPLICAS 從 2 開始擴——2、3、4、5，到 maxReplicas 上限就停。同時 get pods 看新 pod 冒出來，Pending、ContainerCreating、Running。
+
+看到擴到 5 就可以停壓了。壓測終端按 Ctrl+C。回原終端繼續 watch。CPU 一停立刻降到接近 0%。等 60 秒——我們設的穩定窗口——REPLICAS 開始縮：5 回 4、4 回 3、3 回 2。縮到 minReplicas 2 停。
+
+Step 4 kubectl describe hpa 看 Events。你會看到完整的擴縮軌跡：New size 3 reason CPU above target、New size 5 above target、New size 4 below target、New size 2 below target。生產環境排查 HPA 問題就靠這個 Events。
+
+邊等縮容邊講 QA：
+Q：TARGETS unknown？最常見是沒設 requests，或 metrics-server 剛啟動。
+Q：minReplicas 2，手動 scale 到 1？HPA 會把它拉回 2，HPA 是最終控制者。
+Q：擴快縮慢合理嗎？合理。擴慢使用者受影響，縮快容易抖動。
+
+縮回 2 了就進學員實作。[▶ 下一頁：學員實作]`,
+  },
+
+  // ── [10/10] 7-4：學員實作 + Loop 1 收斂 ──
+  {
+    title: '7-4 學員實作 + Loop 1 收斂',
+    subtitle: '照著做三階段壓測 + 挑戰題 targetCPU 30%',
+    section: '7-4：學員實作',
+    duration: '7',
+    content: (
+      <div className="space-y-1 text-[10px]">
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">必做題要求 + 驗收條件</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li>部署 nginx-resource-demo.yaml（含 requests 100m / limits 150m）</li>
+            <li>一行指令建 HPA：min=2 max=5 cpu=50%</li>
+            <li>三階段壓測：輕壓 0.1（不擴）→ 中壓 0.05（臨界）→ 重壓 0.01（擴到 5）</li>
+            <li>升級 hpa-tuned.yaml 加 behavior，停壓後 60 秒內縮回 2</li>
+            <li>✅ get hpa TARGETS 有數字 / 重壓 REPLICAS &gt; 2 / 停壓縮回 2 / describe hpa Events 有擴縮記錄</li>
+          </ul>
+        </div>
+
+        <div className="bg-slate-900 p-2 rounded font-mono">
+          <pre className="text-slate-300 whitespace-pre">{`# ─── Part 1：部署 ───
+kubectl apply -f nginx-resource-demo.yaml
 kubectl get deploy nginx-resource-demo
 kubectl get svc nginx-resource-svc
 
-# Step 2：建 HPA
-kubectl autoscale deployment nginx-resource-demo \\
-  --min=2 --max=10 --cpu=50%
-
-# Step 3：壓測（另開終端機）
-kubectl run load-test --image=busybox:1.36 --rm -it \\
-  --restart=Never -- \\
-  sh -c "while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; done"`,
-    notes: `好，概念講完了，我們來親眼看 HPA 自動擴容。這個實驗非常有感覺，大家一定要跟著做。
-
-首先確認 metrics-server 有在跑。kubectl get pods -n kube-system。找 metrics-server 相關的 Pod，確認是 Running。如果你用 k3s，它內建了 metrics-server，應該已經在跑了。
-
-確認之後，打一下 kubectl top nodes 和 kubectl top pods。如果能看到 CPU 和 MEMORY 的數字，表示 metrics-server 正常運作。
-
-好，接下來部署 HPA 用的 nginx。kubectl apply -f ~/workspace/k8s-course-labs/lesson7/nginx-resource-demo.yaml。這個 yaml 裡面同時包含了 Deployment 和 Service，一次建好。確認一下：kubectl get deploy nginx-resource-demo、kubectl get svc nginx-resource-svc。記住 Deployment 有設 resources.requests，這是 HPA 的前提。
-
-好，現在建 HPA。kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu=50%。看看 HPA 的狀態。kubectl get hpa。
-
-好，重頭戲來了。開另一個終端機，跑一個壓測 Pod。kubectl run load-test --image=busybox:1.36 --rm -it --restart=Never -- sh -c "while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; done"。
-
-這個指令建了一個 busybox Pod，在裡面跑一個無限迴圈，不斷用 wget 去打 nginx Service。每秒鐘幾十次甚至上百次請求，模擬流量暴增。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-9（2/3）：觀察擴容 + 縮容 ──
-  {
-    title: 'HPA 實作：觀察擴容與縮容',
-    subtitle: 'CPU 飆高 → Pod 增加 → 停止壓測 → 等 5 分鐘 → Pod 縮回來',
-    section: 'Loop 1：HPA 實作',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">Step 4：觀察擴容（原本終端機）</p>
-          <div className="text-xs text-green-400 font-mono space-y-1">
-            <p>$ kubectl get hpa -w</p>
-            <p className="text-slate-400"># TARGETS: 1% → 20% → 40% → <span className="text-red-400">60%</span> → REPLICAS: 2 → 3 → 4</p>
-            <p>$ kubectl get pods -l app=nginx-resource -w</p>
-            <p className="text-slate-400"># → 新 Pod 冒出來：Pending → ContainerCreating → Running</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">Step 5：停止壓測 → 等 5 分鐘 → 縮容</p>
-          <div className="text-xs text-slate-300 space-y-1">
-            <p>壓測終端機按 <span className="text-amber-400 font-bold">Ctrl+C</span> 停止</p>
-            <p>回到 HPA watch：CPU 降到 0~1%</p>
-            <p className="text-amber-400">等 5 分鐘冷卻期...</p>
-            <p>REPLICAS：6 → 5 → 4 → 3 → <span className="text-green-400">2</span>（回到 minReplicas）</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">kubectl describe hpa — 看 Events</p>
-          <div className="text-xs text-green-400 font-mono space-y-1">
-            <p>$ kubectl describe hpa nginx-resource-demo</p>
-            <p className="text-slate-400"># Events:</p>
-            <p className="text-slate-400"># New size: 3; reason: cpu above target</p>
-            <p className="text-slate-400"># New size: 4; reason: cpu above target</p>
-            <p className="text-slate-400"># New size: 3; reason: All metrics below target</p>
-            <p className="text-slate-400"># New size: 2; reason: All metrics below target</p>
-          </div>
-        </div>
-      </div>
-    ),
-    code: `# Step 4：觀察擴容
-kubectl get hpa -w
-kubectl get pods -l app=nginx-resource -w
-
-# Step 5：停止壓測 → 等 5 分鐘 → 看縮容
-# Ctrl+C 停止壓測 Pod
-kubectl get hpa -w
-
-# 看 HPA Events
-kubectl describe hpa nginx-resource-demo`,
-    notes: `壓測開始了。回到原本的終端機，觀察 HPA。kubectl get hpa -w。
-
-注意看 TARGETS 欄位。CPU 使用率會慢慢上升。從 1% 到 20% 到 40% 到 60%。當它超過 50% 的時候，REPLICAS 欄位就會開始增加。2 變 3、3 變 4。
-
-你也可以同時觀察 Pod 的變化。開第三個終端機。kubectl get pods -l app=nginx-resource -w。你會看到新的 Pod 一個一個冒出來。Pending、ContainerCreating、Running。HPA 正在自動加 Pod。
-
-好，壓測跑個兩三分鐘，讓大家好好感受一下自動擴容的過程。現在回到壓測的終端機，按 Ctrl+C 停止壓測。
-
-停止壓測之後，回到 HPA 的 watch。CPU 使用率會慢慢降下來。1%、0%。但 REPLICAS 不會馬上縮回 2。記得我剛才說的嗎？HPA 有 5 分鐘的縮容冷卻期。它要確認流量真的穩定下來了才會縮。
-
-等大概 5 分鐘，你會看到 REPLICAS 開始減少。從 6 變 5、5 變 4、4 變 3、3 變 2。最終回到 minReplicas 設的 2 個。
-
-按 Ctrl+C 停止 watch。我們來看 HPA 的 Events。kubectl describe hpa nginx-resource-demo。找到 Events 的部分。你會看到 New size: 3; reason: cpu resource utilization above target。然後過了幾分鐘，New size: 2; reason: All metrics below target。
-
-完整的擴容和縮容過程都記錄在 Events 裡面。生產環境排查 HPA 問題的時候，kubectl describe hpa 是最重要的指令。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-9（3/3）：學員實作時間 ──
-  {
-    title: '學員實作：HPA 自動擴縮',
-    subtitle: '必做 + 挑戰題',
-    section: 'Loop 1：HPA 實作',
-    duration: '10',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-3">必做：壓測看擴容 → 停止看縮容</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-green-400 font-bold shrink-0">1.</span>
-              <span>apply nginx-resource-demo.yaml（含 Deployment + Service）</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-green-400 font-bold shrink-0">2.</span>
-              <span>建 HPA（--min=2 --max=10 --cpu=50%）</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-green-400 font-bold shrink-0">3.</span>
-              <span>busybox 壓測 → kubectl get hpa -w 看 REPLICAS 增加</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-green-400 font-bold shrink-0">4.</span>
-              <span>Ctrl+C 停止壓測 → 等 5 分鐘 → 看 REPLICAS 縮回 2</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/40 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-3">挑戰：改 targetCPU 為 30%</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold shrink-0">A.</span>
-              <span>刪掉 HPA → 重建一個 --cpu=30%</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold shrink-0">B.</span>
-              <span>壓測 → 觀察：擴容觸發更早（30% 比 50% 更容易達到）</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg">
-          <p className="text-red-400 font-semibold text-sm text-center">完成指標：kubectl get hpa 看到 REPLICAS &gt; 2（擴容）→ 停止後回到 2（縮容）</p>
-        </div>
-      </div>
-    ),
-    code: `# 驗收指令（做完每步後確認）
-# Step 1 後：確認 Deployment 有 requests
-kubectl get deployment nginx-resource-demo -o yaml | grep -A5 requests
-
-# Step 2 後：確認 HPA 已建立
+# ─── Part 2：建 HPA（一行版）───
+kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=50%
 kubectl get hpa
-# TARGETS: ?/50%（等 30-60 秒 metrics 收集，再看是否有數字）
 
-# Step 3 壓測中：觀察 REPLICAS 增加
+# ─── Part 3：輕壓 0.1（對照組，應不擴）───
+kubectl run load-light --image=busybox:1.36 --rm -it --restart=Never \\
+  --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.1; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+kubectl get hpa -w          # 另一終端觀察
+
+# ─── Part 4：中壓 0.05（臨界）───
+kubectl run load-medium --image=busybox:1.36 --rm -it --restart=Never \\
+  --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.05; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+
+# ─── Part 5：升級 HPA（加 behavior）───
+kubectl delete hpa nginx-resource-demo
+kubectl apply -f hpa-tuned.yaml
+
+# ─── Part 6：重壓 0.01 → 擴 → 停壓 → 60 秒縮 ───
+kubectl run load-heavy --image=busybox:1.36 --rm -it --restart=Never \\
+  --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.01; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
 kubectl get hpa -w
+kubectl get pods -w
 
-# Step 4 停止壓測後：觀察縮容（約 5 分鐘後 REPLICAS 回到 2）
-kubectl get hpa -w
+# ─── Part 7：看軌跡 ───
+kubectl describe hpa nginx-resource-demo
 
-# 查看 HPA 事件記錄（擴縮完成後）
-kubectl describe hpa nginx-resource-demo`,
-    notes: `接下來是大家的實作時間。必做題：建 HPA，用 busybox 壓測，看到自動擴容，停止壓測看到自動縮容。挑戰題：刪掉 HPA 重新建一個，但 targetCPU 改成 30%。你會發現擴容觸發得更早，因為 30% 的閾值更低，更容易達到。大家動手做。
+# ─── 挑戰題：targetCPU 30% ───
+kubectl delete hpa nginx-resource-demo
+kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=30%
 
-[▶ 下一頁 — 學員開始做，你去巡堂]`,
+# ─── 清理 ───
+kubectl delete hpa nginx-resource-demo --ignore-not-found
+kubectl delete -f nginx-resource-demo.yaml --ignore-not-found
+kubectl delete -f hpa-tuned.yaml --ignore-not-found
+rm -f nginx-resource-demo.yaml hpa-tuned.yaml`}</pre>
+        </div>
+
+        <div className="bg-gradient-to-r from-cyan-900/30 to-purple-900/30 border border-cyan-500/40 p-2 rounded">
+          <p className="text-cyan-300 font-semibold mb-1">Loop 1 因果鏈</p>
+          <p className="text-slate-300">流量暴增手動來不及 → HPA 監控 CPU 自動擴 → 三階段驗證門檻行為 → 生產用 YAML + behavior 控制節奏 → 全自動不需人介入。</p>
+        </div>
+      </div>
+    ),
+    notes: `換你們做。照指令卡跑完整流程，驗證三階段壓測跟縮容。
+
+必做題要求四件事：部署 nginx 含 requests/limits、一行建 HPA、三階段壓測看行為、升級 YAML 看 60 秒縮容。
+
+驗收條件四條：get hpa TARGETS 要有數字不是 unknown；重壓時 REPLICAS 要大於 2；停壓後 60 秒縮回 2；describe hpa Events 要看得到擴縮記錄。
+
+巡堂我會檢查這四條。
+
+挑戰題——targetCPU 改 30%。先把原本的 HPA delete 掉，重新 autoscale 一行把 cpu 改 30%。同樣中壓 sleep 0.05，你會發現這次擴得很快——門檻從 50 降到 30，同樣流量就過門檻了。感受一下 targetCPU 這個參數對擴容敏感度的影響。門檻低越敏感、反應越快，但也容易過度擴容。這是實務上要權衡的。
+
+常見坑四個：unknown 通常是沒設 requests 或 metrics-server 剛啟動；top pods 報 Metrics API not available 是 metrics-server 沒裝；壓測把 VM 打掛通常是壓測 pod 沒設 limits 或 maxReplicas 設太大。
+
+做完清理——hpa delete、deployment delete、yaml rm 掉。
+
+Loop 1 因果鏈一句話：流量暴增手動來不及 → HPA 監控 CPU 自動擴 → 三階段驗證門檻行為 → 生產用 YAML 加 behavior 控制節奏 → 全自動不需人介入。
+
+給你們 15 分鐘做。HPA 讓服務能自己擴縮，但如果誰都能 kubectl delete，擴再多也沒用。Loop 2 來解決權限問題。[▶ Loop 2：RBAC 權限控制]`,
   },
 
 

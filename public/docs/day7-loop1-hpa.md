@@ -1,10 +1,66 @@
-# Loop 1 — HPA 自動擴縮
+# Loop 1 — HPA 自動擴縮（50 分鐘）
 
 ---
 
-## 環境準備（上課前先清理叢集）
+## 7-1 開場 + 第六堂回顧（5 分鐘）
 
-上課前確認叢集是乾淨的，把前幾堂練習留下的資源全部清掉：
+好，歡迎回來。今天是我們 Kubernetes 課程的第七堂，也是最後一堂。
+
+在開始新內容之前，先把第六堂的因果鏈快速串一遍。為什麼要串？因為今天要講的東西，是建立在前六堂基礎上的最後一哩路。
+
+**第六堂六招因果鏈**
+
+第六堂的起點是——使用者要用 IP 加 NodePort 連進來，地址又長又醜、每次改 port 就爆炸。所以學了 **Ingress**，用域名路由。
+
+接著發現設定寫死在 Image 裡、改設定要重 build image。所以學了 **ConfigMap 和 Secret**，設定跟程式分離。
+
+然後 Pod 重啟資料全消失，資料庫跑在 K8s 裡等於自殺。所以學了 **PV 和 PVC**，做持久化。
+
+跑資料庫不只要持久化，還要穩定的身份跟有序啟動。所以學了 **StatefulSet**，Pod 名字不變、順序上線。
+
+當 YAML 多到爆、每個環境要改一堆值，複製貼上地獄。所以學了 **Helm**，用 values.yaml 一次管理。
+
+最後 kubectl 管一整個叢集太痛苦，開發者要看日誌、除錯、重啟 Pod，全部靠指令效率太低。所以學了 **Rancher GUI**，用圖形化界面降低操作門檻。
+
+**銜接句**
+
+服務看起來很體面了：有域名、有設定管理、有資料庫、有 GUI。但我今天要跟大家說一件殘酷的事情——**穿得漂亮不代表扛得住**。
+
+---
+
+## 7-1 今天兩個戰場（5 分鐘）
+
+今天我選了生產環境裡兩個最要命的問題，上午各用一個 Loop 解決。
+
+**戰場一：流量暴增（雙十一故事）**
+
+想像你的網站平常三個 Pod 夠用，雙十一零點開賣，流量瞬間翻十倍。你在哪？凌晨三點你在睡覺。使用者打不開頁面、下不了單，每分鐘損失幾十萬。等你起床手動 `kubectl scale` 已經半小時過去了。
+
+手動 scale 有兩個根本問題：第一，**反應太慢**，沒辦法即時應對。第二，**容易忘記縮回來**，流量過了還開著十個 Pod，月底帳單傻眼。
+
+這個問題用 **HPA**（Horizontal Pod Autoscaler）解決。設定好 CPU 閾值，全自動擴縮，人不用介入。
+
+**戰場二：誰都能刪（實習生故事）**
+
+你團隊十個人，全部都拿 `cluster-admin` 的 kubeconfig。某天實習生跑清理腳本，指令打錯，`kubectl delete namespace production`。整個生產環境瞬間消失。使用者投訴爆炸、主管臉綠、你連夜還原備份。
+
+這個問題用 **RBAC**（Role-Based Access Control）解決。不同角色給不同權限，實習生只能讀、不能刪。
+
+**今天的路線**
+
+上午兩個 Loop：Loop 1 HPA、Loop 2 RBAC。下午從零建一套完整系統，把前面學的所有東西串起來。
+
+---
+
+## 7-1 環境準備（5 分鐘，上課前先清理）
+
+在進 HPA 實作之前，先動手把環境清乾淨。
+
+**為什麼要清？**
+
+第六堂我們部署了四個 Helm release：monitoring、my-app、my-blog、my-ingress。這些都還在跑、會吃 CPU 跟 Memory。等一下 HPA 要觀察 CPU 指標，如果資源被其他東西吃掉，HPA 算出來的百分比會不準。你看到的擴縮行為就會奇怪。
+
+**清理 Helm release**
 
 ```
 指令：helm uninstall monitoring -n default
@@ -13,51 +69,67 @@
 指令：helm uninstall my-ingress -n default
 ```
 
-如果還有其他 Deployment 或 StatefulSet 殘留：
+**清理殘留 Deployment / PVC**
+
+如果還有其他資源殘留：
 
 ```
 指令：kubectl delete all --all -n default
 指令：kubectl delete pvc --all -n default
 ```
 
-清理 journal log 釋放磁碟空間：
+**釋放磁碟**
+
+journal log 佔久了會吃掉幾個 G：
 
 ```
 指令：sudo journalctl --vacuum-size=100M
 ```
 
-確認環境乾淨：
+**確認環境乾淨**
 
 ```
 指令：kubectl get pods -n default
 指令：df -h /
 ```
 
-pods 列表應該是空的（或只剩本次要用的），磁碟空間至少 3G 以上才夠拉 image。
+pods 列表應該是空的，磁碟空間至少 3G 以上才夠等一下拉 image。
+
+清乾淨就進 HPA 概念。
 
 ---
 
-## 7-1 第六堂回顧 + 今天的挑戰
+## 7-2 HPA 概念（5 分鐘）
 
-好，歡迎回來。今天是我們 Kubernetes 課程的第七堂，也是最後一堂。在開始新的內容之前，先花幾分鐘把第六堂的因果鏈快速串一遍。
+**手動 scale 的兩個致命缺陷**
 
-第六堂的起點是使用者要用 IP 加 NodePort 連進來，地址又長又醜。所以學了 Ingress，用域名路由。接著設定寫死在 Image 裡，所以學了 ConfigMap 和 Secret。然後 Pod 重啟資料全消失，所以學了 PV 和 PVC 做持久化。跑資料庫需要穩定身份，所以學了 StatefulSet。YAML 多到爆，學了 Helm。最後 kubectl 管叢集太痛苦，學了 Rancher GUI。
+第一，反應太慢。流量暴增那一刻你可能在睡覺、在吃飯、在開會。等你發現、登入叢集、下指令，幾十分鐘過去了，損失已經造成。
 
-今天我選了兩個最重要的問題。第一個，流量暴增：雙十一零點，平常三個 Pod 夠用，現在流量翻十倍，凌晨三點你在睡覺，這個問題用 HPA 解決。第二個，誰都能刪：實習生跑清理腳本，kubectl delete namespace production，整個生產環境瞬間消失，這個問題用 RBAC 解決。
+第二，容易忘記縮回來。就算你當下撐過去了，事後誰記得要縮回來？開著十個 Pod 整個月，帳單三倍不是開玩笑。
 
----
-
-## 7-2 HPA 概念 — 流量暴增，手動 scale 來不及
-
-**問題：手動 scale 的兩個根本缺陷**
-
-手動 scale 有兩個根本問題。第一，反應太慢，你沒辦法即時應對。第二，容易忘記縮回來，浪費資源。
+所以需要自動化。這就是 HPA 存在的理由。
 
 **HPA 工作流程**
 
-HPA，Horizontal Pod Autoscaler，每 15 秒去問 metrics-server：現在每個 Pod 的 CPU 使用率是多少？超過你設的目標值就增加 Pod，低於目標值就減少 Pod。縮容有 5 分鐘冷卻期，防止流量短暫下降就頻繁縮容。
+HPA 每 15 秒去問一次 metrics-server：目前這個 Deployment 每個 Pod 的 CPU 使用率是多少？
 
-**HPA YAML 三個關鍵**
+- 超過你設的目標值（比如 50%）→ 增加 Pod
+- 低於目標值 → 減少 Pod
+- 但縮容有**穩定窗口**（預設 5 分鐘），防止流量短暫下降就頻繁縮容。等看到 CPU 連續 5 分鐘都低於門檻才開始縮
+
+整個流程**全自動**，人不用看、不用介入。
+
+**兩個前提**
+
+1. **Pod 必須設 resources.requests.cpu**。HPA 算的是百分比，百分比需要分母，分母就是 requests。沒設 requests，TARGETS 永遠顯示 `unknown`，HPA 不會動。
+
+2. **叢集要有 metrics-server**。k3s 內建，如果用 minikube 要 `minikube addons enable metrics-server` 啟用。
+
+---
+
+## 7-2 HPA YAML 完整版（3 分鐘）
+
+這是一份完整的 HPA YAML，四個關鍵欄位：
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -65,55 +137,50 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: nginx-resource-demo
 spec:
-  scaleTargetRef:              # ★ 重點 1：告訴 HPA 要管哪個 Deployment
+  scaleTargetRef:              # ★ 重點 1：要管哪個 Deployment
     apiVersion: apps/v1
     kind: Deployment
     name: nginx-resource-demo  # ← 對應 Deployment 的 name
-  minReplicas: 2               # ★ 重點 2：最少保持 2 個 Pod（基本高可用）
-  maxReplicas: 10              # ★ 重點 3：最多擴到 10 個，超過不再擴
+  minReplicas: 2               # ★ 重點 2：最少 2 個（基本高可用）
+  maxReplicas: 5               # ★ 重點 3：最多 5 個（VM 資源保護）
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 50 # ★ 重點 4：CPU 超過 requests 的 50% 就擴容
+        averageUtilization: 50 # ★ 重點 4：CPU 超過 requests 50% 就擴
 ```
 
-- **`scaleTargetRef`**：告訴 HPA 要擴縮哪個 Deployment，name 要跟 Deployment 的 metadata.name 完全一致
-- **`minReplicas: 2`**：就算沒有流量，也至少保持 2 個 Pod。設 1 的話縮容後只剩 1 個，那個 Pod 掛掉就服務中斷
-- **`maxReplicas: 10`**：防止流量暴增時無限擴容把 Node 資源吃光，要根據 Node 總資源設上限
-- **`averageUtilization: 50`**：50% 是相對於 requests 的比例。Pod requests 設 100m，50% 就是 50m，現在平均用超過 50m 就擴容
+- **`scaleTargetRef.name`**：要跟 Deployment 的 metadata.name 完全一致
+- **`minReplicas: 2`**：沒流量也至少 2 個，避免單點故障
+- **`maxReplicas: 5`**：單節點 VM 環境，5 個夠用；生產環境可以調到 10、20
+- **`averageUtilization: 50`**：50% 是相對於 requests。Pod requests 100m，50% 就是 50m
 
-**前提：Pod 必須設 resources.requests**
+**實戰兩種建法**
 
-HPA 算的是百分比，百分比需要分母，分母就是 requests。沒設 requests，HPA 算不出百分比，TARGETS 一直顯示 unknown，不動。
+- **快速版**：`kubectl autoscale` 一行指令，適合實驗、臨時測試
+- **完整版**：寫 YAML 檔案 + `kubectl apply -f`，適合生產環境、可版控、能加進階參數
 
-**需要 metrics-server**
-
-k3s 內建，minikube 用 `minikube addons enable metrics-server` 啟用。
+等一下 Demo 1 用一行版本、Demo 4 升級成 YAML 版本加 behavior 參數。
 
 ---
 
-## 7-3 HPA 實作 — 壓測觸發自動擴縮
+## 7-3 Demo 1：部署 + 建 HPA（3 分鐘）
 
 **Step 1：確認 metrics-server**
 
-```bash
-kubectl get pods -n kube-system -l k8s-app=metrics-server
-kubectl top nodes
-kubectl top pods
+```
+指令：kubectl get pods -n kube-system -l k8s-app=metrics-server
+指令：kubectl top nodes
+指令：kubectl top pods -A
 ```
 
-看到 CPU 和 MEMORY 的數字代表 metrics-server 正常。
+看到 CPU 跟 MEMORY 有數字代表 metrics-server 正常。
 
 **Step 2：部署 nginx（有設 requests）**
 
-```
-指令：kubectl apply -f nginx-resource-demo.yaml
-```
-
-這個 YAML 同時包含 Deployment 和 Service，一次建好。完整內容如下：
+`nginx-resource-demo.yaml`：
 
 ```yaml
 apiVersion: apps/v1
@@ -135,12 +202,12 @@ spec:
           image: nginx:1.27
           ports:
             - containerPort: 80
-          resources:          # ★ 重點 1：一定要設，HPA 才能運作
+          resources:          # ★ HPA 才能運作
             requests:
-              cpu: "100m"     # ★ 重點 2：HPA 的分母，50% = 50m
+              cpu: "100m"     # ★ HPA 的分母
               memory: "128Mi"
             limits:
-              cpu: "200m"
+              cpu: "150m"     # ★ 單 Pod 最高 150m
               memory: "256Mi"
 ---
 apiVersion: v1
@@ -153,120 +220,288 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-  # type 預設 ClusterIP，不用明確寫，叢集內部可連
 ```
 
-**重點介紹**
-
-- **`resources.requests.cpu: "100m"`**：這是 HPA 的分母。HPA 看的是「現在用了多少 / requests 是多少」，算出百分比。沒設 requests，分母是零，算不出來，TARGETS 永遠顯示 `unknown`。
-- **`resources.limits`**：Pod 最多能用多少資源。Limit 比 Request 高，讓 Pod 有彈性空間，但不至於把 Node 吃乾。
-- **Service 名稱 `nginx-resource-svc`**：後面壓測指令 `wget -qO- http://nginx-resource-svc` 就是打這個名字，K8s DNS 自動解析。
+**部署指令**
 
 ```
+指令：kubectl apply -f nginx-resource-demo.yaml
 指令：kubectl get deploy nginx-resource-demo
-```
-
-確認 Deployment 存在，READY 欄位顯示幾個 Pod 已經 Running（應該是 2/2）。
-
-```
 指令：kubectl get svc nginx-resource-svc
 ```
 
-確認 Service 存在，TYPE 是 ClusterIP，CLUSTER-IP 有分配到 IP 就代表 DNS 可以解析。
+READY 應該是 2/2。
 
-**Step 3：建 HPA**
-
-```
-指令：kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu=50%
-```
-
-這一行指令等於手動寫 HPA YAML。`--min=2` 是最少保持 2 個 Pod，`--max=10` 是最多擴到 10 個，`--cpu=50%` 是 CPU 使用率超過 requests 的 50% 就擴容。
+**Step 3：建 HPA（一行指令版本）**
 
 ```
+指令：kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=50%
 指令：kubectl get hpa
 ```
 
-看 TARGETS 欄位。剛建好會顯示 `unknown/50%`，等 30 秒到 1 分鐘讓 metrics-server 收集數據，就會變成實際數字，比如 `1%/50%`。
+剛建好 TARGETS 顯示 `unknown/50%`，等 30 秒到 1 分鐘後變成實際數字，比如 `1%/50%`。
 
-**Step 4：壓測**
+---
 
-開另一個終端機，跑這個指令：
+## 7-3 Demo 2：輕壓測 sleep 0.1（5 分鐘）
+
+**目的**：證明 HPA 不會亂擴。流量低時即使有 HPA 也不動。
+
+開**另一個終端機**跑壓測：
 
 ```
-指令：kubectl run load-test --image=busybox:1.36 --rm -it --restart=Never -- sh -c "while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; done"
+指令：kubectl run load-light --image=busybox:1.36 --rm -it --restart=Never --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.1; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
 ```
 
-這個指令建了一個 busybox Pod，在裡面跑無限迴圈，一直對 nginx-resource-svc 發請求。`--rm` 是結束後自動刪掉這個 Pod，`-it` 是互動模式讓你可以按 Ctrl+C 停止。每秒幾十到上百次請求，模擬流量暴增。
+每秒約 10 次請求（模擬日常低流量）。壓測 pod 本身也設了 `limits.cpu: 100m`，避免它自己吃爆 node。
 
-**Step 5：觀察**
-
-回到原本的終端機：
+**回原終端機觀察（watch 1 分鐘）**
 
 ```
 指令：kubectl get hpa -w
 ```
 
-`-w` 是 watch 模式，有變化就自動更新，不用一直手動輸入。你會看到 TARGETS 的 CPU 使用率慢慢上升，超過 50% 之後 REPLICAS 開始增加，2 變 3、3 變 4。
+預期：TARGETS 爬到 10-20% 左右，**低於 50% 門檻，REPLICAS 維持 2**。這是對照組——證明 HPA 不會亂加 Pod。
+
+按 Ctrl+C 離開 watch，回到壓測終端機按 Ctrl+C 停掉輕壓測。
+
+---
+
+## 7-3 Demo 3：中壓測 sleep 0.05（5 分鐘）
+
+**目的**：讓 CPU 爬升到接近門檻，觀察邊緣行為。
+
+```
+指令：kubectl run load-medium --image=busybox:1.36 --rm -it --restart=Never --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.05; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+```
+
+每秒約 20 次請求。
+
+**觀察**
+
+```
+指令：kubectl get hpa -w
+```
+
+預期：TARGETS 爬到 30-40%，接近但還沒超過 50%。REPLICAS **可能**從 2 變 3，也可能維持 2。看你 VM 實際表現。
+
+這個階段的重點是**讓學員看到 HPA 在算數字**——不是壓就一定擴，是看比例。
+
+停掉中壓測。
+
+---
+
+## 7-3 Demo 4：重壓 sleep 0.01 + 升級 YAML 看縮容（7 分鐘）
+
+**目的**：觸發擴容 + 觀察縮容節奏。
+
+**Step 1：升級 HPA 到完整 YAML（加 behavior 縮短穩定窗口）**
+
+為了讓課堂能看到縮容，先把舊 HPA 刪掉、換成加了 behavior 的 YAML 版本。
+
+```
+指令：kubectl delete hpa nginx-resource-demo
+```
+
+`hpa-tuned.yaml`：
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nginx-resource-demo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx-resource-demo
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  behavior:                              # ★ 進階參數：控制擴縮節奏
+    scaleDown:
+      stabilizationWindowSeconds: 60    # ← 縮容穩定窗口縮成 60 秒（預設 300）
+```
+
+```
+指令：kubectl apply -f hpa-tuned.yaml
+指令：kubectl get hpa
+```
+
+**這裡的教學點**：一行 `kubectl autoscale` 做不到進階參數，生產環境的 HPA 一定要用 YAML 管理。
+
+**Step 2：重壓測**
+
+```
+指令：kubectl run load-heavy --image=busybox:1.36 --rm -it --restart=Never --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.01; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+```
+
+每秒約 100 次請求。
+
+**Step 3：觀察擴容**
+
+```
+指令：kubectl get hpa -w
+```
+
+預期：TARGETS 飆到 60-80%，REPLICAS 從 2 → 3 → 4 → 5（到 maxReplicas 上限）。
+
+同時看 Pod：
 
 ```
 指令：kubectl get pods -w
 ```
 
-同時看 Pod 的狀態，新的 Pod 一個一個冒出來：Pending → ContainerCreating → Running。這就是 HPA 在自動加 Pod。
+新 Pod 一個個冒出來：Pending → ContainerCreating → Running。
 
-壓測跑兩三分鐘感受擴容過程，然後回到壓測終端機按 Ctrl+C 停止。
+**Step 4：停壓 + 觀察縮容（1 分鐘）**
 
-停止之後 CPU 降到接近 0%，但 REPLICAS 不會馬上縮。等 5 分鐘冷卻期過了，REPLICAS 才開始減少，最終回到 2。
+回到壓測終端機按 Ctrl+C 停止重壓測。
+
+回原終端繼續 watch：
+
+```
+指令：kubectl get hpa -w
+```
+
+CPU 降到接近 0%，等 **60 秒**（我們設的 stabilizationWindowSeconds）後，REPLICAS 從 5 → 4 → 3 → 2，縮回最小值。
+
+如果沒改 behavior 參數，預設要等 5 分鐘。改成 60 秒課堂就看得完。
+
+**Step 5：看完整軌跡**
 
 ```
 指令：kubectl describe hpa nginx-resource-demo
 ```
 
-找 Events 部分，你會看到 `New size: 3; reason: cpu resource utilization above target`，然後 `New size: 2; reason: All metrics below target`。完整的擴縮記錄都在這裡，生產環境排查 HPA 問題就靠這個。
+找 Events：
+- `New size: 3; reason: cpu resource utilization above target`
+- `New size: 5; reason: cpu resource utilization above target`
+- `New size: 4; reason: All metrics below target`
+- `New size: 2; reason: All metrics below target`
 
-**QA**
+完整擴縮記錄都在這裡，生產環境排查 HPA 問題就靠這個。
 
-> Q：TARGETS 一直顯示 unknown/50%？
+**QA（邊等邊講）**
 
-最常見是 Deployment 沒設 resources.requests。加上去重新 apply。另一個原因是 metrics-server 剛啟動，等 30 秒到 1 分鐘。
+> Q：TARGETS 一直 unknown？
 
-> Q：壓測停止後 REPLICAS 一直不縮？
+最常見是 Deployment 沒設 resources.requests。另一個是 metrics-server 剛啟動，等 30 秒到 1 分鐘。
 
-沒壞。HPA 縮容有 5 分鐘冷卻期，等滿 5 分鐘會縮。
+> Q：minReplicas=2，我手動 `kubectl scale --replicas=1` 會怎樣？
 
-> Q：minReplicas 設 2，手動 scale 到 1，HPA 會讓它縮回 2 嗎？
+會被 HPA 拉回 2。HPA 是最終控制者，下次控制迴圈跑完就把它拉回 minReplicas。
 
-會。HPA 是最終控制者，下次控制循環跑完就把它拉回 2。
+> Q：擴容很快但縮容慢，合理嗎？
+
+合理。擴容太慢使用者會受影響，要快；縮容太快流量一回升又要重擴，浪費資源，所以要穩定窗口防抖。
 
 ---
 
-## 7-4 學員實作 + 常見坑
+## 7-4 學員實作（7 分鐘）
 
-**必做題**
+**題目場景**
 
-部署 nginx-resource-demo.yaml，建 HPA，busybox 壓測，觀察 REPLICAS 增加，停止壓測等 5 分鐘看縮回 2。
+部署 nginx、建 HPA、用三種壓力測試，親眼看 HPA 怎麼根據 CPU 使用率自動擴縮。
 
-**挑戰題：改 targetCPU 為 30%**
+**必做題要求**
+
+1. 部署 `nginx-resource-demo.yaml`（Deployment + Service）
+2. 用一行指令建 HPA：min=2、max=5、cpu=50%
+3. 跑三階段壓測：
+   - 輕壓 `sleep 0.1` → 觀察不擴
+   - 中壓 `sleep 0.05` → 觀察臨界
+   - 重壓 `sleep 0.01` → 觀察擴到 5
+4. 停壓 → 觀察縮回 2（預設要等 5 分鐘，或升級 YAML 版加 behavior 縮成 60 秒）
+
+**驗收條件**
+
+- ✅ `kubectl get hpa` TARGETS 有數字（不是 unknown）
+- ✅ 輕壓時 REPLICAS 維持 2
+- ✅ 重壓時 REPLICAS 大於 2
+- ✅ 停壓後 REPLICAS 縮回 2
+- ✅ `kubectl describe hpa` Events 看得到擴縮記錄
+
+**完整指令清單**
+
+```bash
+# ─── Part 1：部署 nginx ───
+kubectl apply -f nginx-resource-demo.yaml
+kubectl get deploy nginx-resource-demo
+kubectl get svc nginx-resource-svc
+
+# ─── Part 2：建 HPA（一行版）───
+kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=50%
+kubectl get hpa
+
+# ─── Part 3：輕壓 0.1（開新終端）───
+kubectl run load-light --image=busybox:1.36 --rm -it --restart=Never \
+  --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.1; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+# 原終端觀察
+kubectl get hpa -w
+# 按 Ctrl+C 停
+
+# ─── Part 4：中壓 0.05 ───
+kubectl run load-medium --image=busybox:1.36 --rm -it --restart=Never \
+  --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.05; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+
+# ─── Part 5：升級 HPA 加 behavior ───
+kubectl delete hpa nginx-resource-demo
+kubectl apply -f hpa-tuned.yaml
+
+# ─── Part 6：重壓 0.01 → 擴 → 停壓 → 縮 ───
+kubectl run load-heavy --image=busybox:1.36 --rm -it --restart=Never \
+  --overrides='{"spec":{"containers":[{"name":"load","image":"busybox:1.36","command":["sh","-c","while true; do wget -qO- http://nginx-resource-svc > /dev/null 2>&1; sleep 0.01; done"],"resources":{"limits":{"cpu":"100m"}}}]}}' -- sh
+# 原終端
+kubectl get hpa -w
+# 看到 REPLICAS 擴到 5、壓測終端 Ctrl+C、繼續 watch 看縮回 2
+
+# ─── Part 7：看完整軌跡 ───
+kubectl describe hpa nginx-resource-demo
+```
+
+**挑戰題：targetCPU 改 30%**
 
 ```
 指令：kubectl delete hpa nginx-resource-demo
-指令：kubectl autoscale deployment nginx-resource-demo --min=2 --max=10 --cpu=30%
+指令：kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=30%
 ```
 
-同樣流量，30% 比 50% 更低，擴容觸發更早。
+同樣中壓 sleep 0.05，這次門檻是 30% 不是 50%，你會發現更容易觸發擴容。感受一下 targetCPU 這個參數對擴容敏感度的影響。
 
 **巡堂確認清單**
 
-- `kubectl get hpa` 看到 TARGETS 有數字不是 unknown
-- 壓測中 REPLICAS 大於 2
-- 停止壓測後 REPLICAS 縮回 2
+- `kubectl get hpa` TARGETS 有數字不是 unknown
+- 重壓中 REPLICAS 大於 2
+- 停壓後 REPLICAS 縮回 2（或等 60 秒如果用 YAML 版）
+- 壓測 pod 有 Ctrl+C 清掉
 
 **常見坑**
 
 - 坑 1：TARGETS unknown → Deployment 沒設 resources.requests，加上去重新 apply
-- 坑 2：`kubectl top pods` 報錯 Metrics API not available → metrics-server 沒裝，k3s 內建，minikube 要 `minikube addons enable metrics-server`
-- 坑 3：requests 有設但還是 unknown → metrics-server 剛啟動，等 30 秒到 1 分鐘
+- 坑 2：`kubectl top pods` 報 Metrics API not available → metrics-server 沒裝
+- 坑 3：requests 有設還是 unknown → metrics-server 剛啟動，等 30 秒到 1 分鐘
+- 坑 4：壓測把 VM 打掛 → 確認壓測 pod 有加 `limits.cpu`、maxReplicas 不要開太大
 
 **Loop 1 因果鏈**
 
-流量暴增，手動 scale 來不及 → HPA 根據 CPU 使用率自動擴縮，全自動，不需要人介入。
+流量暴增手動 scale 來不及 → HPA 根據 CPU 自動擴 → 三階段壓測驗證門檻行為 → 生產環境用 YAML 管理 HPA、加 behavior 控制擴縮節奏 → 全自動、不需要人介入。
+
+---
+
+## 清理（Loop 1 結束）
+
+```
+指令：kubectl delete hpa nginx-resource-demo --ignore-not-found
+指令：kubectl delete -f nginx-resource-demo.yaml --ignore-not-found
+指令：kubectl delete -f hpa-tuned.yaml --ignore-not-found
+指令：rm -f nginx-resource-demo.yaml hpa-tuned.yaml
+```
+
+下一段：Loop 2 RBAC，解決「誰都能刪」的權限問題。HPA 讓服務能自動擴縮，但如果誰都能 `kubectl delete`，擴再多也沒用。

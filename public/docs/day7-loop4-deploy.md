@@ -341,12 +341,25 @@ StatefulSet 的 Pod 命名規則固定是 `StatefulSet名稱-序號`：第一個
 指令：kubectl wait pod/mysql-0 -n tasks --for=condition=Ready --timeout=120s
 ```
 
-輸出 `pod/mysql-0 condition met` 才繼續下一步，否則 migration 會連不上 DB。
+**`kubectl wait` 解析**：
+- `pod/mysql-0`：等的對象是 Pod，名字叫 mysql-0（StatefulSet 第一個 Pod 固定這個名字）
+- `--for=condition=Ready`：等到 Pod 的 Ready condition 變成 True（readinessProbe 通過才算）
+- `--timeout=120s`：最多等 120 秒，超時就報錯退出，不會無限等下去
+- 輸出 `pod/mysql-0 condition met` 才繼續下一步，否則 migration Job 會連不上 DB
 
 確認進得去資料庫：
 ```
 指令：kubectl exec -it mysql-0 -n tasks -- mysql -uroot -p"MyMysqlP@ssw0rd" -D taskdb
 ```
+
+**`kubectl exec` 參數解析**：
+- `-it`：`-i` 保持 stdin 開著（可以打字），`-t` 分配一個終端機（TTY），兩個合用才能互動式操作
+- `mysql-0 -n tasks`：進哪個 Pod（mysql-0）、在哪個 namespace（tasks）
+- `--`：分隔符號，後面的東西是「在容器裡執行的指令」，不是 kubectl 的參數
+- `mysql`：容器裡的 MySQL 客戶端程式
+- `-uroot`：用 `root` 帳號登入（`-u` + 帳號，中間不用空格）
+- `-p"MyMysqlP@ssw0rd"`：密碼是 `MyMysqlP@ssw0rd`（`-p` 後面直接接密碼，加引號因為有 `@`）
+- `-D taskdb`：登入後直接切換到 `taskdb` 資料庫（等同登入後打 `USE taskdb;`）
 
 進去後輸入 `exit` 退出。
 

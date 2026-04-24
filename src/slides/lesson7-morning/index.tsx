@@ -937,30 +937,24 @@ EOF`}</pre>
 
         <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
           <p className="text-green-400 font-semibold mb-1">✓ 可以 get pods</p>
-          <div className="bg-slate-900 p-2 rounded font-mono">
-            <p className="text-green-300">kubectl auth can-i get pods \</p>
-            <p className="text-green-300">  --as=system:serviceaccount:dev-alice:dev-alice \</p>
-            <p className="text-green-300">  -n dev-alice</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <p className="text-green-300">kubectl auth can-i get pods --as=system:serviceaccount:dev-alice:dev-alice -n dev-alice</p>
             <p className="text-green-400 mt-1">yes</p>
           </div>
         </div>
 
         <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
           <p className="text-red-400 font-semibold mb-1">✗ 不能 get secrets</p>
-          <div className="bg-slate-900 p-2 rounded font-mono">
-            <p className="text-green-300">kubectl auth can-i get secrets \</p>
-            <p className="text-green-300">  --as=system:serviceaccount:dev-alice:dev-alice \</p>
-            <p className="text-green-300">  -n dev-alice</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <p className="text-green-300">kubectl auth can-i get secrets --as=system:serviceaccount:dev-alice:dev-alice -n dev-alice</p>
             <p className="text-red-400 mt-1">no</p>
           </div>
         </div>
 
         <div className="bg-slate-800/50 p-2 rounded">
           <p className="text-cyan-400 font-semibold mb-1">列出所有權限（稽核神器）</p>
-          <div className="bg-slate-900 p-2 rounded font-mono">
-            <p className="text-green-300">kubectl auth can-i --list \</p>
-            <p className="text-green-300">  --as=system:serviceaccount:dev-alice:dev-alice \</p>
-            <p className="text-green-300">  -n dev-alice</p>
+          <div className="bg-slate-900 p-2 rounded font-mono text-[10px]">
+            <p className="text-green-300">kubectl auth can-i --list --as=system:serviceaccount:dev-alice:dev-alice -n dev-alice</p>
           </div>
         </div>
       </div>

@@ -21,6 +21,7 @@
 - 現在不是要學生寫產品，而是部署產品。
 - 這個產品為什麼適合當最後一節。
 - 入口、邏輯、資料三層分別在哪裡。
+- 開始 apply YAML 前，先把 image 準備到每台 k3s node。
 
 ### 建議口條
 
@@ -40,10 +41,33 @@
 >
 > 所以今天你不是在背一套 manifest，而是在練習怎麼把一個產品拆成入口、邏輯、資料三層，再用對應的 Kubernetes 元件把它組起來。
 
+### Image 準備口條
+
+> 在我們開始 apply YAML 之前，先補一個很實務、也很容易卡住的環節：image 要先準備好。
+>
+> Kubernetes 的 YAML 會寫要跑哪個 image，但是 YAML 本身不會幫你 build image，也不保證現場一定能從 Docker Hub 拉得到 image。
+>
+> 前幾堂課你們可能遇過，全班同時從 Docker Hub 拉 image，結果有人卡在 rate limit。這不是 YAML 寫錯，而是外部 registry 限流。
+>
+> 所以這個短網址 Lab 的預設流程不是現場 pull Docker Hub，而是講師先提供完整的 `url-shortener-k3s-images.tar`。你們要做的是：下載 tar、匯入每台 k3s node、檢查 image 都在，然後才開始 `kubectl apply`。
+>
+> 以 Windows + VMware 的上課環境來說，你會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
+>
+> 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到你的 Windows、你的 WSL，或你的操作機就好，而是要把 tar 匯入每台 node。
+>
+> 可以直接記這句話：Pod 被排到哪台 node，那台 node 就必須已經有 image。
+>
+> 這份 tar 裡面會包含四個 image：API、Frontend、PostgreSQL、BusyBox。只準備 API 和 Frontend 不夠，因為 PostgreSQL StatefulSet 需要 `postgres:15`，migration init container 需要 `busybox:1.36`。
+>
+> 如果沒有匯入，YAML 寫 `imagePullPolicy: Never` 時會看到 `ErrImageNeverPull`；如果改用 public image，則可能看到 `ImagePullBackOff`。兩個錯誤都跟 image 準備有關。
+>
+> 所以我們今天的順序是：先完成 image 準備和檢查，再開始 apply YAML。Helm 一鍵部署也是一樣，Helm 只部署 Kubernetes resources，不會幫你把 image 放進 node。
+
 ### 這一段學生要帶走的話
 
 - 今天不是寫 app，是部署 app。
 - 先分清楚入口、邏輯、資料，再談 K8s 元件。
+- 先把 image 放進每台 node，Pod 才能在任何 node 上啟動。
 
 ---
 
@@ -54,7 +78,7 @@
 - 不要把手動部署講成照表操課。
 - 每一份 YAML 都是在回答一個部署問題。
 - 每一份 YAML 都要拆出「建了什麼物件、物件做什麼、對應哪個 K8s 觀念」。
-- 要補上 image 也需要被交付到 k3s node，否則一鍵部署仍會卡在 image pull。
+- 開始 apply 前，要先確認 7-11 的 image 檢查已經通過。
 - 學生要知道為什麼先手動，再談 Helm。
 
 ### 講法主軸
@@ -82,26 +106,6 @@
 > 你會發現，這些不是短網址服務才有的問題，而是幾乎所有產品部署到 K8s 上都要回答的問題。
 >
 > 所以手動部署的目的，不是讓你學會背 9 份 YAML。手動部署的目的，是讓你第一次把這些問題完整走過一次。
-
-### Image 交付口條
-
-> 這裡要特別補一個真實上課會遇到的問題：image 也要被交付。
->
-> 如果全班同時從 Docker Hub 拉 `yanchen184/url-shortener-api:v1`、`postgres:15`、`busybox:1.36`，很容易遇到 rate limit。這不是 YAML 寫錯，而是外部 registry 限流。
->
-> 所以這個 Lab 預設改成講師提供完整 image tar。學生不需要在現場從 Docker Hub pull，也不需要重新 build API / Frontend；學生只要從雲端空間下載 `url-shortener-k3s-images.tar`，再匯入每台 k3s node 的 containerd。
->
-> 以 Windows + VMware 的上課環境來說，學生會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
->
-> 所以課前要確認兩件事：第一，學生操作環境可以 SSH 到每台 VM；第二，該帳號可以免互動執行 `sudo -n k3s ctr images list -q`。不然腳本會卡在 sudo password prompt，現場會很難排。
->
-> 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到學生電腦就好，而是要把 tar 匯入每台 node。
->
-> 可以直接給學生一句話：Pod 被排到哪台 node，那台 node 就必須已經有 image。用 `imagePullPolicy: Never` 的時候，K8s 不會幫你去 Docker Hub 補拉。
->
-> 如果沒有匯入，YAML 寫 `imagePullPolicy: Never` 時會看到 `ErrImageNeverPull`；如果用 public image，則可能看到 `ImagePullBackOff`。兩個錯誤都跟 image 準備有關。
->
-> 如果講師要重產 tar，才需要在課前跑 `build-local-images.sh`、`docker pull postgres:15`、`docker pull busybox:1.36` 和 `save-k3s-images.sh`。這不放在學生現場流程。
 
 ### 每份 YAML 的講解口條
 

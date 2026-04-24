@@ -62,6 +62,56 @@ Ingress short.local
 2. 誰處理邏輯？`API`
 3. 資料放哪裡？`PostgreSQL + PVC`
 
+### 先準備 image：下載 tar 並匯入每台 node
+
+在開始 `kubectl apply` 之前，先確認 Pod 啟動會用到的 image 已經放進每台 k3s node。
+
+前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。短網址 Lab 預設改成「講師提供 image tar」的 workflow：
+
+```text
+cloud download
+  -> k3s ctr images import
+  -> check images on every node
+  -> kubectl apply / helm install
+```
+
+學生不需要在課堂現場從 Docker Hub pull `postgres:15`、`busybox:1.36`，也不需要重新 build API / Frontend。講師課前把完整的 `url-shortener-k3s-images.tar` 放到雲端空間，學生下載後直接匯入每台 k3s node。
+
+重點是：k3s 使用的是 control plane / worker node 裡的 containerd，所以 image tar 要匯入每個 k3s node。
+
+一句話記住：**Pod 被排到哪台 node，那台 node 就必須已經有 image。** 如果 YAML 使用 `imagePullPolicy: Never`，k3s 不會退回去 Docker Hub 幫你拉。
+
+在 `k8s-course-labs/lesson7/url-shortener/` 執行：
+
+```bash
+sha256sum ~/Downloads/url-shortener-k3s-images.tar
+IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \
+K3S_NODES="user@192.168.56.10 user@192.168.56.11" \
+  ./scripts/load-images-to-k3s-ssh.sh
+K3S_NODES="user@192.168.56.10 user@192.168.56.11" ./scripts/check-k3s-images-ssh.sh
+```
+
+SHA256 應該是：
+
+```text
+bae34023b8fd055f13235ce239976c95d5f97156bde6bd0452c8de7a76f7fc44
+```
+
+`K3S_NODES` 要填每台 Linux VM 的 SSH 目標，通常會包含 control plane 和 worker node。Windows + VMware 環境下，只要學生可以從執行腳本的地方 `ssh user@<node-ip>` 進 VM，且該使用者可以免互動執行 `sudo -n k3s ctr images list -q`，就可以用這條路徑。
+
+如果講師或助教使用的是 Multipass 環境，才改用 `load-images-to-k3s-multipass.sh` 和 `check-k3s-images.sh`。
+
+這會準備四個 image：
+
+| Image | 用在哪裡 |
+|---|---|
+| `url-shortener-api:lab` | API Deployment 和 migration Job |
+| `url-shortener-frontend:lab` | Frontend Deployment |
+| `postgres:15` | PostgreSQL StatefulSet |
+| `busybox:1.36` | migration Job 的 init container |
+
+如果講師要課前重產 tar，才需要跑 `build-local-images.sh`、`docker pull postgres:15`、`docker pull busybox:1.36` 和 `save-k3s-images.sh`。
+
 ---
 
 ## 7-12 手動部署：一步一步把產品建起來
@@ -69,6 +119,8 @@ Ingress short.local
 > 這段的重點不是背 YAML，而是知道每個檔案負責哪一層。
 >
 > Lab 檔案會放在 `k8s-course-labs/lesson7/url-shortener/`。學生上課時從該資料夾操作即可。
+>
+> 先完成 7-11 的 image 準備與檢查，再開始 apply YAML。
 
 ### 這一段要回答的問題
 
@@ -113,53 +165,6 @@ Ingress short.local
 最後要把學生拉回一個觀念：
 
 > 你剛剛不是在部署 9 份 YAML，你是在把一個產品拆成 9 個可管理、可驗收、可重複交付的 K8s 物件群。
-
-### 預設 image 策略：講師提供 tar，不集中拉 Docker Hub
-
-前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。短網址 Lab 預設改成「講師提供 image tar」的 workflow：
-
-```text
-cloud download
-  -> k3s ctr images import
-  -> kubectl apply / helm install
-```
-
-學生不需要在課堂現場從 Docker Hub pull `postgres:15`、`busybox:1.36`，也不需要重新 build API / Frontend。講師課前把完整的 `url-shortener-k3s-images.tar` 放到雲端空間，學生下載後直接匯入每台 k3s node。
-
-重點是：k3s 使用的是 control plane / worker node 裡的 containerd，所以 image tar 要匯入每個 k3s node。
-
-一句話記住：**Pod 被排到哪台 node，那台 node 就必須已經有 image。** 如果 YAML 使用 `imagePullPolicy: Never`，k3s 不會退回去 Docker Hub 幫你拉。
-
-在 `k8s-course-labs/lesson7/url-shortener/` 執行：
-
-```bash
-sha256sum ~/Downloads/url-shortener-k3s-images.tar
-IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \
-K3S_NODES="user@192.168.56.10 user@192.168.56.11" \
-  ./scripts/load-images-to-k3s-ssh.sh
-K3S_NODES="user@192.168.56.10 user@192.168.56.11" ./scripts/check-k3s-images-ssh.sh
-```
-
-SHA256 應該是：
-
-```text
-bae34023b8fd055f13235ce239976c95d5f97156bde6bd0452c8de7a76f7fc44
-```
-
-`K3S_NODES` 要填每台 Linux VM 的 SSH 目標，通常會包含 control plane 和 worker node。Windows + VMware 環境下，只要學生可以從執行腳本的地方 `ssh user@<node-ip>` 進 VM，且該使用者可以免互動執行 `sudo -n k3s ctr images list -q`，就可以用這條路徑。
-
-如果講師或助教使用的是 Multipass 環境，才改用 `load-images-to-k3s-multipass.sh` 和 `check-k3s-images.sh`。
-
-這會準備四個 image：
-
-| Image | 用在哪裡 |
-|---|---|
-| `url-shortener-api:lab` | API Deployment 和 migration Job |
-| `url-shortener-frontend:lab` | Frontend Deployment |
-| `postgres:15` | PostgreSQL StatefulSet |
-| `busybox:1.36` | migration Job 的 init container |
-
-如果講師要課前重產 tar，才需要跑 `build-local-images.sh`、`docker pull postgres:15`、`docker pull busybox:1.36` 和 `save-k3s-images.sh`。
 
 ### 備援 image 策略：使用 Docker Hub public image
 

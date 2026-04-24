@@ -237,6 +237,14 @@ current-context: alice@k3s
 EOF
 ```
 
+kubeconfig 的三個區塊是「分開定義、再用 context 綁在一起」的設計：
+- **clusters**：API Server 在哪（位址 + CA 憑證）
+- **users**：誰要連（名稱 + Token）
+- **contexts**：把上面兩個配對，`cluster: k3s` + `user: dev-alice` + `namespace: dev-alice` → 一個叫 `alice@k3s` 的組合
+- **current-context**：預設用哪個 context，這裡填 `alice@k3s`，所以 kubectl 一執行就自動用 Alice 的身份
+
+名字（`k3s`、`dev-alice`、`alice@k3s`）都是你自己取的，只要 clusters/users/contexts 三個地方對得上就好。
+
 **`127.0.0.1` 換成 master 實際 IP**（給外部使用者用）：
 
 ```

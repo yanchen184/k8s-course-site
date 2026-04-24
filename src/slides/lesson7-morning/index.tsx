@@ -1092,7 +1092,7 @@ EOF`}</pre>
 
 Token 是一串很長的 JWT。echo 前 40 個字元看一下，確認有東西。
 
-Part 6 組 kubeconfig。用 cat 加 heredoc 語法寫一個 YAML 檔。結構三個部分：clusters 裡放 server 跟 CA，users 裡放 user 名稱跟 token，contexts 把前兩者綁在一起，current-context 指定預設用哪個 context。
+Part 6 組 kubeconfig。用 cat 加 heredoc 語法寫一個 YAML 檔。設計是「分開定義、再用 context 綁在一起」：clusters 放 API Server 位址跟 CA 憑證，users 放名稱跟 Token，contexts 把這兩個配對起來加上預設 namespace，current-context 指定預設用哪個 context。名字（k3s、dev-alice、alice@k3s）都是你自己取的，只要三個區塊對得上就好。
 
 注意這裡 context 有個 namespace 欄位設 dev-alice。這是 Alice 的預設 namespace，她打 kubectl get pods 不加 -n 就會看 dev-alice，很方便。
 

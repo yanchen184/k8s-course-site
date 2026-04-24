@@ -1195,7 +1195,65 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
 好，7-6 結束。你們看到了從零到可交付 kubeconfig 的完整流程。接下來 7-7 換你們自己做。[▶ 7-7：學員實作]`,
   },
 
-  // ── [10/12] 7-7（1/3）：學員實作題目 ──
+  // ── [10/12] 7-6 補充：把 kubeconfig 交給 Alice ──
+  {
+    title: '把 kubeconfig 交給 Alice',
+    subtitle: 'Alice 拿到檔案後，在自己電腦怎麼用',
+    section: '7-6：RBAC 實戰',
+    duration: '2',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-slate-800/40 border-l-4 border-cyan-500 p-2 rounded">
+          <p className="text-cyan-300 font-semibold mb-1">Alice 拿到的是什麼？</p>
+          <p className="text-slate-300">一個 <code className="text-amber-300">alice-kubeconfig.yaml</code>，裡面有三樣東西：</p>
+          <ul className="list-disc list-inside text-slate-300 mt-1 space-y-0.5">
+            <li><span className="text-green-300">cluster 位址</span>：https://192.168.43.134:6443</li>
+            <li><span className="text-green-300">CA 憑證</span>：讓她的電腦信任你的 API Server</li>
+            <li><span className="text-green-300">Token</span>：證明她是 dev-alice 這個 SA</li>
+          </ul>
+          <p className="text-slate-400 mt-1 text-[10px]">就像一把限制功能的鑰匙 — 能開門，但只能進特定房間</p>
+        </div>
+
+        <div className="space-y-2">
+          <div className="bg-slate-800/50 p-2 rounded">
+            <p className="text-amber-300 font-semibold mb-1">方法① 每次指定檔案（最簡單）</p>
+            <div className="font-mono text-green-300 space-y-0.5 text-[10px]">
+              <p>kubectl --kubeconfig=/path/to/alice-kubeconfig.yaml get pods</p>
+              <p>kubectl --kubeconfig=/path/to/alice-kubeconfig.yaml get pods -n kube-system</p>
+            </div>
+            <p className="text-slate-400 text-[10px] mt-1">缺點：每次都要打一長串</p>
+          </div>
+
+          <div className="bg-slate-800/50 p-2 rounded">
+            <p className="text-amber-300 font-semibold mb-1">方法② 加進自己電腦的 ~/.kube/config（推薦）</p>
+            <div className="font-mono text-green-300 space-y-0.5 text-[10px]">
+              <p>kubectl config set-cluster k3s-alice --server=https://192.168.43.134:6443 --insecure-skip-tls-verify=true</p>
+              <p>kubectl config set-credentials dev-alice --token={"<alice-kubeconfig.yaml 裡的 token>"}</p>
+              <p>kubectl config set-context alice@k3s --cluster=k3s-alice --user=dev-alice --namespace=dev-alice</p>
+              <p>kubectl config use-context alice@k3s</p>
+            </div>
+            <p className="text-slate-400 text-[10px] mt-1">之後直接打 kubectl get pods 就自動用 Alice 身份</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">重點</p>
+          <p className="text-slate-300 text-[11px]">不管用哪種方法，Alice 的權限都受 RBAC 控制。她只能做 Role 裡允許的事，無法繞過。</p>
+        </div>
+      </div>
+    ),
+    notes: `這頁解釋老師把 kubeconfig 交給學生之後，學生端怎麼操作。
+
+Alice 拿到的 alice-kubeconfig.yaml 裡有三樣東西：cluster 位址、CA 憑證、Token。CA 憑證讓她的電腦能信任你的 API Server，Token 證明她是 dev-alice 這個 SA。
+
+方法一，每次指定 --kubeconfig，最簡單，但每次都要打一長串。適合一次性操作。
+
+方法二，用 kubectl config set-* 把 alice 的 context 加進她自己電腦的 ~/.kube/config，之後直接 use-context 切換，打 kubectl 不用每次帶參數。這是正式做法。
+
+強調一點：不管用哪種方法，RBAC 都在 cluster 端，Alice 的 token 決定了她能做什麼，她無法繞過。`,
+  },
+
+  // ── [11/12] 7-7（1/3）：學員實作題目 ──
   {
     title: '7-7 學員實作：建 backend-dev',
     subtitle: '照 Alice 的流程，做 backend 團隊的帳號',

@@ -151,6 +151,15 @@ EOF
 
 列出 Alice 能做的所有事 — 稽核神器。
 
+輸出的每一行代表一條「允許規則」，分三欄解讀：
+- **Resources**（左欄）：資源類型，例如 `pods`、`deployments.apps`
+- **Resource Names**（中欄）：空 `[]` 代表所有資源，有值才代表限定某個名稱
+- **Verbs**（右欄）：允許的動作，例如 `[get list watch create update delete]`
+
+所以 `pods  []  []  [get list watch create update delete]` 就是說：Alice 可以對 dev-alice namespace 裡所有 Pod 做 get、list、watch、create、update、delete。
+
+最底下一堆 Non-Resource URLs（`/api`、`/healthz`、`/version` 等）是 k8s 給所有 SA 的最低權限，不是 Role 給的，不用管它。
+
 **為什麼用 `auth can-i` 而不是 `kubectl get pods --as=...`？**
 - `auth can-i` 只問不做，安全。
 - `--as` 會真的執行動作，測 delete 的話會真的刪到東西。

@@ -1105,6 +1105,13 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
           <p className="text-green-300">export KUBECONFIG=$PWD/alice-kubeconfig.yaml</p>
         </div>
 
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-2 rounded font-mono">
+          <p className="text-cyan-400 font-semibold mb-1">先確認現在是誰（防止還在用 admin）</p>
+          <p className="text-green-300">kubectl auth whoami</p>
+          <p className="text-green-300">kubectl config current-context</p>
+          <p className="text-slate-400 text-[10px] mt-1">whoami → system:serviceaccount:dev-alice:dev-alice　　current-context → alice@k3s</p>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
             <p className="text-green-400 font-semibold mb-1">✓ 自己 ns 完整權限</p>
@@ -1160,6 +1167,8 @@ $CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 
     notes: `Part 7 是驗收，也是最爽的一步。前面六步全部為了這一刻。
 
 export KUBECONFIG 指向我們剛才組的 alice-kubeconfig.yaml，後面所有 kubectl 指令都會用 Alice 的身份。
+
+export KUBECONFIG 之後先確認身份，不要假設已經切過去了。kubectl auth whoami 會顯示 system:serviceaccount:dev-alice:dev-alice，kubectl config current-context 顯示 alice@k3s。兩個都對才繼續。這個步驟常見問題：unset 沒生效、export 打錯路徑，結果還在用 admin 身份做測試，以為權限沒擋到。
 
 四個情境要測。
 

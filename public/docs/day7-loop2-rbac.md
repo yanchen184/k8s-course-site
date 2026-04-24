@@ -258,6 +258,14 @@ kubeconfig 的三個區塊是「分開定義、再用 context 綁在一起」的
 指令：export KUBECONFIG=$PWD/alice-kubeconfig.yaml
 ```
 
+**先確認現在是誰（防止還在用 admin）**：
+```
+指令：kubectl auth whoami
+指令：kubectl config current-context
+```
+
+`whoami` 應該回 `system:serviceaccount:dev-alice:dev-alice`，current-context 應該是 `alice@k3s`。
+
 **✓ 自己的 ns 完整權限**：
 ```
 指令：kubectl get pods

@@ -592,9 +592,11 @@ kubectl get pods -w
 # ─── Part 7：看軌跡 ───
 kubectl describe hpa nginx-resource-demo
 
-# ─── 挑戰題：targetCPU 30% ───
-kubectl delete hpa nginx-resource-demo
-kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=30%
+# ─── 挑戰題：修改 yaml 改 min/max ───
+# 編輯 hpa-tuned.yaml：minReplicas: 2 → 3，maxReplicas: 5 → 6
+kubectl apply -f hpa-tuned.yaml
+kubectl get hpa
+# 觀察：無流量也維持 3 個 Pod，重壓最多擴到 6
 
 # ─── 清理 ───
 kubectl delete hpa nginx-resource-demo --ignore-not-found
@@ -617,7 +619,7 @@ rm -f nginx-resource-demo.yaml hpa-tuned.yaml`}</pre>
 
 巡堂我會檢查這四條。
 
-挑戰題——targetCPU 改 30%。先把原本的 HPA delete 掉，重新 autoscale 一行把 cpu 改 30%。同樣中壓 sleep 0.05，你會發現這次擴得很快——門檻從 50 降到 30，同樣流量就過門檻了。感受一下 targetCPU 這個參數對擴容敏感度的影響。門檻低越敏感、反應越快，但也容易過度擴容。這是實務上要權衡的。
+挑戰題——修改 hpa-tuned.yaml，把 minReplicas 從 2 改成 3、maxReplicas 從 5 改成 6，重新 apply。觀察兩件事：沒有任何流量，Pod 也會維持 3 個不縮；重壓時最多能擴到 6 個。感受 min/max 這兩個參數如何決定 HPA 的上下邊界。
 
 常見坑四個：unknown 通常是沒設 requests 或 metrics-server 剛啟動；top pods 報 Metrics API not available 是 metrics-server 沒裝；壓測把 VM 打掛通常是壓測 pod 沒設 limits 或 maxReplicas 設太大。
 

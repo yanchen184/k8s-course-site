@@ -467,14 +467,18 @@ kubectl get hpa -w
 kubectl describe hpa nginx-resource-demo
 ```
 
-**挑戰題：targetCPU 改 30%**
+**挑戰題：修改 hpa-tuned.yaml 改 min/max**
+
+開啟 `hpa-tuned.yaml`，把：
+- `minReplicas: 2` → `3`
+- `maxReplicas: 5` → `6`
 
 ```
-指令：kubectl delete hpa nginx-resource-demo
-指令：kubectl autoscale deployment nginx-resource-demo --min=2 --max=5 --cpu=30%
+指令：kubectl apply -f hpa-tuned.yaml
+指令：kubectl get hpa
 ```
 
-同樣中壓 sleep 0.05，這次門檻是 30% 不是 50%，你會發現更容易觸發擴容。感受一下 targetCPU 這個參數對擴容敏感度的影響。
+觀察兩件事：最少維持 3 個 Pod（即使沒有任何流量）、重壓時最多能擴到 6。感受 min/max 這兩個參數如何控制 HPA 的上下邊界。
 
 **巡堂確認清單**
 

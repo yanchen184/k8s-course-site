@@ -2073,38 +2073,38 @@ pods 看 frontend 兩個、task-runner 三個都 Running。cronjob 等一分鐘�
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-cyan-500">
             <p className="text-cyan-300 font-semibold">② MySQL tasks table</p>
-            <p className="font-mono text-slate-300">mysql ... -e "SHOW TABLES;"</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl exec -it mysql-0 -n tasks -- mysql -uroot -p"MyMysqlP@ssw0rd" -D taskdb -e "SHOW TABLES;"</p>
             <p className="text-slate-400">看到 <code className="text-amber-300">tasks</code> → migration 成功</p>
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-cyan-500">
             <p className="text-cyan-300 font-semibold">③ Redis 密碼驗證</p>
-            <p className="font-mono text-slate-300">redis-cli -a ... ping</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl exec deploy/redis -n tasks -- redis-cli -a MyRedisP@ssw0rd ping</p>
             <p className="text-slate-400">回 <code className="text-amber-300">PONG</code></p>
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-cyan-500">
             <p className="text-cyan-300 font-semibold">④ Job migration log</p>
-            <p className="font-mono text-slate-300">kubectl logs job/db-migrate</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl logs job/db-migrate -n tasks</p>
             <p className="text-slate-400">Migration complete</p>
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-amber-500">
             <p className="text-amber-300 font-semibold">⑤ RBAC 最小權限</p>
-            <p className="font-mono text-slate-300">auth can-i get configmaps ✓</p>
-            <p className="font-mono text-slate-300">auth can-i delete pods ✗</p>
-            <p className="font-mono text-slate-300">auth can-i get secrets ✗</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl auth can-i get configmaps -n tasks --as=system:serviceaccount:tasks:backend-sa</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl auth can-i delete pods -n tasks --as=system:serviceaccount:tasks:backend-sa</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl auth can-i get secrets -n tasks --as=system:serviceaccount:tasks:backend-sa</p>
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-cyan-500">
             <p className="text-cyan-300 font-semibold">⑥ CronJob 觸發</p>
-            <p className="font-mono text-slate-300">kubectl get job -n tasks</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl get job -n tasks</p>
             <p className="text-slate-400">task-scheduler-xxx Complete</p>
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-cyan-500">
             <p className="text-cyan-300 font-semibold">⑦ Task Runner log</p>
-            <p className="font-mono text-slate-300">logs -l app=task-runner</p>
+            <p className="font-mono text-slate-300 text-xs">kubectl logs -l app=task-runner -n tasks --tail=20</p>
             <p className="text-slate-400">waiting for tasks...</p>
           </div>
           <div className="bg-slate-800/50 p-2 rounded border-l-2 border-cyan-500">
             <p className="text-cyan-300 font-semibold">⑧ Ingress + Backend API</p>
-            <p className="font-mono text-slate-300">curl -H Host:task.local .../api/tasks</p>
+            <p className="font-mono text-slate-300 text-xs">curl -H "Host: task.local" http://192.168.43.134/api/tasks</p>
             <p className="text-slate-400">JSON 回得來</p>
           </div>
         </div>

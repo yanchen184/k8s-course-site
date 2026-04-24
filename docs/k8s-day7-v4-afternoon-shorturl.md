@@ -149,6 +149,8 @@
 >
 > 請特別看三個欄位。`serviceName: postgres-service` 讓 StatefulSet 搭配 headless Service。`volumeMounts` 把 PVC 掛到 `/var/lib/postgresql/data`。`readinessProbe` 用 `pg_isready` 確認 DB 是否真的可用。
 >
+> 這裡上課要用 local 版 `03-postgres.yaml`。原因是 `postgres:15` 也在講師提供的 image tar 裡，local YAML 會設定 `imagePullPolicy: Never`。這代表 PostgreSQL 也不會去 Docker Hub 拉 image，而是使用每台 node 已經匯入的本地 image。
+>
 > 這裡複習的是：有狀態服務、穩定名稱、PVC、readinessProbe。
 
 #### `04-migrate-job.yaml`
@@ -159,7 +161,7 @@
 >
 > `restartPolicy: OnFailure` 和 `backoffLimit: 3` 代表失敗會重試，但不會無限重跑。
 >
-> local YAML 會用 `url-shortener-api:lab` 和 `imagePullPolicy: Never`，意思是不要去 Docker Hub 拉，直接使用 k3s node 裡已經匯入的 image。
+> local YAML 會用 `busybox:1.36`、`url-shortener-api:lab` 和 `imagePullPolicy: Never`，意思是不要去 Docker Hub 拉，直接使用 k3s node 裡已經匯入的 image。
 >
 > 這裡複習的是：Job、init container、啟動順序、失敗重試。
 

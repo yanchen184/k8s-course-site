@@ -290,9 +290,11 @@ kubectl apply -f apps/k8s/url-shortener/02-configmap.yaml
 ### Step 3：部署 PostgreSQL StatefulSet + PVC
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/03-postgres.yaml
+kubectl apply -f apps/k8s/url-shortener-local/03-postgres.yaml
 kubectl get pods,pvc -n url-shortener
 ```
+
+這裡使用 local 版 PostgreSQL YAML，因為 `postgres:15` 也是從 image tar 匯入到每台 node 的 image。local 版會設定 `imagePullPolicy: Never`，避免 k3s 在 node 找不到 image 時又跑去 Docker Hub pull。
 
 為什麼 DB 用 StatefulSet？
 

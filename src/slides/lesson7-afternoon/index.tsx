@@ -978,6 +978,12 @@ apply Redis，看到 redis-xxxxx Pod Running 就繼續。Redis 是 Deployment、
     duration: '3',
     content: (
       <div className="space-y-3">
+        <div className="bg-slate-800/50 border-l-4 border-cyan-500 p-3 rounded text-xs">
+          <p className="text-cyan-300 font-semibold mb-1">這個 Job 在做什麼</p>
+          <p className="text-slate-300">MySQL 啟動時是空的，沒有任何資料表。這個 Job 連進去執行 <span className="font-mono text-yellow-300">CREATE TABLE tasks (...)</span>，建好結構後 Backend 才能寫資料。只需要跑一次。</p>
+          <p className="text-slate-400 mt-1">image <span className="font-mono">task-api:v1</span> 裡有兩個進入點：<span className="font-mono text-green-300">server.js</span>（API 伺服器）和 <span className="font-mono text-green-300">migrate.js</span>（建表）。靠 <span className="font-mono">command</span> 決定跑哪個。原始碼：<span className="font-mono">apps/task-api/migrate.js</span></p>
+        </div>
+
         <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded text-xs">
           <p className="text-amber-300 font-semibold">為什麼不用 Deployment</p>
           <p className="text-slate-300 mt-1">
@@ -1313,13 +1319,13 @@ kubectl port-forward service/backend-service 3000:3000，把叢集裡的 3000 po
               </tr>
             </thead>
             <tbody className="text-slate-300">
-              <tr><td className="border border-slate-700 p-2 font-mono">get pods</td><td className="border border-slate-700 p-2">redis Running 1/1；backend x2 Running 1/1</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get job</td><td className="border border-slate-700 p-2">db-migrate COMPLETIONS 1/1</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">logs job/db-migrate</td><td className="border border-slate-700 p-2">Migration complete: tasks table ready</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">get sa,role,rolebinding</td><td className="border border-slate-700 p-2">backend-sa / backend-role / backend-rolebinding</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">can-i get configmaps --as=system:serviceaccount:tasks:backend-sa</td><td className="border border-slate-700 p-2 text-green-300">yes</td></tr>
-              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">can-i delete pods --as=system:serviceaccount:tasks:backend-sa</td><td className="border border-slate-700 p-2 text-red-300">no</td></tr>
-              <tr><td className="border border-slate-700 p-2 font-mono">curl /health</td><td className="border border-slate-700 p-2">{`{"status":"ok"}`}</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl get pods -n tasks</td><td className="border border-slate-700 p-2">redis Running 1/1；backend x2 Running 1/1</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get job -n tasks</td><td className="border border-slate-700 p-2">db-migrate COMPLETIONS 1/1</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl logs job/db-migrate -n tasks</td><td className="border border-slate-700 p-2">Migration complete: tasks table ready</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl get sa,role,rolebinding -n tasks</td><td className="border border-slate-700 p-2">backend-sa / backend-role / backend-rolebinding</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl auth can-i get configmaps -n tasks --as=system:serviceaccount:tasks:backend-sa</td><td className="border border-slate-700 p-2 text-green-300">yes</td></tr>
+              <tr className="bg-slate-800/30"><td className="border border-slate-700 p-2 font-mono">kubectl auth can-i delete pods -n tasks --as=system:serviceaccount:tasks:backend-sa</td><td className="border border-slate-700 p-2 text-red-300">no</td></tr>
+              <tr><td className="border border-slate-700 p-2 font-mono">kubectl port-forward service/backend-service 3000:3000 -n tasks &amp; curl localhost:3000/health</td><td className="border border-slate-700 p-2">{`{"status":"ok"}`}</td></tr>
             </tbody>
           </table>
         </div>

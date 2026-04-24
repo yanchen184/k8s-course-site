@@ -1300,7 +1300,8 @@ kubectl auth can-i get pods --as=system:serviceaccount:backend-team:backend-dev 
 kubectl auth can-i get secrets --as=system:serviceaccount:backend-team:backend-dev -n backend-team
 
 # ─── Part 4：抓 cluster 資訊 ───
-CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+VM_IP=$(hostname -I | awk '{print $1}')
+CLUSTER_SERVER="https://${VM_IP}:6443"
 CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 if [ -z "$CA_DATA" ]; then
   CA_DATA=$(sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt | base64 -w 0)
@@ -1330,16 +1331,19 @@ contexts:
     namespace: backend-team
 current-context: backend-dev@k3s
 EOF
-VM_IP=$(hostname -I | awk '{print $1}')    # 或手動 VM_IP=你的IP
-sed -i "s|https://127.0.0.1:6443|https://\${VM_IP}:6443|" backend-kubeconfig.yaml
 
 # ─── Part 7：切身份驗收 ───
-export KUBECONFIG=$PWD/backend-kubeconfig.yaml
+unset KUBECONFIG
+kubectl config set-cluster k3s-backend --server=https://${VM_IP}:6443 --insecure-skip-tls-verify=true
+kubectl config set-credentials backend-dev --token=$TOKEN
+kubectl config set-context backend-dev@k3s --cluster=k3s-backend --user=backend-dev --namespace=backend-team
+kubectl config use-context backend-dev@k3s
+kubectl auth whoami                 # ✓ system:serviceaccount:backend-team:backend-dev
 kubectl get pods                    # ✓ 空列表
 kubectl get secret                  # ✗ Forbidden
 kubectl delete pod any-name         # ✗ Forbidden
 kubectl get pods -n default         # ✗ Forbidden
-unset KUBECONFIG
+kubectl config use-context default  # 切回 admin
 
 # ─── Part 8：清理 ───
 kubectl delete namespace backend-team
@@ -1361,7 +1365,7 @@ Part 5 產 Token，8760h 一年。
 
 Part 6 組 kubeconfig。注意 context 裡 namespace 設 backend-team，這樣 backend-dev 打 kubectl get pods 預設就看 backend-team。sed 那行把 127.0.0.1 換成實際 Node IP，VM_IP 用 hostname -I 自動偵測你自己機器的 IP，不需要手動改。
 
-Part 7 切身份驗收。四個測試：get pods 空列表、get secret 被擋、delete pod 被擋、跨 ns 被擋。四條全綠才算過。最後 unset KUBECONFIG 切回 admin。
+Part 7 切身份驗收。用 kubectl config set-* 把 backend-dev context 加進 ~/.kube/config，use-context 切過去。先 auth whoami 確認是 backend-dev 才繼續。四個測試：get pods 空列表、get secret 被擋、delete pod 被擋、跨 ns 被擋。四條全綠才算過。最後 use-context default 切回 admin。
 
 Part 8 清理。kubectl delete namespace backend-team 會把裡面的 SA、Role、RoleBinding 全部連帶刪掉。rm 把 kubeconfig 檔案也刪掉。
 

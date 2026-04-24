@@ -173,6 +173,8 @@ EOF
 指令：CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 ```
 
+這兩個值是產生 kubeconfig 的原料 — `CLUSTER_SERVER` 是 API Server 位址，`CA_DATA` 是 TLS 憑證，之後會塞進 kubeconfig 的 YAML 裡。
+
 這兩行只是把值存進 shell 變數，**畫面不會有輸出**。用 echo 確認：
 
 ```

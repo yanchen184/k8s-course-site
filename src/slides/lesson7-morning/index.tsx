@@ -600,644 +600,427 @@ kubectl describe hpa nginx-resource-demo`,
 
 
   // ============================================================
-// Loop 2：RBAC
+  // Loop 2：RBAC 權限控制（對應 public/docs/day7-loop2-rbac.md）
+  // 7-5 概念（2 張） + 7-6 實戰（7 張） + 7-7 學員實作（3 張）= 12 張
   // ============================================================
 
-  // ── 7-11 概念（1/2）：誰都能刪 Pod ──
+
+  // ── [1/12] 7-5 概念（1/2）：誰都能刪 Pod + RBAC 核心邏輯 ──
   {
-    title: '誰都能刪 Pod？',
-    subtitle: '實習生 kubectl delete namespace production',
-    section: 'Loop 2：RBAC',
-    duration: '8',
+    title: '誰都能刪 Pod？RBAC 解決的問題',
+    subtitle: '實習生一個指令，毀掉 production',
+    section: '7-5：RBAC 概念',
+    duration: '3',
     content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
+      <div className="space-y-3">
+        <div className="bg-red-900/30 border border-red-500/50 p-3 rounded">
           <p className="text-red-400 font-semibold mb-2">恐怖故事</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <p>十個開發者，全拿 <code className="text-red-400">cluster-admin</code> 的 kubeconfig</p>
-            <p>某天有人跑清理腳本：</p>
+          <div className="space-y-1 text-sm text-slate-300">
+            <p>十個開發者全拿 <code className="text-red-400">cluster-admin</code> 的 kubeconfig</p>
+            <p>某天實習生跑清理腳本：</p>
             <div className="bg-slate-900 p-2 rounded font-mono text-red-400 text-xs">
               kubectl delete namespace production
             </div>
-            <p>Deployment、Pod、Service、Secret、PVC → <span className="text-red-400 font-bold">全部瞬間消失</span></p>
+            <p className="text-xs text-slate-400">production 底下所有東西瞬間消失（業界真實案例）</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">Docker vs K8s</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>Docker → 沒有內建權限控制，連到 Socket 就等於 root</p>
-            <p>K8s → <span className="text-cyan-400 font-bold">RBAC</span>（Role-Based Access Control）</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
           <p className="text-cyan-400 font-semibold mb-2">RBAC 核心邏輯</p>
-          <div className="flex items-center justify-center gap-2 text-sm">
-            <span className="bg-blue-900/40 border border-blue-500/50 px-3 py-1 rounded text-blue-400">誰 Subject</span>
-            <span className="text-slate-400 font-bold">+</span>
-            <span className="bg-green-900/40 border border-green-500/50 px-3 py-1 rounded text-green-400">能做什麼 Role</span>
-            <span className="text-slate-400 font-bold">=</span>
-            <span className="bg-amber-900/40 border border-amber-500/50 px-3 py-1 rounded text-amber-400">綁定 Binding</span>
-          </div>
+          <p className="text-slate-300 mb-2">誰（Subject）+ 能做什麼（Role）= 綁定（Binding）</p>
+          <ul className="text-slate-300 space-y-1 list-disc list-inside">
+            <li><b className="text-cyan-300">Subject</b>：User、Group、ServiceAccount</li>
+            <li><b className="text-cyan-300">Role</b>：定義允許的操作清單</li>
+            <li><b className="text-cyan-300">Binding</b>：把 Role 綁到 Subject 身上</li>
+          </ul>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          <b>Default Deny</b>：沒寫 = 沒權限。跟防火牆相反 — RBAC 預設全擋，一條一條開。
         </div>
       </div>
     ),
-    notes: `好，大家午休回來了。我們接著上午的因果鏈繼續往下走。
+    notes: `講一個真實故事開場。
 
-上午我們解決了三個問題。第一個，Pod Running 但服務卡死，用 Probe 解決。第二個，一個 Pod 吃光整台機器資源，用 Resource limits 解決。第三個，流量暴增手動 scale 來不及，用 HPA 解決。三條因果鏈串下來，你的服務已經具備了健康檢查、資源隔離、自動彈性擴縮的能力。
+你們公司十個開發者，全部都拿著 cluster-admin 的 kubeconfig。某天實習生跑了一個清理腳本，腳本裡有個 bug：kubectl delete namespace production。production 底下所有東西瞬間消失。這在業界真實發生過。
 
-但我在上午結尾的時候提了一個問題，不知道大家還記不記得。你的叢集上有十個開發者，每個人都拿到了 admin 權限的 kubeconfig。某天有個人在跑清理腳本的時候，不小心打了 kubectl delete namespace production。猜猜怎麼了？production Namespace 底下的所有東西，Deployment、Pod、Service、Secret、PVC，全部瞬間消失。整個生產環境掛掉。
+Docker 更糟。Docker 根本沒有內建的權限控制。只要你能連到 Docker Socket，你就等於 root。K8s 至少提供了一套完整的權限控制機制，叫 RBAC。
 
-這不是我編的。這種事在業界真的發生過。2017 年 GitLab 就出過一次大事故，工程師在操作資料庫的時候誤刪了生產環境的資料，導致服務中斷了好幾個小時。雖然那次不是 K8s 的問題，但道理是一樣的：不該有那麼大權限的人拿到了那麼大的權限。
+RBAC 全名 Role-Based Access Control，中文叫基於角色的存取控制。核心邏輯一句話：誰加上能做什麼等於綁定。
 
-我們來想想，現在你的叢集是什麼狀態。你用 k3s 或 minikube 建的叢集，所有人用同一個 kubeconfig，所有人都是 cluster-admin。cluster-admin 是什麼？就是上帝權限，什麼都能做。建、改、刪，所有 Namespace、所有資源，通通可以。
+三個元素。第一，Subject 是「誰」，可以是 User、Group、或 ServiceAccount。第二，Role 是「能做什麼」，定義操作清單。第三，Binding 把兩個綁在一起。
 
-Docker 有沒有這個問題？Docker 更糟。Docker 根本沒有內建的權限控制。只要你能連到 Docker Socket，你就等於 root。所有容器你都能停、都能刪、都能進去看。K8s 至少提供了一套完整的權限控制機制，叫做 RBAC。
+最重要的觀念：RBAC 是 Default Deny，預設拒絕。沒列進 Role 的就是沒權限。跟防火牆剛好相反——防火牆預設全通，你要一條一條擋；RBAC 預設全擋，你要一條一條開。
 
-RBAC，全名 Role-Based Access Control，中文叫基於角色的存取控制。它的核心邏輯只有一句話：誰加上能做什麼等於綁定。用更具體的方式說就是三個元素。第一個是 Subject，就是「誰」，可以是一個使用者 User、一個群組 Group、或者一個 ServiceAccount。第二個是 Role，就是「能做什麼」，定義了允許的操作清單。第三個是 Binding，把 Role 綁到 Subject 身上。
+所以寫 Role 的時候你不用寫「不能碰 Secret」，你不列它，它就碰不到。這個觀念等一下實作的時候會反覆驗證。
 
-[▶ 下一頁]`,
+[▶ 下一頁：四個物件 + ServiceAccount]`,
   },
 
-  // ── 7-11 概念（2/2）：四個物件 + ServiceAccount ──
+  // ── [2/12] 7-5 概念（2/2）：四個物件 + SA + 企業設計 ──
   {
-    title: 'RBAC 四個物件',
-    subtitle: '門禁卡比喻：Role = 門禁卡，Binding = 發卡',
-    section: 'Loop 2：RBAC',
-    duration: '7',
+    title: '四個 RBAC 物件 + ServiceAccount',
+    subtitle: '門禁卡比喻 + 企業真實設計',
+    section: '7-5：RBAC 概念',
+    duration: '2',
     content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <table className="w-full text-sm">
+      <div className="space-y-3 text-xs">
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold mb-2">四個物件</p>
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="text-cyan-400 border-b border-slate-600">
-                <th className="text-left py-1 pr-2">物件</th>
-                <th className="text-left py-1 pr-2">作用範圍</th>
-                <th className="text-left py-1">職責</th>
+              <tr className="bg-slate-900">
+                <th className="border border-slate-700 p-1 text-cyan-300">物件</th>
+                <th className="border border-slate-700 p-1 text-cyan-300">範圍</th>
+                <th className="border border-slate-700 p-1 text-cyan-300">比喻</th>
               </tr>
             </thead>
-            <tbody className="text-slate-300">
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-2 font-mono text-green-400 text-xs">Role</td>
-                <td className="py-1 pr-2">單一 Namespace</td>
-                <td className="py-1">定義能對什麼資源做什麼動作</td>
+            <tbody>
+              <tr>
+                <td className="border border-slate-700 p-1 font-mono">Role</td>
+                <td className="border border-slate-700 p-1">單一 Namespace</td>
+                <td className="border border-slate-700 p-1">3 樓門禁卡</td>
               </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-2 font-mono text-green-400 text-xs">ClusterRole</td>
-                <td className="py-1 pr-2">整個叢集</td>
-                <td className="py-1">同上，但跨 Namespace</td>
-              </tr>
-              <tr className="border-b border-slate-700/50">
-                <td className="py-1 pr-2 font-mono text-amber-400 text-xs">RoleBinding</td>
-                <td className="py-1 pr-2">單一 Namespace</td>
-                <td className="py-1">把 Role 綁到某人身上</td>
+              <tr className="bg-slate-900/40">
+                <td className="border border-slate-700 p-1 font-mono">ClusterRole</td>
+                <td className="border border-slate-700 p-1">整個叢集</td>
+                <td className="border border-slate-700 p-1">萬能卡</td>
               </tr>
               <tr>
-                <td className="py-1 pr-2 font-mono text-amber-400 text-xs">ClusterRoleBinding</td>
-                <td className="py-1 pr-2">整個叢集</td>
-                <td className="py-1">把 ClusterRole 綁到某人身上</td>
+                <td className="border border-slate-700 p-1 font-mono">RoleBinding</td>
+                <td className="border border-slate-700 p-1">單一 Namespace</td>
+                <td className="border border-slate-700 p-1">發卡給員工</td>
+              </tr>
+              <tr className="bg-slate-900/40">
+                <td className="border border-slate-700 p-1 font-mono">ClusterRoleBinding</td>
+                <td className="border border-slate-700 p-1">整個叢集</td>
+                <td className="border border-slate-700 p-1">發萬能卡</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">ServiceAccount：Pod 的身份</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>User / Group → 給<span className="text-blue-400">人</span>用</p>
-            <p>ServiceAccount → 給<span className="text-green-400">程式（Pod）</span>用</p>
-            <p className="text-slate-400 text-xs mt-2">每個 Namespace 預設有 default SA；生產環境建議每個應用建自己的 SA → 最小權限原則</p>
-          </div>
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">ServiceAccount 不只給 Pod</p>
+          <p className="text-slate-300">SA 原本給 Pod 跟 API Server 溝通用，但也能<b className="text-amber-300">包成 kubeconfig 發給真人工程師</b>。下一段就示範。</p>
         </div>
 
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">常見 RBAC 設計</p>
-          <div className="text-xs text-slate-300 space-y-1">
-            <p>開發人員 → dev/staging 完整權限，prod <span className="text-amber-400">只讀</span></p>
-            <p>SRE/DevOps → 所有 Namespace 完整權限</p>
-            <p>實習生 → dev 只讀，staging/prod <span className="text-red-400">不可碰</span></p>
-            <p>部署 → 交給 CI/CD（ArgoCD）</p>
-          </div>
-        </div>
-      </div>
-    ),
-    notes: `RBAC 一共有四個物件。Role 和 ClusterRole 負責定義「能做什麼」，差別是作用範圍。Role 只在一個 Namespace 裡面有效。比如你建了一個 Role 叫 pod-viewer，放在 default Namespace，那這個 Role 只能控制 default Namespace 裡的資源。ClusterRole 是整個叢集有效的，不限 Namespace。
-
-RoleBinding 和 ClusterRoleBinding 負責「把權限給誰」，差別也是作用範圍。RoleBinding 只在一個 Namespace 裡面有效，ClusterRoleBinding 是整個叢集。
-
-我用公司門禁卡來比喻。Role 就像一張門禁卡，上面寫著「可以進出 3 樓研發部」。ClusterRole 就像萬能卡，所有樓層都能進出。RoleBinding 就是把門禁卡發給某個員工。ClusterRoleBinding 就是把萬能卡發給某個員工。你不會把萬能卡發給每個新來的實習生，對吧？但我們現在的叢集就是在做這件事。
-
-好，再講一個重要的概念叫 ServiceAccount。剛才說的 User 和 Group 是給人用的。但 Pod 也需要跟 K8s API Server 溝通。比如有些監控工具需要列出所有 Pod 的狀態，有些自動化工具需要建立或刪除資源。Pod 不是人，它的身份用的就是 ServiceAccount。
-
-每個 Namespace 預設都有一個叫 default 的 ServiceAccount。如果你建 Pod 的時候不指定 ServiceAccount，Pod 就會自動使用 default。在生產環境裡，建議每個應用建自己的 ServiceAccount，然後用 RBAC 給它需要的最小權限。這叫最小權限原則。
-
-來看 Role 的 YAML 怎麼寫。kind 是 Role，metadata 裡面指定名字叫 pod-viewer，namespace 是 default。rules 是重點，它定義了允許的操作。apiGroups 設空字串，代表 core API group，就是 Pod、Service、ConfigMap 這些最基礎的資源。resources 設 pods 和 services，代表能操作 Pod 和 Service。verbs 設 get、list、watch，代表能查看單個、列出全部、即時監控。注意，沒有 create、update、delete、patch 這些動詞。所以這是一個純粹只讀的 Role，能看不能改。
-
-ServiceAccount 的 YAML 非常簡單，就是 kind 是 ServiceAccount，給個名字 viewer-sa，指定 namespace。
-
-RoleBinding 稍微複雜一點，但邏輯很清楚。subjects 指定「綁給誰」，這裡綁給 ServiceAccount viewer-sa。roleRef 指定「綁哪個 Role」，這裡綁 pod-viewer。apiGroup 要寫 rbac.authorization.k8s.io，這是固定寫法。
-
-三個 YAML 組合在一起，就完成了一件事：viewer-sa 這個 ServiceAccount 擁有 pod-viewer 這個 Role 的權限，也就是在 default Namespace 裡面可以 get、list、watch Pod 和 Service。僅此而已，其他什麼都不能做。
-
-常見的 RBAC 設計方案是這樣的。開發人員在 dev Namespace 有完整權限，在 staging 有完整權限，在 prod 只有只讀。SRE 或 DevOps 在所有 Namespace 都有完整權限。實習生只能在 dev 看看，staging 和 prod 碰都不能碰。真正的部署操作交給 CI/CD Pipeline，比如 ArgoCD。這樣就算有人手滑，損害也限制在可控範圍內。
-
-好，概念講完了。接下來我們實際建一個只讀使用者，然後驗證它真的不能刪東西。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-12 實作（1/2）：RBAC YAML + 操作 ──
-  {
-    title: 'RBAC 實作：只讀使用者',
-    subtitle: 'ServiceAccount + Role + RoleBinding',
-    section: 'Loop 2：RBAC',
-    duration: '6',
-    content: (
-      <div className="space-y-3">
-        <div className="bg-green-900/20 border border-green-500/40 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm mb-1">① Role — 定義能做什麼</p>
-          <div className="text-xs text-slate-300 space-y-0.5">
-            <p><span className="text-slate-400">resources:</span> <code className="text-amber-400">pods, services</code></p>
-            <p><span className="text-slate-400">verbs:</span> <code className="text-green-400">get, list, watch</code>（只讀，無 delete/create）</p>
-          </div>
-        </div>
-        <div className="bg-blue-900/20 border border-blue-500/40 p-3 rounded-lg">
-          <p className="text-blue-400 font-semibold text-sm mb-1">② ServiceAccount — Pod 的身份</p>
-          <div className="text-xs text-slate-300">
-            <p><span className="text-slate-400">name:</span> <code className="text-blue-400">viewer-sa</code>　namespace: default</p>
-          </div>
-        </div>
-        <div className="bg-amber-900/20 border border-amber-500/40 p-3 rounded-lg">
-          <p className="text-amber-400 font-semibold text-sm mb-1">③ RoleBinding — 把 Role 給 SA</p>
-          <div className="text-xs text-slate-300">
-            <p><span className="text-slate-400">subjects:</span> <code className="text-blue-400">viewer-sa</code>　→　<span className="text-slate-400">roleRef:</span> <code className="text-green-400">pod-viewer</code></p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center gap-2 text-xs mt-1">
-          <span className="bg-blue-900/40 border border-blue-500/50 px-2 py-1 rounded text-blue-400">viewer-sa</span>
-          <span className="text-amber-400 font-bold">→ RoleBinding →</span>
-          <span className="bg-green-900/40 border border-green-500/50 px-2 py-1 rounded text-green-400">pod-viewer Role</span>
-          <span className="text-slate-400 font-bold">=</span>
-          <span className="text-slate-300">只能讀 Pod/Service</span>
-        </div>
-      </div>
-    ),
-    code: `# 部署
-kubectl apply -f rbac-viewer.yaml
-kubectl get serviceaccount viewer-sa
-kubectl get role pod-viewer
-kubectl get rolebinding viewer-binding
----
-# Role — 只讀：get / list / watch
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: pod-viewer
-  namespace: default
-rules:
-  - apiGroups: [""]
-    resources: ["pods", "services"]
-    verbs: ["get", "list", "watch"]
----
-# ServiceAccount
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: viewer-sa
-  namespace: default
----
-# RoleBinding — 把 Role 綁到 SA
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: viewer-binding
-  namespace: default
-subjects:
-  - kind: ServiceAccount
-    name: viewer-sa
-    namespace: default
-roleRef:
-  kind: Role
-  name: pod-viewer
-  apiGroup: rbac.authorization.k8s.io`,
-    notes: `好，來動手做。我們要建三個資源：一個 ServiceAccount、一個 Role、一個 RoleBinding。把它們組合起來，做出一個只能看不能改的使用者。
-
-先部署。rbac-viewer.yaml 這個檔案裡面包含了剛才講的三個 YAML，用三個橫線分隔開。
-
-kubectl apply -f rbac-viewer.yaml
-
-你會看到三行輸出。serviceaccount/viewer-sa created。role.rbac.authorization.k8s.io/pod-viewer created。rolebinding.rbac.authorization.k8s.io/viewer-binding created。三個都建好了。
-
-確認一下。kubectl get serviceaccount viewer-sa 看到了，AGE 是幾秒。kubectl get role pod-viewer 看到了。kubectl get rolebinding viewer-binding 也看到了。三個資源都在。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-12 實作（2/2）：--as 測試驗證 ──
-  {
-    title: 'RBAC 驗證：--as 模擬身份',
-    subtitle: 'get 成功 ✓　delete 被拒 ✗',
-    section: 'Loop 2：RBAC',
-    duration: '6',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">✓ 查看成功</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl get pods --as=system:serviceaccount:default:viewer-sa</p>
-            <pre className="text-green-400 whitespace-pre-wrap">{`NAME        READY  STATUS   RESTARTS
-nginx-xxx   1/1    Running  0`}</pre>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">✗ 刪除被拒</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl delete pod nginx-xxx --as=system:serviceaccount:default:viewer-sa</p>
-            <p className="text-red-400">Error from server (Forbidden): pods "nginx-xxx" is forbidden:</p>
-            <p className="text-red-400">User cannot delete resource "pods" in namespace "default"</p>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">✗ 建立被拒</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl run test --image=nginx \</p>
-            <p>    --as=system:serviceaccount:default:viewer-sa</p>
-            <p className="text-red-400">Error from server (Forbidden): cannot create resource "pods"</p>
-          </div>
-        </div>
-
-        <pre className="bg-slate-950 text-slate-100 p-2 rounded text-xs overflow-x-auto"><code>{`kubectl get pods --as=system:serviceaccount:default:viewer-sa
-kubectl delete pod <Pod名稱> --as=system:serviceaccount:default:viewer-sa
-kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa`}</code></pre>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg text-sm text-slate-300">
-          <p>不加 <code className="text-cyan-400">--as</code> → 用預設 admin 身份 → 什麼都能做</p>
-          <p className="mt-1 text-slate-400">企業：開發人員綁只讀 Role、CI/CD 綁部署 Role、只有 SRE 拿完整權限</p>
-        </div>
-      </div>
-    ),
-    notes: `好，現在來測試。K8s 提供了一個非常好用的旗標叫 --as，可以模擬用其他身份來操作。格式是 system:serviceaccount: 加上 namespace 加上冒號加上名字。
-
-先試用 viewer-sa 的身份查看 Pod。
-
-kubectl get pods --as=system:serviceaccount:default:viewer-sa
-
-大家看，成功了。你可以看到 Pod 的列表。因為 pod-viewer 這個 Role 有 get 和 list 的權限。
-
-好，現在試刪除。隨便找一個 Pod 的名字。
-
-kubectl delete pod nginx-resource-demo-隨便一個hash --as=system:serviceaccount:default:viewer-sa
-
-大家猜結果是什麼？
-
-看，Error from server (Forbidden)。完整的錯誤訊息是 pods 某某某 is forbidden: User "system:serviceaccount:default:viewer-sa" cannot delete resource "pods" in API group "" in the namespace "default"。被拒絕了。因為我們的 Role 沒有 delete 這個 verb。K8s 很精確地告訴你：你沒有刪除 Pod 的權限。
-
-再試建立一個新的 Pod。
-
-kubectl run test --image=nginx --as=system:serviceaccount:default:viewer-sa
-
-一樣被拒。cannot create resource "pods"。沒有 create 權限。
-
-那如果我們不加 --as 呢？那就是用你預設的 admin 身份。kubectl get pods 正常。kubectl run test-admin --image=nginx 成功建立了。因為你的 admin 有所有權限。kubectl delete pod test-admin 成功刪除。
-
-看到差別了吧。同一個叢集，同一個 Namespace，但不同的身份有不同的權限。viewer-sa 只能看，admin 什麼都能做。這就是 RBAC 的威力。
-
-在企業環境裡，你不會讓每個人都用 admin。你會根據角色建不同的 ServiceAccount 或 User，綁定不同的 Role。開發人員綁只讀的 Role，CI/CD 綁有部署權限的 Role，只有 SRE 才拿完整權限。
-
-好，接下來先介紹另一個檢查權限的指令 kubectl auth can-i，對排錯很有用。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-12（新增 5/8）：kubectl auth can-i 快速檢查 ──
-  {
-    title: 'kubectl auth can-i：不用真的執行就能問',
-    subtitle: '排錯 / Pipeline 權限自檢的神器',
-    section: 'Loop 2：RBAC',
-    duration: '4',
-    content: (
-      <div className="space-y-3">
-        <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-xs">
-          <p className="text-cyan-300 font-semibold mb-1">--as vs auth can-i</p>
-          <p className="text-slate-300"><code className="text-amber-300">--as</code> 是<b>真的執行</b>動作（會改到東西）；<code className="text-amber-300">auth can-i</code> 是<b>只問不做</b>，只回 yes / no，安全。</p>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-3 rounded">
-          <p className="text-green-400 font-semibold mb-2 text-sm">✓ 可以 get pods</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl auth can-i get pods \</p>
-            <p>    --as=system:serviceaccount:default:viewer-sa</p>
-            <p className="text-green-400">yes</p>
-          </div>
-        </div>
-
-        <div className="bg-red-900/30 border border-red-500/50 p-3 rounded">
-          <p className="text-red-400 font-semibold mb-2 text-sm">✗ 不能 delete pods</p>
-          <div className="bg-slate-900 p-2 rounded font-mono text-xs text-slate-300">
-            <p>$ kubectl auth can-i delete pods \</p>
-            <p>    --as=system:serviceaccount:default:viewer-sa</p>
-            <p className="text-red-400">no</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded text-xs text-slate-300 space-y-1">
-          <p className="text-amber-300 font-semibold">常見用途</p>
-          <ul className="list-disc list-inside space-y-0.5">
-            <li>排錯：Pod 報 forbidden 時，先 can-i 確認是不是 Role 少了 verb</li>
-            <li>CI/CD：Pipeline 跑前先 can-i 自檢，少掉部署到一半才失敗</li>
-            <li>檢視：<code className="text-amber-300">kubectl auth can-i --list</code> 列出身份能做的所有事</li>
+        <div className="bg-slate-800/50 p-3 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">企業真實設計</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li>開發者：自己的 dev ns 完整權限、prod 只讀</li>
+            <li>SRE：所有 ns 完整權限</li>
+            <li>實習生：dev 只讀、prod 禁止</li>
+            <li>CI/CD：有部署權限、沒刪除權限</li>
           </ul>
         </div>
       </div>
     ),
-    notes: `除了 --as，K8s 還提供另一個很好用的指令：kubectl auth can-i。
+    notes: `RBAC 一共四個物件，兩兩成對。
 
-兩個差別：--as 是真的執行動作，所以如果你測的是 delete，它真的會去刪。auth can-i 是只問不做，只會回 yes 或 no。安全很多，不會改到東西。
+Role 跟 ClusterRole 定義「能做什麼」，差別在範圍。Role 只在一個 Namespace 裡有效。ClusterRole 整個叢集有效，不限 Namespace。
 
-看例子。kubectl auth can-i get pods，帶 --as=system:serviceaccount:default:viewer-sa。回 yes，代表這個身份可以 get pods。
+RoleBinding 跟 ClusterRoleBinding 負責「把 Role 發給 Subject」。RoleBinding 只在一個 Namespace 裡生效。ClusterRoleBinding 整個叢集生效。
 
-換成 delete。kubectl auth can-i delete pods，一樣帶 --as。回 no。一眼就知道這個身份沒有刪的權限。
+門禁卡比喻。Role 是 3 樓研發部的門禁卡，ClusterRole 是所有樓層都能進的萬能卡。RoleBinding 就是把卡發給某個員工。企業絕對不會把萬能卡發給實習生。
 
-三個常見用途。
+ServiceAccount 這個觀念要特別講。SA 原本是給 Pod 跟 API Server 溝通用的身份，每個 Namespace 預設都有一個 default SA。但重點來了——SA 不只給 Pod 用，它也可以給真人工程師當身份。你把一個 SA 的 Token 包成 kubeconfig 發給新同事，他就能用 kubectl 連叢集，權限受你設的 Role 限制。這就是下一段 7-6 要做的事。
 
-第一，排錯。線上 Pod 報 forbidden，你不確定是 Role 忘了加 verb 還是 namespace 綁錯。can-i 問一下，yes 就代表權限 OK 問題在別處，no 就代表 Role 設定有問題。一秒定位。
+最後講企業真實設計。開發者在自己的 dev namespace 完整權限，在 prod 只讀。SRE 所有 namespace 完整權限。實習生 dev 只讀、prod 禁止。CI/CD 有部署權限、沒刪除權限。這樣就算有人手滑，損害限制在可控範圍。
 
-第二，CI/CD Pipeline。部署前先用 can-i 自檢一遍，create deployment、update configmap 這些都回 yes 再跑。少掉那種部署到一半才 forbidden 的痛。
-
-第三，kubectl auth can-i --list。帶 --as 可以列出這個身份能做的所有事。權限稽核的時候很方便。
-
-後面下午的 Loop 4 部署完整系統時，我們也會用 can-i 驗證 backend-sa 的最小權限。
-
-好，接下來換你們實作。[▶ 下一頁]`,
+好，概念結束。接下來進 7-6，我們實際做一次——給新同事 Alice 產一份 kubeconfig。[▶ 下一頁：Alice 情境]`,
   },
 
-  // ── 7-12 學員實作 ──
+  // ── [3/12] 7-6（1/7）：情境開場 Alice 報到 ──
   {
-    title: '學員實作：RBAC',
-    subtitle: '⏱ 巡堂確認',
-    section: 'Loop 2：RBAC',
-    duration: '10',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">必做</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>1. 建 ServiceAccount + Role + RoleBinding</p>
-            <p>2. <code className="text-cyan-400 text-xs">kubectl get pods --as=system:serviceaccount:default:viewer-sa</code> → 成功</p>
-            <p>3. <code className="text-cyan-400 text-xs">kubectl delete pod xxx --as=system:serviceaccount:default:viewer-sa</code> → Forbidden</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-4 rounded-lg">
-          <p className="text-amber-400 font-semibold mb-2">挑戰</p>
-          <div className="space-y-1 text-sm text-slate-300">
-            <p>寫一個新 Role：</p>
-            <p>- 允許 get / list / create / update / delete <code className="text-green-400">deployments</code></p>
-            <p>- 不能碰 <code className="text-red-400">secrets</code></p>
-            <p>- 提示：rules 可以寫多條，每條指定不同 resources 和 verbs</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">巡堂檢查清單</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>□ kubectl get role pod-viewer → 存在</p>
-            <p>□ kubectl get rolebinding viewer-binding → 存在</p>
-            <p>□ --as get pods → 成功</p>
-            <p>□ --as delete pod → Forbidden</p>
-          </div>
-        </div>
-      </div>
-    ),
-    code: `# 驗收指令（做完每步後確認）
-
-# Step 1 後：確認三個資源都建好
-kubectl get serviceaccount viewer-sa
-kubectl get role pod-viewer
-kubectl get rolebinding viewer-binding
-
-# Step 2：模擬 viewer-sa 查看 Pod（應該成功）
-kubectl get pods --as=system:serviceaccount:default:viewer-sa
-
-# Step 3：模擬 viewer-sa 刪除 Pod（應該 Forbidden）
-kubectl delete pod <任意pod名> --as=system:serviceaccount:default:viewer-sa
-
-# 快速確認權限（yes = 有，no = 沒有）
-kubectl auth can-i get pods --as=system:serviceaccount:default:viewer-sa
-kubectl auth can-i delete pods --as=system:serviceaccount:default:viewer-sa
-
-# 列出這個身份能做的所有事（權限稽核用）
-kubectl auth can-i --list --as=system:serviceaccount:default:viewer-sa`,
-    notes: `必做題是跟著我剛才的步驟做一遍。建 ServiceAccount、Role、RoleBinding，然後用 --as 測試。確認 get pods 成功，delete pod 被拒。
-
-挑戰題是自己寫一個新的 Role，允許 get、list、create、update、delete deployments，但不能碰 secrets。然後建一個新的 ServiceAccount 綁上去，用 --as 測試能操作 Deployment 但不能讀 Secret。提示：resources 那個欄位可以寫多條 rule，每條 rule 指定不同的 resources 和 verbs。
-
-大家動手做，有問題舉手。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-13 回頭操作：RBAC ──
-  {
-    title: '回頭操作：RBAC 常見坑',
-    subtitle: 'Loop 4 小結',
-    section: 'Loop 2：RBAC',
-    duration: '5',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-lg">
-          <p className="text-red-400 font-semibold mb-2">常見坑</p>
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">1.</span>
-              <div>
-                <p><code className="text-xs text-red-400">--as</code> 格式寫錯</p>
-                <p className="text-xs text-slate-400">✗ --as=viewer-sa | ✓ --as=system:serviceaccount:default:viewer-sa</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">2.</span>
-              <div>
-                <p>Role 和 SA 不在同一個 Namespace</p>
-                <p className="text-xs text-slate-400">Role 在 default、SA 在 dev → dev 裡毫無權限</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-red-400 font-bold shrink-0">3.</span>
-              <div>
-                <p>roleRef 的 kind / name / apiGroup 寫錯</p>
-                <p className="text-xs text-slate-400">apiGroup 固定 rbac.authorization.k8s.io</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/50 p-4 rounded-lg">
-          <p className="text-green-400 font-semibold mb-2">Loop 4 因果鏈</p>
-          <div className="text-sm text-slate-300 space-y-1">
-            <p>上午：Probe 管健康 → Resource 管資源 → HPA 管容量</p>
-            <p>→ 都是管「<span className="text-cyan-400">服務</span>」的</p>
-            <p className="text-green-400 font-bold mt-2">下午 Loop 4：RBAC 管「人」→ 誰能看、誰能改、誰能刪</p>
-          </div>
-        </div>
-
-        <div className="bg-amber-900/30 border border-amber-500/50 p-3 rounded-lg text-sm text-amber-300">
-          <p>下一個問題：人管住了，但 Pod 之間呢？</p>
-          <p>所有 Pod 預設全通 → 前端被入侵 → 攻擊者直通 DB</p>
-        </div>
-      </div>
-    ),
-    notes: `好，回頭確認一下大家的 RBAC 做到了。
-
-kubectl get role pod-viewer 看一下。有沒有？kubectl get rolebinding viewer-binding 有沒有？
-
-然後最重要的測試，用 --as 模擬。
-
-kubectl get pods --as=system:serviceaccount:default:viewer-sa
-
-這行能看到 Pod 列表嗎？能。好。
-
-kubectl delete pod 隨便一個名字 --as=system:serviceaccount:default:viewer-sa
-
-有被拒絕嗎？看到 Forbidden 了嗎？看到了。好，RBAC 就做對了。
-
-來看幾個常見的坑。
-
-第一個坑，--as 的格式寫錯。最常見的錯誤是忘了前面的 system:serviceaccount: 前綴。你不能直接寫 --as=viewer-sa，要寫完整的 system:serviceaccount:default:viewer-sa。冒號分隔，namespace 是 default。如果你的 ServiceAccount 在其他 Namespace，記得把 default 換成對應的 Namespace 名字。
-
-第二個坑，Role 和 ServiceAccount 不在同一個 Namespace。比如 Role 建在 default，ServiceAccount 建在 dev，RoleBinding 也在 default。結果在 dev 裡面這個 ServiceAccount 一點權限都沒有。Role、RoleBinding、和 ServiceAccount 的 Namespace 要配對。
-
-第三個坑，RoleBinding 的 roleRef 寫錯。roleRef 裡面的 kind 要寫 Role 不是 ClusterRole，name 要跟你的 Role 名字完全一樣，apiGroup 固定是 rbac.authorization.k8s.io。如果你用 ClusterRole 搭配 RoleBinding，kind 就要寫 ClusterRole。
-
-好，Loop 4 結束。我們用一句話串一下因果鏈。上午的最後，Probe 確保服務健康、Resource limits 確保資源公平、HPA 確保容量彈性。但這三個都是管「服務」的。下午第一個 Loop，RBAC 開始管「人」。誰能看、誰能改、誰能刪，權限分明。
-
-那下一個問題是什麼？人管住了，但 Pod 之間呢？你的叢集裡面，所有 Pod 預設是全部互通的。前端 Pod 可以直接連資料庫。如果前端被入侵了，攻擊者可以橫向移動到資料庫。這就是下一個 Loop 要解決的問題。
-
-[▶ 下一頁]`,
-  },
-
-  // ── 7-13 學員實作解答：RBAC ──
-  {
-    title: '解答：只讀 Role + ServiceAccount + RoleBinding',
-    subtitle: 'Loop 4 完成',
-    section: 'Loop 2：RBAC',
-    duration: '3',
-    content: (
-      <div className="space-y-4">
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">必做解答：YAML 關鍵片段</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># Role：只讀，沒有 delete</p>
-            <p>rules:</p>
-            <p>{'- '}apiGroups: [""]</p>
-            <p>{'  '}resources: ["pods"]</p>
-            <p className="text-green-400">{'  '}verbs: ["get", "list", "watch"]{'  '}# 沒有 delete！</p>
-            <p className="text-slate-500 mt-1"># ServiceAccount + RoleBinding 也要建</p>
-            <p>subjects:</p>
-            <p>{'- '}kind: ServiceAccount</p>
-            <p>{'  '}name: viewer-sa</p>
-            <p>{'  '}namespace: default</p>
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 p-4 rounded-lg">
-          <p className="text-cyan-400 font-semibold mb-2">驗證指令</p>
-          <div className="font-mono text-xs text-slate-300 bg-slate-900 p-2 rounded space-y-1">
-            <p className="text-slate-500"># 成功（有 get 權限）</p>
-            <p>kubectl --as=system:serviceaccount:default:viewer-sa get pods</p>
-            <p className="text-slate-500 mt-1"># 失敗（沒有 delete 權限）→ Forbidden</p>
-            <p>kubectl --as=system:serviceaccount:default:viewer-sa delete pod {'<任意 pod 名>'}</p>
-            <p className="text-slate-500 mt-1"># 清理</p>
-            <p>kubectl delete sa viewer-sa</p>
-            <p>kubectl delete role pod-viewer</p>
-            <p>kubectl delete rolebinding viewer-binding</p>
-          </div>
-        </div>
-
-        <div className="bg-green-900/30 border border-green-500/30 p-3 rounded-lg">
-          <p className="text-green-400 font-semibold text-sm">預期結果</p>
-          <p className="text-xs text-slate-300 mt-1">get pods 成功列出 Pod；delete pod 回傳 Forbidden（403）</p>
-        </div>
-      </div>
-    ),
-    notes: `來看解答。
-
-RBAC 的核心是 verbs。這個 Role 只給了 get、list、watch，沒有 delete。有了 delete 才能刪，沒有就被拒。
-
-驗證方式是用 --as 模擬 ServiceAccount 的身份。格式一定要是 system:serviceaccount:namespace:名稱，不能省略前綴。get pods 應該成功，delete pod 應該看到 Error from server (Forbidden)。
-
-如果 get pods 也失敗，最常見的原因是 RoleBinding 的 subjects 裡面 namespace 寫錯，或者 roleRef 的 name 跟 Role 名字不匹配。
-
-清理三個資源：kubectl delete sa viewer-sa、delete role pod-viewer、delete rolebinding viewer-binding。 [▶ 下一頁]`,
-  },
-
-  // ── 進階：真的發 kubeconfig 給別人 ──
-  {
-    title: '進階：真的發一份 kubeconfig 給別人',
-    subtitle: '對方用那份登入，就只有你給的權限',
-    section: 'Loop 2：RBAC',
-    duration: '5',
+    title: '情境：新同事 Alice 報到',
+    subtitle: '目標：給她一份 kubeconfig，上班就能用',
+    section: '7-6：RBAC 實戰',
+    duration: '1',
     content: (
       <div className="space-y-3">
-        <div className="bg-slate-800/50 border border-slate-700 p-3 rounded text-xs text-slate-400">
-          <p><code className="text-amber-300">--as</code> 是管理員模擬測試用。真實環境要給對方一份獨立的 kubeconfig，他登入就只有對應的權限。</p>
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded text-xs">
+          <p className="text-cyan-300 font-semibold mb-1">Alice 的需求</p>
+          <ul className="text-slate-300 space-y-1 list-disc list-inside">
+            <li>自己的 namespace <code className="text-amber-300">dev-alice</code> 練習部署</li>
+            <li>不能碰 default / kube-system / production</li>
+            <li>不能看 cluster 層級資源（node、pv）</li>
+            <li>拿一份 kubeconfig 檔案，<code className="text-amber-300">export KUBECONFIG</code> 就能用</li>
+          </ul>
         </div>
 
-        <div className="bg-slate-800/50 p-3 rounded">
-          <p className="text-cyan-400 font-semibold text-xs mb-2">Step 1–3：產生 token + 組 kubeconfig</p>
-          <pre className="bg-slate-950 text-green-400 p-2 rounded text-xs overflow-x-auto"><code>{`TOKEN=$(kubectl create token viewer-sa --duration=8760h)
-CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
-
-cat > /tmp/viewer-sa.kubeconfig << EOF
-apiVersion: v1
-kind: Config
-clusters:
-- name: k3s
-  cluster:
-    server: $CLUSTER_SERVER
-    certificate-authority-data: $CA_DATA
-users:
-- name: viewer-sa
-  user:
-    token: $TOKEN
-contexts:
-- name: viewer-sa@k3s
-  context:
-    cluster: k3s
-    user: viewer-sa
-current-context: viewer-sa@k3s
-EOF`}</code></pre>
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-1">七步驟</p>
+          <ol className="text-slate-300 space-y-0.5 list-decimal list-inside">
+            <li>建 namespace + ServiceAccount</li>
+            <li>建 Role + RoleBinding（YAML）</li>
+            <li><code className="text-amber-300">--as</code> 快速驗 Role 生效</li>
+            <li>抓 cluster 資訊（server + CA）</li>
+            <li>產 Token</li>
+            <li>組 kubeconfig</li>
+            <li>切身份驗收</li>
+          </ol>
         </div>
 
-        <div className="bg-slate-800/50 p-3 rounded">
-          <p className="text-cyan-400 font-semibold text-xs mb-2">Step 4：換成 master 實際 IP（給外部使用者）</p>
-          <pre className="bg-slate-950 text-green-400 p-2 rounded text-xs overflow-x-auto"><code>{`sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' /tmp/viewer-sa.kubeconfig`}</code></pre>
-          <p className="text-slate-400 text-xs mt-1">127.0.0.1 只有在 master 本機才能用，給別人要換成實際 IP</p>
-        </div>
-
-        <div className="bg-slate-800/50 p-3 rounded">
-          <p className="text-cyan-400 font-semibold text-xs mb-2">Step 5：驗證</p>
-          <pre className="bg-slate-950 text-green-400 p-2 rounded text-xs overflow-x-auto"><code>{`# 成功（有 get 權限）
-kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig get pods
-
-# 失敗（沒有 delete 權限）→ Forbidden
-kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig delete pod <任意名稱>`}</code></pre>
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-xs text-amber-300">
+          做完這七步，Alice 今天就能上班。
         </div>
       </div>
     ),
-    code: `# Step 1：產生 token（一年效期）
-TOKEN=$(kubectl create token viewer-sa --duration=8760h)
+    notes: `想像一個情境。公司來了新工程師 Alice，今天要給她權限。她要什麼？
 
-# Step 2：取得 cluster 資訊
-CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+第一，有自己的 namespace，叫 dev-alice，讓她練習部署東西。
 
-# Step 3：組成 kubeconfig
-cat > /tmp/viewer-sa.kubeconfig << EOF
+第二，不能碰其他 namespace。default、kube-system、production 這些全部禁止。她只能在自己的沙盒裡玩。
+
+第三，不能看 cluster 層級資源。node、pv 這些她都不需要看。
+
+第四，拿一份 kubeconfig 檔案。她在自己電腦 export KUBECONFIG 就能用 kubectl，權限受我們設的 Role 限制。
+
+整個流程七步驟。建 namespace 加 SA，建 Role 加 RoleBinding，用 --as 快速驗，抓 cluster 資訊，產 Token，組 kubeconfig，切身份驗收。
+
+做完這七步，Alice 今天就能上班。我們一步一步來。[▶ Part 1：建 namespace + SA]`,
+  },
+
+  // ── [4/12] 7-6（2/7）：Part 1 建 namespace + SA ──
+  {
+    title: 'Part 1：建 namespace + ServiceAccount',
+    subtitle: '身份字串 system:serviceaccount:<ns>:<sa>',
+    section: '7-6：RBAC 實戰',
+    duration: '1',
+    content: (
+      <div className="space-y-3 text-xs">
+        <div className="bg-slate-800/50 p-3 rounded font-mono space-y-1">
+          <p className="text-slate-500"># 建 namespace</p>
+          <p className="text-green-300">kubectl create namespace dev-alice</p>
+          <p className="text-slate-500 mt-1"># 建 ServiceAccount（建在自己的 ns）</p>
+          <p className="text-green-300">kubectl create serviceaccount dev-alice -n dev-alice</p>
+        </div>
+
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-3 rounded">
+          <p className="text-cyan-300 font-semibold mb-1">身份字串格式</p>
+          <p className="font-mono text-amber-300">system:serviceaccount:&lt;ns&gt;:&lt;sa&gt;</p>
+          <p className="text-slate-300 mt-1">Alice 的身份是：<code className="text-amber-300">system:serviceaccount:dev-alice:dev-alice</code></p>
+          <p className="text-slate-400 mt-1 text-[10px]">記住這個格式 — 後面 --as 跟 subjects 都要用</p>
+        </div>
+      </div>
+    ),
+    notes: `Part 1 很簡單，兩個指令。
+
+kubectl create namespace dev-alice，建一個新的 namespace。這是 Alice 的沙盒，接下來所有東西都建在這裡。
+
+kubectl create serviceaccount dev-alice -n dev-alice，建一個 SA。這個 SA 就是 Alice 的身份。注意名字跟 namespace 同名是為了好記，實務上可以叫 alice-sa 之類的。
+
+重點是身份字串的格式：system:serviceaccount 冒號 namespace 冒號 sa 名稱。Alice 的身份就是 system:serviceaccount:dev-alice:dev-alice。
+
+這個格式要記住。等一下 --as 要用它，RoleBinding 的 subjects 也要用到類似的結構。很多學員卡在格式寫錯，會被 forbidden。[▶ Part 2：Role + RoleBinding YAML]`,
+  },
+
+  // ── [5/12] 7-6（3/7）：Part 2 Role + RoleBinding YAML ──
+  {
+    title: 'Part 2：Role + RoleBinding（YAML）',
+    subtitle: '一個 YAML 檔兩個物件，用 --- 分隔',
+    section: '7-6：RBAC 實戰',
+    duration: '3',
+    content: (
+      <div className="space-y-2 text-[11px]">
+        <div className="bg-slate-900 p-2 rounded font-mono overflow-x-auto">
+          <pre className="text-slate-300 whitespace-pre">{`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-role
+  namespace: dev-alice
+rules:
+  - apiGroups: [""]              # ★ 空字串 = core（Pod/Service/ConfigMap/Secret）
+    resources: ["pods", "services", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+  - apiGroups: ["apps"]          # ★ Deployment 屬於 apps group
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alice-dev-binding
+  namespace: dev-alice
+subjects:
+  - kind: ServiceAccount
+    name: dev-alice
+    namespace: dev-alice
+roleRef:
+  kind: Role
+  name: developer-role
+  apiGroup: rbac.authorization.k8s.io`}</pre>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">套用 + 檢查</p>
+          <div className="font-mono space-y-0.5">
+            <p className="text-green-300">kubectl apply -f rbac-alice.yaml</p>
+            <p className="text-green-300">kubectl get role,rolebinding -n dev-alice</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">注意</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li><b>secrets 沒列</b> → Alice 看不到密碼（Default Deny）</li>
+            <li><code className="text-amber-300">roleRef</code> 建好不能改，要改只能砍掉重建</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    notes: `Part 2 是 RBAC 的核心。一個 YAML 檔寫兩個物件，用三個減號分隔。
+
+第一個物件 Role。apiVersion 是 rbac.authorization.k8s.io/v1，kind Role。重點在 rules 這個陣列。
+
+第一條 rule：apiGroups 空字串。空字串代表 core API group，裡面包含 Pod、Service、ConfigMap、Secret 這些基礎資源。resources 列 pods、services、configmaps——注意 secrets 我故意沒寫。verbs 給完整 CRUD：get、list、watch、create、update、delete。
+
+第二條 rule：apiGroups apps。Deployment 跟 ReplicaSet 屬於 apps 這個 group，不在 core 裡面，要另外寫一條。
+
+第二個物件 RoleBinding。subjects 指定綁誰——kind ServiceAccount、name dev-alice、namespace dev-alice。roleRef 指定綁哪個 Role——kind Role、name developer-role、apiGroup rbac.authorization.k8s.io。這個 apiGroup 是固定寫法，不能改不能省。
+
+兩個指令套用。kubectl apply -f rbac-alice.yaml 會看到兩行輸出，Role 跟 RoleBinding 都 created。kubectl get role,rolebinding -n dev-alice 確認兩個都在。
+
+最重要的觀念再講一次：secrets 我沒列，所以 Alice 碰不到 secrets。這就是 Default Deny，沒寫就是沒權限。
+
+還有一個雷：roleRef 一旦建好就不能改。你如果打錯 name，只能砍掉 RoleBinding 重建。[▶ Part 3：--as 快速驗]`,
+  },
+
+  // ── [6/12] 7-6（4/7）：Part 3 --as 快速驗 + auth can-i ──
+  {
+    title: 'Part 3：--as 快速驗 Role 生效',
+    subtitle: 'auth can-i 只問不做，admin 快速確認',
+    section: '7-6：RBAC 實戰',
+    duration: '2',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-cyan-900/20 border border-cyan-500/40 p-2 rounded">
+          <p className="text-cyan-300 font-semibold mb-1">為什麼用 auth can-i</p>
+          <p className="text-slate-300"><code className="text-amber-300">--as</code> 真的執行動作（測 delete 會真的刪）；<code className="text-amber-300">auth can-i</code> 只問不做，只回 yes / no，安全。</p>
+        </div>
+
+        <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
+          <p className="text-green-400 font-semibold mb-1">✓ 可以 get pods</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl auth can-i get pods \</p>
+            <p className="text-green-300">  --as=system:serviceaccount:dev-alice:dev-alice \</p>
+            <p className="text-green-300">  -n dev-alice</p>
+            <p className="text-green-400 mt-1">yes</p>
+          </div>
+        </div>
+
+        <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
+          <p className="text-red-400 font-semibold mb-1">✗ 不能 get secrets</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl auth can-i get secrets \</p>
+            <p className="text-green-300">  --as=system:serviceaccount:dev-alice:dev-alice \</p>
+            <p className="text-green-300">  -n dev-alice</p>
+            <p className="text-red-400 mt-1">no</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">列出所有權限（稽核神器）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">kubectl auth can-i --list \</p>
+            <p className="text-green-300">  --as=system:serviceaccount:dev-alice:dev-alice \</p>
+            <p className="text-green-300">  -n dev-alice</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Part 3 是中間的關鍵步驟。在產 kubeconfig 之前，先用 admin 身份模擬 Alice，確認 Role 設定是對的。
+
+K8s 有兩個工具可以模擬身份。第一個 --as，第二個 auth can-i。差別是：--as 真的執行動作，所以你測 delete 的話會真的刪到東西；auth can-i 只問不做，只回 yes 或 no，安全得多。
+
+我們這裡用 auth can-i。格式：kubectl auth can-i 加上動詞加上資源，後面帶 --as 指定身份，再加 -n 指定 namespace。
+
+第一個測：can-i get pods。回 yes，代表 Role 有 get pods 的權限，設定對了。
+
+第二個測：can-i get secrets。回 no。為什麼？因為我們 Role 沒列 secrets。Default Deny——沒寫就是沒權限。
+
+第三個是稽核神器：can-i --list。它會列出這個身份能做的所有事，給你一張完整權限清單。企業稽核或 debug 權限問題的時候很好用。
+
+這三個指令跑完，確認 Role 設對了，下一步才安心產 kubeconfig。[▶ Part 4：抓 cluster 資訊]`,
+  },
+
+  // ── [7/12] 7-6（5/7）：Part 4 抓 cluster 資訊（CA k3s 備援） ──
+  {
+    title: 'Part 4：抓 cluster 資訊',
+    subtitle: 'server + CA 憑證，k3s 有備援',
+    section: '7-6：RBAC 實戰',
+    duration: '2',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-slate-800/50 p-2 rounded font-mono">
+          <p className="text-slate-500"># server URL</p>
+          <p className="text-green-300">CLUSTER_SERVER=$(kubectl config view --minify \</p>
+          <p className="text-green-300">  -o jsonpath='{`{.clusters[0].cluster.server}`}')</p>
+          <p className="text-slate-500 mt-1"># CA 憑證（base64 編碼）</p>
+          <p className="text-green-300">CA_DATA=$(kubectl config view --minify --raw \</p>
+          <p className="text-green-300">  -o jsonpath='{`{.clusters[0].cluster.certificate-authority-data}`}')</p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">⚠️ k3s 備援</p>
+          <p className="text-slate-300 mb-1">k3s 的 <code>certificate-authority-data</code> 有時抓出來是空的 — 從檔案讀：</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">if [ -z "$CA_DATA" ]; then</p>
+            <p className="text-green-300">  CA_DATA=$(sudo cat \</p>
+            <p className="text-green-300">    /var/lib/rancher/k3s/server/tls/server-ca.crt \</p>
+            <p className="text-green-300">    | base64 -w 0)</p>
+            <p className="text-green-300">fi</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">驗證（畫面不會有輸出，要自己 echo）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">echo "Server: $CLUSTER_SERVER"</p>
+            <p className="text-green-300">echo "CA 長度: ${`{#CA_DATA}`}"</p>
+          </div>
+          <p className="text-slate-400 mt-1">預期：Server 是 https://127.0.0.1:6443，CA 長度 &gt; 1000</p>
+        </div>
+      </div>
+    ),
+    notes: `Part 4 抓 cluster 資訊。kubeconfig 需要兩樣東西：API Server 的 URL，跟 CA 憑證用來驗證 server 身份。
+
+第一行：CLUSTER_SERVER 等於 kubectl config view --minify，後面加 jsonpath 抓 clusters 第一個的 server 欄位。
+
+第二行：CA_DATA 等於一樣的指令，但抓 certificate-authority-data 這個欄位。certificate-authority-data 是 base64 編碼的 CA 憑證。
+
+這兩行一打你會發現畫面什麼都沒有。這是正常的——它們只是把值存進 shell 變數。要確認有抓到，echo 出來看。CLUSTER_SERVER 應該是 https://127.0.0.1:6443，CA 長度應該大於 1000 字元。
+
+k3s 有個雷要特別講。k3s 的 kubeconfig 有時候不是用 certificate-authority-data 這個欄位，而是用 certificate-authority 指向檔案路徑。這時候上面那行會抓到空字串。
+
+備援方案：寫一段 if，如果 CA_DATA 是空的，就從 /var/lib/rancher/k3s/server/tls/server-ca.crt 這個檔案讀出來，轉成 base64。這個檔案路徑是 k3s 固定的位置。
+
+跑完這一步，兩個變數都有值了，下一步產 Token。[▶ Part 5-6：Token + kubeconfig]`,
+  },
+
+  // ── [8/12] 7-6（6/7）：Part 5+6 產 Token + 組 kubeconfig ──
+  {
+    title: 'Part 5-6：產 Token + 組 kubeconfig',
+    subtitle: 'create token 即席產生 + cat EOF 組檔案',
+    section: '7-6：RBAC 實戰',
+    duration: '3',
+    content: (
+      <div className="space-y-2 text-[11px]">
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Part 5：產 Token（1 年效期）</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">TOKEN=$(kubectl create token dev-alice \</p>
+            <p className="text-green-300">  -n dev-alice --duration=8760h)</p>
+            <p className="text-green-300">echo "${`{TOKEN:0:40}`}..."</p>
+          </div>
+          <p className="text-slate-400 mt-1">K8s 1.24+ 不自動產 Token Secret，要用 create token</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">Part 6：組 kubeconfig</p>
+          <div className="bg-slate-900 p-2 rounded font-mono overflow-x-auto">
+            <pre className="text-green-300 whitespace-pre">{`cat > alice-kubeconfig.yaml <<EOF
 apiVersion: v1
 kind: Config
 clusters:
@@ -1246,35 +1029,359 @@ clusters:
     server: $CLUSTER_SERVER
     certificate-authority-data: $CA_DATA
 users:
-- name: viewer-sa
+- name: dev-alice
   user:
     token: $TOKEN
 contexts:
-- name: viewer-sa@k3s
+- name: alice@k3s
   context:
     cluster: k3s
-    user: viewer-sa
-current-context: viewer-sa@k3s
-EOF
+    user: dev-alice
+    namespace: dev-alice
+current-context: alice@k3s
+EOF`}</pre>
+          </div>
+        </div>
 
-# Step 4：換成 master 實際 IP
-sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' /tmp/viewer-sa.kubeconfig
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">給外部使用者：換 127.0.0.1 成實際 IP</p>
+          <div className="bg-slate-900 p-2 rounded font-mono">
+            <p className="text-green-300">sed -i \</p>
+            <p className="text-green-300">  's|https://127.0.0.1:6443|https://192.168.43.133:6443|' \</p>
+            <p className="text-green-300">  alice-kubeconfig.yaml</p>
+          </div>
+        </div>
+      </div>
+    ),
+    notes: `Part 5 產 Token。kubectl create token dev-alice -n dev-alice --duration=8760h。--duration 8760h 就是 365 天，一年。你可以改成 1h、24h 看需求。
 
-# Step 5：驗證
-kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig get pods
-kubectl --kubeconfig=/tmp/viewer-sa.kubeconfig delete pod <任意名稱>`,
-    notes: `--as 是管理員模擬用，不是真的換身份。真實環境要給別人獨立的 kubeconfig。
+講一個 K8s 1.24 的變化。以前你建 SA，K8s 會自動產一個 Secret 存 Token，你去撈那個 Secret 就好。1.24 之後預設不自動產了，所以我們用 kubectl create token 這個新指令即席產生。要永久用，要自己手動建一個 type 是 kubernetes.io/service-account-token 的 Secret。
 
-token 用 kubectl create token 產生，duration 可以設 1h、24h、8760h（一年）。
+Token 是一串很長的 JWT。echo 前 40 個字元看一下，確認有東西。
 
-kubeconfig 裡有三樣東西：cluster（server 位址和 CA）、user（token）、context（把兩者綁在一起）。
+Part 6 組 kubeconfig。用 cat 加 heredoc 語法寫一個 YAML 檔。結構三個部分：clusters 裡放 server 跟 CA，users 裡放 user 名稱跟 token，contexts 把前兩者綁在一起，current-context 指定預設用哪個 context。
 
-注意 server 預設是 127.0.0.1，只有在 master 本機才能用。要給外部的人就要換成 master 的實際 IP。
+注意這裡 context 有個 namespace 欄位設 dev-alice。這是 Alice 的預設 namespace，她打 kubectl get pods 不加 -n 就會看 dev-alice，很方便。
 
-驗證：get pods 成功，delete pod Forbidden，代表這份 kubeconfig 真的只有 viewer-sa 的權限。
-
-把 /tmp/viewer-sa.kubeconfig 複製給對方，對方 export KUBECONFIG=/path/to/viewer-sa.kubeconfig 後所有 kubectl 操作都受 RBAC 限制。`,
+最後一個雷：kubeconfig 裡的 server 預設是 https://127.0.0.1:6443，只有在 master 本機能連。Alice 要從自己電腦連，必須換成 master 對外 IP。用 sed -i 一行替換。這個步驟常忘記，對方拿到 kubeconfig 連不到伺服器就會來問你。[▶ Part 7：切身份驗收]`,
   },
+
+  // ── [9/12] 7-6（7/7）：Part 7 切身份驗收 + 常見坑 ──
+  {
+    title: 'Part 7：切身份驗收 + 常見坑',
+    subtitle: 'export KUBECONFIG 切成 Alice，測四種情境',
+    section: '7-6：RBAC 實戰',
+    duration: '3',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-slate-800/50 p-2 rounded font-mono">
+          <p className="text-slate-500"># 切成 Alice</p>
+          <p className="text-green-300">export KUBECONFIG=$PWD/alice-kubeconfig.yaml</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-green-900/30 border border-green-500/50 p-2 rounded">
+            <p className="text-green-400 font-semibold mb-1">✓ 自己 ns 完整權限</p>
+            <div className="font-mono text-green-300 space-y-0.5">
+              <p>kubectl get pods</p>
+              <p>kubectl run mypod --image=nginx</p>
+              <p>kubectl get pods</p>
+            </div>
+          </div>
+
+          <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
+            <p className="text-red-400 font-semibold mb-1">✗ 其他 ns 被擋</p>
+            <div className="font-mono text-green-300 space-y-0.5">
+              <p>kubectl get pods -n default</p>
+              <p>kubectl get pods -n kube-system</p>
+            </div>
+            <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
+          </div>
+
+          <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
+            <p className="text-red-400 font-semibold mb-1">✗ 不能讀 Secret</p>
+            <div className="font-mono text-green-300">kubectl get secret</div>
+            <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
+          </div>
+
+          <div className="bg-red-900/30 border border-red-500/50 p-2 rounded">
+            <p className="text-red-400 font-semibold mb-1">✗ cluster 層級擋</p>
+            <div className="font-mono text-green-300 space-y-0.5">
+              <p>kubectl get nodes</p>
+              <p>kubectl get ns</p>
+            </div>
+            <p className="text-red-400 mt-1 text-[10px]">Forbidden</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded font-mono">
+          <p className="text-slate-500"># 切回 admin</p>
+          <p className="text-green-300">unset KUBECONFIG</p>
+          <p className="text-green-300">kubectl get nodes  <span className="text-slate-500"># ✓ 全權</span></p>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
+          <p className="text-amber-300 font-semibold mb-1">常見坑</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside text-[11px]">
+            <li>--as 格式不對 → 要寫 <code>system:serviceaccount:&lt;ns&gt;:&lt;sa&gt;</code></li>
+            <li>Role / SA / RoleBinding 不同 ns → 三者 namespace 要一致</li>
+            <li>k3s CA_DATA 空的 → 用 if 備援從檔案讀</li>
+            <li>給 Alice 的 kubeconfig 忘記換 IP → 對方連不到</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    notes: `Part 7 是驗收，也是最爽的一步。前面六步全部為了這一刻。
+
+export KUBECONFIG 指向我們剛才組的 alice-kubeconfig.yaml，後面所有 kubectl 指令都會用 Alice 的身份。
+
+四個情境要測。
+
+第一，自己 ns 完整權限。kubectl get pods，空列表——對，因為 ns 是新的還沒東西。kubectl run mypod --image=nginx，成功！Pod 跑起來了。kubectl get pods，看到 mypod 了。
+
+第二，其他 ns 被擋。kubectl get pods -n default、kubectl get pods -n kube-system，都回 Forbidden。Alice 進不去別人的 ns。
+
+第三，不能讀 Secret。kubectl get secret，回 Forbidden。因為 Role 沒列 secrets。
+
+第四，cluster 層級擋。kubectl get nodes、kubectl get ns，都 Forbidden。因為這些是 cluster 範圍的資源，Role 只能管 namespace 內的，管不到 cluster 層級。
+
+最後 unset KUBECONFIG，切回 admin 身份。kubectl get nodes 可以了，全權回來。
+
+四個常見坑快速講。--as 格式要完整寫 system:serviceaccount:ns:sa，少一段就 forbidden。Role、SA、RoleBinding 三個物件的 namespace 要一致。k3s 的 CA_DATA 常常是空的，用 if 備援從檔案讀。給別人的 kubeconfig 別忘了把 127.0.0.1 換成實際 IP。
+
+好，7-6 結束。你們看到了從零到可交付 kubeconfig 的完整流程。接下來 7-7 換你們自己做。[▶ 7-7：學員實作]`,
+  },
+
+  // ── [10/12] 7-7（1/3）：學員實作題目 ──
+  {
+    title: '7-7 學員實作：建 backend-dev',
+    subtitle: '照 Alice 的流程，做 backend 團隊的帳號',
+    section: '7-7：學員實作',
+    duration: '2',
+    content: (
+      <div className="space-y-2 text-xs">
+        <div className="bg-slate-800/40 border-l-4 border-green-500 p-2 rounded">
+          <p className="text-green-300 font-semibold mb-1">🎯 情境</p>
+          <p className="text-slate-300">backend 團隊新人要一個受限帳號 <code className="text-amber-300">backend-dev</code>，只能看不能改。</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">必做題要求</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li>namespace: <code className="text-amber-300">backend-team</code></li>
+            <li>SA: <code className="text-amber-300">backend-dev</code></li>
+            <li>權限：
+              <ul className="list-disc list-inside ml-4">
+                <li>✓ get / list / watch pods + services + configmaps + deployments</li>
+                <li>✗ 不能碰 secrets</li>
+                <li>✗ 不能 delete / create / update（只讀）</li>
+              </ul>
+            </li>
+            <li>產 <code className="text-amber-300">backend-kubeconfig.yaml</code></li>
+            <li><code className="text-amber-300">export KUBECONFIG</code> 切身份驗證</li>
+          </ul>
+        </div>
+
+        <div className="bg-green-900/20 border border-green-500/40 p-2 rounded">
+          <p className="text-green-300 font-semibold mb-1">驗收條件</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li>✓ <code>kubectl get pods</code> 有結果（空也算）</li>
+            <li>✗ <code>kubectl get secret</code> → Forbidden</li>
+            <li>✗ <code>kubectl delete pod xxx</code> → Forbidden</li>
+            <li>✗ <code>kubectl get pods -n default</code> → Forbidden</li>
+          </ul>
+        </div>
+
+        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-amber-300">
+          🏆 挑戰題：加一個 <code>sre-user</code> 用 ClusterRoleBinding 綁 cluster-admin，感受兩端差異。
+        </div>
+      </div>
+    ),
+    notes: `好，換你們做。情境跟 Alice 類似，但這次你自己做一遍 backend-dev。
+
+必做題要求四件事。第一，namespace backend-team。第二，SA 叫 backend-dev。第三，權限——能 get、list、watch pods、services、configmaps、deployments，不能碰 secrets，不能 delete、create、update，只能看。這跟 Alice 的權限設計不同，Alice 有完整 CRUD，backend-dev 只給讀。第四，產 backend-kubeconfig.yaml，export KUBECONFIG 自己切身份驗。
+
+驗收四條。kubectl get pods 有結果、get secret 被擋、delete pod 被擋、跨 ns 被擋。四條全綠才算過。
+
+挑戰題給行有餘力的。加一個 sre-user，用 ClusterRole 跟 ClusterRoleBinding 綁 cluster-admin，讓他整個 cluster 全權。跟 backend-dev 的只讀做對比，你會很有感——同一套 RBAC 機制可以做出天差地遠的權限。
+
+下一頁給你們完整指令清單，照著打就能跑完。[▶ 下一頁：完整指令卡]`,
+  },
+
+  // ── [11/12] 7-7（2/3）：學員完整指令卡 ──
+  {
+    title: '7-7 學員完整指令卡',
+    subtitle: '照著打，從建立到驗收到清理',
+    section: '7-7：學員實作',
+    duration: '8',
+    content: (
+      <div className="space-y-1 text-[10px]">
+        <div className="bg-slate-900 p-2 rounded font-mono overflow-x-auto">
+          <pre className="text-slate-300 whitespace-pre">{`# ─── Part 1：建 namespace + SA ───
+kubectl create namespace backend-team
+kubectl create serviceaccount backend-dev -n backend-team
+
+# ─── Part 2：建 Role + RoleBinding ───
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backend-dev-role
+  namespace: backend-team
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backend-dev-binding
+  namespace: backend-team
+subjects:
+  - kind: ServiceAccount
+    name: backend-dev
+    namespace: backend-team
+roleRef:
+  kind: Role
+  name: backend-dev-role
+  apiGroup: rbac.authorization.k8s.io
+EOF
+kubectl get sa,role,rolebinding -n backend-team
+
+# ─── Part 3：--as 快速驗 ───
+kubectl auth can-i get pods --as=system:serviceaccount:backend-team:backend-dev -n backend-team
+kubectl auth can-i get secrets --as=system:serviceaccount:backend-team:backend-dev -n backend-team
+
+# ─── Part 4：抓 cluster 資訊 ───
+CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+if [ -z "$CA_DATA" ]; then
+  CA_DATA=$(sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt | base64 -w 0)
+fi
+
+# ─── Part 5：產 Token ───
+TOKEN=$(kubectl create token backend-dev -n backend-team --duration=8760h)
+
+# ─── Part 6：組 kubeconfig ───
+cat > backend-kubeconfig.yaml <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: k3s
+  cluster:
+    server: $CLUSTER_SERVER
+    certificate-authority-data: $CA_DATA
+users:
+- name: backend-dev
+  user:
+    token: $TOKEN
+contexts:
+- name: backend-dev@k3s
+  context:
+    cluster: k3s
+    user: backend-dev
+    namespace: backend-team
+current-context: backend-dev@k3s
+EOF
+sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' backend-kubeconfig.yaml
+
+# ─── Part 7：切身份驗收 ───
+export KUBECONFIG=$PWD/backend-kubeconfig.yaml
+kubectl get pods                    # ✓ 空列表
+kubectl get secret                  # ✗ Forbidden
+kubectl delete pod any-name         # ✗ Forbidden
+kubectl get pods -n default         # ✗ Forbidden
+unset KUBECONFIG
+
+# ─── Part 8：清理 ───
+kubectl delete namespace backend-team
+rm backend-kubeconfig.yaml`}</pre>
+        </div>
+      </div>
+    ),
+    notes: `這一頁就是照著打的完整指令清單，八個 Part。
+
+Part 1 建 namespace 加 SA，兩個指令。
+
+Part 2 建 Role 跟 RoleBinding。用 cat heredoc 語法把 YAML 直接 apply 進去，不用存成檔案。注意 verbs 只給 get、list、watch，沒有 create、update、delete。這跟 Alice 的設計不同，backend-dev 只能看。
+
+Part 3 用 auth can-i 快速驗。can-i get pods 應該回 yes，can-i get secrets 應該回 no。兩個都對了再往下。
+
+Part 4 抓 cluster 資訊。記得 k3s 備援的 if 要加進去，不然 CA_DATA 可能是空的。
+
+Part 5 產 Token，8760h 一年。
+
+Part 6 組 kubeconfig。注意 context 裡 namespace 設 backend-team，這樣 backend-dev 打 kubectl get pods 預設就看 backend-team。sed 那行把 127.0.0.1 換成實際 Node IP，192.168.43.133 那邊你要換成你自己機器的 IP。
+
+Part 7 切身份驗收。四個測試：get pods 空列表、get secret 被擋、delete pod 被擋、跨 ns 被擋。四條全綠才算過。最後 unset KUBECONFIG 切回 admin。
+
+Part 8 清理。kubectl delete namespace backend-team 會把裡面的 SA、Role、RoleBinding 全部連帶刪掉。rm 把 kubeconfig 檔案也刪掉。
+
+給你們 15 分鐘做。有問題舉手。[▶ 下一頁：Loop 2 收斂]`,
+  },
+
+  // ── [12/12] 7-7（3/3）：Loop 2 因果鏈 + 承接 Loop 3 ──
+  {
+    title: 'Loop 2 收斂 — 從管「服務」到管「人」',
+    subtitle: 'RBAC 把權限分明 → 炸也只炸自己的',
+    section: '7-7：Loop 2 總結',
+    duration: '1',
+    content: (
+      <div className="space-y-3">
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-2">Loop 2 因果鏈</p>
+          <div className="space-y-1 text-slate-300">
+            <p>1. <b className="text-red-400">誰都能刪</b> → 實習生一個指令毀掉 production</p>
+            <p>2. <b className="text-amber-300">RBAC 最小權限</b> → 誰能看、誰能改、誰能刪，分明清楚</p>
+            <p>3. <b className="text-cyan-300">ServiceAccount 不只給 Pod</b> → 包成 kubeconfig 發給真人</p>
+            <p>4. <b className="text-green-400">每人一個 namespace sandbox</b> → 炸也只炸自己的</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-2">今天學到的實戰技能</p>
+          <ul className="text-slate-300 space-y-0.5 list-disc list-inside">
+            <li>寫 Role / RoleBinding YAML</li>
+            <li>用 <code className="text-amber-300">--as</code> / <code className="text-amber-300">auth can-i</code> 驗權限</li>
+            <li>產 Token + 組 kubeconfig</li>
+            <li>把 SA 包成給真人用的身份</li>
+          </ul>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded text-xs">
+          <p className="text-cyan-400 font-semibold mb-2">清理（Loop 2 結束）</p>
+          <div className="font-mono text-green-300 space-y-0.5">
+            <p>kubectl delete namespace dev-alice</p>
+            <p>kubectl delete namespace backend-team</p>
+            <p>rm -f alice-kubeconfig.yaml backend-kubeconfig.yaml</p>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-cyan-900/30 to-purple-900/30 border border-cyan-500/40 p-3 rounded text-xs">
+          <p className="text-cyan-300 font-semibold mb-1">承接 Loop 3</p>
+          <p className="text-slate-300">權限搞定了，但服務本身健康嗎？下一段 Probe 健康檢查——<b className="text-amber-300">Running 不代表服務正常</b>。</p>
+        </div>
+      </div>
+    ),
+    notes: `Loop 2 結束，一句話收一下因果鏈。
+
+第一層：誰都能刪。實習生一個指令毀掉 production 的那個故事。
+
+第二層：RBAC 最小權限。我們用 Role 定義「能做什麼」，用 RoleBinding 把 Role 綁到 SA 身上。誰能看、誰能改、誰能刪，分明清楚。
+
+第三層：ServiceAccount 不只給 Pod。這個觀念很多人一開始會卡住——SA 我以為只是給 Pod 用的？不是，SA 是一個身份，Pod 可以用，真人也可以用。包成 kubeconfig 發出去就能用。
+
+第四層：每人一個 namespace sandbox。Alice 有 dev-alice，backend-dev 有 backend-team。彼此隔離，炸也只炸自己的。
+
+今天學到的四個實戰技能：寫 Role YAML、用 --as 跟 auth can-i 驗權限、產 Token 組 kubeconfig、把 SA 包成給真人用的身份。這四個加起來你就能當新同事的 onboarding 人員了。
+
+但我們還沒講完生產就緒。權限搞定了，但服務本身健康嗎？Loop 3 我們進 Probe 健康檢查。Running 不代表服務正常——這個觀念會顛覆你對 kubectl get pods 的信任。[▶ Loop 3：Probe]`,
+  },
+
 
   // ============================================================
   // Loop 3：Probe 健康檢查（對應 public/docs/day7-loop3-probe.md）

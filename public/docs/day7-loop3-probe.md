@@ -179,6 +179,8 @@ Events 會看到：
 - `Liveness probe failed: HTTP probe failed with statuscode: 403`
 - `Container nginx failed liveness probe, will be restarted`
 
+`Killing` 不是死掉，是 k8s 把舊容器殺掉、自動重啟新的。**記得看 `Restart Count`**，從 0 變 1 就代表重啟過一次。
+
 **結論**：**同樣的破壞**，沒 probe → 壞到底；有 Liveness → 30 秒自動救活。
 
 ---

@@ -355,7 +355,7 @@ kubectl get pods -n tasks
 |------|-----------|---------|
 | `kubectl get namespace tasks` | STATUS | `Active` |
 | `kubectl get secret app-secrets -n tasks` | DATA | `3`（mysql-password、redis-password、jwt-secret） |
-| `kubectl get configmap app-config -n tasks` | DATA | `7`（MYSQL_HOST 等七個 key） |
+| `kubectl get configmap app-config -n tasks` | DATA | `6`（MYSQL_HOST、MYSQL_PORT、MYSQL_DATABASE、REDIS_HOST、REDIS_PORT、API_URL） |
 | `kubectl get statefulset -n tasks` | READY | `1/1` |
 | `kubectl get pvc -n tasks` | STATUS | `Bound`（mysql-storage-mysql-0） |
 | `kubectl get pods -n tasks` | STATUS / READY | `mysql-0` Running `1/1` |
@@ -503,7 +503,7 @@ spec:
 指令：kubectl get job -n tasks
 ```
 
-COMPLETIONS 欄位從 `0/1` 變成 `1/1` 才算成功。Job 有 init container 先等 mysql ready，再跑 migrate.js。
+COMPLETIONS 欄位從 `0/1` 變成 `1/1` 才算成功。前面巡堂確認過 mysql-0 Ready，Job apply 下去 migrate.js 就能直接連上；萬一短暫失敗，`backoffLimit: 3` 會自動重試最多三次。
 
 ```
 指令：kubectl logs job/db-migrate -n tasks
@@ -675,7 +675,8 @@ kubectl logs job/db-migrate -n tasks
 kubectl get serviceaccount,role,rolebinding -n tasks
 kubectl auth can-i get configmaps --as=system:serviceaccount:tasks:backend-sa -n tasks
 kubectl auth can-i delete pods --as=system:serviceaccount:tasks:backend-sa -n tasks
-curl -H "Host: task.local" http://192.168.43.133/health
+VM_IP=$(hostname -I | awk '{print $1}')
+curl -H "Host: task.local" http://${VM_IP}/health
 ```
 
 **每個指令要看什麼：**
@@ -956,11 +957,17 @@ ADDRESS 欄位出現 Node IP（`192.168.43.131,192.168.43.133`）代表 Traefik 
 
 ▶ **PPT 38/44：本機 hosts 測試**
 
-**本機測試**：在你的電腦加一行 hosts 對應（不是在 VM 上）：
+**本機測試**：在你的電腦加一行 hosts 對應（不是在 VM 上）。
+
+**先在 VM 抓自己的 IP**（SSH 進 master node 打）：
+```
+指令：hostname -I | awk '{print $1}'
+```
+記下這個 IP（下面指令中 `<VM_IP>` 換成這個值）。
 
 Windows（PowerShell 系統管理員）：
 ```
-指令：Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "192.168.43.133  task.local"
+指令：Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "<VM_IP>  task.local"
 ```
 
 確認有加進去：
@@ -970,7 +977,7 @@ Windows（PowerShell 系統管理員）：
 
 Mac/Linux：
 ```
-指令：echo "192.168.43.133  task.local" | sudo tee -a /etc/hosts
+指令：echo "<VM_IP>  task.local" | sudo tee -a /etc/hosts
 ```
 
 加完開瀏覽器 `http://task.local` 就能看到 Frontend 畫面，`http://task.local/api/tasks` 打到 Backend API。
@@ -1168,7 +1175,8 @@ Migration complete: tasks table ready
 **8. Ingress + Backend API — 對外可用**
 
 ```
-指令：curl -H "Host: task.local" http://192.168.43.133/api/tasks
+指令：VM_IP=$(hostname -I | awk '{print $1}')
+指令：curl -H "Host: task.local" http://${VM_IP}/api/tasks
 ```
 
 回傳 JSON：`{"tasks":[...]}` 代表 Ingress 路由正確，Backend API 可以打到 MySQL 拿資料。

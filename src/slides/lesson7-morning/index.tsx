@@ -983,9 +983,9 @@ K8s 有兩個工具可以模擬身份。第一個 --as，第二個 auth can-i。
     content: (
       <div className="space-y-2 text-xs">
         <div className="bg-slate-800/50 p-2 rounded font-mono">
-          <p className="text-slate-500"># server URL</p>
-          <p className="text-green-300">CLUSTER_SERVER=$(kubectl config view --minify \</p>
-          <p className="text-green-300">  -o jsonpath='{`{.clusters[0].cluster.server}`}')</p>
+          <p className="text-slate-500"># 直接用 VM 對外 IP，後面不需要 sed</p>
+          <p className="text-green-300">VM_IP=$(hostname -I | awk '{`{print $1}`}')</p>
+          <p className="text-green-300">CLUSTER_SERVER="https://${`{VM_IP}`}:6443"</p>
           <p className="text-slate-500 mt-1"># CA 憑證（base64 編碼）</p>
           <p className="text-green-300">CA_DATA=$(kubectl config view --minify --raw \</p>
           <p className="text-green-300">  -o jsonpath='{`{.clusters[0].cluster.certificate-authority-data}`}')</p>
@@ -1009,17 +1009,17 @@ K8s 有兩個工具可以模擬身份。第一個 --as，第二個 auth can-i。
             <p className="text-green-300">echo "Server: $CLUSTER_SERVER"</p>
             <p className="text-green-300">echo "CA 長度: ${`{#CA_DATA}`}"</p>
           </div>
-          <p className="text-slate-400 mt-1">預期：Server 是 https://127.0.0.1:6443，CA 長度 &gt; 1000</p>
+          <p className="text-slate-400 mt-1">預期：Server 是 https://192.168.43.133:6443（VM 實際 IP），CA 長度 &gt; 1000</p>
         </div>
       </div>
     ),
     notes: `Part 4 抓 cluster 資訊。kubeconfig 需要兩樣東西：API Server 的 URL，跟 CA 憑證用來驗證 server 身份。
 
-第一行：CLUSTER_SERVER 等於 kubectl config view --minify，後面加 jsonpath 抓 clusters 第一個的 server 欄位。
+第一行：VM_IP 用 hostname -I 自動抓這台機器的對外 IP，awk 取第一個。第二行直接用 VM_IP 組出 CLUSTER_SERVER，這樣後面塞進 kubeconfig 就已經是正確 IP，不需要事後 sed。
 
-第二行：CA_DATA 等於一樣的指令，但抓 certificate-authority-data 這個欄位。certificate-authority-data 是 base64 編碼的 CA 憑證。
+CA_DATA 抓 certificate-authority-data 欄位，是 base64 編碼的 CA 憑證。
 
-這兩行一打你會發現畫面什麼都沒有。這是正常的——它們只是把值存進 shell 變數。要確認有抓到，echo 出來看。CLUSTER_SERVER 應該是 https://127.0.0.1:6443，CA 長度應該大於 1000 字元。
+這幾行打完畫面什麼都沒有——它們只是把值存進 shell 變數。要確認有抓到，echo 出來看。CLUSTER_SERVER 應該是 https://192.168.43.133:6443（VM 實際 IP），CA 長度應該大於 1000 字元。
 
 k3s 有個雷要特別講。k3s 的 kubeconfig 有時候不是用 certificate-authority-data 這個欄位，而是用 certificate-authority 指向檔案路徑。這時候上面那行會抓到空字串。
 
@@ -1072,15 +1072,8 @@ EOF`}</pre>
           </div>
         </div>
 
-        <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded">
-          <p className="text-amber-300 font-semibold mb-1">給外部使用者：換 127.0.0.1 成實際 IP（自動偵測）</p>
-          <div className="bg-slate-900 p-2 rounded font-mono">
-            <p className="text-slate-500"># 自動抓 VM 的對外 IP（也可手動 VM_IP=你的IP）</p>
-            <p className="text-green-300">VM_IP=$(hostname -I | awk '{`{print $1}`}')</p>
-            <p className="text-green-300">sed -i \</p>
-            <p className="text-green-300">  "s|https://127.0.0.1:6443|https://${`{VM_IP}`}:6443|" \</p>
-            <p className="text-green-300">  alice-kubeconfig.yaml</p>
-          </div>
+        <div className="bg-slate-800/50 border border-slate-600/40 p-2 rounded">
+          <p className="text-cyan-400 font-semibold mb-1">✓ $CLUSTER_SERVER 在 Part 4 已設成 VM 對外 IP，直接帶入，不需要 sed</p>
         </div>
       </div>
     ),
@@ -1096,7 +1089,7 @@ Part 6 組 kubeconfig。用 cat 加 heredoc 語法寫一個 YAML 檔。設計是
 
 注意這裡 context 有個 namespace 欄位設 dev-alice。這是 Alice 的預設 namespace，她打 kubectl get pods 不加 -n 就會看 dev-alice，很方便。
 
-最後一個雷：kubeconfig 裡的 server 預設是 https://127.0.0.1:6443，只有在 master 本機能連。Alice 要從自己電腦連，必須換成 master 對外 IP。用 sed -i 一行替換。這個步驟常忘記，對方拿到 kubeconfig 連不到伺服器就會來問你。[▶ Part 7：切身份驗收]`,
+$CLUSTER_SERVER 在 Part 4 就已經設成 VM 對外 IP 了，所以 kubeconfig 寫進去就是正確值，不需要 sed。[▶ Part 7：切身份驗收]`,
   },
 
   // ── [9/12] 7-6（7/7）：Part 7 切身份驗收 + 常見坑 ──

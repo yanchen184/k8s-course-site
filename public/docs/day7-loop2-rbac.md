@@ -169,20 +169,21 @@ EOF
 ### Part 4：抓 cluster 資訊
 
 ```
-指令：CLUSTER_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+指令：VM_IP=$(hostname -I | awk '{print $1}')
+指令：CLUSTER_SERVER="https://${VM_IP}:6443"
 指令：CA_DATA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 ```
 
-這兩個值是產生 kubeconfig 的原料 — `CLUSTER_SERVER` 是 API Server 位址，`CA_DATA` 是 TLS 憑證，之後會塞進 kubeconfig 的 YAML 裡。
+這三個值是產生 kubeconfig 的原料。`CLUSTER_SERVER` 直接用 VM 對外 IP 組出來，後面塞進 kubeconfig 就不需要再 sed 替換。`CA_DATA` 是 TLS 憑證。
 
-這兩行只是把值存進 shell 變數，**畫面不會有輸出**。用 echo 確認：
+這幾行只是把值存進 shell 變數，**畫面不會有輸出**。用 echo 確認：
 
 ```
 指令：echo "Server: $CLUSTER_SERVER"
 指令：echo "CA 長度: ${#CA_DATA}"
 ```
 
-預期 `Server: https://127.0.0.1:6443`、CA 長度 > 1000。
+預期 `Server: https://192.168.43.133:6443`（VM 的實際 IP）、CA 長度 > 1000。
 
 **k3s 備援**：如果 `CA_DATA` 是空的，直接從檔案讀：
 
@@ -245,13 +246,7 @@ kubeconfig 的三個區塊是「分開定義、再用 context 綁在一起」的
 
 名字（`k3s`、`dev-alice`、`alice@k3s`）都是你自己取的，只要 clusters/users/contexts 三個地方對得上就好。
 
-**`127.0.0.1` 換成 master 實際 IP**（給外部使用者用）：
-
-```
-指令：sed -i 's|https://127.0.0.1:6443|https://192.168.43.133:6443|' alice-kubeconfig.yaml
-```
-
-`127.0.0.1` 只在 master 本機才能用。Alice 要從自己電腦連，必須換成 master 對外 IP。
+`$CLUSTER_SERVER` 在 Part 4 已經設成 VM 對外 IP，所以這裡直接帶入，不需要事後 sed。
 
 ---
 

@@ -21,7 +21,7 @@
 - 現在不是要學生寫產品，而是部署產品。
 - 這個產品為什麼適合當最後一節。
 - 入口、邏輯、資料三層分別在哪裡。
-- 開始 apply YAML 前，先把 image 準備到每台 k3s node。
+- 開始 apply YAML 前，先選 image 路徑：public image 先試；pull 不過才切 local image fallback。
 
 ### 建議口條
 
@@ -49,9 +49,9 @@
 >
 > 前幾堂課你們可能遇過，全班同時從 Docker Hub 拉 image，結果有人卡在 rate limit。這不是 YAML 寫錯，而是外部 registry 限流。
 >
-> 所以這個短網址 Lab 的預設流程不是現場 pull Docker Hub，而是講師先提供完整的 `url-shortener-k3s-images.tar`。你們要做的是：下載 tar、匯入每台 k3s node、檢查 image 都在，然後才開始 `kubectl apply`。
+> 這堂課可以走兩條 image 路徑。第一條先走 public image path，直接用 Docker Hub 上的 public image，讓學生先理解部署流程。第二條是 local image fallback：如果現場 pull Docker Hub 不過、出現 rate limit 或 `ImagePullBackOff`，才用講師提供的 `url-shortener-k3s-images.tar`，匯入每台 k3s node 後再部署。
 >
-> 下載連結會放在講義裡，目前是 `https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive_link`。比較穩的上課做法是：先用 Windows 瀏覽器下載 tar，再用 Windows PowerShell 的 `scp` 把檔案傳進 control plane VM。這樣學生不用在 Linux 終端機處理 Google Drive 的登入或下載確認頁。
+> local fallback 的下載連結會放在講義裡，目前是 `https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive_link`。如果要切 local fallback，比較穩的上課做法是：先用 Windows 瀏覽器下載 tar，再用 Windows PowerShell 的 `scp` 把檔案傳進 control plane VM。這樣學生不用在 Linux 終端機處理 Google Drive 的登入或下載確認頁。
 >
 > `scp` 要在哪裡下？答案是：在 tar 檔所在的那台機器。學生用 Windows 下載 tar，所以 `scp` 就在 Windows PowerShell 下。
 >
@@ -88,13 +88,13 @@
 >
 > 如果沒有匯入，YAML 寫 `imagePullPolicy: Never` 時會看到 `ErrImageNeverPull`；如果改用 public image，則可能看到 `ImagePullBackOff`。兩個錯誤都跟 image 準備有關。
 >
-> 所以我們今天的順序是：先完成 image 準備和檢查，再開始 apply YAML。Helm 一鍵部署也是一樣，Helm 只部署 Kubernetes resources，不會幫你把 image 放進 node。
+> 所以今天要先講清楚：public path 用 `MANIFEST_DIR=k8s`，local fallback 用 `MANIFEST_DIR=k8s-local`。會切換的是 03 PostgreSQL、04 migration、05 API、06 Frontend，因為這幾份直接牽涉 image。Helm 一鍵部署也是一樣，Helm 只部署 Kubernetes resources，不會幫你 build image 或 import image。
 
 ### 這一段學生要帶走的話
 
 - 今天不是寫 app，是部署 app。
 - 先分清楚入口、邏輯、資料，再談 K8s 元件。
-- 先把 image 放進每台 node，Pod 才能在任何 node 上啟動。
+- 先知道 image 從哪裡來；public pull 不過時，才把 image 放進每台 node。
 
 ---
 
@@ -170,7 +170,7 @@
 >
 > 請特別看三個欄位。`serviceName: postgres-service` 讓 StatefulSet 搭配 headless Service。`volumeMounts` 把 PVC 掛到 `/var/lib/postgresql/data`。`readinessProbe` 用 `pg_isready` 確認 DB 是否真的可用。
 >
-> 這裡上課要用 local 版 `03-postgres.yaml`。原因是 `postgres:15` 也在講師提供的 image tar 裡，local YAML 會設定 `imagePullPolicy: Never`。這代表 PostgreSQL 也不會去 Docker Hub 拉 image，而是使用每台 node 已經匯入的本地 image。
+> 這裡要接 47/54 的 image path 選擇。public path 用 `k8s/03-postgres.yaml`，local fallback 用 `k8s-local/03-postgres.yaml`。local YAML 會設定 `imagePullPolicy: Never`，這代表 PostgreSQL 不會去 Docker Hub 拉 image，而是使用每台 node 已經匯入的本地 image。
 >
 > 這裡複習的是：有狀態服務、穩定名稱、PVC、readinessProbe。
 
@@ -182,7 +182,7 @@
 >
 > `restartPolicy: OnFailure` 和 `backoffLimit: 3` 代表失敗會重試，但不會無限重跑。
 >
-> local YAML 會用 `busybox:1.36`、`url-shortener-api:lab` 和 `imagePullPolicy: Never`，意思是不要去 Docker Hub 拉，直接使用 k3s node 裡已經匯入的 image。
+> public path 用 `k8s/04-migrate-job.yaml`，local fallback 用 `k8s-local/04-migrate-job.yaml`。local YAML 會用 `busybox:1.36`、`url-shortener-api:lab` 和 `imagePullPolicy: Never`，意思是不要去 Docker Hub 拉，直接使用 k3s node 裡已經匯入的 image。
 >
 > 這裡複習的是：Job、init container、啟動順序、失敗重試。
 
@@ -198,7 +198,7 @@
 >
 > `resources.requests.cpu` 很重要，因為 HPA 需要它才能算 CPU 使用率百分比。`livenessProbe` 看 `/health`，`readinessProbe` 看 `/ready`，兩者不是同一件事。
 >
-> 這份 local YAML 會用 `url-shortener-api:lab`。所以在 apply 之前，學生必須已經把 API image 匯入所有 k3s node。
+> public path 用 `k8s/05-api.yaml`，local fallback 用 `k8s-local/05-api.yaml`。如果走 local fallback，學生必須已經把 API image 匯入所有 k3s node。
 >
 > 這裡複習的是：Deployment、Service、Secret/ConfigMap 注入、resources、livenessProbe、readinessProbe。
 
@@ -210,7 +210,7 @@
 >
 > 這裡可以讓學生比較：API 和 Frontend 都是無狀態，所以都用 Deployment；但 API 有 DB 依賴、probe、更多 resources，Frontend 則比較單純。
 >
-> local YAML 會用 `url-shortener-frontend:lab`，同樣需要先匯入 k3s node。
+> public path 用 `k8s/06-frontend.yaml`，local fallback 用 `k8s-local/06-frontend.yaml`。如果走 local fallback，同樣需要先匯入 k3s node。
 
 #### `07-hpa.yaml`
 
@@ -409,7 +409,7 @@ http://short.local
 >
 > wait 完成後，再執行 Helm。
 >
-> 這裡也要提醒學生：刪 namespace 會刪掉剛剛 PostgreSQL PVC 裡的測試資料；但不會刪掉已經 import 到每台 k3s node 的 images。所以 `values-local.yaml` 仍然可以用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，不需要重新去 Docker Hub pull。
+> 這裡也要提醒學生：刪 namespace 會刪掉剛剛 PostgreSQL PVC 裡的測試資料；但不會刪掉已經 import 到每台 k3s node 的 images。Helm 也有兩條路徑：public image 可以用 chart 預設 values；如果 Docker Hub pull 不過，就用 `values-local.yaml`，它會使用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，不需要重新去 Docker Hub pull。
 >
 > 所以 Helm 不是取代 Kubernetes，也不是把前面學的東西全部省略掉。相反地，你要先懂前面的東西，才知道 Helm 幫你包了什麼。
 >
@@ -417,7 +417,7 @@ http://short.local
 >
 > 換句話說，Helm 不是做了另一件事。它只是把剛剛那些固定 YAML 變成可以調參的 template。
 >
-> 但 Helm 不會幫你 build image，也不會幫你把 image 匯入 k3s node。一鍵部署前，image 還是要先準備好。`values-local.yaml` 只是告訴 Helm：請使用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，而且 `pullPolicy` 用 `Never`。
+> 但 Helm 不會幫你 build image，也不會幫你把 image 匯入 k3s node。public path 依賴 registry 可以 pull；local fallback 依賴每台 node 已經 import image。`values-local.yaml` 只是告訴 Helm：請使用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，而且 `pullPolicy` 用 `Never`。
 >
 > 接著你可以帶學生看 values。  
 > `image.tag` 控制版本。  

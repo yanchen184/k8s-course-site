@@ -62,11 +62,11 @@ Ingress short.local
 2. 誰處理邏輯？`API`
 3. 資料放哪裡？`PostgreSQL + PVC`
 
-### 先準備 image：下載 tar 並匯入每台 node
+### Local image fallback：下載 tar 並匯入每台 node
 
-在開始 `kubectl apply` 之前，先確認 Pod 啟動會用到的 image 已經放進每台 k3s node。
+如果 public image path 可以正常 pull，可以先跳到 7-12 開始部署。這一段是給 Docker Hub pull 不過、遇到 rate limit 或 `ImagePullBackOff` 時使用的 local image fallback。
 
-前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。短網址 Lab 預設改成「講師提供 image tar」的 workflow：
+前幾堂課如果全班同時從 Docker Hub 拉 image，很容易遇到 rate limit。local fallback 會改走「講師提供 image tar」的 workflow：
 
 ```text
 cloud download
@@ -245,7 +245,7 @@ bae34023b8fd055f13235ce239976c95d5f97156bde6bd0452c8de7a76f7fc44
 >
 > Lab 檔案會放在 `k8s-course-labs/lesson7/url-shortener/`。學生上課時從該資料夾操作即可。
 >
-> 先完成 7-11 的 image 準備與檢查，再開始 apply YAML。
+> 如果走 public image path，可以直接開始 apply YAML；如果 public image pull 不過，再回到 7-11 完成 local image 準備與檢查。
 
 ### 這一段要回答的問題
 
@@ -291,23 +291,44 @@ bae34023b8fd055f13235ce239976c95d5f97156bde6bd0452c8de7a76f7fc44
 
 > 你剛剛不是在部署 9 份 YAML，你是在把一個產品拆成 9 個可管理、可驗收、可重複交付的 K8s 物件群。
 
-### 備援 image 策略：使用 Docker Hub public image
+### 先選 image 路徑：Public 先試，Local 當 fallback
 
-這個 Lab 的 K8s YAML 和 Helm chart 會使用：
+上課先走 **Public image path**。這條路徑會從 Docker Hub 拉講師已準備好的 image，指令最短，適合先理解部署流程：
+
+```bash
+MANIFEST_DIR=k8s
+```
+
+Public image 會使用：
 
 ```text
 yanchen184/url-shortener-api:v1
 yanchen184/url-shortener-frontend:v1
 ```
 
-如果 local image workflow 當天失敗，才改用 public image。上課前先確認 image 已經存在：
+如果現場出現 Docker Hub rate limit、pull image 太慢、`ImagePullBackOff`，再切到 **Local image fallback**。切換前要先完成 7-11 的 tar download、每台 VM sudo setup、image import 和 check：
+
+```bash
+MANIFEST_DIR=k8s-local
+```
+
+後面的 `03-postgres.yaml`、`04-migrate-job.yaml`、`05-api.yaml`、`06-frontend.yaml` 都會用 `$MANIFEST_DIR`。也就是：
+
+| 路徑 | 03~06 會用哪個目錄 |
+|---|---|
+| Public image path | `k8s/` |
+| Local image fallback | `k8s-local/` |
+
+`00-namespace.yaml`、`01-secret.yaml`、`02-configmap.yaml`、`07-hpa.yaml`、`08-ingress.yaml` 不分 public/local，都使用 `k8s/`。
+
+講師課前可以先確認 public image 已經存在：
 
 ```bash
 docker manifest inspect yanchen184/url-shortener-api:v1 >/dev/null
 docker manifest inspect yanchen184/url-shortener-frontend:v1 >/dev/null
 ```
 
-如果 image 還不存在，先把 course site repo 裡的 `apps/**` 變更推到 `master`，讓 `.github/workflows/build-apps.yml` 透過 Docker Hub token build/push。否則學生 apply public YAML 時會卡在 `ImagePullBackOff`。
+如果 image 還不存在，先把 course site repo 裡的 `apps/**` 變更推到 `master`，讓 `.github/workflows/build-apps.yml` 透過 Docker Hub token build/push。否則學生走 public path 時會卡在 `ImagePullBackOff`。
 
 ### Step 0：確認 Node 和 Ingress
 
@@ -377,13 +398,20 @@ kubectl apply -f k8s/02-configmap.yaml
 ### Step 3：部署 PostgreSQL StatefulSet + PVC
 
 ```bash
-kubectl apply -f k8s-local/03-postgres.yaml
+: "${MANIFEST_DIR:=k8s}"
+echo "Using $MANIFEST_DIR"
+kubectl apply -f $MANIFEST_DIR/03-postgres.yaml
 kubectl rollout status statefulset/postgres -n url-shortener --timeout=180s
 kubectl get pod postgres-0 -n url-shortener
 kubectl get pvc -n url-shortener
 ```
 
-這裡使用 local 版 PostgreSQL YAML，因為 `postgres:15` 也是從 image tar 匯入到每台 node 的 image。local 版會設定 `imagePullPolicy: Never`，避免 k3s 在 node 找不到 image 時又跑去 Docker Hub pull。
+這裡會依照你前面選的 `MANIFEST_DIR` 決定 image 來源：
+
+| `MANIFEST_DIR` | 代表 |
+|---|---|
+| `k8s` | Public image path，讓 k3s 從 registry pull。 |
+| `k8s-local` | Local image fallback，使用已匯入每台 node 的 image，並設定 `imagePullPolicy: Never`。 |
 
 為什麼 DB 用 StatefulSet？
 
@@ -418,7 +446,9 @@ kubectl get pvc -n url-shortener
 ### Step 4：執行 Migration Job
 
 ```bash
-kubectl apply -f k8s-local/04-migrate-job.yaml
+: "${MANIFEST_DIR:=k8s}"
+echo "Using $MANIFEST_DIR"
+kubectl apply -f $MANIFEST_DIR/04-migrate-job.yaml
 kubectl wait --for=condition=complete job/db-migrate -n url-shortener --timeout=180s
 kubectl logs job/db-migrate -n url-shortener
 ```
@@ -432,7 +462,7 @@ Job 適合一次性任務。這裡只負責建立 `short_links` table。
 - `kind: Job`：跑完就結束，不需要一直常駐。
 - `restartPolicy: OnFailure`：失敗時重跑 Pod。
 - `initContainers.wait-for-postgres`：先等 `postgres-service:5432` 可以連，再跑 migration。
-- `image: url-shortener-api:lab`：使用學生自己 build 並匯入 k3s 的 local image。
+- `image: url-shortener-api:lab`：local fallback 時使用講師提供 tar 匯入 k3s 的 local image。
 - `imagePullPolicy: Never`：要求 k3s 不要對外拉 image，直接使用 node 上已有的 image。
 - `command: ["node", "migrate.js"]`：用 API image 裡的 migration 程式建表。
 - `backoffLimit: 3`：最多重試 3 次，避免無限重跑。
@@ -440,7 +470,9 @@ Job 適合一次性任務。這裡只負責建立 `short_links` table。
 ### Step 5：部署 API
 
 ```bash
-kubectl apply -f k8s-local/05-api.yaml
+: "${MANIFEST_DIR:=k8s}"
+echo "Using $MANIFEST_DIR"
+kubectl apply -f $MANIFEST_DIR/05-api.yaml
 kubectl rollout status deployment/url-api -n url-shortener --timeout=180s
 kubectl get deploy,svc -n url-shortener
 kubectl get pods -l app=url-api -n url-shortener
@@ -465,8 +497,8 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 
 幾個應該講清楚的欄位：
 
-- `image: url-shortener-api:lab`：使用本地 build/import 的 image，不走 Docker Hub。
-- `imagePullPolicy: Never`：避免現場因外部 registry 限流而失敗。
+- Public path 會使用 Docker Hub public image。
+- Local fallback 會使用 `url-shortener-api:lab` 和 `imagePullPolicy: Never`，避免現場因外部 registry 限流而失敗。
 - `replicas: 2`：API 先跑兩份，避免單 Pod 掛掉就中斷。
 - `envFrom.configMapRef`：把 DB host、port、database、user 注入 API。
 - `secretKeyRef`：只把 API 需要的 DB password 注入，不整包暴露。
@@ -477,7 +509,9 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 ### Step 6：部署 Frontend
 
 ```bash
-kubectl apply -f k8s-local/06-frontend.yaml
+: "${MANIFEST_DIR:=k8s}"
+echo "Using $MANIFEST_DIR"
+kubectl apply -f $MANIFEST_DIR/06-frontend.yaml
 kubectl rollout status deployment/url-frontend -n url-shortener --timeout=180s
 kubectl get deploy,svc -n url-shortener
 ```
@@ -493,7 +527,7 @@ Frontend 是靜態網站，無狀態，所以也是 Deployment。
 | `Deployment` | 跑 2 個 frontend Pod，提供靜態網頁。 |
 | `Service` | 提供 `url-frontend-service`，讓 Ingress 可以把 `/` 導過來。 |
 
-local YAML 使用 `url-shortener-frontend:lab` 和 `imagePullPolicy: Never`，原因和 API 相同：上課時不依賴 Docker Hub。
+Public path 會使用 Docker Hub public image。Local fallback 會使用 `url-shortener-frontend:lab` 和 `imagePullPolicy: Never`，原因和 API 相同：當 Docker Hub pull 不過時，改用每台 node 已經匯入的 image。
 
 Frontend 沒有 DB 連線設定，也不需要 Secret，這正好可以讓學生比較：
 
@@ -773,9 +807,19 @@ kubectl wait --for=delete namespace/url-shortener --timeout=180s
 
 - 這會刪掉剛才 PostgreSQL PVC 裡的測試資料。
 - 這不會刪掉已經匯入 k3s node 的 images。
-- 所以 `values-local.yaml` 仍然會使用本地 image，不需要重新從 Docker Hub pull。
+- 如果 public image pull 不過，`values-local.yaml` 仍然可以使用本地 image，不需要重新從 Docker Hub pull。
 
-### 一個指令安裝
+### 一個指令安裝：Public image path
+
+```bash
+helm install url-shortener ./helm/url-shortener \
+  -n url-shortener \
+  --create-namespace
+```
+
+這條會使用 chart 預設 values，也就是 public image。先用這條，讓 Kubernetes 從 Docker Hub pull image。
+
+如果 Docker Hub pull 不過、出現 rate limit 或 `ImagePullBackOff`，先確認 7-11 local image fallback 已經完成，再改用 local values：
 
 ```bash
 helm install url-shortener ./helm/url-shortener \
@@ -784,7 +828,9 @@ helm install url-shortener ./helm/url-shortener \
   -f ./helm/url-shortener/values-local.yaml
 ```
 
-這一個指令會建立：
+這兩條指令建立的是同一套 K8s resources，差別只在 image 來源和 pullPolicy。
+
+Helm install 會建立：
 
 - Secret
 - ConfigMap

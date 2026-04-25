@@ -58,10 +58,10 @@
 > 建議不要把遠端目標寫成資料夾，直接指定完整遠端檔名，現場最穩：
 >
 > ```powershell
-> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@192.168.56.10:/home/user/url-shortener-k3s-images.tar
+> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:/home/user/url-shortener-k3s-images.tar
 > ```
 >
-> 右邊的 `user`、`192.168.56.10`、`/home/user/` 要換成自己的 Linux VM 帳號與 IP。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。
+> 右邊的 `user`、`control-plane`、`/home/user/` 要換成自己的 Linux VM 帳號、hostname 或 IP。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。
 >
 > 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O /home/user/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
 >
@@ -69,9 +69,9 @@
 >
 > 等一下你會看到一個環境變數叫 `K3S_NODES`。它不是 Kubernetes 指令，而是我們提供給腳本看的清單，意思是「這些 node 都要匯入 image」。
 >
-> 例如 `K3S_NODES="user@192.168.56.10 user@192.168.56.11"`，代表腳本會用 `user` 這個帳號 SSH 到兩台 VM。`192.168.56.10` 通常是 control plane，`192.168.56.11` 通常是 worker。你們要把 IP 換成自己 VM 的 IP，帳號也要換成自己真的可以 SSH 進去的 Linux 帳號。
+> 例如 `K3S_NODES="user@control-plane user@worker"`，代表腳本會用 `user` 這個帳號 SSH 到 control plane 和 worker 兩台 VM。`control-plane` / `worker` 只是示意名稱，你們要換成自己 VM 的 hostname 或 IP，帳號也要換成自己真的可以 SSH 進去的 Linux 帳號。
 >
-> 如果你的帳號是 `ubuntu`，就要寫 `ubuntu@192.168.56.10`，不是照抄 `user@...`。如果有兩台 worker，就要把兩台 worker 都放進 `K3S_NODES`。重點不是名字叫什麼，重點是每一台可能跑 Pod 的 node 都要出現在這份清單裡。
+> 如果你的帳號是 `ubuntu`，就要寫 `ubuntu@control-plane` 或 `ubuntu@<node-ip>`，不是照抄 `user@...`。如果有兩台 worker，就要把兩台 worker 都放進 `K3S_NODES`。重點不是名字叫什麼，重點是每一台可能跑 Pod 的 node 都要出現在這份清單裡。
 >
 > 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到你的 Windows、你的 WSL，或你的操作機就好，而是要把 tar 匯入每台 node。
 >

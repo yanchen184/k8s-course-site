@@ -51,6 +51,10 @@
 >
 > 所以這個短網址 Lab 的預設流程不是現場 pull Docker Hub，而是講師先提供完整的 `url-shortener-k3s-images.tar`。你們要做的是：下載 tar、匯入每台 k3s node、檢查 image 都在，然後才開始 `kubectl apply`。
 >
+> 下載連結會放在講義裡，目前是 `https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive_link`。比較穩的上課做法是：先用 Windows 瀏覽器下載 tar，再用 PowerShell 的 `scp` 把檔案傳進 control plane VM 的 `~/Downloads/`。這樣學生不用在 Linux 終端機處理 Google Drive 的登入或下載確認頁。
+>
+> 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
+>
 > 以 Windows + VMware 的上課環境來說，你會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
 >
 > 等一下你會看到一個環境變數叫 `K3S_NODES`。它不是 Kubernetes 指令，而是我們提供給腳本看的清單，意思是「這些 node 都要匯入 image」。

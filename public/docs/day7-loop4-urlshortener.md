@@ -81,7 +81,34 @@ cloud download
 
 一句話記住：**Pod 被排到哪台 node，那台 node 就必須已經有 image。** 如果 YAML 使用 `imagePullPolicy: Never`，k3s 不會退回去 Docker Hub 幫你拉。
 
-在 `k8s-course-labs/lesson7/url-shortener/` 執行：
+講師提供的 tar 下載連結：
+
+```text
+https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive_link
+```
+
+先把 tar 放到要操作 Lab 指令的 Linux VM，通常是 control plane VM。
+
+建議上課路徑：先用 Windows 瀏覽器打開 Google Drive 連結下載，再用 PowerShell 把 tar 傳進 control plane VM：
+
+```powershell
+ssh user@192.168.56.10 "mkdir -p ~/Downloads"
+scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@192.168.56.10:~/Downloads/
+```
+
+把 `user@192.168.56.10` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@192.168.56.10`。
+
+如果 Linux VM 可以直接連外，也可以在 VM 裡用 `gdown` 下載：
+
+```bash
+mkdir -p ~/Downloads
+python3 -m pip install --user gdown
+python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar
+```
+
+如果 Google Drive 要求登入或權限核准，就改用上面的 Windows 瀏覽器下載方式，或請講師先確認連結權限已開給知道連結的人。
+
+tar 放到 Linux VM 之後，在 `k8s-course-labs/lesson7/url-shortener/` 執行：
 
 ```bash
 sha256sum ~/Downloads/url-shortener-k3s-images.tar

@@ -2282,7 +2282,7 @@ Q4，Task Runner 啟動但 Queue 任務沒被消費。看 task-runner 的 log，
         <div className="bg-slate-900/60 border border-slate-700 p-3 rounded">
           <p className="text-cyan-300 font-semibold mb-2 text-center">上課流程</p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            {['1 下載老師給的 tar', '2 匯入每台 node', '3 檢查 image', '4 開始部署'].map((step, index) => (
+            {['1 Drive 下載 tar', '2 放到 Linux VM', '3 匯入每台 node', '4 開始部署'].map((step, index) => (
               <div key={step} className="flex items-center gap-2">
                 <span className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-slate-200 font-mono">{step}</span>
                 {index < 3 && <span className="text-cyan-400">→</span>}
@@ -2321,6 +2321,8 @@ K3S_NODES="user@192.168.56.10 user@192.168.56.11" \\
 以前上課可能遇過，全班同時從 Docker Hub 拉 image，結果被 rate limit，大家的 Pod 都卡在 ImagePullBackOff。這不是 YAML 寫錯，而是外部 registry 限流。
 
 所以短網址 Lab 預設改成講師提供完整 image tar。學生課堂現場不要 pull Docker Hub，也不要重新 build API / Frontend。學生只要從雲端空間下載 url-shortener-k3s-images.tar，檢查 sha256，再透過 SSH 把 tar 傳進 VMware 裡的 control plane 和 worker node，最後用 k3s ctr images import 把 image 放進每個 k3s node 的 containerd。最後才 kubectl apply 或 helm install。
+
+下載連結放在講義裡，目前是 Google Drive。建議學生先用 Windows 瀏覽器下載，再用 PowerShell 的 scp 傳到 control plane VM 的 ~/Downloads。Linux VM 可以連外時，也可以用 gdown 直接下載，但這需要 Python/pip 和網路，現場不一定每台 VM 都準備好。
 
 K3S_NODES 不是 Kubernetes 指令，它只是給腳本讀的 node 清單。像 K3S_NODES="user@192.168.56.10 user@192.168.56.11"，意思是用 user 這個帳號 SSH 到兩台 VM。192.168.56.10 通常是 control plane，192.168.56.11 通常是 worker。學生要換成自己的 VM IP 和自己的 Linux 帳號。
 

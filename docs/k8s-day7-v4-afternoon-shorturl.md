@@ -51,9 +51,19 @@
 >
 > 所以這個短網址 Lab 的預設流程不是現場 pull Docker Hub，而是講師先提供完整的 `url-shortener-k3s-images.tar`。你們要做的是：下載 tar、匯入每台 k3s node、檢查 image 都在，然後才開始 `kubectl apply`。
 >
-> 下載連結會放在講義裡，目前是 `https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive_link`。比較穩的上課做法是：先用 Windows 瀏覽器下載 tar，再用 PowerShell 的 `scp` 把檔案傳進 control plane VM 的 `~/Downloads/`。這樣學生不用在 Linux 終端機處理 Google Drive 的登入或下載確認頁。
+> 下載連結會放在講義裡，目前是 `https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive_link`。比較穩的上課做法是：先用 Windows 瀏覽器下載 tar，再用 Windows PowerShell 的 `scp` 把檔案傳進 control plane VM。這樣學生不用在 Linux 終端機處理 Google Drive 的登入或下載確認頁。
 >
-> 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
+> `scp` 要在哪裡下？答案是：在 tar 檔所在的那台機器。學生用 Windows 下載 tar，所以 `scp` 就在 Windows PowerShell 下。
+>
+> 建議不要把遠端目標寫成資料夾，直接指定完整遠端檔名，現場最穩：
+>
+> ```powershell
+> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@192.168.56.10:/home/user/url-shortener-k3s-images.tar
+> ```
+>
+> 右邊的 `user`、`192.168.56.10`、`/home/user/` 要換成自己的 Linux VM 帳號與 IP。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。
+>
+> 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O /home/user/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
 >
 > 以 Windows + VMware 的上課環境來說，你會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
 >

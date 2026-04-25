@@ -92,18 +92,32 @@ https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive
 建議上課路徑：先用 Windows 瀏覽器打開 Google Drive 連結下載，再用 PowerShell 把 tar 傳進 control plane VM：
 
 ```powershell
-ssh user@192.168.56.10 "mkdir -p ~/Downloads"
-scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@192.168.56.10:~/Downloads/
+scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@192.168.56.10:/home/user/url-shortener-k3s-images.tar
 ```
 
-把 `user@192.168.56.10` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@192.168.56.10`。
+`scp` 要在 tar 檔所在的那台機器下。這裡 tar 是用 Windows 瀏覽器下載的，所以指令是在 **Windows PowerShell** 執行。
+
+右邊建議直接指定完整遠端檔名：
+
+```text
+user@192.168.56.10:/home/user/url-shortener-k3s-images.tar
+```
+
+把 `user@192.168.56.10` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@192.168.56.10`，遠端路徑也要改成 `/home/ubuntu/url-shortener-k3s-images.tar`。
+
+不要只寫到遠端資料夾，例如 `user@192.168.56.10:/home/user/Downloads/`。如果現場看到 `scp: /home/user/Downloads/: Is a directory`，就改成上面這種完整檔名寫法。
+
+傳完後，進 Linux VM 確認：
+
+```bash
+ls -lh /home/user/url-shortener-k3s-images.tar
+```
 
 如果 Linux VM 可以直接連外，也可以在 VM 裡用 `gdown` 下載：
 
 ```bash
-mkdir -p ~/Downloads
 python3 -m pip install --user gdown
-python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar
+python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O /home/user/url-shortener-k3s-images.tar
 ```
 
 如果 Google Drive 要求登入或權限核准，就改用上面的 Windows 瀏覽器下載方式，或請講師先確認連結權限已開給知道連結的人。
@@ -111,8 +125,8 @@ python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-short
 tar 放到 Linux VM 之後，在 `k8s-course-labs/lesson7/url-shortener/` 執行：
 
 ```bash
-sha256sum ~/Downloads/url-shortener-k3s-images.tar
-IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \
+sha256sum /home/user/url-shortener-k3s-images.tar
+IMAGE_TAR=/home/user/url-shortener-k3s-images.tar \
 K3S_NODES="user@192.168.56.10 user@192.168.56.11" \
   ./scripts/load-images-to-k3s-ssh.sh
 K3S_NODES="user@192.168.56.10 user@192.168.56.11" ./scripts/check-k3s-images-ssh.sh
@@ -122,7 +136,7 @@ K3S_NODES="user@192.168.56.10 user@192.168.56.11" ./scripts/check-k3s-images-ssh
 
 | 片段 | 意思 |
 |---|---|
-| `IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar` | 告訴腳本 image tar 放在哪裡。 |
+| `IMAGE_TAR=/home/user/url-shortener-k3s-images.tar` | 告訴腳本 image tar 放在哪裡。 |
 | `K3S_NODES="..."` | 告訴腳本要處理哪些 k3s node。 |
 | `user@192.168.56.10` | 用 `user` 這個 Linux 帳號 SSH 進 `192.168.56.10` 這台 VM，通常是 control plane。 |
 | `user@192.168.56.11` | 用 `user` 這個 Linux 帳號 SSH 進 `192.168.56.11` 這台 VM，通常是 worker。 |

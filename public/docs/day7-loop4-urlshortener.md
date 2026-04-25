@@ -192,21 +192,40 @@ sudo -n k3s ctr images list -q
 如果同樣出現 `sudo: a password is required`，代表這台 VM 的使用者還不能用非互動方式執行 k3s。上課 Lab 最簡單的處理方式，是在 **每台 control plane / worker VM** 設定這個使用者可以免密碼執行 k3s：
 
 ```bash
-command -v k3s
-sudo visudo -f /etc/sudoers.d/k3s-lab-user
+USER_NAME="$(whoami)"
+K3S_PATH="$(command -v k3s)"
+echo "$USER_NAME ALL=(ALL) NOPASSWD: $K3S_PATH" | sudo tee /etc/sudoers.d/k3s-lab-user
+sudo visudo -c -f /etc/sudoers.d/k3s-lab-user
+sudo chmod 440 /etc/sudoers.d/k3s-lab-user
 ```
 
-在開啟的檔案中加入下面這行。如果你的帳號不是 `user`，要把 `user` 換成自己的 Linux 帳號；如果 `command -v k3s` 顯示的路徑不是 `/usr/local/bin/k3s`，也要改成實際路徑。
+這段指令會自動抓目前登入帳號和 k3s 的實際路徑，避免手動把 `user` 或 `/usr/local/bin/k3s` 寫錯。
 
-```text
-user ALL=(ALL) NOPASSWD: /usr/local/bin/k3s
-```
-
-存檔後確認權限，並重新測試：
+接著重新測試。這裡先跑 `sudo -k` 是為了清掉剛剛可能輸入過密碼留下的 sudo 快取，確定測到的真的是免密碼 sudo：
 
 ```bash
-sudo chmod 440 /etc/sudoers.d/k3s-lab-user
+sudo -k
+sudo -n "$K3S_PATH" ctr images list -q
 sudo -n k3s ctr images list -q
+```
+
+兩個測試都應該要能直接跑，不應該再問密碼。第一個測 k3s 的完整路徑，第二個測腳本實際會用到的 `sudo -n k3s`。
+
+如果 `sudo -n "$K3S_PATH"` 可以，但是 `sudo -n k3s` 還是不行，代表 sudo 對 `k3s` 這個短命令沒有匹配到剛剛的路徑。上課 Lab 可以先改用比較寬的 VM-only 設定，讓這個練習繼續往下走：
+
+```bash
+USER_NAME="$(whoami)"
+echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/k3s-lab-user
+sudo visudo -c -f /etc/sudoers.d/k3s-lab-user
+sudo chmod 440 /etc/sudoers.d/k3s-lab-user
+sudo -k
+sudo -n k3s ctr images list -q
+```
+
+這個 `NOPASSWD:ALL` 只適合上課用的本機 VM，不要用在 production 或共用伺服器。完成課程後，如果想收回設定，可以在每台 VM 執行：
+
+```bash
+sudo rm /etc/sudoers.d/k3s-lab-user
 ```
 
 這件事要在每台 node 做一次。只在 control plane 設定還不夠，因為 `check-k3s-images-ssh.sh` 會 SSH 到 `K3S_NODES` 裡列出的每台 node 檢查 image。

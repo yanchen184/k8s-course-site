@@ -76,7 +76,9 @@
 >
 > 如果學生在 checking 階段看到 `sudo: a password is required`，不要先判斷成密碼輸入錯。這裡的腳本用的是 `sudo -n`，`-n` 代表 non-interactive，所以它不會停下來收密碼。學生要在每台 VM 先確認 `sudo -n k3s ctr images list -q` 能直接執行。
 >
-> 若不能執行，就在每台 control plane / worker VM 設定 lab 使用者可以免密碼執行 k3s。先跑 `command -v k3s` 確認路徑，通常會是 `/usr/local/bin/k3s`。再用 `sudo visudo -f /etc/sudoers.d/k3s-lab-user` 加入：`user ALL=(ALL) NOPASSWD: /usr/local/bin/k3s`。帳號不是 `user` 就換成學生自己的 Linux 帳號；k3s 路徑不同就換成實際路徑。存檔後跑 `sudo chmod 440 /etc/sudoers.d/k3s-lab-user`，再重測 `sudo -n k3s ctr images list -q`。
+> 若不能執行，就在每台 control plane / worker VM 設定 lab 使用者可以免密碼執行 k3s。不要讓學生手動猜帳號和路徑，直接用 `USER_NAME="$(whoami)"`、`K3S_PATH="$(command -v k3s)"`，再用 `echo "$USER_NAME ALL=(ALL) NOPASSWD: $K3S_PATH" | sudo tee /etc/sudoers.d/k3s-lab-user` 寫入 sudoers，接著跑 `sudo visudo -c -f /etc/sudoers.d/k3s-lab-user` 和 `sudo chmod 440 /etc/sudoers.d/k3s-lab-user`。測試時要先跑 `sudo -k` 清掉 sudo 快取，再測 `sudo -n "$K3S_PATH" ctr images list -q` 和 `sudo -n k3s ctr images list -q`。第二條就是腳本實際會用的形式。
+>
+> 如果完整路徑可以、但 `sudo -n k3s` 還是要求密碼，代表 sudoers 沒有匹配到短命令。現場為了讓 Lab 繼續，可以在本機練習 VM 暫時改成 `echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/k3s-lab-user`，再重跑 `sudo visudo -c -f /etc/sudoers.d/k3s-lab-user`、`sudo chmod 440`、`sudo -k`、`sudo -n k3s ctr images list -q`。這只適合上課 VM，不要用在 production 或共用伺服器；課後可用 `sudo rm /etc/sudoers.d/k3s-lab-user` 收回。
 >
 > 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到你的 Windows、你的 WSL，或你的操作機就好，而是要把 tar 匯入每台 node。
 >

@@ -2332,7 +2332,7 @@ K3S_NODES="user@<control-plane-ip> user@<worker-ip>" \\
             tar 已包含 API、Frontend、PostgreSQL、BusyBox；不用現場 pull Docker Hub。
           </div>
           <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-amber-200 text-center">
-            sudo password required：每台 VM 先讓 sudo -n k3s 可免密碼執行。
+            sudo password required：用 whoami + command -v k3s 產生 sudoers，再測 sudo -n k3s。
           </div>
         </div>
 
@@ -2355,7 +2355,9 @@ K3S_NODES 不是 Kubernetes 指令，它只是給腳本讀的 node 清單。像 
 
 課前要確認 SSH 和 sudo 權限。學生要能 ssh 到 control plane 和 worker，而且該帳號要能免互動執行 sudo -n k3s ctr images list -q，否則腳本會卡在 sudo 密碼提示。如果學生說明明有輸入正確密碼還是不行，要直接解釋：腳本使用 sudo -n，這代表 non-interactive，不會讓使用者輸入密碼；所以要先在每台 VM 設定該帳號可以免密碼執行 k3s。
 
-現場可以請學生先在每台 VM 跑 sudo -n k3s ctr images list -q。如果出現 sudo: a password is required，就用 sudo visudo -f /etc/sudoers.d/k3s-lab-user 加入 user ALL=(ALL) NOPASSWD: /usr/local/bin/k3s。帳號或 k3s 路徑不同時要替換成自己的值，最後 chmod 440 後再重測。
+現場可以請學生先在每台 VM 跑 sudo -n k3s ctr images list -q。如果出現 sudo: a password is required，不要叫學生手動猜 user 或 /usr/local/bin/k3s。請他們用 USER_NAME="$(whoami)" 和 K3S_PATH="$(command -v k3s)" 取得實際值，再用 echo "$USER_NAME ALL=(ALL) NOPASSWD: $K3S_PATH" | sudo tee /etc/sudoers.d/k3s-lab-user 寫入 sudoers。寫完要跑 sudo visudo -c -f /etc/sudoers.d/k3s-lab-user 檢查語法，chmod 440，然後 sudo -k 清掉 sudo 快取，再測 sudo -n "$K3S_PATH" ctr images list -q 和 sudo -n k3s ctr images list -q。
+
+如果完整路徑那條可以，但 sudo -n k3s 還是要求密碼，代表 sudoers 沒匹配到腳本使用的短命令。上課 VM 可以暫時改成 NOPASSWD:ALL 讓 Lab 繼續，但要明確說這只適合本機練習 VM，不是 production 做法。
 
 這句話一定要讓學生記住：Pod 被排到哪台 node，那台 node 就必須已經有 image。imagePullPolicy: Never 的意思就是不要對外拉，所以沒有 image 的 node 會直接失敗。
 

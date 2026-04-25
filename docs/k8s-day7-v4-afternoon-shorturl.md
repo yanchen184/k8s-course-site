@@ -76,9 +76,9 @@
 >
 > 如果學生在 checking 階段看到 `sudo: a password is required`，不要先判斷成密碼輸入錯。這裡的腳本用的是 `sudo -n`，`-n` 代表 non-interactive，所以它不會停下來收密碼。學生要在每台 VM 先確認 `sudo -n k3s ctr images list -q` 能直接執行。
 >
-> 若不能執行，就在每台 control plane / worker VM 設定 lab 使用者可以免密碼執行 k3s。不要讓學生手動猜帳號和路徑，直接用 `USER_NAME="$(whoami)"`、`K3S_PATH="$(command -v k3s)"`，再用 `echo "$USER_NAME ALL=(ALL) NOPASSWD: $K3S_PATH" | sudo tee /etc/sudoers.d/k3s-lab-user` 寫入 sudoers，接著跑 `sudo visudo -c -f /etc/sudoers.d/k3s-lab-user` 和 `sudo chmod 440 /etc/sudoers.d/k3s-lab-user`。測試時要先跑 `sudo -k` 清掉 sudo 快取，再測 `sudo -n "$K3S_PATH" ctr images list -q` 和 `sudo -n k3s ctr images list -q`。第二條就是腳本實際會用的形式。
+> 若不能執行，不要讓學生手動猜帳號、k3s 路徑或 sudoers 寫法。請學生把講義裡的整段 copy-paste block 貼到每台 control plane / worker VM 的 Linux terminal。第一次 `sudo tee` 可能會要求輸入一次 Linux 密碼，這是正常的；設定完成後，後面的 `sudo -n k3s` 就不應該再問密碼。那段會自動抓 `whoami` 和 `command -v k3s`，寫入 `/etc/sudoers.d/k3s-lab-user`，用 `sudo visudo -c -f` 檢查語法，`sudo -k` 清掉 sudo 快取，最後直接驗證 `sudo -n k3s ctr images list -q`。看到 `OK: sudo -n k3s is ready...` 才算完成。
 >
-> 如果完整路徑可以、但 `sudo -n k3s` 還是要求密碼，代表 sudoers 沒有匹配到短命令。現場為了讓 Lab 繼續，可以在本機練習 VM 暫時改成 `echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/k3s-lab-user`，再重跑 `sudo visudo -c -f /etc/sudoers.d/k3s-lab-user`、`sudo chmod 440`、`sudo -k`、`sudo -n k3s ctr images list -q`。這只適合上課 VM，不要用在 production 或共用伺服器；課後可用 `sudo rm /etc/sudoers.d/k3s-lab-user` 收回。
+> 這個主流程使用 `NOPASSWD:ALL`，是為了讓上課用的本機 VM 穩定完成練習，避免 sudo 短命令和完整路徑匹配問題。要明確提醒：這只適合上課 VM，不要用在 production 或共用伺服器；課後可用 `sudo rm /etc/sudoers.d/k3s-lab-user` 收回。
 >
 > 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到你的 Windows、你的 WSL，或你的操作機就好，而是要把 tar 匯入每台 node。
 >

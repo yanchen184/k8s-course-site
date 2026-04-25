@@ -257,6 +257,93 @@
 > 如果只能用、不能恢復，不算部署完成。  
 > 如果能恢復、但資料會丟，也不算部署完成。
 
+### Windows + VMware 的驗收教學流程
+
+> 這裡要特別停下來講，因為今天學員是在 Windows 上用 VMware 開 Linux VM。
+> 如果你要用 Windows 的瀏覽器打開 `http://short.local`，那 `short.local` 的 hosts 設定要加在 Windows，不是只加在 Linux VM。
+
+#### Step 1：先在 Linux VM 找到要指向哪個 IP
+
+> 第一個問題是：`short.local` 要指到哪裡？
+>
+> Ingress 是跑在 k3s 裡，外面真正連進來的是 node 的 IP。所以我們先看 Ingress：
+
+```bash
+kubectl get ingress -n url-shortener
+```
+
+> 如果 `ADDRESS` 有出現 IP，就先用那個 IP。
+> 如果 `ADDRESS` 還沒出現，或現場環境顯示不穩定，就先用 control plane VM 的 IP。
+> 在 Linux VM 裡可以用這個方式看 IP：
+
+```bash
+ip addr
+hostname -I
+```
+
+> 這裡要提醒學生：`<NODE-IP>` 不是 Pod IP，也不是 Service ClusterIP。它是 Windows 能連到的 Linux VM IP。
+
+#### Step 2：在 Windows 加 hosts
+
+> 接著回到 Windows。因為瀏覽器跑在 Windows，所以 hosts 要寫在 Windows。
+> 用系統管理員權限開 PowerShell，執行：
+
+```powershell
+Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" `
+  -Value "<NODE-IP> short.local"
+```
+
+> 例如你的 control plane VM IP 是 `192.168.56.10`，就寫：
+
+```powershell
+Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" `
+  -Value "192.168.56.10 short.local"
+```
+
+> 然後確認 hosts 裡真的有這一行：
+
+```powershell
+Get-Content "C:\Windows\System32\drivers\etc\hosts" |
+  Select-String "short.local"
+```
+
+#### Step 3：先驗網路，再開瀏覽器
+
+> 不要一開始就開瀏覽器。先在 Windows PowerShell 做兩個確認：
+
+```powershell
+ping short.local
+Test-NetConnection short.local -Port 80
+```
+
+> `ping` 是確認 `short.local` 有沒有解析到 VM IP。
+> `Test-NetConnection` 是確認 Windows 能不能連到 VM 的 80 port。
+> 如果這兩個都不通，就不是 Kubernetes YAML 的問題，通常是 Windows hosts、VMware 網路模式、防火牆或 VM IP 寫錯。
+
+#### Step 4：再做產品驗收
+
+> 前面都通了，才開 Windows 瀏覽器：
+
+```text
+http://short.local
+```
+
+> 接著輸入 `https://kubernetes.io/`，建立短網址，再點 `http://short.local/r/<code>`。
+> 如果瀏覽器真的跳到 Kubernetes 官方網站，代表 Windows 到 VM、Ingress、Frontend、API、PostgreSQL 這條路都通了。
+
+#### Step 5：如果打不開，照順序排查
+
+> 現場不要一看到打不開就重新 apply。照這個順序查：
+
+1. Windows hosts 是否有 `<NODE-IP> short.local`。
+2. `ping short.local` 是否解析到正確 VM IP。
+3. `Test-NetConnection short.local -Port 80` 是否成功。
+4. Linux VM 裡 `kubectl get ingress -n url-shortener` 是否有 Ingress。
+5. `kubectl get pods -n url-shortener` 是否都 Ready。
+6. `kubectl logs deploy/url-api -n url-shortener` 是否有 API 錯誤。
+
+> 這樣學生會知道：瀏覽器打不開不一定是 Pod 壞掉，也可能只是 Windows 不知道 `short.local` 要去哪裡。
+
 ### 驗收時建議帶學生說出的重點
 
 - `kubectl get all -n url-shortener`：驗證主要工作負載都在。
@@ -279,6 +366,7 @@
 - 為什麼前面要手動做一次。
 - 為什麼實務上又會用 Helm。
 - Helm 不是取代 K8s，而是封裝 K8s。
+- 示範 Helm 前，要先清掉剛才手動建立的同名資源。
 
 ### 建議口條
 
@@ -290,6 +378,21 @@
 >
 > 前面手動做，是為了讓你真的知道一個產品拆開來有哪些 K8s 元件，每個元件各自負責什麼。  
 > Helm 則是把這些元件打包起來，變成一個可以重複部署、可以調參、可以升級、可以回滾的產品。
+>
+> 但是在示範 Helm 前，我們要先清理剛剛手動部署出來的資源。原因很實際：剛才手動 `kubectl apply` 已經建立了同名的 Secret、ConfigMap、Service、Deployment、Ingress。如果現在直接 `helm install`，Helm 會撞到既有資源。
+>
+> 所以這裡不是因為剛剛做錯才清掉，而是要把環境重置，讓 Helm 從零交付同一套產品。
+>
+> 先執行：
+>
+> ```bash
+> kubectl delete namespace url-shortener
+> kubectl get namespace url-shortener
+> ```
+>
+> 看到 namespace 不存在或刪除完成後，再執行 Helm。
+>
+> 這裡也要提醒學生：刪 namespace 會刪掉剛剛 PostgreSQL PVC 裡的測試資料；但不會刪掉已經 import 到每台 k3s node 的 images。所以 `values-local.yaml` 仍然可以用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，不需要重新去 Docker Hub pull。
 >
 > 所以 Helm 不是取代 Kubernetes，也不是把前面學的東西全部省略掉。相反地，你要先懂前面的東西，才知道 Helm 幫你包了什麼。
 >
@@ -343,6 +446,7 @@
 ### 7-14
 
 - 先回答「為什麼前面手動，現在又 Helm」
+- 先清掉手動部署的 namespace，避免 Helm 撞同名資源
 - Helm 是封裝，不是取代
 - 手動 YAML 要能對到 Helm templates
 - 帶學生看 values 對應到真實部署決定

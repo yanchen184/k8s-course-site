@@ -479,23 +479,79 @@ kubectl get ingress -n url-shortener
 
 這裡是整個產品最像真實服務的地方：同一個 domain，用不同 path 分流到不同 Service。
 
-在自己的電腦加 hosts：
+### Windows + VMware：讓瀏覽器找得到 `short.local`
+
+這次教學環境是 Windows 上用 VMware 建 Linux VM。
+如果你要用 **Windows 瀏覽器** 打開 `http://short.local`，hosts 要加在 **Windows**，不是只加在 Linux VM。
+
+#### 1. 找出 `<NODE-IP>`
+
+先在 Linux VM 裡看 Ingress：
 
 ```bash
-sudo sh -c 'echo "<NODE-IP> short.local" >> /etc/hosts'
+kubectl get ingress -n url-shortener
 ```
 
-驗收：
+如果 `ADDRESS` 有 IP，先用那個 IP。
+如果 `ADDRESS` 還沒出現，先用 control plane VM 的 IP：
 
 ```bash
-curl -H "Host: short.local" http://<NODE-IP>/health
+hostname -I
+ip addr
 ```
 
-或直接打開瀏覽器：
+`<NODE-IP>` 必須是 Windows 連得到的 VM IP，不是 Pod IP，也不是 Service ClusterIP。
+
+#### 2. 在 Windows 加 hosts
+
+用系統管理員權限開 PowerShell：
+
+```powershell
+Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" `
+  -Value "<NODE-IP> short.local"
+```
+
+範例：
+
+```powershell
+Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" `
+  -Value "192.168.56.10 short.local"
+```
+
+確認寫入成功：
+
+```powershell
+Get-Content "C:\Windows\System32\drivers\etc\hosts" |
+  Select-String "short.local"
+```
+
+#### 3. 先在 Windows 驗證網路
+
+```powershell
+ping short.local
+Test-NetConnection short.local -Port 80
+```
+
+- `ping short.local`：確認 Windows 會把 `short.local` 解析到 VM IP。
+- `Test-NetConnection short.local -Port 80`：確認 Windows 能連到 VM 的 HTTP 入口。
+
+如果這裡不通，先檢查 Windows hosts、VMware 網路模式、防火牆、VM IP 是否正確。
+不要一開始就重新 apply YAML。
+
+#### 4. 再用瀏覽器驗收
 
 ```text
 http://short.local
 ```
+
+如果只想在 Linux VM 裡用 curl 測試，可以在 VM 的 `/etc/hosts` 加一行：
+
+```bash
+echo "<NODE-IP> short.local" | sudo tee -a /etc/hosts
+curl -H "Host: short.local" http://<NODE-IP>/health
+```
+
+但這只會影響 Linux VM，不會讓 Windows 瀏覽器認得 `short.local`。
 
 ### 這一段學生要帶走什麼？
 
@@ -521,13 +577,16 @@ http://short.local
 
 ### 功能驗收
 
-1. 打開 `http://short.local`。
-2. 輸入 `https://kubernetes.io/`。
-3. 按下 `Create link`。
-4. 看到 `http://short.local/r/<code>`。
-5. 點短網址，瀏覽器跳到 Kubernetes 官方網站。
+1. 在 Windows hosts 確認已加入 `<NODE-IP> short.local`。
+2. 在 Windows PowerShell 執行 `ping short.local`，確認解析到 VM IP。
+3. 在 Windows PowerShell 執行 `Test-NetConnection short.local -Port 80`，確認 80 port 可連。
+4. 用 Windows 瀏覽器打開 `http://short.local`。
+5. 輸入 `https://kubernetes.io/`。
+6. 按下 `Create link`。
+7. 看到 `http://short.local/r/<code>`。
+8. 點短網址，瀏覽器跳到 Kubernetes 官方網站。
 
-也可以用 API 驗收：
+如果要用 Linux VM 裡的 curl 驗收，先確認 VM 裡也有 hosts 或直接帶 Host header：
 
 ```bash
 curl -s -X POST http://short.local/api/links \
@@ -535,7 +594,29 @@ curl -s -X POST http://short.local/api/links \
   -d '{"url":"https://kubernetes.io/"}'
 ```
 
+或：
+
+```bash
+curl -s -X POST http://<NODE-IP>/api/links \
+  -H 'Host: short.local' \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://kubernetes.io/"}'
+```
+
 這一層在回答：**產品到底能不能用？**
+
+### 打不開時的排查順序
+
+不要直接重新部署。照順序切問題：
+
+1. **Windows hosts**：`short.local` 有沒有寫進 Windows hosts？
+2. **DNS 解析**：`ping short.local` 有沒有解析到正確 VM IP？
+3. **Windows 到 VM 網路**：`Test-NetConnection short.local -Port 80` 是否成功？
+4. **Ingress 是否存在**：`kubectl get ingress -n url-shortener`。
+5. **Pod 是否 Ready**：`kubectl get pods -n url-shortener`。
+6. **API 是否正常**：`kubectl logs deploy/url-api -n url-shortener`。
+
+這樣可以讓學生知道：瀏覽器打不開不一定是 Kubernetes 壞掉，也可能只是 Windows 還不知道 `short.local` 要指到哪台 VM。
 
 ### K8s 驗收
 
@@ -609,6 +690,31 @@ kubectl get pod postgres-0 -n url-shortener -w
 |---|---|
 | 手動 `kubectl apply` | 理解一個產品拆開來有哪些 K8s 元件 |
 | `helm install` | 把這些元件包成可重複交付的產品 |
+
+### 先清掉手動部署的資源
+
+前面已經用 `kubectl apply` 手動建立過 `url-shortener` namespace 裡的資源。
+如果現在直接 `helm install`，Helm 會遇到同名的 Secret、ConfigMap、Service、Deployment、Ingress。
+
+所以示範 Helm 前，先把手動部署的 namespace 清掉：
+
+```bash
+kubectl delete namespace url-shortener
+```
+
+確認 namespace 已經不存在：
+
+```bash
+kubectl get namespace url-shortener
+```
+
+如果看到 `NotFound`，代表可以繼續 Helm 安裝。
+
+注意：
+
+- 這會刪掉剛才 PostgreSQL PVC 裡的測試資料。
+- 這不會刪掉已經匯入 k3s node 的 images。
+- 所以 `values-local.yaml` 仍然會使用本地 image，不需要重新從 Docker Hub pull。
 
 ### 一個指令安裝
 

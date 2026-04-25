@@ -92,7 +92,8 @@ https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive
 建議上課路徑：先用 Windows 瀏覽器打開 Google Drive 連結下載，再用 PowerShell 把 tar 傳進 control plane VM：
 
 ```powershell
-scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:/home/user/url-shortener-k3s-images.tar
+ssh user@control-plane "mkdir -p ~/Downloads"
+scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:~/Downloads/url-shortener-k3s-images.tar
 ```
 
 `scp` 要在 tar 檔所在的那台機器下。這裡 tar 是用 Windows 瀏覽器下載的，所以指令是在 **Windows PowerShell** 執行。
@@ -100,24 +101,26 @@ scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane
 右邊建議直接指定完整遠端檔名：
 
 ```text
-user@control-plane:/home/user/url-shortener-k3s-images.tar
+user@control-plane:~/Downloads/url-shortener-k3s-images.tar
 ```
 
-把 `user@control-plane` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@control-plane` 或 `ubuntu@<node-ip>`，遠端路徑也要改成 `/home/ubuntu/url-shortener-k3s-images.tar`。
+第一行先在 VM 裡建立 `~/Downloads`，避免目錄不存在。第二行才把 tar 傳進去。
+
+把 `user@control-plane` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@control-plane` 或 `ubuntu@<node-ip>`。遠端路徑建議保留 `~/Downloads/url-shortener-k3s-images.tar`，讓檔案放在該帳號自己的 Downloads 目錄。
 
 不要只寫到遠端資料夾，例如 `user@control-plane:/home/user/Downloads/`。如果現場看到 `scp: /home/user/Downloads/: Is a directory`，就改成上面這種完整檔名寫法。
 
 傳完後，進 Linux VM 確認：
 
 ```bash
-ls -lh /home/user/url-shortener-k3s-images.tar
+ls -lh ~/Downloads/url-shortener-k3s-images.tar
 ```
 
 如果 Linux VM 可以直接連外，也可以在 VM 裡用 `gdown` 下載：
 
 ```bash
 python3 -m pip install --user gdown
-python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O /home/user/url-shortener-k3s-images.tar
+python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar
 ```
 
 如果 Google Drive 要求登入或權限核准，就改用上面的 Windows 瀏覽器下載方式，或請講師先確認連結權限已開給知道連結的人。
@@ -125,8 +128,8 @@ python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O /home/user/url-shorte
 tar 放到 Linux VM 之後，在 `k8s-course-labs/lesson7/url-shortener/` 執行：
 
 ```bash
-sha256sum /home/user/url-shortener-k3s-images.tar
-IMAGE_TAR=/home/user/url-shortener-k3s-images.tar \
+sha256sum ~/Downloads/url-shortener-k3s-images.tar
+IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \
 K3S_NODES="user@control-plane user@worker" \
   ./scripts/load-images-to-k3s-ssh.sh
 K3S_NODES="user@control-plane user@worker" ./scripts/check-k3s-images-ssh.sh
@@ -136,7 +139,7 @@ K3S_NODES="user@control-plane user@worker" ./scripts/check-k3s-images-ssh.sh
 
 | 片段 | 意思 |
 |---|---|
-| `IMAGE_TAR=/home/user/url-shortener-k3s-images.tar` | 告訴腳本 image tar 放在哪裡。 |
+| `IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar` | 告訴腳本 image tar 放在哪裡。 |
 | `K3S_NODES="..."` | 告訴腳本要處理哪些 k3s node。 |
 | `user@control-plane` | 用 `user` 這個 Linux 帳號 SSH 進 control plane VM。 |
 | `user@worker` | 用 `user` 這個 Linux 帳號 SSH 進 worker VM。 |
@@ -275,7 +278,7 @@ k3s 預設有 Traefik Ingress Controller。等等 Ingress 會用 `ingressClassNa
 ### Step 1：建立 Namespace
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/00-namespace.yaml
+kubectl apply -f k8s/00-namespace.yaml
 kubectl get ns url-shortener
 ```
 
@@ -301,8 +304,8 @@ metadata:
 ### Step 2：建立 Secret 和 ConfigMap
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/01-secret.yaml
-kubectl apply -f apps/k8s/url-shortener/02-configmap.yaml
+kubectl apply -f k8s/01-secret.yaml
+kubectl apply -f k8s/02-configmap.yaml
 ```
 
 分界線：
@@ -331,8 +334,10 @@ kubectl apply -f apps/k8s/url-shortener/02-configmap.yaml
 ### Step 3：部署 PostgreSQL StatefulSet + PVC
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener-local/03-postgres.yaml
-kubectl get pods,pvc -n url-shortener
+kubectl apply -f k8s-local/03-postgres.yaml
+kubectl rollout status statefulset/postgres -n url-shortener --timeout=180s
+kubectl get pod postgres-0 -n url-shortener
+kubectl get pvc -n url-shortener
 ```
 
 這裡使用 local 版 PostgreSQL YAML，因為 `postgres:15` 也是從 image tar 匯入到每台 node 的 image。local 版會設定 `imagePullPolicy: Never`，避免 k3s 在 node 找不到 image 時又跑去 Docker Hub pull。
@@ -370,8 +375,8 @@ kubectl get pvc -n url-shortener
 ### Step 4：執行 Migration Job
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener-local/04-migrate-job.yaml
-kubectl get jobs -n url-shortener
+kubectl apply -f k8s-local/04-migrate-job.yaml
+kubectl wait --for=condition=complete job/db-migrate -n url-shortener --timeout=180s
 kubectl logs job/db-migrate -n url-shortener
 ```
 
@@ -392,7 +397,8 @@ Job 適合一次性任務。這裡只負責建立 `short_links` table。
 ### Step 5：部署 API
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener-local/05-api.yaml
+kubectl apply -f k8s-local/05-api.yaml
+kubectl rollout status deployment/url-api -n url-shortener --timeout=180s
 kubectl get deploy,svc -n url-shortener
 kubectl get pods -l app=url-api -n url-shortener
 ```
@@ -428,7 +434,8 @@ API 是無狀態服務，所以用 Deployment。API 透過：
 ### Step 6：部署 Frontend
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener-local/06-frontend.yaml
+kubectl apply -f k8s-local/06-frontend.yaml
+kubectl rollout status deployment/url-frontend -n url-shortener --timeout=180s
 kubectl get deploy,svc -n url-shortener
 ```
 
@@ -454,7 +461,7 @@ Frontend 沒有 DB 連線設定，也不需要 Secret，這正好可以讓學生
 ### Step 7：部署 HPA
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/07-hpa.yaml
+kubectl apply -f k8s/07-hpa.yaml
 kubectl get hpa -n url-shortener
 ```
 
@@ -479,7 +486,7 @@ kubectl describe hpa url-api-hpa -n url-shortener
 ### Step 8：部署 Ingress
 
 ```bash
-kubectl apply -f apps/k8s/url-shortener/08-ingress.yaml
+kubectl apply -f k8s/08-ingress.yaml
 kubectl get ingress -n url-shortener
 ```
 
@@ -714,15 +721,10 @@ kubectl get pod postgres-0 -n url-shortener -w
 
 ```bash
 kubectl delete namespace url-shortener
+kubectl wait --for=delete namespace/url-shortener --timeout=180s
 ```
 
-確認 namespace 已經不存在：
-
-```bash
-kubectl get namespace url-shortener
-```
-
-如果看到 `NotFound`，代表可以繼續 Helm 安裝。
+`wait --for=delete` 完成後，代表可以繼續 Helm 安裝。
 
 注意：
 
@@ -733,10 +735,10 @@ kubectl get namespace url-shortener
 ### 一個指令安裝
 
 ```bash
-helm install url-shortener ./apps/helm/url-shortener \
+helm install url-shortener ./helm/url-shortener \
   -n url-shortener \
   --create-namespace \
-  -f ./apps/helm/url-shortener/values-local.yaml
+  -f ./helm/url-shortener/values-local.yaml
 ```
 
 這一個指令會建立：
@@ -780,7 +782,7 @@ image:
 ### 一個指令升級
 
 ```bash
-helm upgrade url-shortener ./apps/helm/url-shortener -n url-shortener
+helm upgrade url-shortener ./helm/url-shortener -n url-shortener
 ```
 
 ### 一個指令回滾
@@ -792,7 +794,7 @@ helm rollback url-shortener 1 -n url-shortener
 ### 可以調整什麼？
 
 ```bash
-helm upgrade url-shortener ./apps/helm/url-shortener \
+helm upgrade url-shortener ./helm/url-shortener \
   -n url-shortener \
   --set replicaCount.api=3 \
   --set hpa.maxReplicas=10 \

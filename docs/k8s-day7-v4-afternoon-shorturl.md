@@ -58,12 +58,13 @@
 > 建議不要把遠端目標寫成資料夾，直接指定完整遠端檔名，現場最穩：
 >
 > ```powershell
-> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:/home/user/url-shortener-k3s-images.tar
+> ssh user@control-plane "mkdir -p ~/Downloads"
+> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:~/Downloads/url-shortener-k3s-images.tar
 > ```
 >
-> 右邊的 `user`、`control-plane`、`/home/user/` 要換成自己的 Linux VM 帳號、hostname 或 IP。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。
+> 右邊的 `user`、`control-plane`、`~/Downloads/` 要換成自己的 Linux VM 帳號、hostname 或 IP。第一行是先確保 VM 裡有 Downloads 目錄。第二行 scp 要指定到完整檔名。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。
 >
-> 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O /home/user/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
+> 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
 >
 > 以 Windows + VMware 的上課環境來說，你會有一台 control plane 和至少一台 worker node。image tar 要透過 SSH 傳到每台 Linux VM，然後在每台 VM 執行 `sudo k3s ctr images import`。
 >
@@ -397,10 +398,10 @@ http://short.local
 >
 > ```bash
 > kubectl delete namespace url-shortener
-> kubectl get namespace url-shortener
+> kubectl wait --for=delete namespace/url-shortener --timeout=180s
 > ```
 >
-> 看到 namespace 不存在或刪除完成後，再執行 Helm。
+> wait 完成後，再執行 Helm。
 >
 > 這裡也要提醒學生：刪 namespace 會刪掉剛剛 PostgreSQL PVC 裡的測試資料；但不會刪掉已經 import 到每台 k3s node 的 images。所以 `values-local.yaml` 仍然可以用 `url-shortener-api:lab`、`url-shortener-frontend:lab`，不需要重新去 Docker Hub pull。
 >

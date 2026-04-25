@@ -92,8 +92,8 @@ https://drive.google.com/file/d/1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH-/view?usp=drive
 建議上課路徑：先用 Windows 瀏覽器打開 Google Drive 連結下載，再用 PowerShell 把 tar 傳進 control plane VM：
 
 ```powershell
-ssh user@control-plane "mkdir -p ~/Downloads"
-scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:~/Downloads/url-shortener-k3s-images.tar
+ssh user@<control-plane-ip> "mkdir -p ~/Downloads"
+scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@<control-plane-ip>:~/Downloads/url-shortener-k3s-images.tar
 ```
 
 `scp` 要在 tar 檔所在的那台機器下。這裡 tar 是用 Windows 瀏覽器下載的，所以指令是在 **Windows PowerShell** 執行。
@@ -101,14 +101,16 @@ scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane
 右邊建議直接指定完整遠端檔名：
 
 ```text
-user@control-plane:~/Downloads/url-shortener-k3s-images.tar
+user@<control-plane-ip>:~/Downloads/url-shortener-k3s-images.tar
 ```
 
 第一行先在 VM 裡建立 `~/Downloads`，避免目錄不存在。第二行才把 tar 傳進去。
 
-把 `user@control-plane` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@control-plane` 或 `ubuntu@<node-ip>`。遠端路徑建議保留 `~/Downloads/url-shortener-k3s-images.tar`，讓檔案放在該帳號自己的 Downloads 目錄。
+把 `user@<control-plane-ip>` 換成自己的 Linux VM SSH 目標。如果帳號是 `ubuntu`，就改成 `ubuntu@<control-plane-ip>`。遠端路徑建議保留 `~/Downloads/url-shortener-k3s-images.tar`，讓檔案放在該帳號自己的 Downloads 目錄。
 
-不要只寫到遠端資料夾，例如 `user@control-plane:/home/user/Downloads/`。如果現場看到 `scp: /home/user/Downloads/: Is a directory`，就改成上面這種完整檔名寫法。
+不要直接照抄 `control-plane` 或 `worker` 這種名字，除非你已經自己設定過 hostname 或 hosts。一般上課現場最穩是直接填 VM IP。
+
+不要只寫到遠端資料夾，例如 `user@<control-plane-ip>:/home/user/Downloads/`。如果現場看到 `scp: /home/user/Downloads/: Is a directory`，就改成上面這種完整檔名寫法。
 
 傳完後，進 Linux VM 確認：
 
@@ -130,9 +132,9 @@ tar 放到 Linux VM 之後，在 `k8s-course-labs/lesson7/url-shortener/` 執行
 ```bash
 sha256sum ~/Downloads/url-shortener-k3s-images.tar
 IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \
-K3S_NODES="user@control-plane user@worker" \
+K3S_NODES="user@<control-plane-ip> user@<worker-ip>" \
   ./scripts/load-images-to-k3s-ssh.sh
-K3S_NODES="user@control-plane user@worker" ./scripts/check-k3s-images-ssh.sh
+K3S_NODES="user@<control-plane-ip> user@<worker-ip>" ./scripts/check-k3s-images-ssh.sh
 ```
 
 這段指令的意思是：
@@ -141,8 +143,8 @@ K3S_NODES="user@control-plane user@worker" ./scripts/check-k3s-images-ssh.sh
 |---|---|
 | `IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar` | 告訴腳本 image tar 放在哪裡。 |
 | `K3S_NODES="..."` | 告訴腳本要處理哪些 k3s node。 |
-| `user@control-plane` | 用 `user` 這個 Linux 帳號 SSH 進 control plane VM。 |
-| `user@worker` | 用 `user` 這個 Linux 帳號 SSH 進 worker VM。 |
+| `user@<control-plane-ip>` | 用 `user` 這個 Linux 帳號 SSH 進 control plane VM。 |
+| `user@<worker-ip>` | 用 `user` 這個 Linux 帳號 SSH 進 worker VM。 |
 | `./scripts/load-images-to-k3s-ssh.sh` | 把 tar 傳到每台 node，並在每台 node 執行 `sudo k3s ctr images import`。 |
 | `./scripts/check-k3s-images-ssh.sh` | 逐台檢查 containerd 裡是否已經有短網址會用到的四個 image。 |
 
@@ -156,22 +158,58 @@ K3S_NODES="user@control-plane user@worker" ./scripts/check-k3s-images-ssh.sh
 那 `K3S_NODES` 就寫：
 
 ```bash
-K3S_NODES="user@control-plane user@worker"
+K3S_NODES="user@<control-plane-ip> user@<worker-ip>"
 ```
 
 如果你的帳號叫 `ubuntu`，就要改成：
 
 ```bash
-K3S_NODES="ubuntu@control-plane ubuntu@worker"
+K3S_NODES="ubuntu@<control-plane-ip> ubuntu@<worker-ip>"
 ```
 
 如果目前只有一台 control plane，可以先只填一台：
 
 ```bash
-K3S_NODES="user@control-plane"
+K3S_NODES="user@<control-plane-ip>"
 ```
 
 但只要有 worker node，就一定要把 worker 也放進 `K3S_NODES`。因為 Pod 可能被排到 worker 上，worker 沒有 image 的話，Pod 還是會啟動失敗。
+
+如果檢查時出現：
+
+```text
+sudo: a password is required
+```
+
+這通常不是密碼打錯，而是腳本使用的是 `sudo -n`。`-n` 代表 non-interactive，意思是「不要跳出密碼輸入提示」。所以就算你知道正確密碼，這支腳本也不會停下來讓你輸入。
+
+先在每台 VM 測試：
+
+```bash
+sudo -n k3s ctr images list -q
+```
+
+如果同樣出現 `sudo: a password is required`，代表這台 VM 的使用者還不能用非互動方式執行 k3s。上課 Lab 最簡單的處理方式，是在 **每台 control plane / worker VM** 設定這個使用者可以免密碼執行 k3s：
+
+```bash
+command -v k3s
+sudo visudo -f /etc/sudoers.d/k3s-lab-user
+```
+
+在開啟的檔案中加入下面這行。如果你的帳號不是 `user`，要把 `user` 換成自己的 Linux 帳號；如果 `command -v k3s` 顯示的路徑不是 `/usr/local/bin/k3s`，也要改成實際路徑。
+
+```text
+user ALL=(ALL) NOPASSWD: /usr/local/bin/k3s
+```
+
+存檔後確認權限，並重新測試：
+
+```bash
+sudo chmod 440 /etc/sudoers.d/k3s-lab-user
+sudo -n k3s ctr images list -q
+```
+
+這件事要在每台 node 做一次。只在 control plane 設定還不夠，因為 `check-k3s-images-ssh.sh` 會 SSH 到 `K3S_NODES` 裡列出的每台 node 檢查 image。
 
 SHA256 應該是：
 

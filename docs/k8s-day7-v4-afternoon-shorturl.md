@@ -58,11 +58,11 @@
 > 建議不要把遠端目標寫成資料夾，直接指定完整遠端檔名，現場最穩：
 >
 > ```powershell
-> ssh user@control-plane "mkdir -p ~/Downloads"
-> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@control-plane:~/Downloads/url-shortener-k3s-images.tar
+> ssh user@<control-plane-ip> "mkdir -p ~/Downloads"
+> scp "$env:USERPROFILE\Downloads\url-shortener-k3s-images.tar" user@<control-plane-ip>:~/Downloads/url-shortener-k3s-images.tar
 > ```
 >
-> 右邊的 `user`、`control-plane`、`~/Downloads/` 要換成自己的 Linux VM 帳號、hostname 或 IP。第一行是先確保 VM 裡有 Downloads 目錄。第二行 scp 要指定到完整檔名。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。
+> 右邊的 `user`、`<control-plane-ip>`、`~/Downloads/` 要換成自己的 Linux VM 帳號與 IP。第一行是先確保 VM 裡有 Downloads 目錄。第二行 scp 要指定到完整檔名。如果學生看到 `scp: /home/user/Downloads/: Is a directory`，通常就改用這種「完整遠端檔名」寫法，不要只丟到資料夾。不要直接照抄 `control-plane` 這種 hostname，除非你已經在 Windows 或 DNS/hosts 裡設定過它。
 >
 > 如果 Linux VM 可以連外，也可以用 `gdown` 直接下載：`python3 -m gdown --id 1LAvKkpENmTtQjvxxrivgoHDbuJWzcJH- -O ~/Downloads/url-shortener-k3s-images.tar`。但這條路徑需要 VM 有 Python/pip 和網路，所以建議當備援，不當主要流程。
 >
@@ -70,9 +70,13 @@
 >
 > 等一下你會看到一個環境變數叫 `K3S_NODES`。它不是 Kubernetes 指令，而是我們提供給腳本看的清單，意思是「這些 node 都要匯入 image」。
 >
-> 例如 `K3S_NODES="user@control-plane user@worker"`，代表腳本會用 `user` 這個帳號 SSH 到 control plane 和 worker 兩台 VM。`control-plane` / `worker` 只是示意名稱，你們要換成自己 VM 的 hostname 或 IP，帳號也要換成自己真的可以 SSH 進去的 Linux 帳號。
+> 例如 `K3S_NODES="user@<control-plane-ip> user@<worker-ip>"`，代表腳本會用 `user` 這個帳號 SSH 到 control plane 和 worker 兩台 VM。`<control-plane-ip>` / `<worker-ip>` 要換成自己 VM 的 IP，帳號也要換成自己真的可以 SSH 進去的 Linux 帳號。
 >
-> 如果你的帳號是 `ubuntu`，就要寫 `ubuntu@control-plane` 或 `ubuntu@<node-ip>`，不是照抄 `user@...`。如果有兩台 worker，就要把兩台 worker 都放進 `K3S_NODES`。重點不是名字叫什麼，重點是每一台可能跑 Pod 的 node 都要出現在這份清單裡。
+> 如果你的帳號是 `ubuntu`，就要寫 `ubuntu@<control-plane-ip>` 或 `ubuntu@<worker-ip>`，不是照抄 `user@...`。如果有兩台 worker，就要把兩台 worker 都放進 `K3S_NODES`。重點不是名字叫什麼，重點是每一台可能跑 Pod 的 node 都要出現在這份清單裡。
+>
+> 如果學生在 checking 階段看到 `sudo: a password is required`，不要先判斷成密碼輸入錯。這裡的腳本用的是 `sudo -n`，`-n` 代表 non-interactive，所以它不會停下來收密碼。學生要在每台 VM 先確認 `sudo -n k3s ctr images list -q` 能直接執行。
+>
+> 若不能執行，就在每台 control plane / worker VM 設定 lab 使用者可以免密碼執行 k3s。先跑 `command -v k3s` 確認路徑，通常會是 `/usr/local/bin/k3s`。再用 `sudo visudo -f /etc/sudoers.d/k3s-lab-user` 加入：`user ALL=(ALL) NOPASSWD: /usr/local/bin/k3s`。帳號不是 `user` 就換成學生自己的 Linux 帳號；k3s 路徑不同就換成實際路徑。存檔後跑 `sudo chmod 440 /etc/sudoers.d/k3s-lab-user`，再重測 `sudo -n k3s ctr images list -q`。
 >
 > 這裡有一個很重要的觀念：k3s 跑 Pod 用的是每台 Linux node 裡的 containerd。不是下載到你的 Windows、你的 WSL，或你的操作機就好，而是要把 tar 匯入每台 node。
 >

@@ -2304,9 +2304,9 @@ Q4，Task Runner 啟動但 Queue 任務沒被消費。看 task-runner 的 log，
           </div>
           <div className="bg-slate-800/40 border border-slate-700 p-3 rounded">
             <p className="text-cyan-300 font-semibold">2. 傳到 control plane VM</p>
-            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`ssh user@control-plane "mkdir -p ~/Downloads"
+            <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-2 overflow-x-auto"><code>{`ssh user@<control-plane-ip> "mkdir -p ~/Downloads"
 scp "$env:USERPROFILE\\Downloads\\url-shortener-k3s-images.tar" \\
-  user@control-plane:~/Downloads/url-shortener-k3s-images.tar`}</code></pre>
+  user@<control-plane-ip>:~/Downloads/url-shortener-k3s-images.tar`}</code></pre>
             <p className="text-slate-400 mt-1">在 Windows PowerShell 下；右邊直接指定遠端檔名最穩。</p>
           </div>
         </div>
@@ -2319,16 +2319,21 @@ scp "$env:USERPROFILE\\Downloads\\url-shortener-k3s-images.tar" \\
           <div className="bg-slate-800/40 border border-slate-700 p-2 rounded">
             <p className="text-cyan-300 font-semibold">4. 匯入並檢查每台 node</p>
             <pre className="bg-slate-950 text-slate-100 p-2 rounded mt-1 overflow-x-auto"><code>{`IMAGE_TAR=~/Downloads/url-shortener-k3s-images.tar \\
-K3S_NODES="user@control-plane user@worker" \\
+K3S_NODES="user@<control-plane-ip> user@<worker-ip>" \\
   ./scripts/load-images-to-k3s-ssh.sh
-K3S_NODES="user@control-plane user@worker" \\
+K3S_NODES="user@<control-plane-ip> user@<worker-ip>" \\
   ./scripts/check-k3s-images-ssh.sh`}</code></pre>
-            <p className="text-slate-400 mt-1">把 control-plane / worker 換成自己的 VM hostname 或 IP。</p>
+            <p className="text-slate-400 mt-1">把 &lt;control-plane-ip&gt; / &lt;worker-ip&gt; 換成自己的 VM IP。</p>
           </div>
         </div>
 
-        <div className="bg-cyan-900/20 border border-cyan-500/40 p-2 rounded text-cyan-300 text-center">
-          tar 裡已經包含 API、Frontend、PostgreSQL、BusyBox；不用在現場 pull Docker Hub。
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-cyan-900/20 border border-cyan-500/40 p-2 rounded text-cyan-300 text-center">
+            tar 已包含 API、Frontend、PostgreSQL、BusyBox；不用現場 pull Docker Hub。
+          </div>
+          <div className="bg-amber-900/20 border border-amber-500/40 p-2 rounded text-amber-200 text-center">
+            sudo password required：每台 VM 先讓 sudo -n k3s 可免密碼執行。
+          </div>
         </div>
 
         <div className="bg-emerald-900/20 border border-emerald-500/40 p-2 rounded text-emerald-300 text-center font-semibold">
@@ -2344,11 +2349,13 @@ K3S_NODES="user@control-plane user@worker" \\
 
 下載連結放在講義裡，目前是 Google Drive。建議學生先用 Windows 瀏覽器下載，再用 Windows PowerShell 的 scp 傳到 control plane VM。scp 要在 tar 所在的機器執行，也就是 Windows。傳檔前先用 ssh 建立 ~/Downloads，然後 scp 右邊不要只寫遠端資料夾，要直接寫完整遠端檔名，例如 ~/Downloads/url-shortener-k3s-images.tar，這樣可以避開 scp: ... Is a directory 這類現場問題。Linux VM 可以連外時，也可以用 gdown 直接下載，但這需要 Python/pip 和網路，現場不一定每台 VM 都準備好。
 
-K3S_NODES 不是 Kubernetes 指令，它只是給腳本讀的 node 清單。像 K3S_NODES="user@control-plane user@worker"，意思是用 user 這個帳號 SSH 到 control plane 和 worker 兩台 VM。control-plane / worker 只是示意名稱，學生要換成自己真的能 SSH 進去的 hostname 或 IP，也要換成自己的 Linux 帳號。
+K3S_NODES 不是 Kubernetes 指令，它只是給腳本讀的 node 清單。像 K3S_NODES="user@<control-plane-ip> user@<worker-ip>"，意思是用 user 這個帳號 SSH 到 control plane 和 worker 兩台 VM。學生要把 angle bracket 裡的內容換成自己真的能 SSH 進去的 VM IP，也要換成自己的 Linux 帳號。如果學生自己有設定 hostname 或 hosts，才可以改用 user@control-plane 這種名字。
 
 這裡一定要講清楚：下載 tar 到學生操作環境還不夠；k3s 跑 Pod 用的是每台 Linux node 裡的 containerd，所以還要 import 到 control plane 和 worker。
 
-課前要確認 SSH 和 sudo 權限。學生要能 ssh 到 control plane 和 worker，而且該帳號要能免互動執行 sudo -n k3s ctr images list -q，否則腳本會卡在 sudo 密碼提示。
+課前要確認 SSH 和 sudo 權限。學生要能 ssh 到 control plane 和 worker，而且該帳號要能免互動執行 sudo -n k3s ctr images list -q，否則腳本會卡在 sudo 密碼提示。如果學生說明明有輸入正確密碼還是不行，要直接解釋：腳本使用 sudo -n，這代表 non-interactive，不會讓使用者輸入密碼；所以要先在每台 VM 設定該帳號可以免密碼執行 k3s。
+
+現場可以請學生先在每台 VM 跑 sudo -n k3s ctr images list -q。如果出現 sudo: a password is required，就用 sudo visudo -f /etc/sudoers.d/k3s-lab-user 加入 user ALL=(ALL) NOPASSWD: /usr/local/bin/k3s。帳號或 k3s 路徑不同時要替換成自己的值，最後 chmod 440 後再重測。
 
 這句話一定要讓學生記住：Pod 被排到哪台 node，那台 node 就必須已經有 image。imagePullPolicy: Never 的意思就是不要對外拉，所以沒有 image 的 node 會直接失敗。
 

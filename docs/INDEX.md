@@ -16,6 +16,7 @@
 | [k8s-lesson4-7-plan.md](k8s-lesson4-7-plan.md) | Day 4-7 整體規劃 |
 | [k8s-lesson4-7-skeleton.md](k8s-lesson4-7-skeleton.md) | Day 4-7 骨架 |
 | [k8s-lesson4-7-labs.md](k8s-lesson4-7-labs.md) | Day 4-7 學員實作集 |
+| [task_plan.md](task_plan.md) | Loop 3 四個服務（task-api / runner / scheduler / frontend）設計文件 |
 
 ## 錄影 / 簡報製作支援
 

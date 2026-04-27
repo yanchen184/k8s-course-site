@@ -1,0 +1,12 @@
+{
+  "name": "pptx-gen",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "pilot": "node pilot.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0"
+  }
+}

@@ -125,7 +125,6 @@ slide9_end.txt
 memory/
 
 # Local-only assets (not for repo)
-audio/
 .claude/
 tools/pptx-gen/node_modules/
 tools/pptx-gen/output/

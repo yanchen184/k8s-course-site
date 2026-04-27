@@ -45,8 +45,6 @@
 | [k8s-day4-afternoon-v3-part3.md](k8s-day4-afternoon-v3-part3.md) | 下午錄影逐字稿 v3 (Loop 5：Deployment 入門) | 現行（錄影用） |
 | [k8s-day4-commands.md](k8s-day4-commands.md) | 第四堂指令清單 | 現行 |
 
-> Note：`k8s-day4-afternoon-final.md`、`k8s-day4-afternoon-v3-part2.md`、`k8s-day4-morning-scripts-v2.md`、`k8s-day4-scripts-part{2,3,4}.md` 已移到 `_archive/`。
-
 ## 第五堂 — k3s 多節點 + Deployment + Service
 
 | 檔案 | 角色 | 狀態 |
@@ -76,8 +74,6 @@
 | [k8s-day7-v4-afternoon-loop3.md](k8s-day7-v4-afternoon-loop3.md) | 下午 Loop 3：從零部署 v4 | 現行（錄影用） |
 | [k8s-day7-v4-afternoon-shorturl.md](k8s-day7-v4-afternoon-shorturl.md) | 下午短網址服務實作 v4 | 現行（錄影用） |
 
-> Note：`k8s-day7-v3-part1.md`、`v3-part2.md` 已被 v4 取代，移到 `_archive/`。
-
 ## 外部參考資料
 
 | 檔案 | 用途 |
@@ -85,13 +81,6 @@
 | [reference-geek-hour-k8s-notes.md](reference-geek-hour-k8s-notes.md) | Geek Hour K8s 講座筆記 |
 | [reference-geek-hour-k8s-transcript.md](reference-geek-hour-k8s-transcript.md) | Geek Hour 逐字稿（md） |
 | [reference-geek-hour-k8s-transcript.txt](reference-geek-hour-k8s-transcript.txt) | Geek Hour 逐字稿（txt） |
-
-## 子目錄
-
-| 路徑 | 說明 |
-|------|------|
-| `_archive/` | 過程稿封存（被新版本取代或結構改變的舊稿） |
-| `legacy-day1-2-3/` | Day 1-3（Docker 基礎課）的舊講稿，K8s 主軸不會用到 |
 
 ---
 
@@ -103,4 +92,3 @@
 | `*-v3-part*.md` / `*-v4-*.md` | 錄影逐字稿（Loop 結構，可直接念） |
 | `*-commands.md` | 該堂課的指令清單（學員 / 講師對照） |
 | `*-teaching-guide.md` / `*-outline.md` | 講師教學流程指南 |
-| `_archive/` 內檔案 | 已被取代的過程稿，保留供查考，不再更新 |
